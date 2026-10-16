@@ -40,7 +40,8 @@ Paths the brain writes into an answer are relative to the brain folder or to the
   - `digest_paused_until` and `digest_pause_noticed`, the owner's pause of both digests and whether the pause
     has been told;
   - the person-book sort's failure counters, one per fingerprint of a failed group, cut or sheet;
-  - the day a book starts reading, one key per agent and room;
+  - the day a book starts reading, one key `people_digest_since:<agent>:<chatId>` per agent and room, in epoch
+    seconds, which the brain sends with every unread read and count it asks the receiver for;
   - the brain holds, one key `brain_hold:<run>` per job run holding the editors off;
   - the chat-session summaries, one key `<agent>_pending_summary` per agent (「Chat-session summaries」).
 - **Its migrations:** the brain's own migrations make the tables and the settings table, each in the shape and
@@ -330,12 +331,16 @@ A message is answered as `chatId`, `messageId`, `senderId` (or null), `senderNam
 
 | Operation | Path | Sends | Answers |
 |---|---|---|---|
-| unread messages | `/messages/unread` | `agent`, `chatId`, `limit`, `since` or null | `messages` past the agent's read marks, oldest first |
-| read messages | `/messages/read` | `agent`, `chatId`, `from`, `limit` | `messages` the agent has marked, after `from`, oldest first |
+| unread messages | `/messages/unread` | `agent`, `chatId`, `limit`, `since` or null | `messages` past the agent's read marks, sent at or after `since` where it is given, oldest first |
+| unread counts | `/messages/unread-counts` | `agent`, `since`: each `chatId` and `since`, the moment the agent's book of that room starts reading | `rooms`: each room holding messages past the agent's read marks, its `chatId` and `count`; a room named in `since` counts only the messages sent at or after its moment |
+| read messages | `/messages/read` | `agent`, `chatId`, `from`, `limit` | `messages` the agent has marked, after the message `from` in the room's order (or, where that message is gone, with an id above `from`), oldest first |
+| read count | `/read-marks/count` | `agent`, `chatId` | `count`: the agent's marks on the room's messages that still stand |
 | keep read marks | `/read-marks/keep` | `agent`, `chatId`, `messageIds` | `ok` |
 | forget read marks | `/read-marks/forget` | `agent`, `chatId` or null for every room | `forgotten`: the count of marks let go |
 | room titles | `/rooms/titles` | none | `rooms`: each room's `chatId`, `title` (or null) and `senders`, the people that have stood as a sender in it |
-| room answerers | `/rooms/answerers` | `chatId` or null | `rooms`: each room's `chatId` and `agents`, the agents answering it |
+| room answerers | `/rooms/answerers` | `chatId` or null | `rooms`: each room's `chatId` and `agents`, the agents answering it: the awake agents it names, or the default answerer where it names none awake |
+| spoke between | `/rooms/spoke-between` | `chatId`, `person`, `from`, `to` | `spoke` (boolean): the person sent a message in the room between the two moments, both included |
+| own number | `/rooms/own-number` | `agent`, `chatId` | `number` (or null): the sender the agent's own words stand under in the room: the number the room's road gave the agent, or for the default answerer where it gave none, who the road says the bot is there |
 | spoken in | `/rooms/spoken-in` | `chatId`, `people` | `people`: those who have stood as a sender in the room |
 | display names | `/people/names` | `people` | `names`: each person's `person` and `name` or null: the name their latest message went under, a room where the owner goes by a name of that room alone read last |
 | waits on a happening | `/promises/waits` | `text` | `waits` (boolean): whether the text waits for something to happen first, by the receiver's reading of promises |

@@ -422,8 +422,9 @@ alone, so the fragment tool refuses a piece whose bracket leaves the names out (
 - **The rooms it reads are the rooms the agent answers,** by the receiver's room answerers; a room with no
   answerers is the chat agent's. A one-to-one is never among them (「Two parts」): the launcher passes it by, a
   room's own run is refused `one-to-one`, and a history walk reaching the top of one starts nothing.
-- **Its own words are not a person.** The sender the agent's own words stand under in the room is left out of
-  the book; any other speaker is written as the room shows them.
+- **Its own words are not a person.** The sender the agent's own words stand under in the room, as the
+  receiver's own number answers it, is left out of the book, and none is left out where it answers none; any
+  other speaker is written as the room shows them.
 - **What it has read is its own.** Each agent's read marks are the receiver's, one per agent and message, so a
   message one agent has read stays unread for another until that agent's run reads it (`boundary-api.md`, 「The
   receiver」, unread messages and read marks).

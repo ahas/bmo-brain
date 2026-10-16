@@ -14,7 +14,9 @@ use bmo_brain::ports::agency::{
 };
 use bmo_brain::ports::gate::{Gate, HttpGate, Piece, Sanitised, SheetAsk, SheetPart};
 use bmo_brain::ports::http::{Caller, Patience, Peer, PortFailure, Wait, WireError};
-use bmo_brain::ports::receiver::{HttpReceiver, OwnerNotice, OwnerSpoke, Receiver, Rest, RoadKind};
+use bmo_brain::ports::receiver::{
+  HttpReceiver, OwnerNotice, OwnerSpoke, Receiver, Rest, RoadKind, RoomCount, RoomSince,
+};
 use futures_util::future::BoxFuture;
 use serde_json::json;
 use support::agency::FakeAgency;
@@ -155,7 +157,11 @@ async fn the_receiver_client_posts_each_operation_and_reads_its_answer() {
     "sentAt": 1_700_000_000, "text": "hello", "replyToMessageId": null });
   stub
     .answer("/messages/unread", json!({ "messages": [said] }))
+    .answer("/messages/unread-counts", json!({ "rooms": [{ "chatId": ROOM, "count": 3 }] }))
     .answer("/messages/read", json!({ "messages": [] }))
+    .answer("/read-marks/count", json!({ "count": 2 }))
+    .answer("/rooms/spoke-between", json!({ "spoke": true }))
+    .answer("/rooms/own-number", json!({ "number": null }))
     .answer("/read-marks/keep", json!({ "ok": true }))
     .answer("/read-marks/forget", json!({ "forgotten": 4 }))
     .answer(
@@ -186,11 +192,40 @@ async fn the_receiver_client_posts_each_operation_and_reads_its_answer() {
     json!({ "agent": AGENT, "chatId": ROOM, "limit": 50, "since": 1_699_000_000 })
   );
 
+  let since = [RoomSince {
+    chat_id: ROOM,
+    since: 1_699_000_000,
+  }];
+  let counts = receiver.unread_counts(AGENT, &since).await.unwrap();
+  assert_eq!(
+    counts,
+    [RoomCount {
+      chat_id: ROOM,
+      count: 3
+    }]
+  );
+  assert_eq!(
+    stub.body_at("/messages/unread-counts"),
+    json!({ "agent": AGENT, "since": [{ "chatId": ROOM, "since": 1_699_000_000 }] })
+  );
+
   assert!(receiver.read_messages(AGENT, ROOM, MESSAGE, 20).await.unwrap().is_empty());
   assert_eq!(
     stub.body_at("/messages/read"),
     json!({ "agent": AGENT, "chatId": ROOM, "from": MESSAGE, "limit": 20 })
   );
+
+  assert_eq!(receiver.read_count(AGENT, ROOM).await.unwrap(), 2);
+  assert_eq!(stub.body_at("/read-marks/count"), json!({ "agent": AGENT, "chatId": ROOM }));
+
+  assert!(receiver.spoke_between(ROOM, OWNER, 1_699_000_000, 1_700_000_000).await.unwrap());
+  assert_eq!(
+    stub.body_at("/rooms/spoke-between"),
+    json!({ "chatId": ROOM, "person": OWNER, "from": 1_699_000_000, "to": 1_700_000_000 })
+  );
+
+  assert_eq!(receiver.own_number(AGENT, ROOM).await.unwrap(), None);
+  assert_eq!(stub.body_at("/rooms/own-number"), json!({ "agent": AGENT, "chatId": ROOM }));
 
   assert!(receiver.keep_read_marks(AGENT, ROOM, &[MESSAGE]).await.unwrap());
   assert_eq!(
@@ -396,6 +431,28 @@ async fn the_fakes_answer_as_their_units_would() {
   assert_eq!(unread.iter().map(|message| message.message_id).collect::<Vec<_>>(), [2]);
   assert_eq!(receiver.unread_messages(OTHER_AGENT, ROOM, 10, None).await.unwrap().len(), 2);
   assert_eq!(receiver.read_messages(AGENT, ROOM, 0, 10).await.unwrap()[0].message_id, 1);
+  assert!(receiver.read_messages(AGENT, ROOM, 1, 10).await.unwrap().is_empty());
+  assert_eq!(receiver.read_count(AGENT, ROOM).await.unwrap(), 1);
+  let counts = receiver
+    .unread_counts(
+      AGENT,
+      &[RoomSince {
+        chat_id: ROOM,
+        since: 300,
+      }],
+    )
+    .await
+    .unwrap();
+  assert_eq!(
+    counts,
+    [RoomCount {
+      chat_id: OWNER,
+      count: 1
+    }]
+  );
+  assert!(receiver.spoke_between(ROOM, 7, 200, 200).await.unwrap());
+  assert!(!receiver.spoke_between(ROOM, 7, 201, 300).await.unwrap());
+  assert_eq!(receiver.own_number(AGENT, ROOM).await.unwrap(), None);
   assert!(receiver.sender_is_owner(ROOM, 1).await.unwrap());
   assert_eq!(receiver.forget_read_marks(AGENT, None).await.unwrap(), 1);
 

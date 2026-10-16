@@ -30,6 +30,22 @@ pub struct RoomTitle {
   pub senders: Vec<i64>,
 }
 
+/// The moment an agent's book of a room starts reading.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RoomSince {
+  pub chat_id: i64,
+  pub since: i64,
+}
+
+/// How many of a room's messages lie past an agent's read marks.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RoomCount {
+  pub chat_id: i64,
+  pub count: i64,
+}
+
 /// The agents answering a room.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -98,7 +114,16 @@ pub trait Receiver: Send + Sync {
     since: Option<i64>,
   ) -> BoxFuture<'a, Result<Vec<Message>, PortFailure>>;
 
-  /// The messages of a room the agent has marked, after `from`, oldest first.
+  /// How many messages of each room lie past the agent's read marks, a room named in `since` counting
+  /// only those sent at or after its moment.
+  fn unread_counts<'a>(
+    &'a self,
+    agent: &'a str,
+    since: &'a [RoomSince],
+  ) -> BoxFuture<'a, Result<Vec<RoomCount>, PortFailure>>;
+
+  /// The messages of a room the agent has marked, after the message `from` in the room's order, oldest
+  /// first.
   fn read_messages<'a>(
     &'a self,
     agent: &'a str,
@@ -114,6 +139,9 @@ pub trait Receiver: Send + Sync {
     chat_id: i64,
     message_ids: &'a [i64],
   ) -> BoxFuture<'a, Result<bool, PortFailure>>;
+
+  /// How many of the room's messages that still stand the agent has marked.
+  fn read_count<'a>(&'a self, agent: &'a str, chat_id: i64) -> BoxFuture<'a, Result<i64, PortFailure>>;
 
   /// Lets go of the agent's read marks in a room, or in every room where none is named, and answers how
   /// many went.
@@ -135,6 +163,22 @@ pub trait Receiver: Send + Sync {
     chat_id: i64,
     people: &'a [i64],
   ) -> BoxFuture<'a, Result<Vec<i64>, PortFailure>>;
+
+  /// Whether the person sent a message in the room between the two moments, both included.
+  fn spoke_between(
+    &self,
+    chat_id: i64,
+    person: i64,
+    from: i64,
+    to: i64,
+  ) -> BoxFuture<'_, Result<bool, PortFailure>>;
+
+  /// The sender the agent's own words stand under in the room, where anything says.
+  fn own_number<'a>(
+    &'a self,
+    agent: &'a str,
+    chat_id: i64,
+  ) -> BoxFuture<'a, Result<Option<i64>, PortFailure>>;
 
   /// The name each person goes by.
   fn display_names<'a>(&'a self, people: &'a [i64]) -> BoxFuture<'a, Result<Vec<PersonName>, PortFailure>>;
@@ -188,6 +232,48 @@ struct UnreadAsk<'a> {
   chat_id: i64,
   limit: i64,
   since: Option<i64>,
+}
+
+#[derive(Serialize)]
+struct CountsAsk<'a> {
+  agent: &'a str,
+  since: &'a [RoomSince],
+}
+
+#[derive(Deserialize)]
+struct Counts {
+  rooms: Vec<RoomCount>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct AgentRoomAsk<'a> {
+  agent: &'a str,
+  chat_id: i64,
+}
+
+#[derive(Deserialize)]
+struct Count {
+  count: i64,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SpokeAsk {
+  chat_id: i64,
+  person: i64,
+  from: i64,
+  to: i64,
+}
+
+#[derive(Deserialize)]
+struct Spoke {
+  spoke: bool,
+}
+
+#[derive(Deserialize)]
+struct Number {
+  number: Option<i64>,
 }
 
 #[derive(Serialize)]
@@ -314,6 +400,17 @@ impl Receiver for HttpReceiver {
     })
   }
 
+  fn unread_counts<'a>(
+    &'a self,
+    agent: &'a str,
+    since: &'a [RoomSince],
+  ) -> BoxFuture<'a, Result<Vec<RoomCount>, PortFailure>> {
+    Box::pin(async move {
+      let answer: Counts = self.caller.post("/messages/unread-counts", &CountsAsk { agent, since }).await?;
+      Ok(answer.rooms)
+    })
+  }
+
   fn read_messages<'a>(
     &'a self,
     agent: &'a str,
@@ -347,6 +444,13 @@ impl Receiver for HttpReceiver {
       };
       let answer: Done = self.caller.post("/read-marks/keep", &ask).await?;
       Ok(answer.ok)
+    })
+  }
+
+  fn read_count<'a>(&'a self, agent: &'a str, chat_id: i64) -> BoxFuture<'a, Result<i64, PortFailure>> {
+    Box::pin(async move {
+      let answer: Count = self.caller.post("/read-marks/count", &AgentRoomAsk { agent, chat_id }).await?;
+      Ok(answer.count)
     })
   }
 
@@ -384,6 +488,36 @@ impl Receiver for HttpReceiver {
       let answer: People<Vec<i64>> =
         self.caller.post("/rooms/spoken-in", &SpokenAsk { chat_id, people }).await?;
       Ok(answer.people)
+    })
+  }
+
+  fn spoke_between(
+    &self,
+    chat_id: i64,
+    person: i64,
+    from: i64,
+    to: i64,
+  ) -> BoxFuture<'_, Result<bool, PortFailure>> {
+    Box::pin(async move {
+      let ask = SpokeAsk {
+        chat_id,
+        person,
+        from,
+        to,
+      };
+      let answer: Spoke = self.caller.post("/rooms/spoke-between", &ask).await?;
+      Ok(answer.spoke)
+    })
+  }
+
+  fn own_number<'a>(
+    &'a self,
+    agent: &'a str,
+    chat_id: i64,
+  ) -> BoxFuture<'a, Result<Option<i64>, PortFailure>> {
+    Box::pin(async move {
+      let answer: Number = self.caller.post("/rooms/own-number", &AgentRoomAsk { agent, chat_id }).await?;
+      Ok(answer.number)
     })
   }
 

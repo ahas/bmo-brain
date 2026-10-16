@@ -1,12 +1,13 @@
 //! The receiver in memory: the messages a test lays down, each agent's read marks on them, the rooms,
-//! names, roads and rest a test sets, the owner as `OWNER`, and every call recorded.
+//! names, roads, own numbers and rest a test sets, the owner as `OWNER`, and every call recorded.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Mutex;
 
 use bmo_brain::ports::http::PortFailure;
 use bmo_brain::ports::receiver::{
-  Message, OwnerNotice, OwnerSpoke, PersonName, Receiver, Rest, RoadKind, Roads, RoomAnswerers, RoomTitle,
+  Message, OwnerNotice, OwnerSpoke, PersonName, Receiver, Rest, RoadKind, Roads, RoomAnswerers, RoomCount,
+  RoomSince, RoomTitle,
 };
 use futures_util::future::BoxFuture;
 use serde_json::json;
@@ -27,6 +28,8 @@ pub struct FakeReceiver {
   /// Each room's roads; a room not set is a group that is no one-to-one.
   pub roads: Mutex<BTreeMap<i64, Roads>>,
   pub rest: Mutex<Option<Rest>>,
+  /// The sender each agent's own words stand under, by agent and room.
+  pub own_numbers: Mutex<BTreeMap<(String, i64), i64>>,
   pub notices: Mutex<Vec<OwnerNotice>>,
   pub calls: Calls,
 }
@@ -101,13 +104,50 @@ impl Receiver for FakeReceiver {
     let body = json!({ "agent": agent, "chatId": chat_id, "from": from, "limit": limit });
     self.calls.take("read_messages", body);
     let marked = self.marked(agent, chat_id);
-    let read = self
-      .room(chat_id)
+    let room = self.room(chat_id);
+    let at = room.iter().position(|message| message.message_id == from);
+    let read = room
       .into_iter()
-      .filter(|message| marked.contains(&message.message_id) && message.message_id > from)
+      .enumerate()
+      .filter(|(place, message)| at.map_or(message.message_id > from, |at| *place > at))
+      .map(|(_, message)| message)
+      .filter(|message| marked.contains(&message.message_id))
       .take(usize::try_from(limit).unwrap_or(0))
       .collect();
     Box::pin(async move { Ok(read) })
+  }
+
+  fn unread_counts<'a>(
+    &'a self,
+    agent: &'a str,
+    since: &'a [RoomSince],
+  ) -> BoxFuture<'a, Result<Vec<RoomCount>, PortFailure>> {
+    self.calls.take("unread_counts", json!({ "agent": agent, "since": since }));
+    let rooms: BTreeSet<i64> =
+      self.messages.lock().unwrap().iter().map(|message| message.chat_id).collect();
+    let counts = rooms
+      .into_iter()
+      .filter_map(|chat_id| {
+        let marked = self.marked(agent, chat_id);
+        let from = since.iter().find(|room| room.chat_id == chat_id).map(|room| room.since);
+        let count = self
+          .room(chat_id)
+          .iter()
+          .filter(|message| !marked.contains(&message.message_id))
+          .filter(|message| from.is_none_or(|from| message.sent_at >= from))
+          .count() as i64;
+        (count > 0).then_some(RoomCount { chat_id, count })
+      })
+      .collect();
+    Box::pin(async move { Ok(counts) })
+  }
+
+  fn read_count<'a>(&'a self, agent: &'a str, chat_id: i64) -> BoxFuture<'a, Result<i64, PortFailure>> {
+    self.calls.take("read_count", json!({ "agent": agent, "chatId": chat_id }));
+    let marked = self.marked(agent, chat_id);
+    let count =
+      self.room(chat_id).iter().filter(|message| marked.contains(&message.message_id)).count() as i64;
+    Box::pin(async move { Ok(count) })
   }
 
   fn keep_read_marks<'a>(
@@ -167,6 +207,32 @@ impl Receiver for FakeReceiver {
       self.room(chat_id).iter().filter_map(|message| message.sender_id).collect();
     let spoke = people.iter().copied().filter(|person| senders.contains(person)).collect();
     Box::pin(async move { Ok(spoke) })
+  }
+
+  fn spoke_between(
+    &self,
+    chat_id: i64,
+    person: i64,
+    from: i64,
+    to: i64,
+  ) -> BoxFuture<'_, Result<bool, PortFailure>> {
+    let body = json!({ "chatId": chat_id, "person": person, "from": from, "to": to });
+    self.calls.take("spoke_between", body);
+    let spoke = self
+      .room(chat_id)
+      .iter()
+      .any(|message| message.sender_id == Some(person) && message.sent_at >= from && message.sent_at <= to);
+    Box::pin(async move { Ok(spoke) })
+  }
+
+  fn own_number<'a>(
+    &'a self,
+    agent: &'a str,
+    chat_id: i64,
+  ) -> BoxFuture<'a, Result<Option<i64>, PortFailure>> {
+    self.calls.take("own_number", json!({ "agent": agent, "chatId": chat_id }));
+    let number = self.own_numbers.lock().unwrap().get(&(agent.to_owned(), chat_id)).copied();
+    Box::pin(async move { Ok(number) })
   }
 
   fn display_names<'a>(&'a self, people: &'a [i64]) -> BoxFuture<'a, Result<Vec<PersonName>, PortFailure>> {
