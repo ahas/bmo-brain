@@ -107,6 +107,7 @@ name = "brain-support"
 version = "0.1.0"
 dependencies = [
  "chrono",
+ "libc",
  "sea-orm",
  "serde",
  "serde_json",

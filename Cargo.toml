@@ -11,6 +11,7 @@ edition = "2024"
 [workspace.dependencies]
 brain-support = { path = "crates/brain-support" }
 chrono = { version = "0.4.41", default-features = false, features = ["std"] }
+libc = "0.2.177"
 sea-orm = { version = "1.1.17", default-features = false, features = ["macros", "runtime-tokio-rustls", "sqlx-postgres"] }
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.138"

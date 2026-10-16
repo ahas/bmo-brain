@@ -12,7 +12,7 @@ selects nothing.
 | Path | Holds |
 |---|---|
 | `src/` | the service's own package: its routes, editors, schedules and the ports to other units |
-| `crates/brain-support/` | helpers the crates share: database access, the clock, text measures, policy loading |
+| `crates/brain-support/` | helpers the crates share: database access, the clock, text measures, policy loading, the editing lock's process start times and whole-published files |
 | `crates/memory-rows/` | the memory, note and watch rows and the operations on them |
 | `crates/fragment-desk/` | the fragment desk over an agent's brain documents |
 | `crates/word-chain/` | the word-chain game: word book, rules and game state |

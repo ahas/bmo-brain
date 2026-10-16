@@ -1,12 +1,13 @@
 [package]
 name = "brain-support"
-description = "Helpers the brain's crates share: database access, the clock, text measures and policy loading."
+description = "Helpers the brain's crates share: database access, the clock, text measures, policy loading, and the process start times and whole-published files the editing lock reads and writes."
 version.workspace = true
 edition.workspace = true
 publish = false
 
 [dependencies]
 chrono.workspace = true
+libc.workspace = true
 sea-orm.workspace = true
 serde.workspace = true
 sqlx.workspace = true
