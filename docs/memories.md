@@ -246,8 +246,10 @@ There are three roads down, and none of them deletes.
   reach allows.
 - **A global row's text may name no room and no person.** The condition and the action are both checked as the
   row is written, and one naming a room by its title, a person by name, a user or chat id the receiver has
-  seen, or a bare `id <number>` is refused with the offending phrase named. The titles and ids come from the
-  receiver's room titles. The owner's own name is not among them: the owner is in every room.
+  seen, or a bare `id <number>` is refused with the offending phrase named. The titles, the rooms' ids and the
+  senders' ids come from the receiver's room titles, and the people's names from its display names. A title
+  that is an awake agent's label, or its name where it has none, by the agency's registration lookup, is not
+  counted as a room's. The owner's own name is not among them: the owner is in every room.
 - **A global row may not be for one person,** since it is read in rooms that person was never in.
 - **Which rooms it reaches is the row's own field:** the owner's private room (`owner`), group rooms (`group`),
   or every room (`all`). **The default is the owner's private room alone,** so a row set in private never
