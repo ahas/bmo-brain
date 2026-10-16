@@ -3,6 +3,7 @@
 
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::sync::Mutex;
+use std::time::Duration;
 
 use bmo_brain::ports::agency::{
   Agency, ItemState, Launch, LaunchOutcome, Outcome, Overrun, QuietInstruction, Registration, Reload,
@@ -22,6 +23,10 @@ pub struct FakeAgency {
   pub registrations: Mutex<Vec<Registration>>,
   /// The ends the sessions come to, one per wait; a wait past them answers a session that answered nothing.
   pub ends: Mutex<VecDeque<SessionEnd>>,
+  /// How long each session runs before its wait answers; none answers at once.
+  pub runs_for: Mutex<Option<Duration>>,
+  /// The overrun ask's answers, one per ask; an ask past them answers with `overrun`.
+  pub overruns: Mutex<VecDeque<Overrun>>,
   pub overrun: Mutex<Option<Overrun>>,
   /// The runs that still stand; every run the fake started stands until it is stopped.
   pub open: Mutex<BTreeSet<String>>,
@@ -79,7 +84,13 @@ impl Agency for FakeAgency {
       cost: None,
       size: None,
     });
-    Box::pin(async move { Ok(end) })
+    let runs_for = *self.runs_for.lock().unwrap();
+    Box::pin(async move {
+      if let Some(runs_for) = runs_for {
+        tokio::time::sleep(runs_for).await;
+      }
+      Ok(end)
+    })
   }
 
   fn stop_session<'a>(&'a self, run: &'a str) -> BoxFuture<'a, Result<bool, PortFailure>> {
@@ -97,7 +108,8 @@ impl Agency for FakeAgency {
     self
       .calls
       .take("ask_overrun", json!({ "run": run, "unit": unit, "capSeconds": cap_seconds }));
-    let overrun = self.overrun.lock().unwrap().unwrap_or(Overrun {
+    let next = self.overruns.lock().unwrap().pop_front();
+    let overrun = next.or(*self.overrun.lock().unwrap()).unwrap_or(Overrun {
       keep: false,
       until: None,
     });

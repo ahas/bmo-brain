@@ -25,7 +25,13 @@ pub struct Registration {
 pub struct SessionStart {
   pub work_key: String,
   pub agent: String,
-  pub unit: String,
+  pub chat_id: i64,
+  /// The unit the batch runs in, or none where it runs in none.
+  pub unit: Option<String>,
+  pub cap_seconds: i64,
+  /// Which batch it is, and of how many, or none for a run that is no batch of a planned run.
+  pub step: Option<i64>,
+  pub steps: Option<i64>,
   pub prompt: String,
   pub tools: Vec<String>,
   pub workdir: String,

@@ -307,7 +307,7 @@ unit's tables or files.
 | Operation | Path | Sends | Answers |
 |---|---|---|---|
 | registration lookup | `/registrations/lookup` | `agent`, or null for all | `agents`: each agent's `name`, `label` (or null), `key`, `brainFolder`, `awake`, `recollectorRegistration` (or null), `reasoning` (or null) |
-| recollector session start | `/runs/start` | `workKey`, `agent`, `unit`, `prompt`, `tools`, `workdir`, `desk`, `registration` or null | `run` |
+| recollector session start | `/runs/start` | `workKey`, `agent`, `chatId`, `unit` or null, `capSeconds`, `step` and `steps` (or null), `prompt`, `tools`, `workdir`, `desk`, `registration` or null | `run` |
 | recollector session wait | `/runs/wait` | `run` | `outcome` (`answered`, `failed`, `overran`, `stopped` or `limit`), `answer` (or null), `filesWritten`, `cost` (or null), `size` (or null) |
 | recollector session stop | `/runs/stop` | `run` | `ok` |
 | overrun ask | `/runs/overrun` | `run`, `unit`, `capSeconds` | `keep` (boolean) and `until` (or null) |
@@ -323,6 +323,23 @@ the desk, holds the lock and judges the result. Everything about the model run i
 logins it goes out on, the run's usage and cache events, and a usage limit. A session that reaches a limit
 ends with the outcome `limit`; the agency has rested its login and told the owner where that rest silenced the
 last open login, as for every session it runs. The brain writes no rest, and the run stops without a retry.
+
+What the brain sends and does around one session:
+
+- **The cap** is the work key's `capSeconds` for the agent the run writes for: the agency folds in the request
+  wait of the registration that agent's recollectors run on, where that is longer.
+- **The start** names the work key, the agent, the room of the batch, the unit the batch runs in (null where it
+  runs in none), the cap, which batch it is of how many (null for a run that is no batch of a planned run), the
+  prompt, the tools (the file tools `read`, `write`, `edit`, `glob` and `grep`, and the brain's `fragment`
+  tool), the folder the run stands in, the desk and the registration its agent's recollectors run on. The
+  agency keeps the run's record from it: opened at the start and closed at the session's end with its outcome,
+  what it cost and the size it ended carrying.
+- **The clock** is the brain's: once the session passes its cap the brain makes the overrun ask, naming the
+  batch's unit, or the run where the batch runs in none. Kept, it asks again at `until`, or one cap later where
+  `until` is null; not kept, or where the ask has no answer, the brain stops the session, waits for its end and
+  fails the batch as cut at its cap.
+- **The end:** `answered` with an answer is the run's answer, the files it wrote named from the folder it stands
+  in; `answered` with none, `failed`, `overran` and `stopped` fail the batch; `limit` stops it without a retry.
 
 ### The receiver
 

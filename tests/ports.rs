@@ -58,7 +58,11 @@ async fn the_agency_client_posts_each_operation_and_reads_its_answer() {
   let start = SessionStart {
     work_key: "people-digest".to_owned(),
     agent: AGENT.to_owned(),
-    unit: "brain-run".to_owned(),
+    chat_id: ROOM,
+    unit: Some("brain-run".to_owned()),
+    cap_seconds: 1800,
+    step: Some(2),
+    steps: Some(5),
     prompt: "Read the room.".to_owned(),
     tools: vec!["fragment".to_owned()],
     workdir: "agents/agent-a".to_owned(),
@@ -68,8 +72,9 @@ async fn the_agency_client_posts_each_operation_and_reads_its_answer() {
   assert_eq!(agency.start_session(&start).await.unwrap(), "run-7");
   assert_eq!(
     stub.body_at("/runs/start"),
-    json!({ "workKey": "people-digest", "agent": AGENT, "unit": "brain-run", "prompt": "Read the room.",
-      "tools": ["fragment"], "workdir": "agents/agent-a", "desk": "desk-1", "registration": null })
+    json!({ "workKey": "people-digest", "agent": AGENT, "chatId": ROOM, "unit": "brain-run",
+      "capSeconds": 1800, "step": 2, "steps": 5, "prompt": "Read the room.", "tools": ["fragment"],
+      "workdir": "agents/agent-a", "desk": "desk-1", "registration": null })
   );
 
   let end = agency.wait_session("run-7").await.unwrap();

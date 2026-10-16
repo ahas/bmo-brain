@@ -176,6 +176,7 @@ version = "0.1.0"
 dependencies = [
  "axum",
  "brain-support",
+ "fragment-desk",
  "futures-util",
  "memory-rows",
  "reqwest",

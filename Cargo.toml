@@ -12,6 +12,7 @@ edition = "2024"
 axum = { version = "0.8.4", default-features = false, features = ["http1", "json", "tokio"] }
 brain-support = { path = "crates/brain-support" }
 chrono = { version = "0.4.41", default-features = false, features = ["std"] }
+fragment-desk = { path = "crates/fragment-desk" }
 futures-util = "0.3.34"
 libc = "0.2.177"
 memory-rows = { path = "crates/memory-rows" }
@@ -37,6 +38,8 @@ publish = false
 
 [dependencies]
 brain-support.workspace = true
+# The row writes an editor run leaves on its desk.
+fragment-desk.workspace = true
 futures-util.workspace = true
 # The ports' calls on the agency, the receiver and the gate.
 reqwest.workspace = true
@@ -53,4 +56,6 @@ memory-rows.workspace = true
 sqlx.workspace = true
 # The brain folders the editors' tests lay down.
 tempfile.workspace = true
+# The editors' clocks, run on time a test moves.
+tokio = { workspace = true, features = ["test-util"] }
 toml.workspace = true
