@@ -190,7 +190,7 @@ road on its own route; the gate puts what they answer into the turn.
   - a condition and an event on the same row, and an event outside the vocabulary;
   - `until` beside a condition or an event, or on a global row, which no watch can come back to;
   - an errand whose action waits on something happening ("once it is out", "after it ends", "after the
-    deploy") carrying neither `on` nor `until`;
+    deploy"), as the receiver's reading of promises says, carrying neither `on` nor `until`;
   - `for` on a global row, `reach` on a room's own row;
   - a reason left out of retire or candidate;
   - a row of another scope or another agent, one already down or already up, a `replaces` naming no standing

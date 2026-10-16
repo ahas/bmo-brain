@@ -19,14 +19,15 @@ of them a turn needs (`boundary-api.md`, 「Fragments」).
 
 ## The kinds, and where each row comes from
 
-A row's kind is the library it belongs to. Each library is a member of one library trait: it says what its
-index is, which of its entries become rows, where a slug's body sits, and whether its pieces settle with their
-items. Nothing central reads a library's files on its behalf, and nothing branches on a kind's name.
+A row's kind is the library it belongs to. Each library the brain writes is a member of one library trait, the
+extension point a new brain library is added at: it says what its index is, which of its entries become rows,
+where a slug's body sits, and whether its pieces settle with their items. A shipped library answers the same
+questions through what its owner hands in, and its pieces never settle. Nothing central reads a library's files
+on its behalf, and nothing branches on a kind's name.
 
 | Kind | Where its bodies live | Where its rows come from |
 |---|---|---|
-| `system-document` | with the unit that ships them | that unit's entries, handed in through the reconcile route |
-| `lore` | with the unit that ships them | that unit's entries, handed in through the reconcile route |
+| a shipped kind, such as the system documents or the lore | with the unit that ships them | that unit's entries, handed in through the reconcile route |
 | `room-rule` | the room's rules in the brain | the digest's writes through the fragment tool, and the room-rule route |
 | `library-knowledge` | the knowledge library in the brain | the digest's writes through the fragment tool |
 | `person-book` | the room part and the common part of the person book in the brain | the person-book writer's and the digest's writes through the fragment tool |
@@ -34,9 +35,10 @@ items. Nothing central reads a library's files on its behalf, and nothing branch
 - **The brain's three libraries are the table.** Their rows are the one index they have; an editor writes a row
   when it writes the piece, and the index files beside the pieces are drawn out of the rows afterwards (「The
   brain's libraries」 below).
-- **The shipped libraries follow their owners.** A system document and a lore piece are another unit's code,
-  edited with their index and deployed with it; that unit hands its entries in and the rows are brought to them
-  (「The shipped libraries」 below).
+- **The shipped libraries follow their owners.** A shipped piece is another unit's code, edited with its index
+  and deployed with it; that unit hands its entries in and the rows are brought to them (「The shipped
+  libraries」 below). The library trait's members are the brain's three libraries; a shipped library is no
+  member of it, and the brain names no shipped kind.
 - **Each kind carries the word a screen calls it by,** as its own answer, so a kind added without a name is
   refused before it can be shown as a slug.
 
@@ -230,8 +232,9 @@ The brain's rows are the source, so their reconcile repairs what can be read off
 ## The shipped libraries
 
 - **Their owners hand them in.** The unit that ships the system documents or the lore reads its own index and
-  bodies and hands the brain the whole list of its entries: slug, title, path, position, and the dates and hash
-  read off each body. A shipped row carries no keywords, since nobody but a writer gives them.
+  bodies and hands the brain the whole list of its entries: slug, title, path, position, the scope tag its index
+  line carries, the items its title and slug name, and the dates and hash read off each body, with the word a
+  screen calls its kind by. A shipped row carries no keywords, since nobody but a writer gives them.
 - **The reconcile brings the table to the list:** a slug not yet in the table becomes a row, a changed title,
   path, position, date or hash updates its row, a slug that has left the list takes its row down, and a slug
   that comes back raises the row that was already there. A row taken down and raised again keeps its counts and

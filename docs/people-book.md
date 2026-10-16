@@ -121,7 +121,7 @@ their way of talking:
   - The same person is called differently in different rooms, and a room's nickname is that room's business.
   - The only things the same in every room are the display name and the user id, which stand in the common
     index's section heading.
-  - The display name is the name the person's latest message went under, as the receiver's messages carry it. A
+  - The display name is the name the person's latest message went under, as the receiver's display names say. A
     room where the owner goes by a name of that room alone is read last, so such a name stands only for somebody
     who has no other.
 

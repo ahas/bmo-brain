@@ -20,6 +20,7 @@ The service reads its configuration at start and holds it for its life:
 | data root | where the word book, the editing locks, the fragment desks and the failure logs live |
 | brain folder | the brain root, a git repository holding every agent's documents |
 | chat agent's key | the registration key of the chat agent, whose brain folder is the brain root |
+| service unit | the unit the service runs as: a failure notice of a run with no unit of its own names this unit's journal, and a run under a launched unit names that unit's |
 | agency, receiver, gate | each unit's base address and the token it is called with |
 | policy | the files under `policy/`: the word chain's vocabulary, numbers and dictionary readings, and the memory, digest and person-book numbers |
 
@@ -35,7 +36,8 @@ Paths the brain writes into an answer are relative to the brain folder or to the
     has been told;
   - the person-book sort's failure counters, one per fingerprint of a failed group, cut or sheet;
   - the day a book starts reading, one key per agent and room;
-  - the brain holds, one key `brain_hold:<run>` per job run holding the editors off.
+  - the brain holds, one key `brain_hold:<run>` per job run holding the editors off;
+  - the chat-session summaries, one key `<agent>_pending_summary` per agent (「Chat-session summaries」).
 - **Its folder:** the brain repository and its documents, and under the data root the word book
   `word-chain/ko.sqlite`, the editing locks with their ticket queues and fences, the fragment desks, and the
   failure logs `digest-failures.log` and `people-digest-failures.log`.
@@ -191,18 +193,19 @@ The console's and the hand writer's routes:
 
 A fragment carries `kind`, `chatId`, `owner`, `agent`, `allAgents`, `slug`, `title`, `path`, `scope`,
 `position`, `active`, `lastHitAt`, `hits`, `setBy`, `setAt`, `hand`, `handAt`, `keywords`, `items`,
-`writtenOn`, `confirmedOn`, `status` and `bodyHash`. `kind` is `system-document`, `lore`, `room-rule`,
-`library-knowledge` or `person-book`.
+`writtenOn`, `confirmedOn`, `status` and `bodyHash`. `kind` is one of the brain's own `room-rule`,
+`library-knowledge` and `person-book`, or a kind its owner hands in (「Shipped libraries」 below).
 
 ### Shipped libraries
 
 | Route | Body | Answer |
 |---|---|---|
-| `POST /libraries/reconcile` | `kind`, `entries` (each `slug`, `title`, `path`, `position`, `writtenOn`, `confirmedOn`, `bodyHash`) | a reading of the rows raised, changed and taken down |
+| `POST /libraries/reconcile` | `kind`, `label`, `entries` (each `slug`, `title`, `path`, `position`, `scope` or null, `items`, `writtenOn`, `confirmedOn`, `bodyHash`) | a reading of the rows raised, changed and taken down |
 
-The system documents and the lore are not the brain's. Their owners read their own index and bodies and hand
-the entries in whole; the brain brings the kind's rows to them (「The shipped libraries」 in `fragments.md`). A
-kind the brain writes itself is refused `brain-library`.
+A shipped library is not the brain's. Its owner reads its own index and bodies and hands the entries in whole,
+with the word a screen calls its kind by; the brain brings the kind's rows to them (「The shipped libraries」 in
+`fragments.md`). The brain names no shipped kind: it takes any kind but its own, and a kind the brain writes
+itself is refused `brain-library`.
 
 ### Brain documents
 
@@ -231,7 +234,10 @@ A document the brain changes is forgotten in every session holding it before the
 ### Chat-session summaries
 
 The handoff note a chat agent's folded session leaves for its next one. The note is handed in already
-sanitised; the brain keeps it as it came, one per agent, the next overwriting it.
+sanitised and already whole: the lines that carry it and the summary cut to its cap, or the lines saying the
+summary was lost where none came, as the next fresh session opens with it. The brain keeps it as it came, in
+its settings table under `<agent>_pending_summary`, one per agent, the next keep overwriting it; a read answers
+it until a clear forgets it.
 
 | Route | Body | Answer |
 |---|---|---|
@@ -244,7 +250,7 @@ sanitised; the brain keeps it as it came, one per agent, the next overwriting it
 | Route | Body | Answer |
 |---|---|---|
 | `POST /digest/run` | `chatId` or null | `outcome`: `launched`, `running`, `nothing` (no note waits), `resting`, `paused` |
-| `POST /digest/now` | `agent`, `chatId` | `outcome`: `running`, `launched` or `refused` with `why` |
+| `POST /digest/now` | `agent`, `chatId` | `outcome`: `resting` (a rest is on), `nothing` (no note waits), `running` with `unit`, `launched` with `unit` and `notes`, or `refused` with `why`, the unit launch's refusal |
 | `POST /digest/people` | `chatId`, `agent`, `all`, `split` with `person` and `spans`, `sheets`, `reform` with `batches`, `sort` with `person`, `all` or `status` and `groups`, `since` (a day, `none`, or absent to read it), `forgetRead` with `chatId` or `all` | `outcome` and a reading |
 | `POST /digest/pause` | `set`: `status`, `off`, `on`, or a length (`2h`, `90m`, `30s`, a bare number of minutes) | `pausedUntil` (time, or null for none, or `forever`) |
 | `POST /people/before-fold` | `chatId`, `agent` | `outcome`: `launched`, `running` or `skipped` (the room keeps no book) |
@@ -273,7 +279,7 @@ sanitised; the brain keeps it as it came, one per agent, the next overwriting it
 | Route | Body | Answer |
 |---|---|---|
 | `POST /rooms/forgotten` | `chatId` | `ok`; the room's withering stamps and games are let go |
-| `POST /rooms/removed` | `chatId`, `preview` (boolean) | `took`: the count of the room's rows per table and the room folders per agent; with `preview` false they are removed and the brain repository committed |
+| `POST /rooms/removed` | `chatId`, `preview` (boolean) | `took`: the count of the room's rows per table, its settings keys (each agent's day its book of the room starts reading) and the room folders per agent; with `preview` false they are removed and the brain repository committed |
 
 ### Agents forgetting
 
@@ -306,7 +312,10 @@ holds no other unit's tables or files.
 | document reload notice | `agent`, `paths`, `rooms` | `ok` |
 
 The recollector runs are the agency's sessions; the brain decides what to recollect, writes the prompt, opens
-the desk, holds the lock and judges the result.
+the desk, holds the lock and judges the result. Everything about the model run itself is the agency's: the
+logins it goes out on, the run's usage and cache events, and a usage limit. A session that reaches a limit
+ends with the outcome `limit`; the agency has rested its login and told the owner where that rest silenced the
+last open login, as for every session it runs. The brain writes no rest, and the run stops without a retry.
 
 ### The receiver
 
@@ -318,6 +327,8 @@ the desk, holds the lock and judges the result.
 | room titles | none | `rooms`: `chatId`, `title`; with the senders that have stood in the archive |
 | room answerers | `chatId` or none | the agents answering each room |
 | spoken in | `chatId`, `people` | the people who have stood as a sender in the room |
+| display names | `people` | each person's `name` or null: the name their latest message went under, a room where the owner goes by a name of that room alone read last |
+| waits on a happening | `text` | `waits` (boolean): whether the text waits for something to happen first, by the receiver's reading of promises |
 | roads | `chatId` | `kind` (`owner` or `group`) and `oneToOne` (boolean) |
 | sender is owner | `chatId`, `messageId` | `owner` (boolean) |
 | owner spoke | `chatId`, `person`, `before`, `seconds` | `owner` (boolean): the person is the owner; `spoke` (boolean): the owner sent a message in the room in that span |
@@ -331,6 +342,9 @@ the desk, holds the lock and judges the result.
 |---|---|---|
 | document sanitiser | `path`, `text` | `text`, or a refusal naming why |
 | sheet judgement | `agent`, `part`, `person`, `pieces`, `ceiling`, `registration` or null | `sheet`, or null where none came |
+
+Which texts the sanitiser needs to look at is the gate's: the brain sends every document an editor changed and
+writes back only a text that came back changed.
 
 ## Codes the brain answers with
 
