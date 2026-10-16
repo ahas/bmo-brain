@@ -2,10 +2,11 @@
 
 This repository is the brain service, `bmo-brain`: each chat agent's memory rows (promises, checks,
 states, situation rules, notes and watches), its brain documents (knowledge, the person book and room
-rules), the fragment index over them, the word-chain game, and the recollector runs that write the
-documents. It owns its own database tables and its brain folder. It asks the agency for recollector model
-sessions and nothing else, reads messages and rooms from the receiver, and serves raw material to the
-gate, which does all reference selection. Other units reach it over HTTP only.
+rules), the fragment index over them, and the recollector runs that write the documents. It owns its own
+database tables and its brain folder. It asks the agency for recollector model sessions and nothing else,
+reads messages and rooms from the receiver, and serves raw material to the gate, which does all reference
+selection. Other units reach it over HTTP only. The word-chain game is not the brain's: it is its own tool
+repository, `bmo-word-chain`.
 
 ## Rules
 
@@ -21,9 +22,8 @@ gate, which does all reference selection. Other units reach it over HTTP only.
   default; no code here names the unit or agent that calls it.
 - **English only** in code, comments, strings, tests and documents, and in commit messages. Messages the
   service answers with are English sentences; what a machine reads is a status code or a kebab-case code
-  with parameters, and the web unit's language packs render it for people. Korean game vocabulary and
-  dictionary data are data, kept in `policy/*.toml` files and under `tests/fixtures/`, never in `.rs`
-  files.
+  with parameters, and the web unit's language packs render it for people. Korean words the code reads
+  or matches on are data, kept in `policy/*.toml` files and under `tests/fixtures/`, never in `.rs` files.
 - **No agent names, owner names, host names, home paths or private network addresses** in code, documents
   or commits. An agent is named by its registration and the service's configuration; tests use neutral
   names such as `agent-a` and `agent-b`. `tests/repository.rs` fails on these.

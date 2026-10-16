@@ -8,6 +8,10 @@ The brain serves raw material: rows, documents and their index entries. It selec
 what a turn is shown and asks the brain for the material it chooses from; the brain answers for one agent at a
 time and never names the unit or the agent that calls it.
 
+The word-chain game is not the brain's. It is a tool of its own, `bmo-word-chain`, which holds its word book,
+its rules, its routes and the codes its room lines go out as; the brain serves no word-chain route and holds no
+word-chain data.
+
 ## Configuration
 
 The service reads its configuration at start and holds it for its life:
@@ -17,13 +21,13 @@ The service reads its configuration at start and holds it for its life:
 | listen address | where the service answers |
 | token | the bearer token every caller presents |
 | database | the brain's own database: the tables below and the brain's settings table, nothing else |
-| data root | where the word book, the editing locks, the fragment desks and the failure logs live |
+| data root | where the editing locks, the fragment desks and the failure logs live |
 | brain folder | the brain root, a git repository holding every agent's documents |
 | chat agent's key | the registration key of the chat agent, whose brain folder is the brain root |
 | owner's names | the names the owner goes by in the rooms, counted among the common words ([fragments](fragments.md)) |
 | service unit | the unit the service runs as: a failure notice of a run with no unit of its own names this unit's journal, and a run under a launched unit names that unit's |
 | agency, receiver, gate | each unit's base address and the token it is called with |
-| policy | the files under `policy/`, the service's and each crate's own: the word chain's vocabulary, numbers and dictionary readings, the common words, and the memory, digest and person-book numbers |
+| policy | the files under `policy/`, the service's and each crate's own: the common words, the fragment titles' cues, and the memory, digest and person-book numbers |
 
 Paths the brain writes into an answer are relative to the brain folder or to the data root, never absolute.
 
@@ -42,9 +46,9 @@ Paths the brain writes into an answer are relative to the brain folder or to the
 - **Its migrations:** the brain's own migrations make the tables and the settings table, each in the shape and
   with the indexes the archive holds it in, so the archive's rows move across as they stand; the one difference
   is the `agent` column's, which has no default.
-- **Its folder:** the brain repository and its documents, and under the data root the word book
-  `word-chain/ko.sqlite`, the editing locks with their ticket queues and fences, the fragment desks, and the
-  failure logs `digest-failures.log` and `people-digest-failures.log`.
+- **Its folder:** the brain repository and its documents, and under the data root the editing locks with their
+  ticket queues and fences, the fragment desks, and the failure logs `digest-failures.log` and
+  `people-digest-failures.log`.
 - **Its prompts:** the recollectors' task prompts and the rules they read are this repository's.
 
 ## Wire conventions
@@ -74,7 +78,7 @@ Every non-2xx answer carries `code` (a string below) and `error` (an English sen
 | 400 | `bad-request` | the body is not JSON, or not the shape the route takes; the sentence names what is missing |
 | 401 | `unauthorized` | the token is missing or wrong |
 | 404 | `no-route` | no route at this method and path |
-| 404 | `not-found` | the row, game or run the request names does not exist |
+| 404 | `not-found` | the row or run the request names does not exist |
 | 409 | `not-ready` | the service is up but cannot answer yet: its database or brain folder is not open |
 | 409 | `conflict` | the request contradicts the row's state; the answer carries the refusal code as well |
 | 500 | `failed` | the service failed while answering; the sentence is the failure |
@@ -269,20 +273,11 @@ it until a clear forgets it.
 
 `POST /brain/wait` looks every five seconds for at most nine minutes, so a caller's own wait is longer.
 
-### The word chain
-
-| Route | Body | Answer |
-|---|---|---|
-| `POST /word-chain/line` | `chatId`, `messageId`, `senderId`, `senderName`, `text`, `owner` (boolean) | `taken` (boolean): a taken message goes no further |
-| `POST /word-chain/start` | `chatId`, `starterId`, `starterName`, `robot` (`easy`, `normal`, `hard` or null), `turnSeconds`, `loanwords` (default true), `manner` (default false), `opening` | `answered` and a code (「Word-chain codes」 below) |
-| `POST /word-chain/stop` | `chatId`, `playerId` or null | `answered` and a code; 404 where the room plays no game |
-| `POST /word-chain/playing` | `chatId` | `playing` (boolean) |
-
 ### Rooms leaving
 
 | Route | Body | Answer |
 |---|---|---|
-| `POST /rooms/forgotten` | `chatId` | `ok`; the room's withering stamps and games are let go |
+| `POST /rooms/forgotten` | `chatId` | `ok`; the room's withering stamps are let go |
 | `POST /rooms/removed` | `chatId`, `preview` (boolean) | `took`: the count of the room's rows per table, its settings keys (each agent's day its book of the room starts reading) and the room folders per agent; with `preview` false they are removed and the brain repository committed |
 
 ### Agents forgetting
@@ -338,7 +333,6 @@ last open login, as for every session it runs. The brain writes no rest, and the
 | owner spoke | `chatId`, `person`, `before`, `seconds` | `owner` (boolean): the person is the owner; `spoke` (boolean): the owner sent a message in the room in that span |
 | rest state | none | `resting` (boolean) and `until` |
 | owner notice | `code` and its parameters | `ok` |
-| coded room line | `chatId`, `lines` (each a code and its parameters) | `ok`; the lines go out as one message and are archived as the agent's own |
 
 ### The gate
 
@@ -398,70 +392,3 @@ A listing line marks a global row with `global-scope` (`reach`) and a handed-ove
 | `too-few-batches` | `needed`, `given` | a reform whose folded messages do not fit the batches it was given |
 | `brain-root` | none | an agent reset names the agent whose folder is the brain root |
 | `not-theirs` | none | a watch cancelled from a room that neither set it nor is the owner's |
-
-### Word-chain codes
-
-A game's words leave the brain as codes with parameters, through the receiver's coded room line; the web unit's
-language pack renders them. A word or a name is sent bare and the pack chooses its particle. No model is called.
-
-The room lines:
-
-| Code | Parameters |
-|---|---|
-| `game` | `shown` |
-| `game-more` | `shown`, `rest` |
-| `opening-not-in-book`, `opening-loanword`, `opening-no-follower` | `topic` |
-| `ask-again` | `unusable`, `name` |
-| `ask-again-bare` | `unusable` |
-| `ask-first` | `name` |
-| `no-opening`, `folded`, `call`, `call-join`, `call-moves`, `rule-nouns`, `rule-loanwords-on`, `rule-loanwords-off`, `rule-manner-on`, `rule-manner-off`, `nobody`, `stopped`, `decided` | |
-| `call-join-named` | `name` |
-| `call-how` | `how`, `seconds` |
-| `call-opening` | `openings` |
-| `rule-no-limit` | `minutes` |
-| `rule-limit` | `seconds` |
-| `rule-robot` | `agent`, `difficulty` (`easy`, `normal`, `hard`) |
-| `off-chain` | `topic`, `openings` |
-| `not-in-book`, `loanword`, `used`, `manner` | `topic` |
-| `joined` | `name`, `count` |
-| `started` | `order` |
-| `first-word`, `new-word` | `word` |
-| `meaning` | `word`, `meaning` |
-| `turn` | `name`, `openings`, `limit` |
-| `turn-limit` | `seconds` |
-| `taken` | `word`, `points` |
-| `taken-robot` | `name`, `word`, `points` |
-| `timeout`, `gave-up` | `name` |
-| `one-shot` | `openings`, `name`, `by` |
-| `one-shot-by` | `name`, `points` |
-| `stuck` | `subject`, `name` |
-| `idle` | `minutes` |
-| `ranking` | `place`, `name`, `score`, `words` |
-| `pick` | `verb`, `games`, `word`, `example` |
-| `pick-stop`, `pick-join`, `pick-stop-word`, `pick-join-word` | |
-
-The answers to a start or a stop:
-
-| Code | Parameters |
-|---|---|
-| `no-book` | `path` |
-| `in-game` | `subject`, `game` |
-| `unusable` | `unusable` |
-| `asked-again` | `unusable`, `name` |
-| `opened` | `chat`, `more` |
-| `opened-more` | `count` |
-| `none`, `not-theirs` | |
-| `several` | `count`, `games` |
-| `unreached` | `why` |
-| `not-taken` | `status` |
-
-What the brain binary's own word-book commands print:
-
-| Code | Parameters |
-|---|---|
-| `book-installed` | `count`, `path`, `source`, `commit`, `licence` |
-| `book-meanings` | `count`, `source`, `commit`, `licence` |
-| `book-absent` | `word` |
-| `book-found` | `word`, `loanword`, `openings`, `count` |
-| `book-loanword` | |
-| `book-basic`, `book-hard` | `meaning` |
