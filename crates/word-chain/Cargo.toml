@@ -1,12 +1,14 @@
 [package]
 name = "word-chain"
-description = "The word-chain game: its word book, its rules and the game state."
+description = "The word-chain game: its Hangul arithmetic, its word book and the game itself."
 version.workspace = true
 edition.workspace = true
 publish = false
 
 [dependencies]
 brain-support.workspace = true
+rand.workspace = true
+rusqlite.workspace = true
 serde.workspace = true
 
 [dev-dependencies]

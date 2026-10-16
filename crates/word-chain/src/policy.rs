@@ -10,7 +10,18 @@ pub struct WordChainPlay {
   pub rounds: Rounds,
   pub points: Points,
   pub names: Names,
+  pub particles: Particles,
   pub install: Install,
+}
+
+/// The subject particle a name takes by the sound it ends on.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Particles {
+  pub after_vowel: String,
+  pub after_consonant: String,
+  /// Both, for a name whose spelling does not say how it ends.
+  pub unread: String,
 }
 
 /// What the word book is installed from.

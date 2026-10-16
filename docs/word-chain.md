@@ -156,10 +156,15 @@ what they do.
   (players, turns, judging, rounds, scores and the robot), which keeps time with a clock it is handed and says what
   happened as events. It names no room, road or agent. The KKuTu and NIKL readers that build the book are the
   install command's.
+- **The Hangul arithmetic is done on code points:** a syllable is taken apart and put together by its place in
+  the Unicode syllable block, and the initial-sound rule is a table of consonant and vowel indices, so no syllable
+  of the language is written in the code. The crate also reads which subject particle a name takes by the sound it
+  ends on, for a caller that joins a name to its particle itself; the particles are the policy's.
 - **The service holds the rest:** which room each game stands in and which game each person is in, the wait for a
   usable opening word, which words of a room are joins, starts, give-ups and stops and which game each is for, the
   name a game goes by, the code each event leaves as, and the routes.
 - **What a game is played by is the policy's:** the words a room says to a game, how long a game recruits, waits
   for a move and lets the agent think, how many answers a round's opening word must leave and the syllables it is
   drawn from, how many words the agent weighs, the range a turn's seconds are held to, how many players a game's
-  name lists and the closing word a name given for a game may end with, and the points.
+  name lists and the closing word a name given for a game may end with, the points, and the subject particles a
+  name takes after a vowel, after a consonant and where its sound cannot be read.

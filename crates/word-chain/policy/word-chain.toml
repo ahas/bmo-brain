@@ -45,6 +45,13 @@ listed = 3
 # The word a name given for a game may close on, which is set aside when the name is matched.
 closing = "판"
 
+# The subject particle a name takes: after a vowel, after a consonant, and both where the name's spelling does
+# not say how it ends.
+[particles]
+after_vowel = "가"
+after_consonant = "이"
+unread = "이(가)"
+
 # What the word book is installed from (docs/word-chain.md, 「The word book」): KKuTu's word list and the
 # National Institute of Korean Language's dictionaries, each at the commit its reader was written against,
 # with the licence it is under, which the book records about itself.

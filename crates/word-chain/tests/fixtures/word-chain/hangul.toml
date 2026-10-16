@@ -1,0 +1,35 @@
+# Texts made of whole syllables and nothing else, and texts that are not.
+words = ["기차"]
+not_words = ["ㅋㅋ", "기차 표", ""]
+
+# The syllables a word may start with to follow a word ending in the given one, under the initial-sound rule:
+# rieul to nieun, rieul to a silent ieung, nieun to a silent ieung, the rule running one way, and a syllable
+# the rule does not touch.
+[[openings]]
+syllable = "력"
+openings = ["력", "역"]
+
+[[openings]]
+syllable = "락"
+openings = ["락", "낙"]
+
+[[openings]]
+syllable = "녀"
+openings = ["녀", "여"]
+
+[[openings]]
+syllable = "역"
+openings = ["역"]
+
+[[openings]]
+syllable = "차"
+openings = ["차"]
+
+# The final consonant of a word's last syllable: nieun is 4, none is 0.
+[[finals]]
+word = "사전"
+last = 4
+
+[[finals]]
+word = "기차"
+last = 0
