@@ -7,7 +7,7 @@ use std::time::Duration;
 
 use bmo_brain::ports::agency::{
   Agency, ItemState, Launch, LaunchOutcome, Outcome, Overrun, QuietInstruction, Registration, Reload,
-  SessionEnd, SessionStart, WorkKey,
+  Rulebook, SessionEnd, SessionStart, WorkKey,
 };
 use bmo_brain::ports::http::PortFailure;
 use futures_util::future::BoxFuture;
@@ -30,6 +30,8 @@ pub struct FakeAgency {
   pub overrun: Mutex<Option<Overrun>>,
   /// The runs that still stand; every run the fake started stands until it is stopped.
   pub open: Mutex<BTreeSet<String>>,
+  /// The moment each run or unit is kept until; one not set is kept by no ask.
+  pub kept: Mutex<BTreeMap<String, i64>>,
   pub work_keys: Mutex<BTreeMap<String, WorkKey>>,
   pub finished: Mutex<BTreeSet<i64>>,
   pub launch: Mutex<Option<Launch>>,
@@ -120,6 +122,24 @@ impl Agency for FakeAgency {
     self.calls.take("run_open", json!({ "run": run }));
     let open = self.open.lock().unwrap().contains(run);
     Box::pin(async move { Ok(open) })
+  }
+
+  fn kept_until<'a>(&'a self, run: &'a str) -> BoxFuture<'a, Result<Option<i64>, PortFailure>> {
+    self.calls.take("kept_until", json!({ "run": run }));
+    let until = self.kept.lock().unwrap().get(run).copied();
+    Box::pin(async move { Ok(until) })
+  }
+
+  fn rulebooks<'a>(&'a self, names: &'a [&'a str]) -> BoxFuture<'a, Result<Vec<Rulebook>, PortFailure>> {
+    self.calls.take("rulebooks", json!({ "names": names }));
+    let rulebooks = names
+      .iter()
+      .map(|name| Rulebook {
+        name: (*name).to_owned(),
+        text: format!("The {name} rulebook."),
+      })
+      .collect();
+    Box::pin(async move { Ok(rulebooks) })
   }
 
   fn work_key<'a>(

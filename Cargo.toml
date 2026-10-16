@@ -38,9 +38,17 @@ publish = false
 
 [dependencies]
 brain-support.workspace = true
+# The moments the editors' prompts show.
+chrono.workspace = true
 # The row writes an editor run leaves on its desk.
 fragment-desk.workspace = true
 futures-util.workspace = true
+# Whether a lock ticket's process lives, and the account's home a commit's git reads.
+libc.workspace = true
+# A desk's file name.
+rand.workspace = true
+# The stretches a document is cut in, a prompt's marks and a sheet's days.
+regex.workspace = true
 # The ports' calls on the agency, the receiver and the gate.
 reqwest.workspace = true
 sea-orm.workspace = true

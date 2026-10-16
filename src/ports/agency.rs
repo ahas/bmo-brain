@@ -1,5 +1,6 @@
-//! The agency port: the registrations, the recollector sessions and the work keys they run on, a job's run
-//! and items, the units launched and the notices handed to an agent (`docs/boundary-api.md`, 「The agency」).
+//! The agency port: the registrations, the recollector sessions and the work keys they run on, a job's run, its
+//! clock keep and items, the rulebooks every document writer shares, the units launched and the notices handed to
+//! an agent (`docs/boundary-api.md`, 「The agency」).
 
 use futures_util::future::BoxFuture;
 use serde::{Deserialize, Serialize};
@@ -122,6 +123,14 @@ pub struct Reload {
   pub rooms: Vec<i64>,
 }
 
+/// A rulebook the agency keeps for every document writer, by its name.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Rulebook {
+  pub name: String,
+  pub text: String,
+}
+
 /// What the brain asks of the agency.
 pub trait Agency: Send + Sync {
   /// The named agent's registration, or every agent's where none is named.
@@ -149,6 +158,12 @@ pub trait Agency: Send + Sync {
 
   /// Whether a job's run still stands.
   fn run_open<'a>(&'a self, run: &'a str) -> BoxFuture<'a, Result<bool, PortFailure>>;
+
+  /// The moment the open overrun ask on a run or unit stands until, or none where none stands open.
+  fn kept_until<'a>(&'a self, run: &'a str) -> BoxFuture<'a, Result<Option<i64>, PortFailure>>;
+
+  /// The named rulebooks, in the order asked.
+  fn rulebooks<'a>(&'a self, names: &'a [&'a str]) -> BoxFuture<'a, Result<Vec<Rulebook>, PortFailure>>;
 
   /// A work key's cap and reasoning for an agent.
   fn work_key<'a>(
@@ -226,6 +241,21 @@ struct Open {
   open: bool,
 }
 
+#[derive(Deserialize)]
+struct Kept {
+  until: Option<i64>,
+}
+
+#[derive(Serialize)]
+struct RulebooksAsk<'a> {
+  names: &'a [&'a str],
+}
+
+#[derive(Deserialize)]
+struct Rulebooks {
+  rulebooks: Vec<Rulebook>,
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct WorkKeyAsk<'a> {
@@ -298,6 +328,20 @@ impl Agency for HttpAgency {
     Box::pin(async move {
       let answer: Open = self.caller.post("/runs/open", &RunAsk { run }).await?;
       Ok(answer.open)
+    })
+  }
+
+  fn kept_until<'a>(&'a self, run: &'a str) -> BoxFuture<'a, Result<Option<i64>, PortFailure>> {
+    Box::pin(async move {
+      let answer: Kept = self.caller.post("/runs/kept-until", &RunAsk { run }).await?;
+      Ok(answer.until)
+    })
+  }
+
+  fn rulebooks<'a>(&'a self, names: &'a [&'a str]) -> BoxFuture<'a, Result<Vec<Rulebook>, PortFailure>> {
+    Box::pin(async move {
+      let answer: Rulebooks = self.caller.post("/rulebooks/read", &RulebooksAsk { names }).await?;
+      Ok(answer.rulebooks)
     })
   }
 

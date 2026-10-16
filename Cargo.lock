@@ -176,9 +176,13 @@ version = "0.1.0"
 dependencies = [
  "axum",
  "brain-support",
+ "chrono",
  "fragment-desk",
  "futures-util",
+ "libc",
  "memory-rows",
+ "rand 0.9.5",
+ "regex",
  "reqwest",
  "sea-orm",
  "sea-orm-migration",

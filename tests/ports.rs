@@ -10,7 +10,8 @@ use std::time::Duration;
 
 use axum::http::StatusCode;
 use bmo_brain::ports::agency::{
-  Agency, HttpAgency, ItemState, LaunchOutcome, Outcome, Overrun, QuietInstruction, Reload, SessionStart,
+  Agency, HttpAgency, ItemState, LaunchOutcome, Outcome, Overrun, QuietInstruction, Reload, Rulebook,
+  SessionStart,
 };
 use bmo_brain::ports::gate::{Gate, HttpGate, Piece, Sanitised, SheetAsk, SheetPart};
 use bmo_brain::ports::http::{Caller, Patience, Peer, PortFailure, Wait, WireError};
@@ -42,6 +43,11 @@ async fn the_agency_client_posts_each_operation_and_reads_its_answer() {
     .answer("/runs/stop", json!({ "ok": true }))
     .answer("/runs/overrun", json!({ "keep": true, "until": 1_700_000_600 }))
     .answer("/runs/open", json!({ "open": false }))
+    .answer("/runs/kept-until", json!({ "until": 1_700_000_900 }))
+    .answer(
+      "/rulebooks/read",
+      json!({ "rulebooks": [{ "name": "plain-writing", "text": "Write plainly." }] }),
+    )
     .answer("/work-keys/read", json!({ "capSeconds": 1200, "reasoning": null }))
     .answer("/items/states", json!({ "items": [{ "item": 3, "finished": true }, { "item": 4, "finished": false }] }))
     .answer("/units/launch", json!({ "outcome": "refused", "why": "The unit is masked." }))
@@ -101,6 +107,19 @@ async fn the_agency_client_posts_each_operation_and_reads_its_answer() {
 
   assert!(!agency.run_open("run-7").await.unwrap());
   assert_eq!(stub.body_at("/runs/open"), json!({ "run": "run-7" }));
+
+  assert_eq!(agency.kept_until("brain-run").await.unwrap(), Some(1_700_000_900));
+  assert_eq!(stub.body_at("/runs/kept-until"), json!({ "run": "brain-run" }));
+
+  let rulebooks = agency.rulebooks(&["plain-writing"]).await.unwrap();
+  assert_eq!(
+    rulebooks,
+    [Rulebook {
+      name: "plain-writing".to_owned(),
+      text: "Write plainly.".to_owned()
+    }]
+  );
+  assert_eq!(stub.body_at("/rulebooks/read"), json!({ "names": ["plain-writing"] }));
 
   let key = agency.work_key("people-digest", AGENT).await.unwrap();
   assert_eq!((key.cap_seconds, key.reasoning), (1200, None));

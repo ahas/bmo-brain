@@ -50,7 +50,11 @@ Paths the brain writes into an answer are relative to the brain folder or to the
 - **Its folder:** the brain repository and its documents, and under the data root the editing locks with their
   ticket queues and fences, the fragment desks, and the failure logs `digest-failures.log` and
   `people-digest-failures.log`.
-- **Its prompts:** the recollectors' task prompts and the rules they read are this repository's.
+- **Its prompts:** the recollectors' task prompts and the rulebooks only they read, the fragment tool's and the
+  recollection's, are this repository's. The rulebooks every document writer shares, document writing, plain
+  writing and the one against destroying the system, are the agency's, read through its rulebook read. A writer's
+  prompt is the five in that order, document writing, plain writing, the fragment tool, recollection and self
+  preservation, each headed by its name, then its task with its `{{name}}` marks filled.
 - **Its tools:** the tools bound to the brain are this repository's, each under `tools/` with its own
   `tool.toml` manifest, which the tool host reads as it reads any tool's: `tools/memory`, the memory rows an
   agent keeps and the note it keeps for a room's digest, and `tools/fragment`, an editor's fragment desk. Each
@@ -312,6 +316,8 @@ unit's tables or files.
 | recollector session stop | `/runs/stop` | `run` | `ok` |
 | overrun ask | `/runs/overrun` | `run`, `unit`, `capSeconds` | `keep` (boolean) and `until` (or null) |
 | run open | `/runs/open` | `run` | `open` (boolean): whether a job's run still stands |
+| clock keep | `/runs/kept-until` | `run`: the run or unit a lock ticket names | `until` (or null): the moment the open overrun ask on it stands until, the keep's end where it was kept and the moment it must be answered by while it is not yet; null where no ask stands open or it was cut |
+| rulebook read | `/rulebooks/read` | `names` | `rulebooks`: each named rulebook's `name` and `text`, trimmed, in the order asked |
 | work key cap and reasoning | `/work-keys/read` | `workKey`, `agent` | `capSeconds`, `reasoning` (or null) |
 | item states | `/items/states` | `items` | `items`: each item's `item` and `finished` (boolean), for a fragment's status and a trim's stretch |
 | unit launch | `/units/launch` | `unit`, `command` (its words, in order) | `outcome`: `launched`, `running` or `refused`, and `why` (or null) |
@@ -376,6 +382,15 @@ A message is answered as `chatId`, `messageId`, `senderId` (or null), `senderNam
 
 Which texts the sanitiser needs to look at is the gate's: the brain sends every document an editor changed and
 writes back only a text that came back changed.
+
+### Owner notices
+
+What the brain tells the owner goes as a code and its parameters through the receiver's owner notice, which the
+web unit's language packs render; the brain writes no sentence of it.
+
+| Code | Parameters | When |
+|---|---|---|
+| `digest-paused` | `until` (epoch seconds, or null for a pause until it is lifted), `notes` (the count not yet filed), `rooms` (each `chatId`, `title` or null, `agent` by its label, `messages` unread) | the first hourly launch that finds the owner's pause holding with work waiting behind it, once for that pause |
 
 ## Codes the brain answers with
 
