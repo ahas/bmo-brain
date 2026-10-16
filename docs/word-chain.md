@@ -96,9 +96,9 @@ what they do.
   start, give-up or stop goes to the one game they are in, and a join word from someone already in a game is not a
   join.
 - **Which game a join is for.** With one game recruiting, a join word joins it. With several, the join word is
-  followed by the name of a player of the one meant, matched on the start of the name, spaces aside. A bare join
-  word, or a name that fits more than one, is answered with the games recruiting and how to name one; a name that
-  fits none leaves the message as talk. A call for players says so while another game is recruiting beside it.
+  followed by the name of a player of the one meant, matched on the start of the name, spaces, case and the
+  policy's closing word for a game aside. A bare join word, or a name that fits more than one, is answered with
+  the games recruiting and how to name one; a name that fits none leaves the message as talk. A call for players says so while another game is recruiting beside it.
 - **Playing.** The order is the order of joining, with the agent last. Only the player whose move it is is heard,
   and only with a move as 「The rules」 says, trailing punctuation aside; everything else in the room is talk and
   goes on as talk. A player types one of the policy's give-up words to give up.
@@ -162,4 +162,4 @@ what they do.
 - **What a game is played by is the policy's:** the words a room says to a game, how long a game recruits, waits
   for a move and lets the agent think, how many answers a round's opening word must leave and the syllables it is
   drawn from, how many words the agent weighs, the range a turn's seconds are held to, how many players a game's
-  name lists, and the points.
+  name lists and the closing word a name given for a game may end with, and the points.

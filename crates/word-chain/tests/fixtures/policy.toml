@@ -1,0 +1,4 @@
+# What the word-chain policy test expects of the game's vocabulary: a word a room says to join a game, and
+# the word a name given for a game closes on.
+join = "참가"
+closing = "판"

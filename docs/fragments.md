@@ -66,8 +66,10 @@ on its behalf, and nothing branches on a kind's name.
   everyday work of the rooms it reaches.
 - **Keywords:** the words somebody asks for the piece by that are particular to it: the words the room itself
   uses for the matter, names, product and system names, identifiers, and none of the common words. They are
-  the writer's alone. A person's address piece is the exception: its keywords are the names that person is
-  called by.
+  the writer's alone. The common words are the ones nearly every turn of the rooms carries: the policy's list,
+  the chat agent's key and its label as its registration names it, and the owner's names the configuration
+  holds, all compared in lower case. A person's address piece is the exception: its keywords are the names
+  that person is called by.
 - **Items:** the TODO items the piece is tied to: the ones its writer named, and every `#<n>` its body carries.
 - **Written and confirmed:** the earliest day and the latest confirmed day its item brackets carry
   (`[date D · confirmed D]`), or nothing where it carries none. The period a drawn index line shows is read

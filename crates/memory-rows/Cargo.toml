@@ -4,3 +4,6 @@ description = "The memory, note and watch rows a chat agent keeps, and the opera
 version.workspace = true
 edition.workspace = true
 publish = false
+
+[dependencies]
+brain-support.workspace = true

@@ -4,3 +4,16 @@ description = "Helpers the brain's crates share: database access, the clock, tex
 version.workspace = true
 edition.workspace = true
 publish = false
+
+[dependencies]
+chrono.workspace = true
+sea-orm.workspace = true
+serde.workspace = true
+sqlx.workspace = true
+tokio.workspace = true
+toml.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true
+tempfile.workspace = true
+tokio.workspace = true

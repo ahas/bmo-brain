@@ -1,0 +1,62 @@
+//! The service's own policy, under the root `policy/` folder: the common words (docs/fragments.md), and the
+//! memory and person-book numbers (docs/memories.md, docs/people-book.md).
+
+use serde::Deserialize;
+
+/// The words every turn of the rooms carries, which a fragment's title or keyword hanging on them cannot
+/// carry as its substance.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CommonWords {
+  /// Each word as a keyword is compared with it, lower case.
+  pub words: Vec<String>,
+}
+
+impl CommonWords {
+  /// The policy's words joined by the names the rooms call the chat agent and the owner by, as its
+  /// registration and the configuration give them, each lower case and named once.
+  pub fn with_names<'a>(&self, names: impl IntoIterator<Item = &'a str>) -> Vec<String> {
+    let mut words = self.words.clone();
+
+    for name in names {
+      let name = name.trim().to_lowercase();
+
+      if !name.is_empty() && !words.contains(&name) {
+        words.push(name);
+      }
+    }
+
+    words
+  }
+}
+
+brain_support::part!(pub COMMON_WORDS: CommonWords = "common-words.toml");
+
+/// The brain's own numbers.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Brain {
+  pub memories: Memories,
+  pub sheets: Sheets,
+}
+
+/// A memory row's withering and a still state's release.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Memories {
+  pub wither_after_seconds: i64,
+  pub wither_every_seconds: i64,
+  pub state_idle_seconds: i64,
+  /// The code a state released for standing still is checked off with; `{hours}` is how long it stood.
+  pub released: String,
+}
+
+/// How long a standing sheet attached on every turn of its speaker may be, in characters.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Sheets {
+  pub common_ceiling: usize,
+  pub room_ceiling: usize,
+}
+
+brain_support::part!(pub BRAIN: Brain = "brain.toml");

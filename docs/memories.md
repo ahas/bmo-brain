@@ -152,8 +152,8 @@ road on its own route; the gate puts what they answer into the turn.
   - someone ends it in words, or the thing reaches its end, and the agent checks it off in that run;
   - the agent judges the room has plainly moved on, and checks it off saying it stopped half-way;
   - it has not moved for twelve hours: the standing route releases it on its room's next read, before it
-    answers, with a line saying it stopped for want of movement. A quiet room releases nothing until it is
-    read again.
+    answers, with the reason code `stood-still` and its `hours` parameter written as how it ended. A quiet
+    room releases nothing until it is read again.
 - **Taking it back up** after it was released is a new state; the released row is not reopened.
 
 ## The memory routes

@@ -4,3 +4,10 @@ description = "The word-chain game: its word book, its rules and the game state.
 version.workspace = true
 edition.workspace = true
 publish = false
+
+[dependencies]
+brain-support.workspace = true
+serde.workspace = true
+
+[dev-dependencies]
+toml.workspace = true

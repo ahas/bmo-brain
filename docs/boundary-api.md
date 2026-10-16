@@ -20,9 +20,10 @@ The service reads its configuration at start and holds it for its life:
 | data root | where the word book, the editing locks, the fragment desks and the failure logs live |
 | brain folder | the brain root, a git repository holding every agent's documents |
 | chat agent's key | the registration key of the chat agent, whose brain folder is the brain root |
+| owner's names | the names the owner goes by in the rooms, counted among the common words ([fragments](fragments.md)) |
 | service unit | the unit the service runs as: a failure notice of a run with no unit of its own names this unit's journal, and a run under a launched unit names that unit's |
 | agency, receiver, gate | each unit's base address and the token it is called with |
-| policy | the files under `policy/`: the word chain's vocabulary, numbers and dictionary readings, and the memory, digest and person-book numbers |
+| policy | the files under `policy/`, the service's and each crate's own: the word chain's vocabulary, numbers and dictionary readings, the common words, and the memory, digest and person-book numbers |
 
 Paths the brain writes into an answer are relative to the brain folder or to the data root, never absolute.
 
