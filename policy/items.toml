@@ -1,0 +1,11 @@
+# How a batch's text names a TODO item without its `#<n>` mark (docs/fragments.md, 「Finding a piece before
+# writing one」): the editor's narrowing hands a writer whole every piece tied to an item the batch names.
+
+# The word that follows an item's number of two to five digits, white space allowed between: "758번".
+after_number = "번"
+
+# What, standing right after that word, makes the number something else: a phone or room number, an ordinal.
+not_after = ["호", "째"]
+
+# The word an item is named as one by, ahead of its number, with or without the mark: "항목 77".
+before_number = "항목"

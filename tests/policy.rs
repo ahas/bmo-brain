@@ -1,6 +1,7 @@
-//! The service's own policy read whole: the common words, and the memory and person-book numbers.
+//! The service's own policy read whole: the common words, the words an item is named by, and the memory and
+//! person-book numbers.
 
-use bmo_brain::policy::{BRAIN, COMMON_WORDS};
+use bmo_brain::policy::{BRAIN, COMMON_WORDS, ITEM_WORDS};
 use brain_support::policy::fill_marks;
 
 #[test]
@@ -20,6 +21,14 @@ fn the_names_join_the_common_words_lower_case_and_once() {
 
   assert_eq!(words.len(), COMMON_WORDS.words.len() + 1);
   assert_eq!(words.last().map(String::as_str), Some("agent-a"));
+}
+
+#[test]
+fn an_item_is_named_by_one_word_after_its_number_and_one_before_it() {
+  assert!(!ITEM_WORDS.after_number.trim().is_empty() && !ITEM_WORDS.before_number.trim().is_empty());
+  assert!(
+    !ITEM_WORDS.not_after.is_empty() && ITEM_WORDS.not_after.iter().all(|word| !word.trim().is_empty())
+  );
 }
 
 #[test]

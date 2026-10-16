@@ -6,6 +6,7 @@ pub mod commits;
 pub mod desk;
 pub mod documents;
 pub mod editor;
+pub mod fragments;
 pub mod lock;
 pub mod people;
 pub mod prompts;

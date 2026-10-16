@@ -27,7 +27,7 @@ The service reads its configuration at start and holds it for its life:
 | owner's names | the names the owner goes by in the rooms, counted among the common words ([fragments](fragments.md)) |
 | service unit | the unit the service runs as: a failure notice of a run with no unit of its own names this unit's journal, and a run under a launched unit names that unit's |
 | agency, receiver, gate | each unit's base address and the token it is called with |
-| policy | the files under `policy/`, the service's and each crate's own: the common words, the fragment titles' cues, and the memory, digest and person-book numbers |
+| policy | the files under `policy/`, the service's and each crate's own: the common words, the fragment titles' cues, the words an item is named by, and the memory, digest and person-book numbers |
 
 Paths the brain writes into an answer are relative to the brain folder or to the data root, never absolute.
 

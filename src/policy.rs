@@ -1,5 +1,5 @@
-//! The service's own policy, under the root `policy/` folder: the common words (docs/fragments.md), and the
-//! memory and person-book numbers (docs/memories.md, docs/people-book.md).
+//! The service's own policy, under the root `policy/` folder: the common words and the words an item is named
+//! by (docs/fragments.md), and the memory and person-book numbers (docs/memories.md, docs/people-book.md).
 
 use serde::Deserialize;
 
@@ -31,6 +31,20 @@ impl CommonWords {
 }
 
 brain_support::part!(pub COMMON_WORDS: CommonWords = "common-words.toml");
+
+/// The words a text names a TODO item by without its mark, which the editor's narrowing reads.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ItemWords {
+  /// The word that follows an item's number.
+  pub after_number: String,
+  /// What, standing right after that word, makes the number something else.
+  pub not_after: Vec<String>,
+  /// The word an item is named as one by, ahead of its number.
+  pub before_number: String,
+}
+
+brain_support::part!(pub ITEM_WORDS: ItemWords = "items.toml");
 
 /// The brain's own numbers.
 #[derive(Debug, Deserialize)]
