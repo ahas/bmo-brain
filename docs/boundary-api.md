@@ -39,6 +39,9 @@ Paths the brain writes into an answer are relative to the brain folder or to the
   - the day a book starts reading, one key per agent and room;
   - the brain holds, one key `brain_hold:<run>` per job run holding the editors off;
   - the chat-session summaries, one key `<agent>_pending_summary` per agent (「Chat-session summaries」).
+- **Its migrations:** the brain's own migrations make the tables and the settings table, each in the shape and
+  with the indexes the archive holds it in, so the archive's rows move across as they stand; the one difference
+  is the `agent` column's, which has no default.
 - **Its folder:** the brain repository and its documents, and under the data root the word book
   `word-chain/ko.sqlite`, the editing locks with their ticket queues and fences, the fragment desks, and the
   failure logs `digest-failures.log` and `people-digest-failures.log`.
