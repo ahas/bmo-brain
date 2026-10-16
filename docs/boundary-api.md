@@ -50,6 +50,10 @@ Paths the brain writes into an answer are relative to the brain folder or to the
   ticket queues and fences, the fragment desks, and the failure logs `digest-failures.log` and
   `people-digest-failures.log`.
 - **Its prompts:** the recollectors' task prompts and the rules they read are this repository's.
+- **Its tools:** the tools bound to the brain are this repository's, each under `tools/` with its own
+  `tool.toml` manifest, which the tool host reads as it reads any tool's: `tools/memory`, the memory rows an
+  agent keeps and the note it keeps for a room's digest, and `tools/fragment`, an editor's fragment desk. Each
+  answers through the routes below, over HTTP.
 
 ## Wire conventions
 
@@ -291,24 +295,27 @@ The chat agent's folder is the brain root, so `POST /agents/reset` refuses it `b
 
 ## Calls the brain makes
 
-Each call is one POST at the path the serving unit's own boundary document gives for the operation. The brain
-holds no other unit's tables or files.
+Each call is one POST of a JSON body under the serving unit's configured base address, carrying that unit's
+token, at the path the tables below give. The paths are the brain's side of the contract, and the serving
+unit's own boundary document states the operation at the same path. An operation that sends none sends an
+empty object. A call is answered, refused and retried by the wire conventions above. The brain holds no other
+unit's tables or files.
 
 ### The agency
 
-| Operation | Sends | Answers |
-|---|---|---|
-| registration lookup | an agent name, or none for all | each agent's `name`, `label`, `key`, `brainFolder`, `awake`, `recollectorRegistration` (or null), `reasoning` |
-| recollector session start | `workKey`, `agent`, `unit`, `prompt`, `tools`, `workdir`, `desk`, `registration` or null | `run` |
-| recollector session wait | `run` | `outcome`, `answer`, `filesWritten`, `cost`, `size` |
-| recollector session stop | `run` | `ok` |
-| overrun ask | `run`, `unit`, `capSeconds` | `keep` (boolean) and `until` |
-| work key cap and reasoning | `workKey`, `agent` | `capSeconds`, `reasoning` |
-| run open | `run` | `open` (boolean): whether a job's run still stands |
-| item states | `items` | each item's `finished` (boolean), for a fragment's status and a trim's stretch |
-| unit launch | `unit`, `command` | `launched`, `running` or `refused` |
-| quiet instruction | `agent`, `chatId`, `text`, `kind` or null | `ok` |
-| document reload notice | `agent`, `paths`, `rooms` | `ok` |
+| Operation | Path | Sends | Answers |
+|---|---|---|---|
+| registration lookup | `/registrations/lookup` | `agent`, or null for all | `agents`: each agent's `name`, `label` (or null), `key`, `brainFolder`, `awake`, `recollectorRegistration` (or null), `reasoning` (or null) |
+| recollector session start | `/runs/start` | `workKey`, `agent`, `unit`, `prompt`, `tools`, `workdir`, `desk`, `registration` or null | `run` |
+| recollector session wait | `/runs/wait` | `run` | `outcome` (`answered`, `failed`, `overran`, `stopped` or `limit`), `answer` (or null), `filesWritten`, `cost` (or null), `size` (or null) |
+| recollector session stop | `/runs/stop` | `run` | `ok` |
+| overrun ask | `/runs/overrun` | `run`, `unit`, `capSeconds` | `keep` (boolean) and `until` (or null) |
+| run open | `/runs/open` | `run` | `open` (boolean): whether a job's run still stands |
+| work key cap and reasoning | `/work-keys/read` | `workKey`, `agent` | `capSeconds`, `reasoning` (or null) |
+| item states | `/items/states` | `items` | `items`: each item's `item` and `finished` (boolean), for a fragment's status and a trim's stretch |
+| unit launch | `/units/launch` | `unit`, `command` (its words, in order) | `outcome`: `launched`, `running` or `refused`, and `why` (or null) |
+| quiet instruction | `/instructions/quiet` | `agent`, `chatId`, `text`, `kind` or null | `ok` |
+| document reload notice | `/documents/reload` | `agent`, `paths`, `rooms` | `ok` |
 
 The recollector runs are the agency's sessions; the brain decides what to recollect, writes the prompt, opens
 the desk, holds the lock and judges the result. Everything about the model run itself is the agency's: the
@@ -318,28 +325,32 @@ last open login, as for every session it runs. The brain writes no rest, and the
 
 ### The receiver
 
-| Operation | Sends | Answers |
-|---|---|---|
-| unread messages | `agent`, `chatId`, `limit`, `since` | `messages` past the agent's read marks, oldest first |
-| read messages | `chatId`, `from`, `limit` | `messages` already marked, oldest first |
-| read marks | `agent`, `chatId`, `messageIds`, or `forget` | `ok` |
-| room titles | none | `rooms`: `chatId`, `title`; with the senders that have stood in the archive |
-| room answerers | `chatId` or none | the agents answering each room |
-| spoken in | `chatId`, `people` | the people who have stood as a sender in the room |
-| display names | `people` | each person's `name` or null: the name their latest message went under, a room where the owner goes by a name of that room alone read last |
-| waits on a happening | `text` | `waits` (boolean): whether the text waits for something to happen first, by the receiver's reading of promises |
-| roads | `chatId` | `kind` (`owner` or `group`) and `oneToOne` (boolean) |
-| sender is owner | `chatId`, `messageId` | `owner` (boolean) |
-| owner spoke | `chatId`, `person`, `before`, `seconds` | `owner` (boolean): the person is the owner; `spoke` (boolean): the owner sent a message in the room in that span |
-| rest state | none | `resting` (boolean) and `until` |
-| owner notice | `code` and its parameters | `ok` |
+A message is answered as `chatId`, `messageId`, `senderId` (or null), `senderName`, `sentAt`, `text` and
+`replyToMessageId` (or null).
+
+| Operation | Path | Sends | Answers |
+|---|---|---|---|
+| unread messages | `/messages/unread` | `agent`, `chatId`, `limit`, `since` or null | `messages` past the agent's read marks, oldest first |
+| read messages | `/messages/read` | `agent`, `chatId`, `from`, `limit` | `messages` the agent has marked, after `from`, oldest first |
+| keep read marks | `/read-marks/keep` | `agent`, `chatId`, `messageIds` | `ok` |
+| forget read marks | `/read-marks/forget` | `agent`, `chatId` or null for every room | `forgotten`: the count of marks let go |
+| room titles | `/rooms/titles` | none | `rooms`: each room's `chatId`, `title` (or null) and `senders`, the people that have stood as a sender in it |
+| room answerers | `/rooms/answerers` | `chatId` or null | `rooms`: each room's `chatId` and `agents`, the agents answering it |
+| spoken in | `/rooms/spoken-in` | `chatId`, `people` | `people`: those who have stood as a sender in the room |
+| display names | `/people/names` | `people` | `names`: each person's `person` and `name` or null: the name their latest message went under, a room where the owner goes by a name of that room alone read last |
+| waits on a happening | `/promises/waits` | `text` | `waits` (boolean): whether the text waits for something to happen first, by the receiver's reading of promises |
+| roads | `/rooms/roads` | `chatId` | `kind` (`owner` or `group`) and `oneToOne` (boolean) |
+| sender is owner | `/messages/sender-is-owner` | `chatId`, `messageId` | `owner` (boolean) |
+| owner spoke | `/rooms/owner-spoke` | `chatId`, `person`, `before`, `seconds` | `owner` (boolean): the person is the owner; `spoke` (boolean): the owner sent a message in the room in that span |
+| rest state | `/rest` | none | `resting` (boolean) and `until` (or null) |
+| owner notice | `/owner/notice` | `code` and its parameters beside it | `ok` |
 
 ### The gate
 
-| Operation | Sends | Answers |
-|---|---|---|
-| document sanitiser | `path`, `text` | `text`, or a refusal naming why |
-| sheet judgement | `agent`, `part`, `person`, `pieces`, `ceiling`, `registration` or null | `sheet`, or null where none came |
+| Operation | Path | Sends | Answers |
+|---|---|---|---|
+| document sanitiser | `/sanitiser/documents` | `path`, `text` | `text`, or a refusal (`answered` false) naming why |
+| sheet judgement | `/sheets/judge` | `agent`, `part` (`common` or `room`), `chatId` (the room's, or null for the common part), `person`, `pieces` (each `path` and `text`), `ceiling`, `registration` or null | `sheet`, or null where none came |
 
 Which texts the sanitiser needs to look at is the gate's: the brain sends every document an editor changed and
 writes back only a text that came back changed.
