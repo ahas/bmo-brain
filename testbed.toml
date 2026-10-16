@@ -1,0 +1,7 @@
+# How the testbed builds, tests and runs this repository. The shape is provisional until bmo-testbed
+# defines the convention every repository follows.
+kind = "service"
+version = "0.1.0"
+unit = "bmo-brain"
+build = "cargo build --workspace --release"
+test = "cargo test --workspace"

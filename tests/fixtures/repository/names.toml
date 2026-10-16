@@ -1,0 +1,11 @@
+# Agent names that appear in no tracked file but this one. An agent is named by its registration and the
+# service's configuration; tests use neutral names such as agent-a and agent-b.
+
+# Matched as whole words, ignoring case.
+words = ["agent-x", "agent-y"]
+
+# Matched as whole words with their case kept: the system's own name used as the speaking agent.
+exact_words = ["BMO"]
+
+# Matched anywhere: a Korean name takes its particles directly after it, with no space between.
+anywhere = ["비모"]

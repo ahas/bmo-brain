@@ -1,0 +1,6 @@
+[package]
+name = "memory-rows"
+description = "The memory, note and watch rows a chat agent keeps, and the operations on them."
+version.workspace = true
+edition.workspace = true
+publish = false

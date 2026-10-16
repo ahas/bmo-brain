@@ -1,0 +1,6 @@
+[package]
+name = "word-chain"
+description = "The word-chain game: its word book, its rules and the game state."
+version.workspace = true
+edition.workspace = true
+publish = false
