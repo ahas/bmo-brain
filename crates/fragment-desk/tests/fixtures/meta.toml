@@ -1,0 +1,25 @@
+# The text in the rooms' language the meta tests read, kept out of the Rust source.
+
+# The names a test desk carries: a neutral agent name as the rooms call it, its key, and the common words.
+[names]
+agent = "에이"
+agent_key = "agent-a"
+common_words = ["agent-a", "에이", "방", "rule"]
+
+# A body in the rooms' language and the first sixteen hex digits of its SHA-256.
+[hash]
+body = "가"
+digest = "64ee5293d31bc58b"
+
+# A title too short to stand, one that carries the agent's name, and one that stands.
+[titles]
+short = "짧다"
+naming_the_agent = "에이가 방에서 쓰는 말을 정리한 문서로, 그 말을 물을 때 꺼내 읽는 조각입니다."
+standing = "배포 순서를 적은 문서로, 배포를 다시 해야 할 때 무엇부터 하는지 물으면 읽는 조각입니다."
+
+# Words asked for, and two texts: one carrying a word in the rooms' language and a Latin word only as part
+# of a longer one, and one carrying both.
+[carried]
+words = ["rule", "배포", "x"]
+one = "the rules of 배포를"
+both = "a rule of 배포를"

@@ -1,0 +1,8 @@
+# What the shape check reads a title by (docs/fragments.md, 「The shape a title must have」): the words
+# that say when the piece is needed. A title that carries none of them is refused.
+
+# Matched as whole words, ignoring case.
+situation_words = ["when", "whenever", "if", "only", "during", "while", "before", "after", "asked", "asks", "comes up"]
+
+# The same in the rooms' language, matched wherever they stand, since its words take their endings directly.
+situation_stems = ["때", "경우", "물을", "물으면", "묻는", "논할", "다룰", "나오면", "할 때"]
