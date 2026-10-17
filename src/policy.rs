@@ -1,5 +1,8 @@
 //! The service's own policy, under the root `policy/` folder: the common words and the words an item is named
-//! by (docs/fragments.md), and the memory and person-book numbers (docs/memories.md, docs/people-book.md).
+//! by (docs/fragments.md), the memory and person-book numbers (docs/memories.md, docs/people-book.md), and the
+//! Korean words the prompts quote (docs/boundary-api.md, 「Its prompts」).
+
+use std::collections::BTreeMap;
 
 use serde::Deserialize;
 
@@ -74,3 +77,12 @@ pub struct Sheets {
 }
 
 brain_support::part!(pub BRAIN: Brain = "brain.toml");
+
+/// The Korean words the recollectors' prompts quote, each by the name of the `{{name}}` mark that stands for it.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PromptWords {
+  pub words: BTreeMap<String, String>,
+}
+
+brain_support::part!(pub PROMPT_WORDS: PromptWords = "prompts.toml");

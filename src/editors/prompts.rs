@@ -9,6 +9,7 @@ use std::sync::LazyLock;
 
 use regex::{Captures, Regex};
 
+use crate::policy::PROMPT_WORDS;
 use crate::ports::agency::Agency;
 use crate::ports::http::PortFailure;
 
@@ -82,15 +83,26 @@ pub fn render(template: &str, values: &[(&str, &str)]) -> String {
     .into_owned()
 }
 
+/// A prompt of this repository's with its marks filled: the run's own values, then the Korean words the prompts
+/// quote, which the policy holds so the prompt files hold none.
+pub fn filled(template: &str, values: &[(&str, &str)]) -> String {
+  let mut marks: Vec<(&str, &str)> = values.to_vec();
+
+  marks.extend(PROMPT_WORDS.words.iter().map(|(name, word)| (name.as_str(), word.as_str())));
+
+  render(template, &marks)
+}
+
 /// A task an editor that writes the brain's pieces is handed: the editor's task document under the prompts
-/// folder with its marks filled, behind the rulebooks every such editor reads, each headed by its name.
+/// folder with its marks filled, behind the rulebooks every such editor reads, each headed by its name. This
+/// repository's rulebooks are filled as the task is; the agency's go in as they are handed over.
 pub async fn fragment_writer(
   prompts: Prompts<'_>,
   editor: &str,
   file: &str,
   values: &[(&str, &str)],
 ) -> Result<String, PromptFailure> {
-  let task = render(&read_required(&prompts.root.join(editor).join(file))?, values);
+  let task = filled(&read_required(&prompts.root.join(editor).join(file))?, values);
   let shared: Vec<&str> = RULEBOOKS.iter().filter(|(_, agency)| *agency).map(|(name, _)| *name).collect();
   let handed = prompts.agency.rulebooks(&shared).await?;
   let mut parts = vec![];
@@ -106,7 +118,7 @@ pub async fn fragment_writer(
           why: "the agency did not hand it over".to_owned(),
         })?
     } else {
-      read_required(&prompts.root.join("rules").join(format!("{name}.md")))?
+      filled(&read_required(&prompts.root.join("rules").join(format!("{name}.md")))?, values)
     };
 
     parts.push(format!("RULEBOOK prompts/rules/{name}.md:\n{text}"));

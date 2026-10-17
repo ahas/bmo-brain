@@ -15,6 +15,8 @@ selects nothing.
 | `crates/brain-support/` | helpers the crates share: database access, the clock, text measures, policy loading, the editing lock's process start times and whole-published files |
 | `crates/memory-rows/` | the memory, note and watch rows and the operations on them |
 | `crates/fragment-desk/` | the fragment desk over an agent's brain documents |
+| `prompts/` | the recollectors' tasks and the two rulebooks only they read, which the `prompts` setting points at |
+| `policy/` | the service's own policy, the Korean words the prompts quote among it |
 | `tests/` | the service's tests and the checks that span the repository |
 | `testbed.toml` | the build and test commands, the service unit and the version |
 
@@ -36,7 +38,8 @@ reads:
 
 - the address it listens on and the bearer token callers present;
 - its database, which holds only the brain's own tables and its own settings;
-- its brain folder, a git repository of the agents' documents, and its prompts folder;
+- its brain folder, a git repository of the agents' documents, and its prompts folder, this repository's
+  `prompts/` as it is deployed;
 - the chat agent's key, which names whose brain it serves, and the owner's number and names;
 - the addresses and tokens of the agency, the receiver and the gate;
 - its own command, the words that start its binary, which every run it launches apart through the agency begins

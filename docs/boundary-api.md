@@ -32,7 +32,7 @@ the same binary with a run's words does that one piece of work and ends (「Runs
 | service unit | `service_unit` | the unit the service runs as: a failure notice of a run with no unit of its own names this unit's journal, and a run under a launched unit names that unit's |
 | agency, receiver, gate | `[agency]`, `[receiver]`, `[gate]`, each with `base` and `token` | each unit's base address and the token it is called with |
 | own command | `own_command` | the words that start this service's binary with its configuration, which every run the brain launches apart begins with (「Runs launched apart」) |
-| policy | none | the files under `policy/`, the service's and each crate's own, built into the binary: the common words, the fragment titles' cues, the words an item is named by, and the memory, digest and person-book numbers |
+| policy | none | the files under `policy/`, the service's and each crate's own, built into the binary: the common words, the fragment titles' cues, the words an item is named by, the Korean words the prompts quote, and the memory, digest and person-book numbers |
 
 Paths the brain writes into an answer are relative to the brain folder or to the data root, never absolute.
 
@@ -59,10 +59,15 @@ Paths the brain writes into an answer are relative to the brain folder or to the
   `people-digest-failures.log`, and the owner's room rules, one document `room-rules/<chatId>.json` per room
   (「Owner room rules」).
 - **Its prompts:** the recollectors' task prompts and the rulebooks only they read, the fragment tool's and the
-  recollection's, are this repository's. The rulebooks every document writer shares, document writing, plain
-  writing and the one against destroying the system, are the agency's, read through its rulebook read. A writer's
-  prompt is the five in that order, document writing, plain writing, the fragment tool, recollection and self
-  preservation, each headed by its name, then its task with its `{{name}}` marks filled.
+  recollection's, are this repository's, under `prompts/`: each editor's tasks in a folder of its own
+  (`digest/task.md`, `people/{task,sort,trim,split}.md`), the chat-session summariser's task
+  (`session-summary/chat.md`), and the two rulebooks under `rules/`. The rulebooks every document writer shares,
+  document writing, plain writing and the one against destroying the system, are the agency's, read through its
+  rulebook read. A writer's prompt is the five in that order, document writing, plain writing, the fragment tool,
+  recollection and self preservation, each headed by its name, then its task. The task and this repository's two
+  rulebooks have their `{{name}}` marks filled: the run's own (the agent it writes for by its label, the batch,
+  the documents) and the Korean words the prompts quote, which stand in `policy/prompts.toml` so the prompt
+  files hold none; a mark nothing fills is left as it stands. The agency's rulebooks go in as they are handed over.
 - **Its tools:** the tools bound to the brain are this repository's, each under `tools/` with its own
   `tool.toml` manifest, which the tool host reads as it reads any tool's: `tools/memory`, the memory rows an
   agent keeps and the note it keeps for a room's digest, and `tools/fragment`, an editor's fragment desk. Each
