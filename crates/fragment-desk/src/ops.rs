@@ -62,8 +62,8 @@ pub struct WriteRequest {
   pub distinct_from: Vec<String>,
 }
 
-fn refused<T>(why: impl Into<String>) -> Desked<T> {
-  Err(DeskError::refused(why))
+fn refused<T>(code: &'static str, why: impl Into<String>) -> Desked<T> {
+  Err(DeskError::refused(code, why))
 }
 
 /// A path with its empty and `.` steps dropped and each `..` folding the step before it, for the one
@@ -330,21 +330,27 @@ impl Open {
   // The written library a path is a piece of, where the run may write it, or a refusal saying which.
   fn writable_library(&self, path: &str) -> Desked<&'static Library> {
     if path.is_empty() || path.starts_with('/') || normalized(path).starts_with("..") {
-      return refused(format!("{path} is not a path relative to the folder this run works in."));
+      return refused(
+        "out-of-place",
+        format!("{path} is not a path relative to the folder this run works in."),
+      );
     }
 
     let brain = self.brain_side(path);
     let Some(library) = self.folders.library_owning(&brain) else {
-      return refused(format!(
-        "{path} is no piece of a brain library: a room rule chunk, a knowledge chunk or a person-book piece under chunks/. A standing sheet, knowledge/candidates.md and an index.md are not pieces and have no row."
-      ));
+      return refused(
+        "out-of-place",
+        format!(
+          "{path} is no piece of a brain library: a room rule chunk, a knowledge chunk or a person-book piece under chunks/. A standing sheet, knowledge/candidates.md and an index.md are not pieces and have no row."
+        ),
+      );
     };
 
     if !in_places(&self.desk.places, path) {
-      return refused(format!(
-        "{path} is outside where this run may write: {}.",
-        self.desk.places.join(", ")
-      ));
+      return refused(
+        "out-of-place",
+        format!("{path} is outside where this run may write: {}.", self.desk.places.join(", ")),
+      );
     }
 
     let (owner, _) = self.folders.agent_of(&brain);
@@ -352,7 +358,10 @@ impl Open {
     if let Some(agent) = &self.desk.agent
       && owner != agent
     {
-      return refused(format!("{path} is in {owner}'s memory, and this run writes {agent}'s alone."));
+      return refused(
+        "out-of-place",
+        format!("{path} is in {owner}'s memory, and this run writes {agent}'s alone."),
+      );
     }
 
     Ok(library)
@@ -418,28 +427,37 @@ impl Open {
     let library = self.writable_library(&write.path)?;
 
     if !self.body_path(&write.path).exists() {
-      return refused(format!(
-        "{} is not on disk. Write the piece's body with your file tools first, then its row.",
-        write.path
-      ));
+      return refused(
+        "no-body",
+        format!(
+          "{} is not on disk. Write the piece's body with your file tools first, then its row.",
+          write.path
+        ),
+      );
     }
 
     if let Some(brackets) = item_bracket_problem(&self.body_at(&write.path).unwrap_or_default()) {
-      return refused(format!(
-        "{} {brackets}. Put the slot names into its body with your file tools, then write its row again.",
-        write.path
-      ));
+      return refused(
+        "unnamed-slots",
+        format!(
+          "{} {brackets}. Put the slot names into its body with your file tools, then write its row again.",
+          write.path
+        ),
+      );
     }
 
     if let Some(shape) = title_shape_problem(&write.title, &self.names) {
-      return refused(format!(
-        "The title of {} {shape}. Say what kind of document the piece is and the situations a turn needs it for, in one or two sentences.",
-        write.path,
-      ));
+      return refused(
+        "title-shape",
+        format!(
+          "The title of {} {shape}. Say what kind of document the piece is and the situations a turn needs it for, in one or two sentences.",
+          write.path,
+        ),
+      );
     }
 
     if let Some(keywords) = keyword_problem(&write, &self.names) {
-      return refused(format!("{} {keywords}.", write.path));
+      return refused("keywords", format!("{} {keywords}.", write.path));
     }
 
     if held && !self.stands_at(library, &write.path)? {
@@ -455,7 +473,7 @@ impl Open {
         said.extend(already.iter().map(line_of));
         said.push("Put the matter into the piece that holds it and write that piece's row, fold the two with fragment_merge, or — where this really is another matter — write again naming each of them in distinct_from.".to_owned());
 
-        return refused(said.join("\n"));
+        return refused("repeats", said.join("\n"));
       }
     }
 
@@ -497,7 +515,7 @@ impl Open {
     let library = self.writable_library(&named)?;
 
     if !self.body_path(&named).exists() && !self.stands_at(library, &named)? {
-      return refused(format!("Nothing stands at {named}: no file and no row."));
+      return refused("nothing-stands", format!("Nothing stands at {named}: no file and no row."));
     }
 
     Ok(named)
@@ -529,7 +547,7 @@ impl Open {
       .collect();
 
     if from.is_empty() {
-      return refused("A merge names at least one piece to fold into the kept one.");
+      return refused("bad-merge", "A merge names at least one piece to fold into the kept one.");
     }
 
     let folded: Vec<DeskRow> = self
@@ -572,6 +590,7 @@ impl Open {
 
     if paths.len() < 2 && !(paths.len() == 1 && paths[0] != from) {
       return refused(
+        "bad-split",
         "A split names the pieces that come out of it: two or more, or one that is not the piece cut.",
       );
     }

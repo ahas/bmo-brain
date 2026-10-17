@@ -290,7 +290,7 @@ fn a_writer_is_handed_what_the_batch_names_beside_what_it_always_gets() {
 #[test]
 fn a_run_s_row_writes_are_held_against_what_it_wrote() {
   let brain = brain();
-  let names = names(&brain, AGENT);
+  let names = names(&brain, AGENT, &[" The Owner ".to_owned(), "the owner".to_owned()]);
   let writes = vec![
     write("notes/loose.md", "x", &[], &[]),
     write("knowledge/elsewhere.md", "Elsewhere", &[], &[]),
@@ -325,6 +325,11 @@ fn a_run_s_row_writes_are_held_against_what_it_wrote() {
   );
   assert_eq!(names.agent, AGENT);
   assert_eq!(names.agent_key, AGENT);
+  // The common words are the policy's, the chat agent's key and label, and the owner's names, each once in lower
+  // case.
+  assert!(names.common_words.contains(&"worker".to_owned()));
+  assert_eq!(names.common_words.iter().filter(|word| *word == AGENT).count(), 1);
+  assert_eq!(names.common_words.iter().filter(|word| *word == "the owner").count(), 1);
 }
 
 #[tokio::test]
@@ -332,7 +337,9 @@ async fn the_table_follows_the_agencys_folders_and_labels() {
   let scratch = Scratch::new().await;
   let agency = agency();
   let receiver = FakeReceiver::default();
-  let table = Table::of(scratch.db(), &agency, &receiver, Path::new("/brain"), AGENT).await.unwrap();
+  let table = Table::of(scratch.db(), &agency, &receiver, Path::new("/brain"), AGENT, &[])
+    .await
+    .unwrap();
 
   assert_eq!(table.brain.root_agent(), AGENT);
   assert_eq!(table.brain.folder_of(OTHER_AGENT), COMPANION);
@@ -349,7 +356,7 @@ async fn a_batch_s_writes_become_rows_settle_and_draw_their_agents_index_alone()
     ("knowledge/restart.md", "# Restart\n\nThe restart of the tool.\n"),
     (&format!("{COMPANION}/knowledge/tea.md"), "# Tea\n\nThe tea notes.\n"),
   ]);
-  let table = Table::of(scratch.db(), &agency, &receiver, dir.path(), AGENT).await.unwrap();
+  let table = Table::of(scratch.db(), &agency, &receiver, dir.path(), AGENT, &[]).await.unwrap();
 
   agency.finished.lock().unwrap().insert(758);
   table
@@ -430,7 +437,7 @@ async fn a_brain_that_is_no_repository_is_passed_over() {
   let agency = agency();
   let receiver = FakeReceiver::default();
   let dir = tempfile::tempdir().unwrap();
-  let table = Table::of(scratch.db(), &agency, &receiver, dir.path(), AGENT).await.unwrap();
+  let table = Table::of(scratch.db(), &agency, &receiver, dir.path(), AGENT, &[]).await.unwrap();
   let done = table.reconcile(None).await.unwrap();
 
   assert_eq!(done.len(), 3);
@@ -444,7 +451,7 @@ async fn a_writer_is_handed_the_named_brain_pieces_on_disk_alone() {
   let agency = agency();
   let receiver = FakeReceiver::default();
   let dir = laid_brain(&[("rooms/-5/people/chunks/p9-tools.md", "# Tools\n")]);
-  let table = Table::of(scratch.db(), &agency, &receiver, dir.path(), AGENT).await.unwrap();
+  let table = Table::of(scratch.db(), &agency, &receiver, dir.path(), AGENT, &[]).await.unwrap();
 
   receiver.names.lock().unwrap().insert(9, "Tester".into());
 
@@ -489,7 +496,9 @@ async fn a_shipped_library_is_brought_to_its_owners_entries_with_the_hand_honour
   let scratch = Scratch::new().await;
   let agency = agency();
   let receiver = FakeReceiver::default();
-  let table = Table::of(scratch.db(), &agency, &receiver, Path::new("/brain"), AGENT).await.unwrap();
+  let table = Table::of(scratch.db(), &agency, &receiver, Path::new("/brain"), AGENT, &[])
+    .await
+    .unwrap();
 
   assert_eq!(
     table.reconcile_shipped("person-book", "Person book", &[entry("a", "A", 0)]).await,

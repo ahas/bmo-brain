@@ -33,6 +33,8 @@ pub struct Ground<'a> {
   pub prompts_root: &'a Path,
   /// The chat agent's registration key, whose memory is the brain root.
   pub chat_key: &'a str,
+  /// The names the owner goes by in the rooms, which the fragment checks count among the common words.
+  pub owner_names: &'a [String],
   /// The unit the service runs as, whose journal holds a run that ran in no unit of its own.
   pub service_unit: &'a str,
   /// The unit this process was launched in, none where it runs inside the service or by hand.
@@ -52,7 +54,7 @@ impl<'a> Ground<'a> {
 
   /// The fragment table over the brain as the agency registers its folders now.
   pub async fn table(&self) -> Result<Table<'a>, Failure> {
-    Table::of(self.db, self.agency, self.receiver, self.brain_root, self.chat_key).await
+    Table::of(self.db, self.agency, self.receiver, self.brain_root, self.chat_key, self.owner_names).await
   }
 
   /// Where the desks of the runs in flight stand.

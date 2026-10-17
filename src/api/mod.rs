@@ -6,6 +6,7 @@
 //! conventions.
 
 pub mod console;
+pub mod desk;
 pub mod digests;
 pub mod fragments;
 pub mod gate;
@@ -43,7 +44,7 @@ use crate::schedules::launches::Launches;
 
 /// What the routes stand on: the brain's database and the address the fragment tool opens it by, the agency, the
 /// receiver and the gate, the brain root, the data root and the prompts folder, the chat agent's registration key
-/// and the owner's number, the unit the service runs as and the words that start its binary, the token every caller
+/// and the owner's number and names, the unit the service runs as and the words that start its binary, the token every caller
 /// presents, and the withering stamps the conditions route keeps for the service's life.
 pub struct Api {
   pub db: DatabaseConnection,
@@ -56,6 +57,7 @@ pub struct Api {
   pub prompts_root: PathBuf,
   pub chat_key: String,
   pub owner: Option<i64>,
+  pub owner_names: Vec<String>,
   pub service_unit: String,
   pub program: Vec<String>,
   pub token: String,
@@ -81,6 +83,7 @@ impl Api {
       data_root: &self.data_root,
       prompts_root: &self.prompts_root,
       chat_key: &self.chat_key,
+      owner_names: &self.owner_names,
       service_unit: &self.service_unit,
       unit,
       own_run: unit,
@@ -279,6 +282,7 @@ pub fn router(api: Arc<Api>) -> Router {
     .merge(summaries::routes())
     .merge(console::routes())
     .merge(room_rules::routes())
+    .merge(desk::routes())
     .fallback(no_route)
     .layer(middleware::from_fn_with_state(api.clone(), authorised))
     .with_state(api)

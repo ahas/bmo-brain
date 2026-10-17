@@ -144,27 +144,32 @@ impl From<Fault> for ShippedFailure {
 }
 
 /// The names the write checks read: the name the brain root's agent calls itself by, its registration key, and
-/// the policy's common words.
-pub fn names(brain: &Brain, chat_key: &str) -> Names {
+/// the common words: the policy's, the chat agent's key and label, and the owner's names the configuration holds.
+pub fn names(brain: &Brain, chat_key: &str, owner_names: &[String]) -> Names {
+  let agent = brain.writer_name(brain.root_agent());
+  let named = [chat_key, agent.as_str()].into_iter().chain(owner_names.iter().map(String::as_str));
+
   Names {
-    agent: brain.writer_name(brain.root_agent()),
+    common_words: COMMON_WORDS.with_names(named),
+    agent,
     agent_key: chat_key.to_owned(),
-    common_words: COMMON_WORDS.words.clone(),
   }
 }
 
 impl<'a> Table<'a> {
   /// The table on a database, with every awake agent's brain folder and label as the agency registers them;
-  /// `chat_key` is the chat agent's registration key, whose memory the brain root is.
+  /// `chat_key` is the chat agent's registration key, whose memory the brain root is, and `owner_names` the names
+  /// the owner goes by, which the checks count among the common words.
   pub async fn of(
     db: &'a DatabaseConnection,
     agency: &'a dyn Agency,
     receiver: &'a dyn Receiver,
     brain_root: &Path,
     chat_key: &str,
+    owner_names: &[String],
   ) -> Result<Self, Failure> {
     let brain = Brain::of(agency, brain_root, chat_key).await?;
-    let names = names(&brain, chat_key);
+    let names = names(&brain, chat_key, owner_names);
 
     Ok(Self {
       db,

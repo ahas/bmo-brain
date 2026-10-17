@@ -195,9 +195,21 @@ moved to another room meanwhile), `already-up` or `already-down`. A slug names o
 
 ### Fragments
 
-The fragment tool's routes, one per tool schema. Each body is `desk` (the desk the run's session record names)
-plus the tool's arguments; each answer is a reading or a refusal (「Fragment refusals」 below). A desk that is
-not open is refused `no-desk`.
+The fragment tool's routes, one per tool schema. Each body is `desk` (the desk the run's session record names,
+as the session start handed it) plus the tool's arguments; each answer is a reading or a refusal (「Fragment
+refusals」 below). A desk is found only among the desks open under the data root: a `desk` naming any other
+file, or a desk already closed, is refused `no-desk`. Each call reads the desk afresh; a call that writes saves
+it whole, or leaves it as it stood on a refusal, and writes nothing to the table, which the batch writes once
+the run ends.
+
+- **Arguments as the tool schemas take them:** `keywords` is one text of words separated by commas; `items`
+  are positive whole numbers; `status` is `open` or `done`; `from` of a merge names at least one piece, and
+  `pieces` of a split at least one, each `path`, `title`, `keywords`, `items` and `shared` or null. A body
+  of another shape is 400.
+- **The readings:** a search answers one line per row the run may reach, with its own writes laid over them, or
+  `No row matches.`, cut under the answer ceiling with a line saying how to narrow it; a write, a merge and a
+  split answer the rows they wrote; a remove what it took down; owed the pieces still owed a row, or that
+  nothing is owed.
 
 | Route | Tool | Arguments |
 |---|---|---|
@@ -509,11 +521,16 @@ A listing line marks a global row with `global-scope` (`reach`) and a handed-ove
 | Code | When |
 |---|---|
 | `no-desk` | the desk named is not open |
-| `out-of-place` | a path that is no piece of a brain library, or outside the run's folder |
+| `no-names` | the desk was opened without the names the checks read |
+| `out-of-place` | a path that is not relative, is no piece of a brain library, is outside the places the run may write, or is in another agent's memory |
 | `no-body` | a write for a piece whose body is not on disk |
 | `unnamed-slots` | a day bracket that leaves its slot names out |
 | `title-shape` | a title the shape check refuses, with the reason |
-| `repeats` | a new piece whose matter a reachable row holds, with those rows' paths |
+| `keywords` | keywords carrying a common word (「Keywords」 in `fragments.md`), outside a person's address piece |
+| `repeats` | a new piece whose matter a reachable row holds, the sentence naming those rows |
+| `nothing-stands` | a remove, merge or split naming a path with no file and no row |
+| `bad-merge` | a merge naming no piece to fold into the kept one |
+| `bad-split` | a split naming fewer pieces than a cut makes |
 | `body-stands` | a hand remove for a piece whose file still stands |
 | `row-refused` | a hand write the row checks refuse, with `reasons` |
 

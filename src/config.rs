@@ -65,6 +65,7 @@ impl Config {
       prompts_root: self.prompts.clone(),
       chat_key: self.chat_key.clone(),
       owner: self.owner,
+      owner_names: self.owner_names.clone(),
       service_unit: self.service_unit.clone(),
       program: self.own_command.clone(),
       token: self.token.clone(),

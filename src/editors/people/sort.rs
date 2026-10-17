@@ -1130,6 +1130,7 @@ impl SortRoom for &PeopleDigest<'_> {
     Ok(table_names(
       &Brain::of(ground.agency, ground.brain_root, ground.chat_key).await?,
       ground.chat_key,
+      ground.owner_names,
     ))
   }
 

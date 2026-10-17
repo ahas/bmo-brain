@@ -81,6 +81,7 @@ impl Stage {
       data_root: self.data.path(),
       prompts_root: &self.prompts,
       chat_key: AGENT,
+      owner_names: &[],
       service_unit: "brain-service",
       unit: None,
       own_run: None,

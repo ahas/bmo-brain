@@ -100,7 +100,7 @@ fn request(path: &str, title: &str, keywords: &[&str]) -> WriteRequest {
 
 fn refusal<T: std::fmt::Debug>(answer: Result<T, DeskError>) -> String {
   match answer.unwrap_err() {
-    DeskError::Refused(refusal) => refusal.0,
+    DeskError::Refused(refusal) => refusal.message,
     DeskError::Failed(why) => panic!("failed rather than refused: {why}"),
   }
 }

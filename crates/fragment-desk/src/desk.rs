@@ -9,13 +9,17 @@ use std::path::Path;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
-/// A call the tool refuses: nothing was written, and the message says why and what to do instead.
+/// A call the tool refuses: nothing was written. The code names the refusal for a machine, and the message says
+/// why and what to do instead.
 #[derive(Debug)]
-pub struct Refusal(pub String);
+pub struct Refusal {
+  pub code: &'static str,
+  pub message: String,
+}
 
 impl fmt::Display for Refusal {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    f.write_str(&self.0)
+    f.write_str(&self.message)
   }
 }
 
@@ -27,8 +31,11 @@ pub enum DeskError {
 }
 
 impl DeskError {
-  pub fn refused(why: impl Into<String>) -> Self {
-    Self::Refused(Refusal(why.into()))
+  pub fn refused(code: &'static str, why: impl Into<String>) -> Self {
+    Self::Refused(Refusal {
+      code,
+      message: why.into(),
+    })
   }
 }
 
@@ -148,7 +155,7 @@ impl Desk {
   /// The names the checks read, which the batch that opened the desk wrote on it.
   pub fn names(&self) -> Desked<&Names> {
     self.names.as_ref().ok_or_else(|| {
-      DeskError::refused("This desk names none of the deployment's names; it was opened before the tool host could read it. Let the batch open a new desk.")
+      DeskError::refused("no-names", "This desk names none of the deployment's names; it was opened before the tool host could read it. Let the batch open a new desk.")
     })
   }
 }

@@ -72,6 +72,7 @@ pub async fn served() -> Served {
     prompts_root: prompts_root(),
     chat_key: AGENT.to_owned(),
     owner: Some(OWNER),
+    owner_names: vec!["Owner".to_owned()],
     service_unit: "brain-service".to_owned(),
     program: PROGRAM.map(str::to_owned).to_vec(),
     token: TOKEN.to_owned(),
