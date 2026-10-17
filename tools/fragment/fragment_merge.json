@@ -1,0 +1,51 @@
+{
+  "properties": {
+    "from": {
+      "description": "The pieces folded into it, which are removed.",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "into": {
+      "description": "The kept piece's path, whose body now holds the merged matter.",
+      "type": "string"
+    },
+    "items": {
+      "description": "The TODO item numbers the piece is about (#758 is 758); [] for none.",
+      "items": {
+        "exclusiveMinimum": 0,
+        "type": "integer"
+      },
+      "type": [
+        "array",
+        "null"
+      ]
+    },
+    "keywords": {
+      "description": "One text of three to ten words, separated by commas, that somebody would ask for this piece by and that are particular to it: the Korean words the room uses for the matter, names, product and system names, identifiers. None of the words every turn carries.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "shared": {
+      "description": "On a knowledge chunk only: true for a chunk every room may read, false for one of this room alone.",
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "title": {
+      "description": "One or two sentences, 40 to 320 characters: what kind of document the piece is and the situations a turn needs it for. Never a list of nouns.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "into",
+    "from",
+    "title"
+  ],
+  "type": "object"
+}

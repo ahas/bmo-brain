@@ -70,8 +70,23 @@ Paths the brain writes into an answer are relative to the brain folder or to the
   files hold none; a mark nothing fills is left as it stands. The agency's rulebooks go in as they are handed over.
 - **Its tools:** the tools bound to the brain are this repository's, each under `tools/` with its own
   `tool.toml` manifest, which the tool host reads as it reads any tool's: `tools/memory`, the memory rows an
-  agent keeps and the note it keeps for a room's digest, and `tools/fragment`, an editor's fragment desk. Each
-  answers through the routes below, over HTTP.
+  agent keeps, the note it keeps for a room's digest and the watch it sets, and `tools/fragment`, an editor's
+  fragment desk. Each answers through the routes below, over HTTP, and opens no database.
+  - **The call:** the tool host's protocol 1. The executable is handed one JSON object on standard input,
+    the protocol version, `kind` (`call`, with the entry's full name and its arguments) and the session record,
+    and answers one on standard output: a tool result, `content` text pieces and `isError`. A refusal is the
+    route's sentence marked `isError` (the fragment tool's headed `REFUSED: `, a watch's `watch: `), a failure
+    to reach the brain `ERROR: ` and its reason; `memory_list` answers its reading as `structuredContent`
+    `{lines}` under its output schema, the same object as its text. A request that does not read ends the
+    executable unclean with why on standard error. `crates/tool-call` is the brain's side of it.
+  - **What a tool reads of the record:** `dataRoot`; the turn, from the run its `place` names (`run.json`, none
+    for a person's turn) over `runVariables`: `BMO_TURN_AGENT` the agent, `BMO_TURN_CHAT` the room; and an
+    editor's `fragmentDesk`. Every other field is passed over.
+  - **Where the brain stands:** `BRAIN_ADDRESS` (its base address) and `BRAIN_TOKEN` from the tool's own
+    environment, else from `env/brain.env` under the record's data root, the file the service's unit is
+    configured beside; a tool placed by the host has a clean environment.
+  - **A turn a companion's reset overtook** is refused by the agency before its tools are called; the brain's
+    tools read no reset point.
 
 ## Wire conventions
 

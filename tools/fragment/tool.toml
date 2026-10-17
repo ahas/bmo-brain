@@ -1,0 +1,66 @@
+# The editors' fragment desk, each call answered through the brain's desk routes for the desk its session's
+# record names (docs/fragments.md, 「An editor writes the row through the fragment tool」). The crate's own test
+# holds every entry here to the Rust tool answering it.
+
+[tool]
+name = "fragment"
+protocol = 1
+language = "rust"
+build = 'cargo build --release -p fragment-tool && cp "$BMO_CARGO_TARGET/release/fragment-tool" "$BMO_TOOL_OUT/"'
+check = 'cargo test -p fragment-tool'
+run = ["fragment-tool"]
+timeout = 30
+
+[[entry]]
+namespace = "fragments"
+name = "fragment_search"
+title = "Search the fragment rows"
+description = "The rows of the pieces this run may reach, each as a line with its slug, title, path, keywords, items, period and status, with this run's own writes laid over them. Search before you create a piece: a matter a row already holds goes into that piece."
+input = "fragment_search.json"
+hints = { read_only = true }
+capabilities = ["fragments.desk"]
+
+[[entry]]
+namespace = "fragments"
+name = "fragment_write"
+title = "Write a piece's row"
+description = "Writes the row of a piece whose body you have just created or changed with your file tools. Call it for every piece you create or change, again whenever its body changes. A new piece whose matter a row already holds is refused with those rows named."
+input = "fragment_write.json"
+hints = { idempotent = true }
+capabilities = ["fragments.desk"]
+
+[[entry]]
+namespace = "fragments"
+name = "fragment_remove"
+title = "Remove a piece"
+description = "Deletes a piece's file and takes its row down. Your file tools cannot delete a file; this is how a piece left with nothing in it goes."
+input = "fragment_remove.json"
+hints = { destructive = true }
+capabilities = ["fragments.desk"]
+
+[[entry]]
+namespace = "fragments"
+name = "fragment_merge"
+title = "Merge pieces"
+description = "Folds pieces into one after you have written the merged body into the kept piece: writes the kept piece's row and removes every piece folded into it. Keywords and items left out are those of all the pieces together."
+input = "fragment_merge.json"
+hints = { destructive = true }
+capabilities = ["fragments.desk"]
+
+[[entry]]
+namespace = "fragments"
+name = "fragment_split"
+title = "Split a piece"
+description = "Cuts one piece into several after you have written their bodies: writes a row for each piece that comes out of it and removes the original unless it is one of them. What comes out of a standing piece is not held against other rows."
+input = "fragment_split.json"
+hints = { destructive = true }
+capabilities = ["fragments.desk"]
+
+[[entry]]
+namespace = "fragments"
+name = "fragment_owed"
+title = "Pieces still owed a row"
+description = "The pieces this run created or changed on disk and has written no row for yet. A run that ends with any of them fails, so ask before you finish."
+input = "fragment_owed.json"
+hints = { read_only = true }
+capabilities = ["fragments.desk"]

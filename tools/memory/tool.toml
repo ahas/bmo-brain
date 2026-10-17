@@ -1,0 +1,131 @@
+# The memory tools, each answering through the brain's routes (docs/boundary-api.md, 「Its tools」): the memory
+# rows an agent keeps, the note it keeps for the room's digest and the watch it sets (docs/memories.md). The
+# crate's own test holds every entry here to the Rust tool answering it.
+
+[tool]
+name = "memory"
+protocol = 1
+language = "rust"
+build = 'cargo build --release -p memory-tool && cp "$BMO_CARGO_TARGET/release/memory-tool" "$BMO_TOOL_OUT/"'
+check = 'cargo test -p memory-tool'
+run = ["memory-tool"]
+timeout = 30
+
+[[entry]]
+namespace = "bmo"
+name = "memory_list"
+description = "A room's memory rows, or the global ones; open rows unless all are asked for."
+input = "memory_list.json"
+output = "reading.json"
+hints = { read_only = true }
+capabilities = ["room.tools"]
+
+[entry.bundle."room.chat"]
+shown = ["type", "all"]
+
+[entry.facts]
+icon = "material-symbols:cognition-2-outline-sharp"
+
+[[entry]]
+namespace = "bmo"
+name = "memory_add"
+description = "Write a memory row: a promise, a check, a follow-up, a situation rule, or the state of something under way."
+input = "memory_add.json"
+capabilities = ["room.tools"]
+grant = "memories"
+
+[entry.bundle."room.chat"]
+shown = ["type", "action", "condition", "slug"]
+
+[entry.facts]
+record = "memory"
+icon = "material-symbols:cognition-2-outline-sharp"
+
+[[entry]]
+namespace = "bmo"
+name = "memory_update"
+description = "Move a room's open state on: its text becomes where the thing now stands."
+input = "memory_update.json"
+capabilities = ["room.tools"]
+grant = "memories"
+
+[entry.bundle."room.chat"]
+shown = ["memory", "action"]
+
+[entry.facts]
+icon = "material-symbols:cognition-2-outline-sharp"
+
+[[entry]]
+namespace = "bmo"
+name = "memory_done"
+description = "Check off a room's errand row, or release its state."
+input = "memory_done.json"
+capabilities = ["room.tools"]
+grant = "memories"
+
+[entry.bundle."room.chat"]
+shown = ["memory", "text"]
+
+[entry.facts]
+icon = "material-symbols:cognition-2-outline-sharp"
+
+[[entry]]
+namespace = "bmo"
+name = "memory_retire"
+description = "Take a memory row down, saying why."
+input = "memory_retire.json"
+capabilities = ["room.tools"]
+grant = "memories"
+
+[entry.bundle."room.chat"]
+shown = ["memory", "why"]
+
+[entry.facts]
+icon = "material-symbols:cognition-2-outline-sharp"
+
+[[entry]]
+namespace = "bmo"
+name = "memory_revive"
+description = "Put a memory row that was taken down back."
+input = "memory_revive.json"
+capabilities = ["room.tools"]
+grant = "memories"
+
+[entry.facts]
+icon = "material-symbols:cognition-2-outline-sharp"
+
+[[entry]]
+namespace = "bmo"
+name = "memory_candidate"
+description = "Raise a memory row as a candidate for a person to take down on the console."
+input = "memory_candidate.json"
+capabilities = ["room.tools"]
+grant = "memories"
+
+[entry.facts]
+icon = "material-symbols:cognition-2-outline-sharp"
+
+[[entry]]
+namespace = "bmo"
+name = "note_add"
+description = "Keep a note for the room's digest, for that room or for every room. Sends nothing."
+input = "note_add.json"
+capabilities = ["room.tools"]
+grant = "notes"
+
+[entry.bundle."room.chat"]
+shown = ["text"]
+
+[entry.facts]
+record = "note"
+
+[[entry]]
+namespace = "bmo"
+name = "watch_set"
+description = "Set a watch that comes back to the room when a check passes, or a timer when no check can say it."
+input = "watch_set.json"
+capabilities = ["room.tools"]
+grant = "watch"
+
+[entry.facts]
+record = "watch"

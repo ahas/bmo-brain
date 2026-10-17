@@ -1,7 +1,15 @@
-# The workspace: the brain service's own package at the root, and the crates it is built from under
-# `crates/`. The root package also holds the checks that span the repository in `tests/`.
+# The workspace: the brain service's own package at the root, the crates it is built from under `crates/`, and
+# the tools bound to it under `tools/`. The root package also holds the checks that span the repository in
+# `tests/`.
 [workspace]
-members = ["crates/brain-support", "crates/memory-rows", "crates/fragment-desk"]
+members = [
+  "crates/brain-support",
+  "crates/memory-rows",
+  "crates/fragment-desk",
+  "crates/tool-call",
+  "tools/memory",
+  "tools/fragment",
+]
 resolver = "3"
 
 [workspace.package]
@@ -12,6 +20,7 @@ edition = "2024"
 axum = { version = "0.8.4", default-features = false, features = ["http1", "json", "query", "tokio"] }
 brain-support = { path = "crates/brain-support" }
 chrono = { version = "0.4.41", default-features = false, features = ["std"] }
+dotenvy = "0.15.7"
 clap = { version = "4.5.40", features = ["derive"] }
 fragment-desk = { path = "crates/fragment-desk" }
 futures-util = "0.3.34"
@@ -20,6 +29,7 @@ memory-rows = { path = "crates/memory-rows" }
 rand = "0.9.2"
 reqwest = { version = "0.13.5", default-features = false }
 regex = "1.11.1"
+schemars = "1.0.4"
 sea-orm = { version = "1.1.17", default-features = false, features = ["macros", "runtime-tokio-rustls", "sqlx-postgres"] }
 sea-orm-migration = { version = "1.1.17", default-features = false, features = ["runtime-tokio-rustls", "sqlx-postgres"] }
 serde = { version = "1.0.219", features = ["derive"] }
@@ -28,6 +38,7 @@ sha2 = "0.10.9"
 sqlx = { version = "0.8.6", default-features = false, features = ["any", "postgres", "sqlite", "runtime-tokio"] }
 tempfile = "3.20.0"
 tokio = { version = "1.47.0", features = ["macros", "rt", "rt-multi-thread", "net", "time", "signal", "io-util", "process"] }
+tool-call = { path = "crates/tool-call" }
 toml = { version = "0.8.23", default-features = false, features = ["parse"] }
 
 [package]
@@ -67,7 +78,12 @@ tokio.workspace = true
 toml.workspace = true
 
 [dev-dependencies]
+# The brain's tools, called in the service's tests against the served routes.
+fragment-tool = { path = "tools/fragment" }
+memory-tool = { path = "tools/memory" }
 sqlx.workspace = true
+# The session record and the brain a tool call is made with, in the tools' tests.
+tool-call.workspace = true
 # The brain folders the editors' tests lay down.
 tempfile.workspace = true
 # The editors' clocks, run on time a test moves.

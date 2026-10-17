@@ -1,0 +1,40 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "author": {
+      "description": "Who it is about or from, by user id.",
+      "format": "int64",
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "chat": {
+      "description": "The room, by chat id, where it is not this turn's own.",
+      "format": "int64",
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "global": {
+      "description": "For every room: a way of working, know-how or a fact that holds wherever the work is done.",
+      "type": "boolean"
+    },
+    "message": {
+      "description": "The message this call acts on: the id of the person's message in this turn that asked for it. Omitted only in a turn whose every new message is the owner's, or that no person's message opened.",
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "text": {
+      "description": "What to keep.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "text"
+  ],
+  "type": "object"
+}

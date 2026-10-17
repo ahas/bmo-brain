@@ -1,0 +1,37 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "all": {
+      "description": "Finished and taken-down rows too.",
+      "type": "boolean"
+    },
+    "chat": {
+      "description": "The room, by chat id, where it is not this turn's own.",
+      "format": "int64",
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "global": {
+      "description": "A row tied to no room.",
+      "type": "boolean"
+    },
+    "type": {
+      "description": "One kind of row.",
+      "enum": [
+        "promise",
+        "check",
+        "followup",
+        "situation",
+        "state",
+        null
+      ],
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "type": "object"
+}

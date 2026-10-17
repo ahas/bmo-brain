@@ -1,0 +1,55 @@
+{
+  "properties": {
+    "distinct_from": {
+      "description": "Paths of the rows a refusal named that you have read and that hold another matter than this new piece.",
+      "items": {
+        "type": "string"
+      },
+      "type": [
+        "array",
+        "null"
+      ]
+    },
+    "for_every_agent": {
+      "description": "On a knowledge chunk or a person-book piece: true for a fact every agent is better for knowing, which every agent may be offered; false for a memory of this agent's own. Left out, the row keeps what it says, and a new one is this agent's own.",
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "items": {
+      "description": "The TODO item numbers the piece is about (#758 is 758); [] for none.",
+      "items": {
+        "exclusiveMinimum": 0,
+        "type": "integer"
+      },
+      "type": "array"
+    },
+    "keywords": {
+      "description": "One text of three to ten words, separated by commas, that somebody would ask for this piece by and that are particular to it: the Korean words the room uses for the matter, names, product and system names, identifiers. None of the words every turn carries.",
+      "type": "string"
+    },
+    "path": {
+      "description": "The piece's path relative to the folder you work in, exactly as you wrote it.",
+      "type": "string"
+    },
+    "shared": {
+      "description": "On a knowledge chunk only: true for a chunk every room may read, false for one of this room alone.",
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "title": {
+      "description": "One or two sentences, 40 to 320 characters: what kind of document the piece is and the situations a turn needs it for. Never a list of nouns.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "path",
+    "title",
+    "keywords",
+    "items"
+  ],
+  "type": "object"
+}

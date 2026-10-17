@@ -15,6 +15,8 @@ selects nothing.
 | `crates/brain-support/` | helpers the crates share: database access, the clock, text measures, policy loading, the editing lock's process start times and whole-published files |
 | `crates/memory-rows/` | the memory, note and watch rows and the operations on them |
 | `crates/fragment-desk/` | the fragment desk over an agent's brain documents |
+| `crates/tool-call/` | the brain's side of the tool host's call protocol, which its tools share |
+| `tools/memory/`, `tools/fragment/` | the tools bound to the brain, each with its `tool.toml`, answering through the brain's routes |
 | `prompts/` | the recollectors' tasks and the two rulebooks only they read, which the `prompts` setting points at |
 | `policy/` | the service's own policy, the Korean words the prompts quote among it |
 | `tests/` | the service's tests and the checks that span the repository |
