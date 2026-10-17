@@ -387,9 +387,13 @@ sentence naming the form it takes.
 |---|---|---|
 | `POST /agents/reset` | `agent`, `preview` (boolean) | `took`: `rows`, the count of the agent's rows per table (`memories`, `reminders`, `watches`, `notes`, `fragments`), and `folder`, its brain folder relative to the brain root where it stands, else null; with `preview` false every program still working in its folder is killed, the folder fenced and its editing lock taken ahead of every waiter (a taker still holding it killed rather than waited for), what a stopped run left unwritten put back, its rows removed, its read marks forgotten at the receiver, its book of every room it answers made to read from now, its folder removed and the removal committed, the folder fenced again and the lock let go; `couldNot` lists what it could not do. Its recollector runs are the agency's to stop, which the agency's own reset does first |
 | `POST /agents/removed` | `agent` | `ok` and `left`, what could not be removed; the agent's editing lock, its ticket queue and its fence are removed. The folder is the one the agency registers for the agent, so the agency calls this before it forgets the registration; an agent it registers no folder for has nothing to remove |
+| `POST /agents/fence` | `agent` | `ok`; the agent's folder fenced now, so no writer begun before this moment takes the folder's editing lock again. An agent the agency registers no folder for has nothing fenced |
+| `POST /agents/lock` | `agent` | `path`: the agent's folder's editing lock file, relative to the data root, which the caller may take as any writer takes it; null where the agency registers no folder for the agent |
+| `POST /agents/book-since` | `agent`, `chatId`, `at` | `ok`; the agent's person book of the room reads from `at`, in seconds, on: the day a book starts reading (「What the brain owns」) set to it |
+| `POST /agents/put-back` | `agent` | `ok`; the agent's folder put back to its last commit in the brain repository, so what its stopped recollector runs wrote and left uncommitted there goes. It takes no lock: the caller holds the folder's editing lock, taken through its path, while it asks. An agent the agency registers no folder for, or whose folder does not stand, has nothing undone; the brain root holds every other agent's folder, so the chat agent's is refused `brain-root` |
 
-An agent's folder is its registration's brain folder. The chat agent's is the brain root, so `POST /agents/reset`
-refuses it `brain-root`.
+An agent's folder is its registration's brain folder, read through the agency's registration lookup. The chat
+agent's is the brain root, so `POST /agents/reset` and `POST /agents/put-back` refuse it `brain-root`.
 
 ## Calls the brain makes
 
@@ -598,7 +602,7 @@ A listing line marks a global row with `global-scope` (`reach`) and a handed-ove
 | `not-answered` | `agent` | a person-book run asked for a room the agent does not answer |
 | `no-brain` | none | an editor finds the live brain folder is no git repository and makes none |
 | `too-few-batches` | `needed`, `given` | a reform whose folded messages do not fit the batches it was given |
-| `brain-root` | none | an agent reset names the agent whose folder is the brain root |
+| `brain-root` | none | an agent reset or put-back names the agent whose folder is the brain root |
 | `not-theirs` | none | a watch cancelled from a room that neither set it nor is the owner's |
 | `no-watch` | none | a watch cancel naming no watch |
 | `ended` | none | a watch cancel naming a watch that has already ended |
