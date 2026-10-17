@@ -23,7 +23,7 @@ the same binary with a run's words does that one piece of work and ends (「Runs
 | listen address | `listen` | where the service answers |
 | token | `token` | the bearer token every caller presents |
 | database | `database` | the address of the brain's own database: the tables below and the brain's settings table, nothing else |
-| data root | `data_root` | where the editing locks, the fragment desks and the failure logs live |
+| data root | `data_root` | where the editing locks, the fragment desks, the failure logs and the owner's room rules live |
 | brain folder | `brain` | the brain root, a git repository holding every agent's documents |
 | prompts folder | `prompts` | this repository's `prompts/`: the recollectors' tasks and the rulebooks only they read |
 | chat agent's key | `chat_key` | the registration key of the chat agent, whose brain folder is the brain root |
@@ -55,8 +55,9 @@ Paths the brain writes into an answer are relative to the brain folder or to the
   is the `agent` column's, which has no default. `fragment_kinds` has no archive counterpart: the archive's
   screens named the kinds in their own code, and the table fills as each owner hands its entries in.
 - **Its folder:** the brain repository and its documents, and under the data root the editing locks with their
-  ticket queues and fences, the fragment desks, and the failure logs `digest-failures.log` and
-  `people-digest-failures.log`.
+  ticket queues and fences, the fragment desks, the failure logs `digest-failures.log` and
+  `people-digest-failures.log`, and the owner's room rules, one document `room-rules/<chatId>.json` per room
+  (「Owner room rules」).
 - **Its prompts:** the recollectors' task prompts and the rulebooks only they read, the fragment tool's and the
   recollection's, are this repository's. The rulebooks every document writer shares, document writing, plain
   writing and the one against destroying the system, are the agency's, read through its rulebook read. A writer's
@@ -244,10 +245,26 @@ body with an empty `kind` or `label` is answered 400. The brain's own kinds answ
 |---|---|---|
 | `POST /knowledge/read` | `agent`, `chatId`, `slugs` | `documents`: `slug`, `path`, `text`, `version`; a slug outside the room's own and the shared chunks is refused `out-of-room` |
 | `POST /people/read` | `agent`, `chatId`, `senders`, `slugs` | `sheets` (per sender, the common sheet and the room sheet where the room keeps one and the file is under its ceiling) and `pieces`, each `path`, `text`, `version`, `owner`; a slug of another shape, a room piece of another room or a common piece of somebody who never spoke in the room is refused `out-of-room` |
-| `POST /room-rules/read` | `agent`, `chatId` | `rules`: `id`, `subject`, `text`, one per rule chunk of the room |
-| `POST /room-rules/set` | `agent`, `chatId`, `messageId`, `rules` (each `id` or null, `subject`, `text`), `removed` (ids) | a reading; refused `not-owner` unless the receiver confirms the message's sender is the room's owner |
 
 `version` is the body's hash; a session holds a document by its path and version.
+
+### Owner room rules
+
+The rules the owner grants in a room: each names one sender (`subject`, a user id) and what that person may
+ask the room's agents for (`text`). They are not the room-rule chunks of the brain's library: they are rows the
+owner sets, read by whoever decides whose message an agent answers in the room, which fills them into its own
+block. A room's rows are one document, `room-rules/<chatId>.json` under the data root, every agent of the room
+reading the same rows. A change replaces or removes one rule by its id and is made only on a message the
+receiver confirms the room's owner sent; a rule that is revoked leaves nothing behind.
+
+| Route | Body | Answer |
+|---|---|---|
+| `POST /room-rules/read` | `chatId` | `rules`: each `id`, `subject`, `text`, in the order they were set; none for a room with no document |
+| `POST /room-rules/set` | `chatId`, `messageId`, `id`, `rule` (`subject`, `text`) or null to revoke | `rules`, the room's rows as they now stand; refused `not-owner` unless the receiver confirms the message's sender is the owner |
+
+An `id` is 1 to 80 letters, digits, `_` or `-`; a `subject` is a whole number; a `text` is not blank and at most
+8000 characters, kept trimmed. Any other is 400. A change while another change of the same room holds its lock is
+409 `conflict` with the refusal `busy`; nothing waits for the lock.
 
 ### Session document loads
 

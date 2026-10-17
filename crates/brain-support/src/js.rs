@@ -8,6 +8,9 @@ pub const SPACE: &str =
 /// JavaScript's `.`: any character but a line terminator, as a regular expression's class.
 pub const DOT: &str = r"[^\n\r\x{2028}\x{2029}]";
 
+/// The largest whole number a JavaScript number tells apart, `Number.MAX_SAFE_INTEGER`.
+pub const MAX_SAFE_INTEGER: i64 = (1 << 53) - 1;
+
 /// Whether a character is JavaScript's white space.
 pub fn is_space(character: char) -> bool {
   matches!(

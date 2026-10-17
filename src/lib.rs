@@ -9,6 +9,7 @@ pub mod failure;
 pub mod migration;
 pub mod policy;
 pub mod ports;
+pub mod room_rules;
 pub mod schedules;
 pub mod settings;
 

@@ -12,6 +12,7 @@ pub mod gate;
 pub mod holds;
 pub mod memories;
 pub mod records;
+pub mod room_rules;
 pub mod summaries;
 pub mod table;
 
@@ -26,6 +27,7 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::get;
 use axum::{Json, Router};
 use brain_support::database::one;
+use brain_support::js::MAX_SAFE_INTEGER;
 use sea_orm::DatabaseConnection;
 use serde::de::DeserializeOwned;
 use serde_json::{Map, Value, json};
@@ -184,6 +186,19 @@ fn rejected(rejection: &JsonRejection) -> String {
 /// What a route answers: a JSON object, or the wire's error.
 pub type Answer = Result<Json<Value>, ApiError>;
 
+/// A whole number a body carries, as JavaScript's `Number.isSafeInteger` takes one: a number with nothing after
+/// its point, no larger than a JavaScript number tells apart.
+pub fn whole(value: &Value) -> Option<i64> {
+  let whole = value.as_i64().or_else(|| {
+    value
+      .as_f64()
+      .filter(|float| float.fract() == 0.0 && float.abs() <= MAX_SAFE_INTEGER as f64)
+      .map(|float| float as i64)
+  })?;
+
+  (whole.abs() <= MAX_SAFE_INTEGER).then_some(whole)
+}
+
 /// A reading carried out: its lines.
 pub fn reading(lines: Vec<String>) -> Json<Value> {
   Json(json!({ "answered": true, "lines": lines }))
@@ -263,6 +278,7 @@ pub fn router(api: Arc<Api>) -> Router {
     .merge(holds::routes())
     .merge(summaries::routes())
     .merge(console::routes())
+    .merge(room_rules::routes())
     .fallback(no_route)
     .layer(middleware::from_fn_with_state(api.clone(), authorised))
     .with_state(api)

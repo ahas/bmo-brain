@@ -10,12 +10,13 @@ use axum::extract::{Query, State};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use brain_support::database::{all, one};
+use brain_support::js::MAX_SAFE_INTEGER;
 use sea_orm::{DatabaseConnection, Value as Bound};
 use serde_json::{Map, Value, json};
 
 use super::fragments::Fragment;
 use super::memories::{MemoryRow, row_of};
-use super::{Answer, Api, ApiError, Body};
+use super::{Answer, Api, ApiError, Body, whole};
 use crate::Failure;
 use crate::editors::fragments::kind_labels;
 use crate::editors::fragments::store::{now_seconds, set_hand};
@@ -27,9 +28,6 @@ pub fn routes() -> Router<Arc<Api>> {
     .route("/memories/active", post(memory_active))
     .route("/fragments/active", post(fragment_active))
 }
-
-// The largest whole number a JavaScript number tells apart, which the console's numbers stand within.
-const MAX_SAFE_INTEGER: i64 = (1 << 53) - 1;
 
 /// A room's id as JavaScript's parseInt reads one off a query: leading digits after an optional sign, past any
 /// whitespace, within the whole numbers a double holds exactly.
@@ -43,19 +41,6 @@ pub fn leading_whole(text: &str) -> Option<i64> {
   let value = sign * digits.parse::<i64>().ok()?;
 
   (value.abs() <= MAX_SAFE_INTEGER).then_some(value)
-}
-
-// A whole number a body carries, as JavaScript takes one: a number with nothing after its point, no larger than
-// it tells apart.
-fn whole(value: &Value) -> Option<i64> {
-  let whole = value.as_i64().or_else(|| {
-    value
-      .as_f64()
-      .filter(|float| float.fract() == 0.0 && float.abs() <= MAX_SAFE_INTEGER as f64)
-      .map(|float| float as i64)
-  })?;
-
-  (whole.abs() <= MAX_SAFE_INTEGER).then_some(whole)
 }
 
 // A number a body may leave out, which a fragment belonging to every room or to nobody names: the outer none is
