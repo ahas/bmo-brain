@@ -2,6 +2,8 @@
 //! room rules) and the recollector runs that write them. Other units reach it over HTTP only.
 
 pub mod api;
+pub mod commands;
+pub mod config;
 pub mod editors;
 pub mod failure;
 pub mod migration;

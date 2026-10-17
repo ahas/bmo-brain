@@ -29,15 +29,17 @@ cargo fmt --all --check
 
 ## Running
 
-The service runs as the `bmo-brain` unit `testbed.toml` names. The repository holds the workspace and its
-checks; the server binary arrives with its routes, and its configuration is stated in
-`docs/boundary-api.md`. It reads:
+The service runs as the `bmo-brain` unit `testbed.toml` names, with `bmo-brain --config <file> serve`: it runs
+its migrations and answers on its listen address. The same binary given a run's words does one piece of work the
+brain launched apart and ends. Its configuration, a TOML file, is stated key by key in `docs/boundary-api.md`. It
+reads:
 
 - the address it listens on and the bearer token callers present;
 - its database, which holds only the brain's own tables and its own settings;
-- its brain folder, a git repository of the agents' documents;
-- the chat agent's key, which names whose brain it serves;
+- its brain folder, a git repository of the agents' documents, and its prompts folder;
+- the chat agent's key, which names whose brain it serves, and the owner's number and names;
 - the addresses and tokens of the agency, the receiver and the gate;
 - its own command, the words that start its binary, which every run it launches apart through the agency begins
-  with;
-- its policy files under `policy/`.
+  with.
+
+Its policy files under `policy/` are built into the binary.

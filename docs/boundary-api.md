@@ -14,21 +14,25 @@ word-chain data.
 
 ## Configuration
 
-The service reads its configuration at start and holds it for its life:
+The service's binary, `bmo-brain`, reads its configuration from the TOML file its `--config` names, at start, and
+holds it for its life. `bmo-brain --config <file> serve` runs the migrations and then answers on its listen address;
+the same binary with a run's words does that one piece of work and ends (「Runs launched apart」).
 
-| Setting | What it is |
-|---|---|
-| listen address | where the service answers |
-| token | the bearer token every caller presents |
-| database | the brain's own database: the tables below and the brain's settings table, nothing else |
-| data root | where the editing locks, the fragment desks and the failure logs live |
-| brain folder | the brain root, a git repository holding every agent's documents |
-| chat agent's key | the registration key of the chat agent, whose brain folder is the brain root |
-| owner's names | the names the owner goes by in the rooms, counted among the common words ([fragments](fragments.md)) |
-| service unit | the unit the service runs as: a failure notice of a run with no unit of its own names this unit's journal, and a run under a launched unit names that unit's |
-| agency, receiver, gate | each unit's base address and the token it is called with |
-| own command | the words that start this service's binary, which every run the brain launches apart begins with (「Runs launched apart」) |
-| policy | the files under `policy/`, the service's and each crate's own: the common words, the fragment titles' cues, the words an item is named by, and the memory, digest and person-book numbers |
+| Setting | Key | What it is |
+|---|---|---|
+| listen address | `listen` | where the service answers |
+| token | `token` | the bearer token every caller presents |
+| database | `database` | the address of the brain's own database: the tables below and the brain's settings table, nothing else |
+| data root | `data_root` | where the editing locks, the fragment desks and the failure logs live |
+| brain folder | `brain` | the brain root, a git repository holding every agent's documents |
+| prompts folder | `prompts` | this repository's `prompts/`: the recollectors' tasks and the rulebooks only they read |
+| chat agent's key | `chat_key` | the registration key of the chat agent, whose brain folder is the brain root |
+| owner's number | `owner` | the owner's user id: a global memory row reaches the owner's room unless told otherwise, and its text is checked without the owner's own name |
+| owner's names | `owner_names` | the names the owner goes by in the rooms, counted among the common words ([fragments](fragments.md)) |
+| service unit | `service_unit` | the unit the service runs as: a failure notice of a run with no unit of its own names this unit's journal, and a run under a launched unit names that unit's |
+| agency, receiver, gate | `[agency]`, `[receiver]`, `[gate]`, each with `base` and `token` | each unit's base address and the token it is called with |
+| own command | `own_command` | the words that start this service's binary with its configuration, which every run the brain launches apart begins with (「Runs launched apart」) |
+| policy | none | the files under `policy/`, the service's and each crate's own, built into the binary: the common words, the fragment titles' cues, the words an item is named by, and the memory, digest and person-book numbers |
 
 Paths the brain writes into an answer are relative to the brain folder or to the data root, never absolute.
 
@@ -114,7 +118,7 @@ arguments name none, is refused `no-room`. Nothing is filed under a default agen
 
 | Route | Answer |
 |---|---|
-| `GET /health` | `ready` (boolean) and `reason` (string or null) |
+| `GET /health` | `ready` (boolean) and `reason` (string or null): not ready where the database does not answer or the brain folder is no git repository, the reason saying which |
 
 ### Memory rows
 
@@ -169,7 +173,7 @@ and 409 with the code `missing`, `other-room`, `already-up` or `already-down`.
 | Route | Body | Answer |
 |---|---|---|
 | `POST /notes/add` | as above | a reading |
-| `POST /notes/list` | `agent`, `chatId` or null | `notes`: `id`, `agent`, `chatId`, `author`, `text`, `global`, `messageId`, `at`, the notes still waiting for the digest |
+| `POST /notes/list` | `agent`, `chatId` or null | `notes`: `id`, `agent`, `chatId`, `author`, `text`, `global`, `at`, the notes still waiting for the digest, oldest first |
 
 ### Watches and reminders
 
@@ -208,12 +212,12 @@ The console's and the hand writer's routes:
 
 | Route | Body | Answer |
 |---|---|---|
-| `GET /fragments` | query `kind`, `chat`, `person`, `item`, `text`, `down`, all optional | `fragments` |
+| `GET /fragments` | query `kind`, `chat`, `person`, `item`, `text`, `down`, all optional | `fragments`: the rows that are up, or with `down` every row, narrowed by a kind, a room, a person, an item, or a word their title or a keyword carries; 400 for a kind there is none of |
 | `POST /fragments/active` | `kind`, `slug`, `active`, `chatId` or null, `owner` or null | `ok` and the row; 404 for no such row |
-| `POST /fragments/write` | `path`, `title`, `keywords`, `items`, `shared`, `forEveryAgent` | a reading or a fragment refusal; the index files are drawn after it |
+| `POST /fragments/write` | `path`, `title`, `keywords`, `items`, `shared` or null, `chatId` or null, `forEveryAgent` or null | a reading of the row's index line; refused `row-refused` where the row checks refuse it, with the reasons; the index files are drawn after it. A knowledge chunk new to the table names `shared` or a `chatId` |
 | `POST /fragments/remove` | `path` | a reading; refused `body-stands` where the file still stands |
-| `POST /fragments/check` | `kind` or null | `drift` and `titles` (「The drift check」 in `fragments.md`) |
-| `POST /fragments/sync` | none | a reading of what the reconcile changed |
+| `POST /fragments/check` | `kind` or null | `drift` (each `trouble`: `unlisted`, `bodiless` or `moved`, with `kind`, `chatId`, `owner`, `slug` and `said`) and `titles` (each refused title's `kind`, `chatId`, `owner`, `slug`, `path`, `title` and `problem`, and `counted`: each brain kind's refused and standing rows) (「The drift check」 in `fragments.md`) |
+| `POST /fragments/sync` | none | a reading of what the reconcile changed, one line per brain library, and of each index file drawn |
 
 A fragment carries `kind`, `chatId`, `owner`, `agent`, `allAgents`, `slug`, `title`, `path`, `scope`,
 `position`, `active`, `lastHitAt`, `hits`, `setBy`, `setAt`, `hand`, `handAt`, `keywords`, `items`,
@@ -275,11 +279,17 @@ it until a clear forgets it.
 
 | Route | Body | Answer |
 |---|---|---|
-| `POST /digest/run` | `chatId` or null | `outcome`: `launched`, `running`, `nothing` (no note waits), `resting`, `paused` |
+| `POST /digest/run` | `chatId` or null | `outcome`: `paused` (the owner told once of what waits behind the pause), `resting`, `nothing` (no note waits, in the room where one is named), or the memo digest's launch: `launched` or `running` with `unit`, or `refused` with `why` |
 | `POST /digest/now` | `agent`, `chatId` | `outcome`: `resting` (a rest is on), `nothing` (no note waits), `running` with `unit`, `launched` with `unit` and `notes`, or `refused` with `why`, the unit launch's refusal |
-| `POST /digest/people` | `chatId`, `agent`, `all`, `split` with `person` and `spans`, `sheets`, `reform` with `batches`, `sort` with `person`, `all` or `status` and `groups`, `since` (a day, `none`, or absent to read it), `forgetRead` with `chatId` or `all` | `outcome` and a reading |
-| `POST /digest/pause` | `set`: `status`, `off`, `on`, or a length (`2h`, `90m`, `30s`, a bare number of minutes) | `pausedUntil` (time, or null for none, or `forever`) |
-| `POST /people/before-fold` | `chatId`, `agent` | `outcome`: `launched`, `running` or `skipped` (the room keeps no book) |
+| `POST /digest/people` | `chatId`, `agent`, `all`, `split` with `person` and `spans`, `sheets`, `reform` with `batches`, `sort` with `person`, `all` or `status` and `groups`, `since` (a day, `none`, or absent to read it), `forgetRead` with `chatId` or `all` | `outcome`: `answered` with a reading for what is read or set in the request (`status`, `since`, `forgetRead`), or for the work itself its launch: `launched` or `running` with `unit`, or `refused` with `why` |
+| `POST /digest/pause` | `set`: `status`, `off`, `on`, or a length (`2h`, `90m`, `30s`, a bare number of minutes) | `pausedUntil` (time, or null for none, or `forever`) and a reading of how the digests stand |
+| `POST /people/before-fold` | `chatId`, `agent` | `outcome`: `launched` or `running` with `unit`, `skipped` (the agent's book is not written from the room), or `refused` with `why` |
+
+`POST /digest/people` names its agent by registration, the chat agent where it names none. It refuses before it
+launches anything: `no-memory` for an agent that keeps no long-term memory, `not-answered` for a room the agent
+does not answer, `one-to-one` for a room that keeps no room part, and `too-few-batches` for a reform whose folded
+messages do not fit the batches it was given. A body whose forms do not go together is answered 400, the
+sentence naming the form it takes.
 
 ### Brain holds
 
@@ -370,8 +380,8 @@ knows its unit by it, and its clock, its brain hold and a failure's record are n
 | `bmo-digest` | `digest` | null | `All pending notes` | `digest` |
 | `bmo-digest-<chatId>` | `digest` | null | the room's name | `digest --chat <chatId>` |
 | `bmo-people-digest` | `people-digest` | null | `Rooms in turn` | `people-digest` |
-| `bmo-people-sort-<agent>` | `people-digest` | the agent | `Sorting the person book` | `people-digest --sort --all --agent <agent>` |
-| `bmo-people-digest-<agent>-<chatId>` | `people-digest` | the agent | the room's name | `people-digest --chat <chatId> --agent <agent>`, and `--all` for a catch-up |
+| `bmo-people-sort-<agent>` | `people-digest` | the agent | `Sorting the person book` | `people-digest --sort --all --agent <agent>`, or `--person <userId>` for one person, with `--groups <n>` where a sort is bounded |
+| `bmo-people-digest-<agent>-<chatId>` | `people-digest` | the agent | the room's name | `people-digest --chat <chatId> --agent <agent>`, and `--all` for a catch-up; asked by hand, `--split` (with `--person <userId>` and `--spans <n>`), `--sheets` or `--reform --batches <n>` |
 | `bmo-watch-<id>-<milliseconds>` | `watch` | null | `<room's name> watch #<id>` | `watch-runner <id> <unit>` |
 
 - **A room's name** is its title as the receiver's room titles give it; a room with none is `Private chat` where
@@ -482,6 +492,7 @@ A listing line marks a global row with `global-scope` (`reach`) and a handed-ove
 | `title-shape` | a title the shape check refuses, with the reason |
 | `repeats` | a new piece whose matter a reachable row holds, with those rows' paths |
 | `body-stands` | a hand remove for a piece whose file still stands |
+| `row-refused` | a hand write the row checks refuse, with `reasons` |
 
 ### Document, digest and agent refusals
 
@@ -491,6 +502,8 @@ A listing line marks a global row with `global-scope` (`reach`) and a handed-ove
 | `out-of-room` | `slugs` | a document read names a slug the room may not be offered |
 | `not-owner` | none | a room-rule set whose message the receiver does not confirm as the owner's |
 | `one-to-one` | none | a person-book run asked for a room the receiver's roads call a one-to-one |
+| `no-memory` | `agent` | a person-book run asked for an agent that keeps no long-term memory |
+| `not-answered` | `agent` | a person-book run asked for a room the agent does not answer |
 | `no-brain` | none | an editor finds the live brain folder is no git repository and makes none |
 | `too-few-batches` | `needed`, `given` | a reform whose folded messages do not fit the batches it was given |
 | `brain-root` | none | an agent reset names the agent whose folder is the brain root |

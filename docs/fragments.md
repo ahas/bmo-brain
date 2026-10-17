@@ -271,8 +271,9 @@ about its library, so it is kept on the row and neither a reconcile nor an edito
 
 ## The drift check
 
-- **What it compares:** for the brain's libraries, the piece files on disk against the rows; for a shipped
-  library, the entries last handed in against the rows.
+- **What it compares:** for the brain's libraries, the piece files on disk against the rows. A shipped library
+  is not compared: its rows are brought to its entries the moment its owner hands them in, and its index against
+  its bodies is its owner's to check.
 - **What it reports:** a piece file the table does not offer, a row the table offers that no file stands behind,
   a row whose body has changed since the table last read it, and a row that is offered while the file it points
   at is gone.

@@ -1,12 +1,17 @@
-//! The routes the gate reads a turn's raw material by and hands its facts back on (docs/boundary-api.md, 「Memory
-//! rows」, 「Fragments」 and 「Rooms leaving」): a room's standing memory rows, its matcher's candidates and what the
-//! matcher made of them, the rows a turn's events wake, the fragment rows a room may be offered and what a turn
-//! attached, and a forgotten room let go of; and a shipped library's entries its owner hands in, with the words a
-//! screen calls every kind by (「Shipped libraries」). The brain selects nothing here; it answers for one agent at a
-//! time, and every route takes the brain's token and answers by the wire conventions.
+//! The brain's routes (docs/boundary-api.md, 「Routes the brain serves」): what the gate reads a turn's raw material
+//! by and hands its facts back on, the memory tools' and the fragment table's routes, the shipped libraries, the
+//! digests, the brain holds and the chat-session summaries, each subject in a module of its own. The brain selects
+//! nothing; it answers for one agent at a time, and every route takes the brain's token and answers by the wire
+//! conventions.
 
+pub mod digests;
 pub mod fragments;
+pub mod gate;
+pub mod holds;
 pub mod memories;
+pub mod records;
+pub mod summaries;
+pub mod table;
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -16,33 +21,80 @@ use axum::extract::{FromRequest, Request, State};
 use axum::http::{StatusCode, header};
 use axum::middleware::{self, Next};
 use axum::response::{IntoResponse, Response};
-use axum::routing::{get, post};
+use axum::routing::get;
 use axum::{Json, Router};
-use memory_rows::events::Event;
+use brain_support::database::one;
 use sea_orm::DatabaseConnection;
-use serde::Deserialize;
 use serde::de::DeserializeOwned;
-use serde_json::{Value, json};
+use serde_json::{Map, Value, json};
 
-use self::fragments::Hit;
 use self::memories::Withering;
 use crate::Failure;
-use crate::editors::fragments::store::{ShippedEntry, now_seconds};
-use crate::editors::fragments::{ShippedFailure, Table, kind_labels};
+use crate::editors::fragments::Table;
+use crate::editors::ground::Ground;
 use crate::ports::agency::Agency;
+use crate::ports::gate::Gate;
 use crate::ports::receiver::Receiver;
+use crate::schedules::launches::Launches;
 
-/// What the routes stand on: the brain's database, the agency and the receiver, the brain root and the chat agent's
-/// registration key whose memory it is, the token every caller presents, and the withering stamps the conditions
-/// route keeps for the service's life.
+/// What the routes stand on: the brain's database and the address the fragment tool opens it by, the agency, the
+/// receiver and the gate, the brain root, the data root and the prompts folder, the chat agent's registration key
+/// and the owner's number, the unit the service runs as and the words that start its binary, the token every caller
+/// presents, and the withering stamps the conditions route keeps for the service's life.
 pub struct Api {
   pub db: DatabaseConnection,
+  pub database: String,
   pub agency: Arc<dyn Agency>,
   pub receiver: Arc<dyn Receiver>,
+  pub gate: Arc<dyn Gate>,
   pub brain_root: PathBuf,
+  pub data_root: PathBuf,
+  pub prompts_root: PathBuf,
   pub chat_key: String,
+  pub owner: Option<i64>,
+  pub service_unit: String,
+  pub program: Vec<String>,
   pub token: String,
   pub withering: Withering,
+}
+
+impl Api {
+  /// What an editor run started inside a request stands on: no unit and no job run of its own.
+  pub fn ground(&self) -> Ground<'_> {
+    self.ground_under(None)
+  }
+
+  /// What a run launched apart stands on: the unit it runs under, which is also the run its clock, its brain hold
+  /// and a failure's record are named by.
+  pub fn ground_under<'a>(&'a self, unit: Option<&'a str>) -> Ground<'a> {
+    Ground {
+      db: &self.db,
+      database: &self.database,
+      agency: self.agency.as_ref(),
+      receiver: self.receiver.as_ref(),
+      gate: self.gate.as_ref(),
+      brain_root: &self.brain_root,
+      data_root: &self.data_root,
+      prompts_root: &self.prompts_root,
+      chat_key: &self.chat_key,
+      service_unit: &self.service_unit,
+      unit,
+      own_run: unit,
+    }
+  }
+
+  /// The runs the brain launches apart.
+  pub fn launches(&self) -> Launches<'_> {
+    Launches {
+      ground: self.ground(),
+      program: &self.program,
+    }
+  }
+
+  /// The fragment table over the brain as the agency registers its folders now.
+  pub async fn table(&self) -> Result<Table<'_>, Failure> {
+    self.ground().table().await
+  }
 }
 
 /// A non-2xx answer: its status, its code and the English sentence saying what went wrong.
@@ -54,7 +106,8 @@ pub struct ApiError {
 }
 
 impl ApiError {
-  fn bad_request(error: impl Into<String>) -> Self {
+  /// A body the route cannot read, the sentence naming what is wrong with it.
+  pub fn bad_request(error: impl Into<String>) -> Self {
     Self {
       status: StatusCode::BAD_REQUEST,
       code: "bad-request",
@@ -97,6 +150,34 @@ fn rejected(rejection: &JsonRejection) -> String {
   format!("The body is not the shape this route takes: {}", rejection.body_text())
 }
 
+/// What a route answers: a JSON object, or the wire's error.
+pub type Answer = Result<Json<Value>, ApiError>;
+
+/// A reading carried out: its lines.
+pub fn reading(lines: Vec<String>) -> Json<Value> {
+  Json(json!({ "answered": true, "lines": lines }))
+}
+
+/// A request understood and not carried out: its code, its English sentence and the code's own parameters, with
+/// the lines it wrote before it stopped where it wrote any.
+pub fn refusal(code: &str, message: &str, params: Map<String, Value>, lines: Vec<String>) -> Json<Value> {
+  let mut refusal = params;
+
+  refusal.insert("code".to_owned(), json!(code));
+  refusal.insert("message".to_owned(), json!(message));
+
+  let mut answer = Map::new();
+
+  answer.insert("answered".to_owned(), json!(false));
+  answer.insert("refusal".to_owned(), Value::Object(refusal));
+
+  if !lines.is_empty() {
+    answer.insert("lines".to_owned(), json!(lines));
+  }
+
+  Json(Value::Object(answer))
+}
+
 // Every route needs the brain's token as a bearer.
 async fn authorised(State(api): State<Arc<Api>>, request: Request, next: Next) -> Response {
   let presented = request
@@ -125,172 +206,30 @@ async fn no_route() -> ApiError {
   }
 }
 
+// Whether the service can answer: its database answers, and its brain folder is a git repository.
+async fn health(State(api): State<Arc<Api>>) -> Json<Value> {
+  let reason = if let Err(why) = one(&api.db, "SELECT 1 AS \"one\"", vec![]).await {
+    Some(format!("The database does not answer: {why}"))
+  } else if !api.brain_root.join(".git").exists() {
+    Some("The brain folder is no git repository.".to_owned())
+  } else {
+    None
+  };
+
+  Json(json!({ "ready": reason.is_none(), "reason": reason }))
+}
+
 /// The routes, on what they stand on.
 pub fn router(api: Arc<Api>) -> Router {
   Router::new()
-    .route("/memory/standing", post(memory_standing))
-    .route("/memory/conditions", post(memory_conditions))
-    .route("/memory/matched", post(memory_matched))
-    .route("/memory/events", post(memory_events))
-    .route("/fragments/offer", post(fragments_offer))
-    .route("/fragments/hits", post(fragments_hits))
-    .route("/rooms/forgotten", post(rooms_forgotten))
-    .route("/libraries/reconcile", post(libraries_reconcile))
-    .route("/fragments/kinds", get(fragments_kinds))
+    .route("/health", get(health))
+    .merge(gate::routes())
+    .merge(records::routes())
+    .merge(table::routes())
+    .merge(digests::routes())
+    .merge(holds::routes())
+    .merge(summaries::routes())
     .fallback(no_route)
     .layer(middleware::from_fn_with_state(api.clone(), authorised))
     .with_state(api)
-}
-
-type Answer = Result<Json<Value>, ApiError>;
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct AgentRoom {
-  agent: String,
-  chat_id: i64,
-}
-
-async fn memory_standing(State(api): State<Arc<Api>>, Body(asked): Body<AgentRoom>) -> Answer {
-  let rows = memories::standing(&api.db, asked.chat_id, &asked.agent, now_seconds()).await?;
-
-  Ok(Json(json!({ "rows": rows })))
-}
-
-async fn memory_conditions(State(api): State<Arc<Api>>, Body(asked): Body<AgentRoom>) -> Answer {
-  let room = api.receiver.roads(asked.chat_id).await.map_err(Failure::from)?.kind;
-  let rows =
-    memories::conditions(&api.db, &api.withering, asked.chat_id, room, &asked.agent, now_seconds()).await?;
-  let rows: Vec<Value> = rows
-    .into_iter()
-    .map(|row| json!({ "slug": row.slug, "condition": row.condition, "action": row.action }))
-    .collect();
-
-  Ok(Json(json!({ "rows": rows })))
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct Matched {
-  agent: String,
-  chat_id: i64,
-  matched: Vec<String>,
-  spent: Vec<String>,
-}
-
-async fn memory_matched(State(api): State<Arc<Api>>, Body(asked): Body<Matched>) -> Answer {
-  let room = api.receiver.roads(asked.chat_id).await.map_err(Failure::from)?.kind;
-
-  memories::matched(
-    &api.db,
-    asked.chat_id,
-    room,
-    &asked.agent,
-    (&asked.matched, &asked.spent),
-    now_seconds(),
-  )
-  .await?;
-
-  Ok(Json(json!({ "ok": true })))
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct Events {
-  agent: String,
-  chat_id: i64,
-  events: Vec<Event>,
-}
-
-async fn memory_events(State(api): State<Arc<Api>>, Body(asked): Body<Events>) -> Answer {
-  let room = api.receiver.roads(asked.chat_id).await.map_err(Failure::from)?.kind;
-  let rows =
-    memories::woken(&api.db, asked.chat_id, room, &asked.agent, &asked.events, now_seconds()).await?;
-
-  Ok(Json(json!({ "rows": rows })))
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct Offer {
-  agent: String,
-  chat_id: i64,
-  kinds: Vec<String>,
-}
-
-async fn fragments_offer(State(api): State<Arc<Api>>, Body(asked): Body<Offer>) -> Answer {
-  let fragments =
-    fragments::offer(&api.db, api.receiver.as_ref(), &asked.agent, asked.chat_id, &asked.kinds).await?;
-
-  Ok(Json(json!({ "fragments": fragments })))
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct Hits {
-  agent: String,
-  // The turn's room, which the wire names and nothing reads: each attached row names its own.
-  #[allow(dead_code)]
-  chat_id: i64,
-  attached: Vec<Hit>,
-}
-
-async fn fragments_hits(State(api): State<Arc<Api>>, Body(asked): Body<Hits>) -> Answer {
-  fragments::hits(&api.db, &asked.agent, &asked.attached, now_seconds()).await?;
-
-  Ok(Json(json!({ "ok": true })))
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct Forgotten {
-  chat_id: i64,
-}
-
-async fn rooms_forgotten(State(api): State<Arc<Api>>, Body(asked): Body<Forgotten>) -> Answer {
-  api.withering.forget(asked.chat_id);
-
-  Ok(Json(json!({ "ok": true })))
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct Reconcile {
-  kind: String,
-  label: String,
-  entries: Vec<ShippedEntry>,
-}
-
-async fn libraries_reconcile(State(api): State<Arc<Api>>, Body(asked): Body<Reconcile>) -> Answer {
-  if asked.kind.trim().is_empty() || asked.label.trim().is_empty() {
-    return Err(ApiError::bad_request(
-      "A shipped library is handed in with a kind and the word a screen calls it by.",
-    ));
-  }
-
-  let table =
-    Table::of(&api.db, api.agency.as_ref(), api.receiver.as_ref(), &api.brain_root, &api.chat_key).await?;
-
-  match table.reconcile_shipped(&asked.kind, &asked.label, &asked.entries).await {
-    Ok(done) => Ok(Json(json!({ "answered": true, "lines": [done.line()] }))),
-    Err(ShippedFailure::BrainLibrary) => Ok(Json(json!({
-      "answered": false,
-      "refusal": {
-        "code": "brain-library",
-        "message": "The kind is one of the brain's own libraries, whose rows only its editors write.",
-        "kind": asked.kind,
-      },
-    }))),
-    Err(ShippedFailure::Failed(failure)) => Err(failure.into()),
-  }
-}
-
-async fn fragments_kinds(State(api): State<Arc<Api>>) -> Answer {
-  let kinds: Vec<Value> = kind_labels(&api.db)
-    .await?
-    .into_iter()
-    .map(|(kind, label)| json!({ "kind": kind, "label": label }))
-    .collect();
-
-  Ok(Json(json!({ "kinds": kinds })))
 }

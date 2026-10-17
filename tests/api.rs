@@ -5,93 +5,21 @@
 
 mod support;
 
-use std::sync::Arc;
-
-use bmo_brain::api::memories::Withering;
-use bmo_brain::api::{Api, router};
 use bmo_brain::editors::fragments::store::now_seconds;
-use bmo_brain::ports::agency::Registration;
-use bmo_brain::ports::http::{Caller, Peer, PortFailure};
+use bmo_brain::ports::http::PortFailure;
 use bmo_brain::ports::receiver::{RoadKind, Roads};
 use sea_orm::Value as Sql;
 use serde_json::{Value, json};
 
-use support::agency::{FakeAgency, registration};
-use support::receiver::{FakeReceiver, message};
-use support::scratch::Scratch;
+use support::receiver::message;
+use support::served::{Served, caller, served};
 use support::{AGENT, OTHER_AGENT, ROOM};
 
-const TOKEN: &str = "brain-token";
 const OTHER_ROOM: i64 = -200;
 const DAY: i64 = 86_400;
 
-struct Served {
-  scratch: Scratch,
-  receiver: Arc<FakeReceiver>,
-  caller: Caller,
-  base: String,
-  _brain: tempfile::TempDir,
-}
-
-async fn served() -> Served {
-  let scratch = Scratch::new().await;
-  let receiver = Arc::new(FakeReceiver::default());
-  let agency = FakeAgency::default();
-  let brain = tempfile::tempdir().unwrap();
-
-  *agency.registrations.lock().unwrap() = vec![Registration {
-    brain_folder: String::new(),
-    ..registration(AGENT)
-  }];
-
-  let api = Arc::new(Api {
-    db: scratch.db().clone(),
-    agency: Arc::new(agency),
-    receiver: receiver.clone(),
-    brain_root: brain.path().to_path_buf(),
-    chat_key: AGENT.to_owned(),
-    token: TOKEN.to_owned(),
-    withering: Withering::default(),
-  });
-  let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
-  let base = format!("http://{}", listener.local_addr().unwrap());
-
-  tokio::spawn(async move { axum::serve(listener, router(api)).await.unwrap() });
-
-  Served {
-    caller: caller(&base, TOKEN),
-    scratch,
-    receiver,
-    base,
-    _brain: brain,
-  }
-}
-
-fn caller(base: &str, token: &str) -> Caller {
-  Caller::new(&Peer {
-    base: base.to_owned(),
-    token: token.to_owned(),
-  })
-}
-
+// What the gate's tests lay down on the served stage.
 impl Served {
-  async fn post(&self, path: &str, body: Value) -> Value {
-    self.caller.post::<Value>(path, &body).await.unwrap()
-  }
-
-  // A route read with GET, as a screen reads it: its status and its body.
-  async fn get(&self, path: &str) -> (u16, Value) {
-    let answer = reqwest::Client::new()
-      .get(format!("{}{path}", self.base))
-      .bearer_auth(TOKEN)
-      .send()
-      .await
-      .unwrap();
-    let status = answer.status().as_u16();
-
-    (status, serde_json::from_slice(&answer.bytes().await.unwrap()).unwrap())
-  }
-
   // A memory row of an agent, open and up, set the given seconds ago.
   async fn memory(&self, agent: &str, slug: &str, chat_id: Option<i64>, kind: &str, more: Row<'_>) {
     let now = now_seconds();

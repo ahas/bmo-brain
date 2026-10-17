@@ -404,6 +404,18 @@ async fn take_lock_as<W: WaitOn>(
   }
 }
 
+/// A job's hold on the brain set for its run, the moment it was first set kept where it is already set.
+pub async fn place_brain_hold(db: &DatabaseConnection, run: &str, now: i64) -> Result<(), Failure> {
+  brain_support::database::run(
+    db,
+    r#"INSERT INTO "settings" ("key", "value") VALUES ($1, $2) ON CONFLICT ("key") DO NOTHING"#,
+    vec![format!("{HOLD_PREFIX}{run}").into(), now.to_string().into()],
+  )
+  .await?;
+
+  Ok(())
+}
+
 /// The run names of the jobs holding the brain against a process running as `own_run`: every hold whose job's
 /// run the agency still has open, but that process's own. A hold whose run is over is cleared here.
 pub async fn brain_holders(

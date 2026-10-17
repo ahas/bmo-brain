@@ -46,7 +46,8 @@ pub struct Fragment {
 }
 
 impl Fragment {
-  fn of((row, standing): (Row, Standing)) -> Self {
+  /// A row with what it has come to, as a screen or a gate reads it.
+  pub fn of((row, standing): (Row, Standing)) -> Self {
     Self {
       kind: row.kind,
       chat_id: row.chat_id,

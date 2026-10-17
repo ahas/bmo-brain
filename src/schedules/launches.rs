@@ -9,6 +9,7 @@ use std::collections::HashSet;
 use brain_support::database::{all, run};
 
 use crate::Failure;
+use crate::commands::PeopleRun;
 use crate::editors::archive::{book_room, chat_title};
 use crate::editors::ground::Ground;
 use crate::editors::people::{LAUNCHER_UNIT, sort_unit};
@@ -70,6 +71,16 @@ pub fn room_digest_unit(chat_id: i64) -> String {
   format!("{MEMO_UNIT}-{chat_id}")
 }
 
+/// What asking for a room's worker before its session folds came to: nothing started for a room the agent's book is
+/// not written from, a worker launched or already standing under its unit, or why the launch was refused.
+#[derive(Debug, PartialEq, Eq)]
+pub enum BeforeFold {
+  Skipped,
+  Launched(String),
+  Running(String),
+  Refused(String),
+}
+
 /// What asking for one room's digest came to: a run of it already standing, one launched, or the agency's refusal,
 /// the first two under the unit the room's digest goes by.
 #[derive(Debug, PartialEq, Eq)]
@@ -97,8 +108,9 @@ impl Launches<'_> {
       .collect()
   }
 
-  // One run started apart through the agency.
-  async fn launch(
+  /// One run started apart through the agency: its unit, the work it does, what it is titled, the agent it works
+  /// for where it works for one, and its words.
+  pub async fn launch(
     &self,
     unit: &str,
     kind: &str,
@@ -157,11 +169,43 @@ impl Launches<'_> {
     )
   }
 
+  /// The memo digest of every room's pending notes launched where no run of it stands.
+  pub async fn memo_digest(&self) -> Result<Launch, PortFailure> {
+    self.launch(MEMO_UNIT, MEMO_KIND, "All pending notes", None, &[MEMO_WORDS]).await
+  }
+
+  /// A run of the person book asked for by hand, in the unit its form runs under: the sort in the agent's sort unit,
+  /// a room's work in the agent's worker of the room, and the launcher in its own. Answers the unit and what came of
+  /// the launch.
+  pub async fn people_run(&self, run: &PeopleRun, agent: &str) -> (String, Result<Launch, PortFailure>) {
+    let (unit, title, for_agent) = if run.sort {
+      (sort_unit(agent), "Sorting the person book".to_owned(), Some(agent))
+    } else if let Some(chat_id) = run.chat {
+      let title = self.room_name(chat_id).await.unwrap_or_else(|_| chat_id.to_string());
+
+      (crate::editors::people::worker_unit(chat_id, agent), title, Some(agent))
+    } else {
+      (LAUNCHER_UNIT.to_owned(), "Rooms in turn".to_owned(), None)
+    };
+    let words = run.words(agent);
+    let words: Vec<&str> = words.iter().map(String::as_str).collect();
+    let launched = self.launch(&unit, PEOPLE_KIND, &title, for_agent, &words).await;
+
+    (unit, launched)
+  }
+
   /// A digest that came due, by its name: the memo digest, or the person-book launcher with every recollecting
   /// agent's sort, each in a unit of its own so one agent's sort never waits on another's.
   pub async fn digest(&self, digest: &str) -> Result<(), String> {
     match digest {
-      "memo" => self.detached(MEMO_UNIT, MEMO_KIND, "All pending notes", None, &[MEMO_WORDS]).await,
+      "memo" => match self.memo_digest().await {
+        Ok(Launch {
+          outcome: LaunchOutcome::Refused,
+          why,
+        }) => eprintln!("{MEMO_UNIT} launch failed: {}", why.unwrap_or_default()),
+        Ok(_) => {}
+        Err(why) => eprintln!("{MEMO_UNIT} launch failed: {why}"),
+      },
       "people" => {
         self.detached(LAUNCHER_UNIT, PEOPLE_KIND, "Rooms in turn", None, &[PEOPLE_WORDS]).await;
 
@@ -201,24 +245,36 @@ impl Launches<'_> {
   /// A room's person book brought up to date before its session is folded away, in the agent's worker of the
   /// room: what the session is about to forget is read through the receiver before it goes. A room the agent's
   /// book is not written from, a one-to-one above all, starts nothing; where that cannot be read, it starts.
-  pub async fn people_before_fold(&self, chat_id: i64, agent: &str) {
+  pub async fn people_before_fold(&self, chat_id: i64, agent: &str) -> BeforeFold {
     if !book_room(self.ground.receiver, agent, chat_id).await.unwrap_or(true) {
-      return;
+      return BeforeFold::Skipped;
     }
 
     let unit = crate::editors::people::worker_unit(chat_id, agent);
     let title = self.room_name(chat_id).await.unwrap_or_else(|_| chat_id.to_string());
     let chat = chat_id.to_string();
+    let words = [PEOPLE_WORDS, "--chat", &chat, "--agent", agent];
 
-    self
-      .detached(
-        &unit,
-        PEOPLE_KIND,
-        &title,
-        Some(agent),
-        &[PEOPLE_WORDS, "--chat", &chat, "--agent", agent],
-      )
-      .await;
+    match self.launch(&unit, PEOPLE_KIND, &title, Some(agent), &words).await {
+      Ok(Launch {
+        outcome: LaunchOutcome::Launched,
+        ..
+      }) => BeforeFold::Launched(unit),
+      Ok(Launch {
+        outcome: LaunchOutcome::Running,
+        ..
+      }) => BeforeFold::Running(unit),
+      Ok(Launch { why, .. }) => {
+        let why = why.unwrap_or_default();
+
+        eprintln!("{unit} launch failed: {why}");
+        BeforeFold::Refused(why)
+      }
+      Err(why) => {
+        eprintln!("{unit} launch failed: {why}");
+        BeforeFold::Refused(why.to_string())
+      }
+    }
   }
 
   /// One agent's book of one room written in its own unit: a room with a whole batch or more waiting worked until

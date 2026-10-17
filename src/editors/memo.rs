@@ -337,6 +337,12 @@ impl MemoDigest<'_> {
     })
   }
 
+  /// The owner told, once for this pause, what it holds back: the notes, and each agent's person book of a room
+  /// with enough unread. Answers whether a notice went out.
+  pub async fn notice_pause(&self) -> Result<bool, Failure> {
+    notice_paused_digests(self.ground.db, self.ground.receiver, async || self.backlog().await).await
+  }
+
   /// The hourly digest, or one room's where a chat is named: the process's exit code.
   pub async fn run(&self, chat_filter: Option<i64>) -> Result<u8, Failure> {
     let ground = &self.ground;

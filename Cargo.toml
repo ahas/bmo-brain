@@ -9,9 +9,10 @@ version = "0.1.0"
 edition = "2024"
 
 [workspace.dependencies]
-axum = { version = "0.8.4", default-features = false, features = ["http1", "json", "tokio"] }
+axum = { version = "0.8.4", default-features = false, features = ["http1", "json", "query", "tokio"] }
 brain-support = { path = "crates/brain-support" }
 chrono = { version = "0.4.41", default-features = false, features = ["std"] }
+clap = { version = "4.5.40", features = ["derive"] }
 fragment-desk = { path = "crates/fragment-desk" }
 futures-util = "0.3.34"
 libc = "0.2.177"
@@ -42,6 +43,8 @@ axum.workspace = true
 brain-support.workspace = true
 # The moments the editors' prompts show.
 chrono.workspace = true
+# The binary's command line.
+clap.workspace = true
 # The row writes an editor run leaves on its desk.
 fragment-desk.workspace = true
 futures-util.workspace = true
@@ -60,6 +63,8 @@ sea-orm-migration.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 tokio.workspace = true
+# The configuration file.
+toml.workspace = true
 
 [dev-dependencies]
 sqlx.workspace = true
@@ -67,4 +72,3 @@ sqlx.workspace = true
 tempfile.workspace = true
 # The editors' clocks, run on time a test moves.
 tokio = { workspace = true, features = ["test-util"] }
-toml.workspace = true

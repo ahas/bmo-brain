@@ -10,6 +10,7 @@ pub mod editing;
 pub mod gate;
 pub mod receiver;
 pub mod scratch;
+pub mod served;
 pub mod sorting;
 pub mod stub;
 
