@@ -101,6 +101,14 @@ pub async fn chat_titles(receiver: &dyn Receiver) -> Result<Vec<String>, Failure
   Ok(rooms.into_iter().filter_map(|room| room.title).collect())
 }
 
+/// The name a person's common book is headed with: the name their latest message went under, as the receiver's
+/// display names say, where it names one.
+pub async fn display_name(receiver: &dyn Receiver, person: i64) -> Result<Option<String>, Failure> {
+  let names = receiver.display_names(&[person]).await?;
+
+  Ok(names.into_iter().find(|named| named.person == person).and_then(|named| named.name))
+}
+
 /// What every key of the day an agent's book of a room starts reading from begins with; the agent and the
 /// room follow it, each ending in its own part.
 pub const DIGEST_SINCE: &str = "people_digest_since:";

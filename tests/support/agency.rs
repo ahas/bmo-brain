@@ -35,7 +35,18 @@ pub struct FakeAgency {
   pub work_keys: Mutex<BTreeMap<String, WorkKey>>,
   pub finished: Mutex<BTreeSet<i64>>,
   pub launch: Mutex<Option<Launch>>,
+  /// What each session does as it starts, standing in for the model's file and fragment tools.
+  pub session: Mutex<Option<Session>>,
   pub calls: Calls,
+}
+
+/// What a session does with the start it was given, in the folder and at the desk the start names.
+pub struct Session(pub Box<dyn Fn(&SessionStart) + Send + Sync>);
+
+impl std::fmt::Debug for Session {
+  fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    formatter.write_str("Session")
+  }
 }
 
 /// A registration of `name` whose brain folder is its own name, awake and with nothing else set.
@@ -72,6 +83,9 @@ impl Agency for FakeAgency {
 
   fn start_session<'a>(&'a self, start: &'a SessionStart) -> BoxFuture<'a, Result<String, PortFailure>> {
     self.calls.take("start_session", start);
+    if let Some(session) = self.session.lock().unwrap().as_ref() {
+      (session.0)(start);
+    }
     let run = format!("run-{}", self.calls.of("start_session").len());
     self.open.lock().unwrap().insert(run.clone());
     Box::pin(async move { Ok(run) })

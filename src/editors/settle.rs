@@ -4,18 +4,24 @@
 //! the owner — or, where even that cannot be said, written to the failure log — and the owner's pause on the
 //! digests.
 
+use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use brain_support::database::one;
+use brain_support::database::{one, run};
+use fragment_desk::desk::FragmentFilter;
 use sea_orm::DatabaseConnection;
 use serde_json::{Map, Value, json};
 
+use super::book::{KNOWLEDGE_ROOT, PEOPLE_ROOT, ROOMS_ROOT};
+use super::fragments::libraries::{Knowledge, Library};
+use super::fragments::store;
+use super::recollection::Recollection;
 use crate::Failure;
 use crate::ports::agency::{Agency, Reload};
 use crate::ports::gate::{Gate, Sanitised};
-use crate::ports::receiver::{OwnerNotice, Receiver};
+use crate::ports::receiver::{OwnerNotice, Receiver, RoomTitle};
 use crate::settings;
 
 pub use crate::editors::commits::{Committed, commit_paths};
@@ -97,6 +103,109 @@ pub async fn announce_reload(agency: &dyn Agency, agent: &str, paths: &[String],
     Ok(true) => {}
     Ok(false) => eprintln!("reload: the agency did not take the notice"),
     Err(why) => eprintln!("reload: the sessions could not be told: {why}"),
+  }
+}
+
+/// The rooms whose sessions read a document of an agent's folder, by its path relative to that folder
+/// (docs/people-book.md, 「Who reads a changed document again」): a room's own document that room's; a person's
+/// common document, the index excepted, every room the person has stood as a sender in; a knowledge chunk the
+/// room its row is scoped to, or every room the receiver knows where its row is shared. `scopes` reads a knowledge
+/// chunk's row: none where no row stands for it, some none where it is shared.
+pub fn rooms_reading(
+  path: &str,
+  rooms: &[RoomTitle],
+  scopes: &dyn Fn(&str) -> Option<Option<i64>>,
+) -> Vec<i64> {
+  let parts: Vec<&str> = path.split('/').collect();
+  let index = parts.last().is_some_and(|name| *name == "index.md");
+
+  match parts.as_slice() {
+    [ROOMS_ROOT, chat, ..] => chat.parse::<i64>().map_or_else(|_| vec![], |chat| vec![chat]),
+    [KNOWLEDGE_ROOT, _] if !index => match scopes(path) {
+      Some(None) => rooms.iter().map(|room| room.chat_id).collect(),
+      Some(Some(chat)) => vec![chat],
+      None => vec![],
+    },
+    [PEOPLE_ROOT, person, rest @ ..] if !(rest.len() == 1 && index) && !rest.is_empty() => {
+      let Ok(person) = person.parse::<i64>() else { return vec![] };
+
+      rooms
+        .iter()
+        .filter(|room| room.senders.contains(&person))
+        .map(|room| room.chat_id)
+        .collect()
+    }
+    _ => vec![],
+  }
+}
+
+/// What an editor wrote in an agent's folder, by absolute path, let go of by every session holding it and
+/// announced to the sessions of the rooms that read it, the paths named from the brain root.
+pub async fn reload_written(
+  db: &DatabaseConnection,
+  agency: &dyn Agency,
+  receiver: &dyn Receiver,
+  recollection: &Recollection,
+  written: &[PathBuf],
+) {
+  let inward: Vec<String> = written
+    .iter()
+    .filter_map(|path| path.strip_prefix(&recollection.brain).ok())
+    .map(|path| path.to_string_lossy().into_owned())
+    .collect();
+
+  if inward.is_empty() {
+    return;
+  }
+
+  let named: Vec<String> = inward.iter().map(|path| recollection.outward(path)).collect();
+
+  // A session holding a stale copy is let go of it before the notice goes out.
+  for path in &named {
+    if let Err(why) =
+      run(db, r#"DELETE FROM "session_people" WHERE "path" = $1"#, vec![path.as_str().into()]).await
+    {
+      eprintln!("reload: the sessions holding {path} could not be let go of it: {why}");
+    }
+  }
+
+  let rooms = match receiver.room_titles().await {
+    Ok(rooms) => rooms,
+    Err(why) => {
+      eprintln!("reload: the rooms could not be read, so nobody is told: {why}");
+      return;
+    }
+  };
+  let knowledge = match store::rows(db, &knowledge_rows(&recollection.agent)).await {
+    Ok(rows) => rows,
+    Err(why) => {
+      eprintln!("reload: the knowledge rows could not be read: {why}");
+      vec![]
+    }
+  };
+  let scopes = |path: &str| {
+    let outward = recollection.outward(path);
+
+    knowledge
+      .iter()
+      .find(|row| row.path == outward && row.active)
+      .or_else(|| knowledge.iter().find(|row| row.path == outward))
+      .map(|row| row.chat_id)
+  };
+  let mut reading = BTreeSet::new();
+
+  for path in &inward {
+    reading.extend(rooms_reading(path, &rooms, &scopes));
+  }
+
+  announce_reload(agency, &recollection.agent, &named, &reading.into_iter().collect::<Vec<_>>()).await;
+}
+
+fn knowledge_rows(agent: &str) -> FragmentFilter {
+  FragmentFilter {
+    kind: Some(Knowledge.kind().to_owned()),
+    agent: Some(agent.to_owned()),
+    ..FragmentFilter::default()
   }
 }
 

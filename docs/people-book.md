@@ -664,6 +664,9 @@ alone, so the fragment tool refuses a piece whose bracket leaves the names out (
 - **Room-only documents:** when one changes, that room's sessions are told.
 - **Common documents:** when one changes (anything under `<brain>/people/<userId>/`, the index excepted), the
   sessions of the rooms the person has spoken in are told.
+- **Beside the book, the same rule:** a room's rule chunk tells that room's sessions; a knowledge chunk tells the
+  sessions of the room its row is scoped to, or of every room the receiver knows where its row is shared; the
+  knowledge index and a document no row stands for (the candidates) tell nobody.
 - **A notice names the path and carries no text,** and before it goes out the path is forgotten in every session
   holding it (`boundary-api.md`, 「Session document loads」). The notice is the agency's document reload notice,
   given the agent, the paths and the rooms; the agency reaches each session once, however many of the rooms

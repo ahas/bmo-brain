@@ -386,11 +386,24 @@ writes back only a text that came back changed.
 ### Owner notices
 
 What the brain tells the owner goes as a code and its parameters through the receiver's owner notice, which the
-web unit's language packs render; the brain writes no sentence of it.
+web unit's language packs render. The brain writes no sentence of it but a failure's `cause`: why a run did not
+stand, an English sentence the notice carries as it is. Where the receiver does not take a failure's notice, its
+line goes to the failure log instead (「What the brain owns」).
 
 | Code | Parameters | When |
 |---|---|---|
 | `digest-paused` | `until` (epoch seconds, or null for a pause until it is lifted), `notes` (the count not yet filed), `rooms` (each `chatId`, `title` or null, `agent` by its label, `messages` unread) | the first hourly launch that finds the owner's pause holding with work waiting behind it, once for that pause |
+| `digest-failed` | `chatId`, `title` or null, `agent` by its label, `notes` (the count left pending), `cause` | a room's notes digest did not stand; its notes are tried again at the next digest |
+| `rule-candidate` | `agent` by its label, `candidate` (the item as the candidates document holds it) | a digest batch wrote a candidate rule awaiting the owner's approval, one notice per candidate |
+| `people-digest-failed` | `chatId`, `title` or null, `agent` by its label, `messages` (the count left unmarked), `cause` | a room's person-book batch failed its last try; its messages are read again at the next run |
+| `people-sort-failed` | `work`, `heading` (the fixed heading's name, or null), `person`, `chatId` (or null for the common part), `title` or null, `cause` | the sort failed a second time at the same work on the same material, which is skipped until that material changes |
+
+The sort's `work` is what failed and what is skipped: `cut` (cutting a book, and that person's room is skipped),
+`group` (sorting a group of pieces, and that person's room is skipped), `sheet` (writing a room sheet over the
+ceiling again, which is not written again, so that person's room sheet is not attached meanwhile), `trim-stretch`
+(walking a stretch of a fixed heading, which goes back into the heading unwalked while the trim goes on past it)
+and `trim-heading` (a fixed heading still past its ceiling after its walk, left as it stands until its text
+changes).
 
 ## Codes the brain answers with
 

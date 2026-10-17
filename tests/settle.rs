@@ -9,11 +9,11 @@ use std::path::{Path, PathBuf};
 use bmo_brain::editors::settle::{
   DIGEST_PAUSED, PauseState, PausedBacklog, PausedRoom, announce_reload, clean_documents, digest_paused,
   digest_paused_until, journal_record, leading_number, notice_paused_digests, pause_digests, pause_notice,
-  resume_digests, tell_failure, unknown_cause,
+  resume_digests, rooms_reading, tell_failure, unknown_cause,
 };
 use bmo_brain::ports::gate::Sanitised;
 use bmo_brain::ports::http::Refusal;
-use bmo_brain::ports::receiver::OwnerNotice;
+use bmo_brain::ports::receiver::{OwnerNotice, RoomTitle};
 use serde_json::{Map, json};
 
 use support::AGENT;
@@ -221,4 +221,36 @@ async fn a_pause_is_told_to_the_owner_once_and_lifted() {
   resume_digests(db).await.unwrap();
 
   assert!(!digest_paused(db).await.unwrap());
+}
+
+#[test]
+fn a_changed_document_is_read_again_in_the_rooms_that_read_it() {
+  let rooms = vec![
+    RoomTitle {
+      chat_id: -5,
+      title: Some("Family".into()),
+      senders: vec![7, 8],
+    },
+    RoomTitle {
+      chat_id: -6,
+      title: None,
+      senders: vec![8],
+    },
+  ];
+  let scopes = |path: &str| match path {
+    "knowledge/tea.md" => Some(Some(-6)),
+    "knowledge/rules.md" => Some(None),
+    _ => None,
+  };
+  let reading = |path: &str| rooms_reading(path, &rooms, &scopes);
+
+  assert_eq!(reading("rooms/-5/people/chunks/p7-address.md"), vec![-5]);
+  assert_eq!(reading("rooms/-5/rules/quiet.md"), vec![-5]);
+  assert_eq!(reading("people/8/chunks/c8-speech.md"), vec![-5, -6]);
+  assert_eq!(reading("people/7/sheet.md"), vec![-5]);
+  assert!(reading("people/7/index.md").is_empty());
+  assert_eq!(reading("knowledge/tea.md"), vec![-6]);
+  assert_eq!(reading("knowledge/rules.md"), vec![-5, -6]);
+  assert!(reading("knowledge/candidates.md").is_empty());
+  assert!(reading("knowledge/index.md").is_empty());
 }

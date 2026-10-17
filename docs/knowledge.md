@@ -128,7 +128,10 @@ it, and the gate asks its own models about the rows this room may be offered (`f
 - **A failure is loud** (「When a run fails」): the owner is told which room's digest failed and why, as a code
   with its parameters through the receiver's owner notice. Only when that notice cannot be sent does the failure
   land in `digest-failures.log` under the data root instead, one line carrying the error, the room and the note
-  ids left pending, so nothing disappears silently. A usage limit reached mid-run is one of those failures.
+  ids left pending, so nothing disappears silently.
+- **A usage limit reached mid-run is not told as a failure:** the agency has rested its login and told the owner
+  (`boundary-api.md`, 「The agency」). The run's writes are put back and the digest stops there, its notes left
+  pending for a later hour.
 - **The lock wait is twenty minutes** (「Boundaries and locking」): a room whose batch cannot have the editing
   lock in that time, because a cut or a rewrite is holding it, is not a failure; its notes wait for the next
   hour.
