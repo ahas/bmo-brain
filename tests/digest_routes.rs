@@ -9,6 +9,7 @@ use std::time::Duration;
 
 use bmo_brain::api::digests::{PauseAsked, seoul_day_start};
 use bmo_brain::api::holds::locks_free;
+use bmo_brain::editors::lock::{brain_held, brain_holders};
 use bmo_brain::ports::agency::{Launch, LaunchOutcome};
 use bmo_brain::ports::receiver::{RoadKind, Roads, RoomAnswerers};
 use serde_json::{Value, json};
@@ -377,6 +378,27 @@ async fn a_jobs_hold_stands_while_its_run_does_and_the_wait_answers_once_the_loc
   tokio::time::sleep(Duration::from_millis(50)).await;
   lock.unlock().unwrap();
   assert!(waiting.await.unwrap());
+}
+
+#[tokio::test]
+async fn a_jobs_hold_on_the_brain_holds_the_editors_off_while_its_run_is_open_but_never_its_own_run() {
+  let api = served().await;
+
+  api.post("/brain/hold", json!({ "run": "job-1" })).await;
+  api.post("/brain/hold", json!({ "run": "job-2" })).await;
+  api.agency.open.lock().unwrap().insert("job-1".to_owned());
+
+  assert_eq!(brain_holders(api.scratch.db(), api.agency.as_ref(), None).await.unwrap(), ["job-1"]);
+  // The hold of the run that is over went as it was read.
+  assert_eq!(
+    api
+      .scratch
+      .count(r#"SELECT COUNT(*) FROM "settings" WHERE "key" LIKE 'brain_hold:%'"#, vec![])
+      .await,
+    1
+  );
+  assert!(brain_held(api.scratch.db(), api.agency.as_ref(), None).await);
+  assert!(!brain_held(api.scratch.db(), api.agency.as_ref(), Some("job-1")).await);
 }
 
 #[tokio::test]

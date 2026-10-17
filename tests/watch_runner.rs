@@ -404,13 +404,12 @@ async fn a_memo_the_agency_will_not_take_leaves_the_watch_standing() {
   assert_eq!(api.state(id).await.0, "active");
 }
 
-#[tokio::test]
-async fn the_binary_runs_a_watch_as_the_agency_launches_it() {
-  let scratch = Scratch::new().await;
+// The binary run on one watch as the agency launches it, over stub agency and receiver servers, with `env` set on
+// its environment: what it ended with, and the agency stub the memo went to.
+async fn launched(scratch: &Scratch, id: i64, env: &[(&str, String)]) -> (std::process::Output, Stub) {
   let agency = Stub::start().await;
   let receiver = Stub::start().await;
   let data = tempfile::tempdir().unwrap();
-  let id = watch_row(&scratch, "echo ready", 600, UNIT).await;
 
   agency.answer("/instructions/quiet", json!({ "ok": true }));
   receiver.answer(
@@ -447,9 +446,19 @@ async fn the_binary_runs_a_watch_as_the_agency_launches_it() {
     .arg(&file)
     .args(["watch-runner", &id.to_string(), UNIT, "--unit", UNIT])
     .current_dir(data.path())
+    .envs(env.iter().map(|(name, value)| (*name, value.as_str())))
     .output()
     .await
     .unwrap();
+
+  (ran, agency)
+}
+
+#[tokio::test]
+async fn the_binary_runs_a_watch_as_the_agency_launches_it() {
+  let scratch = Scratch::new().await;
+  let id = watch_row(&scratch, "echo ready", 600, UNIT).await;
+  let (ran, agency) = launched(&scratch, id, &[]).await;
 
   assert!(ran.status.success(), "{}", String::from_utf8_lossy(&ran.stderr));
   assert!(String::from_utf8_lossy(&ran.stdout).contains(&format!("watch #{id}: the check succeeded")));
@@ -461,6 +470,46 @@ async fn the_binary_runs_a_watch_as_the_agency_launches_it() {
     (json!(AGENT), json!(ROOM), json!("watch"))
   );
   assert!(memo["text"].as_str().unwrap().contains("in Family Room (chat"));
+  assert_eq!(
+    scratch
+      .count(r#"SELECT COUNT(*) FROM "watches" WHERE "state" = 'fired' AND "last_exit" = 0"#, vec![])
+      .await,
+    1
+  );
+}
+
+// A run launched from a shell with no bus still reaches the user's service manager: the check asking whether a unit
+// runs is answered by a stand-in `systemctl` that answers only where the runtime directory is named.
+#[tokio::test]
+async fn a_check_on_a_running_unit_reaches_the_bus_from_a_shell_with_none() {
+  use std::os::unix::fs::PermissionsExt;
+
+  let scratch = Scratch::new().await;
+  let bin = tempfile::tempdir().unwrap();
+  let systemctl = bin.path().join("systemctl");
+
+  std::fs::write(
+    &systemctl,
+    "#!/bin/sh\nif [ -z \"$XDG_RUNTIME_DIR\" ]; then echo \"Failed to connect to bus: No medium found\" >&2; exit 1; fi\nexit 0\n",
+  )
+  .unwrap();
+  std::fs::set_permissions(&systemctl, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+  let id = watch_row(&scratch, "systemctl --user is-active --quiet brain-probe", 600, UNIT).await;
+  let path = format!("{}:{}", bin.path().display(), std::env::var("PATH").unwrap_or_default());
+  let (ran, _) = launched(
+    &scratch,
+    id,
+    &[
+      ("PATH", path),
+      ("XDG_RUNTIME_DIR", String::new()),
+      ("DBUS_SESSION_BUS_ADDRESS", "disabled:".to_owned()),
+    ],
+  )
+  .await;
+
+  assert!(ran.status.success(), "{}", String::from_utf8_lossy(&ran.stderr));
+  assert!(String::from_utf8_lossy(&ran.stdout).contains(&format!("watch #{id}: the check succeeded")));
   assert_eq!(
     scratch
       .count(r#"SELECT COUNT(*) FROM "watches" WHERE "state" = 'fired' AND "last_exit" = 0"#, vec![])

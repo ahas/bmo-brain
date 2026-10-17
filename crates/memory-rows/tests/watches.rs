@@ -35,6 +35,23 @@ fn a_check_is_asked_for_with_its_defaults() {
 }
 
 #[test]
+fn a_moment_is_read_on_the_seoul_clock_or_as_an_iso_moment_and_a_setter_only_as_its_chat() {
+  // 2026-10-10 09:00 in Seoul.
+  assert_eq!(seoul_when("2026-10-10 09:00"), Some(1_791_590_400));
+  assert_eq!(seoul_when("2026-10-10T00:00:00Z"), Some(1_791_590_400));
+  assert_eq!(seoul_when("2026-10-10T09:00:00+09:00"), Some(1_791_590_400));
+  assert_eq!(seoul_when("2026-10-10"), Some(1_791_590_400));
+  assert_eq!(seoul_when("soon"), None);
+
+  let by_room = WatchArguments {
+    by: Some("room:5"),
+    ..arguments()
+  };
+
+  assert!(watch_request(&by_room, NOW, &|_| true).unwrap_err().contains("whose it is"));
+}
+
+#[test]
 fn a_timer_is_read_on_the_seoul_clock() {
   let timer = WatchArguments {
     until: None,

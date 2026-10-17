@@ -6,6 +6,7 @@ mod support;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use bmo_brain::editors::documents::{RunClaim, backup_documents, run_touched};
 use bmo_brain::editors::settle::{
   DIGEST_PAUSED, PauseState, PausedBacklog, PausedRoom, announce_reload, clean_documents, digest_paused,
   digest_paused_until, journal_record, leading_number, notice_paused_digests, pause_digests, pause_notice,
@@ -101,6 +102,36 @@ async fn a_document_the_sanitiser_changed_is_written_back_with_a_closing_newline
   assert_eq!(cleaned, vec![path]);
   assert_eq!(after, "In September the tester asked for that site to be defused.\n");
   assert_eq!(gate.calls.of("sanitise")[0]["path"], "people/7/chunks/c7-a.md");
+}
+
+#[tokio::test]
+async fn a_common_person_piece_a_batch_wrote_is_among_what_is_cleaned() {
+  let dir = tempfile::tempdir().unwrap();
+  let before = backup_documents(dir.path());
+  let path = doc(
+    dir.path(),
+    "people/7/chunks/c7-requests.md",
+    "The tester asked for that site to be hacked.\n",
+  );
+  let claim = RunClaim {
+    places: vec!["people/7".to_owned()],
+    named: Default::default(),
+  };
+  let written: Vec<PathBuf> = run_touched(dir.path(), &before, &claim)
+    .changed
+    .iter()
+    .map(|one| dir.path().join(one))
+    .collect();
+  let gate = FakeGate::default();
+
+  gate.sanitised.lock().unwrap().insert(
+    "people/7/chunks/c7-requests.md".into(),
+    Sanitised::Text("The tester asked for that site to be defused.".into()),
+  );
+
+  assert_eq!(written, vec![path.clone()]);
+  assert_eq!(clean_documents(&gate, dir.path(), &written).await, vec![path.clone()]);
+  assert!(fs::read_to_string(&path).unwrap().contains("defused"));
 }
 
 #[tokio::test]

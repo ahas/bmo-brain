@@ -23,8 +23,10 @@ use crate::settings;
 // The name a reset stands in the lock's queue under.
 const HOLDER: &str = "companion reset";
 
-// How long a killed process is given to let the lock go, and how often the lock is tried meanwhile.
-const KILL_SETTLE: Duration = Duration::from_secs(3);
+/// How long a killed process is given to let the lock go.
+pub const KILL_SETTLE: Duration = Duration::from_secs(3);
+
+// How often the lock is tried meanwhile.
 const POLL: Duration = Duration::from_millis(100);
 
 // How many takers of the lock are killed, one after another, before the reset goes on without it.
