@@ -46,7 +46,7 @@ tools through `env/brain.env`, written from it (「Its tools」).
 | owner's number | `owner` | the owner's user id: a global memory row reaches the owner's room unless told otherwise, and its text is checked without the owner's own name |
 | owner's names | `owner_names` | the names the owner goes by in the rooms, counted among the common words ([fragments](fragments.md)) |
 | service unit | `service_unit` | the unit the service runs as: a failure notice of a run with no unit of its own names this unit's journal, and a run under a launched unit names that unit's |
-| agency, receiver, gate | `[agency]`, `[receiver]`, `[gate]`, each with `base` and `token` | each unit's base address and the token it is called with |
+| agency, receiver, gate, bmo-job | `[agency]`, `[receiver]`, `[gate]`, `[job]`, each with `base` and `token` | each unit's base address and the token it is called with |
 | own command | `own_command` | the words that start this service's binary with its configuration, which every run the brain launches apart begins with (「Runs launched apart」) |
 | policy | none | the files under `policy/`, the service's and each crate's own, built into the binary: the common words, the fragment titles' cues, the words an item is named by, the Korean words the prompts quote, and the memory, digest and person-book numbers |
 
@@ -83,7 +83,8 @@ Paths the brain writes into an answer are relative to the brain folder or to the
   recollection and self preservation, each headed by its name, then its task. The task and this repository's two
   rulebooks have their `{{name}}` marks filled: the run's own (the agent it writes for by its label, the batch,
   the documents) and the Korean words the prompts quote, which stand in `policy/prompts.toml` so the prompt
-  files hold none; a mark nothing fills is left as it stands. The agency's rulebooks go in as they are handed over.
+  files hold none; a mark nothing fills is left as it stands. The agency's rulebooks go in as they are handed
+  over, and the prompt so made is the whole of what the run's turn hands the agency.
 - **Its tools:** the tools bound to the brain are this repository's, each under `tools/` with its own
   `tool.toml` manifest, which the tool host reads as it reads any tool's: `tools/memory`, the memory rows an
   agent keeps, the note it keeps for a room's digest and the watch it sets, and `tools/fragment`, an editor's
@@ -243,12 +244,16 @@ moved to another room meanwhile), `already-up` or `already-down`. A slug names o
 
 A watch's run is the brain's own binary, `watch-runner <id> <unit>` (「Runs launched apart」), which claims and ends
 its watch as these routes do. A memo goes to the agent that set the watch, in the room that set it, as a quiet
-instruction of kind `watch`; the watch is ended only once the agency has taken the memo.
+instruction of kind `watch`; the watch is ended only once the receiver has taken the memo.
+
+The agency does not call `POST /watches/stopped` yet before it stops a watch's unit (row #1782), and no tool
+sets or cancels a reminder yet: the send tool's remind entry, whose repository is not made, is to post
+`POST /reminders/set` and `POST /reminders/cancel` (row #1784).
 
 ### Fragments
 
 The fragment tool's routes, one per tool schema. Each body is `desk` (the desk the run's session record names,
-as the session start handed it) plus the tool's arguments; each answer is a reading or a refusal (「Fragment
+as the editor turn handed it) plus the tool's arguments; each answer is a reading or a refusal (「Fragment
 refusals」 below). A desk is found only among the desks open under the data root: a `desk` naming any other
 file, or a desk already closed, is refused `no-desk`. Each call reads the desk afresh; a call that writes saves
 it whole, or leaves it as it stood on a refusal, and writes nothing to the table, which the batch writes once
@@ -368,7 +373,7 @@ it until a clear forgets it.
 | Route | Body | Answer |
 |---|---|---|
 | `POST /digest/run` | `chatId` or null | `outcome`: `paused` (the owner told once of what waits behind the pause), `resting`, `nothing` (no note waits, in the room where one is named), or the memo digest's launch: `launched` or `running` with `unit`, or `refused` with `why` |
-| `POST /digest/now` | `agent`, `chatId` | `outcome`: `resting` (a rest is on), `nothing` (no note waits), `running` with `unit`, `launched` with `unit` and `notes`, or `refused` with `why`, the unit launch's refusal |
+| `POST /digest/now` | `agent`, `chatId` | `outcome`: `resting` (a rest is on), `nothing` (no note waits), `running` with `unit`, `launched` with `unit` and `notes`, or `refused` with `why`, why the launch was refused |
 | `POST /digest/people` | `chatId`, `agent`, `all`, `split` with `person` and `spans`, `sheets`, `reform` with `batches`, `sort` with `person`, `all` or `status` and `groups`, `since` (a day, `none`, or absent to read it), `forgetRead` with `chatId` or `all` | `outcome`: `answered` with a reading for what is read or set in the request (`status`, `since`, `forgetRead`), or for the work itself its launch: `launched` or `running` with `unit`, or `refused` with `why` |
 | `POST /digest/pause` | `set`: `status`, `off`, `on`, or a length (`2h`, `90m`, `30s`, a bare number of minutes) | `pausedUntil` (time, or null for none, or `forever`) and a reading of how the digests stand |
 | `POST /people/before-fold` | `chatId`, `agent` | `outcome`: `launched` or `running` with `unit`, `skipped` (the agent's book is not written from the room), or `refused` with `why` |
@@ -407,75 +412,100 @@ sentence naming the form it takes.
 | `POST /agents/book-since` | `agent`, `chatId`, `at` | `ok`; the agent's person book of the room reads from `at`, in seconds, on: the day a book starts reading (「What the brain owns」) set to it |
 | `POST /agents/put-back` | `agent` | `ok`; the agent's folder put back to its last commit in the brain repository, so what its stopped recollector runs wrote and left uncommitted there goes. It takes no lock: the caller holds the folder's editing lock, taken through its path, while it asks. An agent the agency registers no folder for, or whose folder does not stand, has nothing undone; the brain root holds every other agent's folder, so the chat agent's is refused `brain-root` |
 
-An agent's folder is its registration's brain folder, read through the agency's registration lookup. The chat
+An agent's folder is its registration's brain folder, read through the agency's registrations. The chat
 agent's is the brain root, so `POST /agents/reset` and `POST /agents/put-back` refuse it `brain-root`.
 
 ## Calls the brain makes
 
-Each call is one POST of a JSON body under the serving unit's configured base address, carrying that unit's
-token, at the path the tables below give. The paths are the brain's side of the contract, and the serving
-unit's own boundary document states the operation at the same path. An operation that sends none sends an
-empty object. A call is answered, refused and retried by the wire conventions above. The brain holds no other
-unit's tables or files.
+Each call goes to the serving unit's configured base address, carrying that unit's token, by the method, the
+path and the body the serving unit's own boundary document gives it; the tables below repeat them as that
+document states them, and where the serving unit states no boundary yet, the path is the brain's side, which its
+document is to state. A call is answered, refused and retried by the serving unit's conventions, which for the
+agency and the receiver are the chat wire protocol's (「Wire conventions」). The brain holds no other unit's
+tables or files.
+
+Where a unit does not serve yet what the brain needs of it, the table says so in its last column and names the
+row raised for it, and the brain keeps the nearest behaviour stated beside it, so the brain stands with what is
+served now and takes the rest up as each is served.
 
 ### The agency
 
-| Operation | Path | Sends | Answers |
-|---|---|---|---|
-| registration lookup | `/registrations/lookup` | `agent`, or null for all | `agents`: each agent's `name`, `label` (or null), `key`, `brainFolder`, `awake`, `recollectorRegistration` (or null), `reasoning` (or null) |
-| recollector session start | `/runs/start` | `workKey`, `agent`, `chatId`, `unit` or null, `capSeconds`, `step` and `steps` (or null), `prompt`, `tools`, `workdir`, `desk`, `registration` or null | `run` |
-| recollector session wait | `/runs/wait` | `run` | `outcome` (`answered`, `failed`, `overran`, `stopped` or `limit`), `answer` (or null), `filesWritten`, `cost` (or null), `size` (or null) |
-| recollector session stop | `/runs/stop` | `run` | `ok` |
-| overrun ask | `/runs/overrun` | `run`, `unit`, `capSeconds` | `keep` (boolean) and `until` (or null) |
-| run open | `/runs/open` | `run` | `open` (boolean): whether a job's run still stands |
-| cap end | `/runs/cap-ends` | `unit` | `until` (or null): the moment the open session started under that unit runs out of its cap, the latest where several stand; null where none stands |
-| clock keep | `/runs/kept-until` | `run`: the run or unit a lock ticket names | `until` (or null): the moment the open overrun ask on it stands until, the keep's end where it was kept and the moment it must be answered by while it is not yet; null where no ask stands open or it was cut |
-| rulebook read | `/rulebooks/read` | `names` | `rulebooks`: each named rulebook's `name` and `text`, trimmed, in the order asked |
-| work key cap and reasoning | `/work-keys/read` | `workKey`, `agent` | `capSeconds`, `reasoning` (or null) |
-| item states | `/items/states` | `items` | `items`: each item's `item` and `finished` (boolean), for a fragment's status and a trim's stretch |
-| unit launch | `/units/launch` | `unit`, `kind`, `title`, `agent` or null, `command` (its words, in order) | `outcome`: `launched`, `running` (a run of that unit stands, and nothing is started) or `refused`, and `why` (or null) |
-| units running | `/units/running` | `units` | `running`: those of the units a run stands under, as a unit, an open execution or a run the agency's host holds |
-| quiet instruction | `/instructions/quiet` | `agent`, `chatId`, `text`, `kind` or null | `ok` |
-| document reload notice | `/documents/reload` | `agent`, `paths`, `rooms` | `ok` |
+The agency's boundary document is its `docs/api.md`. It supplies the brain one thing: the model runs of the
+recollectors, as the turns of an editor work key's session (`digest`, `people-digest`). What to recollect, the
+prompt, the desk, the lock, the commit and the judgement of the result are the brain's. Beside the runs the
+brain reads the registrations, whether a run or a unit is alive, the rest and the clock of a run, and tells the
+agency which documents moved.
 
-The recollector runs are the agency's sessions; the brain decides what to recollect, writes the prompt, opens
-the desk, holds the lock and judges the result. Everything about the model run itself is the agency's: the
-logins it goes out on, the run's usage and cache events, and a usage limit. A session that reaches a limit
-ends with the outcome `limit`; the agency has rested its login and told the owner where that rest silenced the
-last open login, as for every session it runs. The brain writes no rest, and the run stops without a retry.
-
-What the brain sends and does around one session:
-
-- **The cap** is the work key's `capSeconds` for the agent the run writes for: the agency folds in the request
-  wait of the registration that agent's recollectors run on, where that is longer.
-- **The start** names the work key, the agent, the room of the batch, the unit the batch runs in (null where it
-  runs in none), the cap, which batch it is of how many (null for a run that is no batch of a planned run), the
-  prompt, the tools (the file tools `read`, `write`, `edit`, `glob` and `grep`, and the brain's `fragment`
-  tool), the folder the run stands in, the desk and the registration its agent's recollectors run on. The
-  agency keeps the run's record from it: opened at the start and closed at the session's end with its outcome,
-  what it cost and the size it ended carrying.
-- **The clock** is the brain's: once the session passes its cap the brain makes the overrun ask, naming the
-  batch's unit, or the run where the batch runs in none. Kept, it asks again at `until`, or one cap later where
-  `until` is null; not kept, or where the ask has no answer, the brain stops the session, waits for its end and
-  fails the batch as cut at its cap.
-- **The end:** `answered` with an answer is the run's answer, the files it wrote named from the folder it stands
-  in; `answered` with none, `failed`, `overran` and `stopped` fail the batch; `limit` stops it without a retry.
-
-#### Runs launched apart
-
-Work that must outlive a request runs apart: one run of the brain's own binary in a unit of its own, started
-through the agency's unit launch, which answers `running` where a run of that unit already stands, so the unit's
-name is the run's mutex. The command is the own command, then the run's words below, then `--unit <unit>`: the run
-knows its unit by it, and its clock, its brain hold and a failure's record are named by it.
-
-| Unit | `kind` | `agent` | `title` | Words |
+| Operation | Route | Sends | Answers | Served |
 |---|---|---|---|---|
-| `bmo-digest` | `digest` | null | `All pending notes` | `digest` |
-| `bmo-digest-<chatId>` | `digest` | null | the room's name | `digest --chat <chatId>` |
-| `bmo-people-digest` | `people-digest` | null | `Rooms in turn` | `people-digest` |
-| `bmo-people-sort-<agent>` | `people-digest` | the agent | `Sorting the person book` | `people-digest --sort --all --agent <agent>`, or `--person <userId>` for one person, with `--groups <n>` where a sort is bounded |
-| `bmo-people-digest-<agent>-<chatId>` | `people-digest` | the agent | the room's name | `people-digest --chat <chatId> --agent <agent>`, and `--all` for a catch-up; asked by hand, `--split` (with `--person <userId>` and `--spans <n>`), `--sheets` or `--reform --batches <n>` |
-| `bmo-watch-<id>-<milliseconds>` | `watch` | null | `<room's name> watch #<id>` | `watch-runner <id> <unit>` |
+| registrations | `GET /agents` | none | `agents`: each agent's `name`, which is its registration key, `label` (or null), `brainFolder` (relative to the brain root, empty for the root), `awake`, `recollectorRegistration` (or null) | `name` and `label` only; `brainFolder`, `awake` and `recollectorRegistration` not yet (row #1781). Meanwhile an agent answered with no brain folder keeps no long-term memory, so only the chat agent, at the root, is recollected |
+| editor session | `POST /session/start` | `agent`: the work key; `scope`: `{"kind": "editor"}` | `id`, `agent`, `scope` | yes |
+| the turn's events | `GET /events?kinds=turn-started,turn-ended` | none | server-sent events: `turn-started` with `session`, `run`, `at`; `turn-ended` with `session`, `run`, `outcome` (`answered`, `blocked`, `stopped` or `failed`), `answer` where it answered, `reason` where it failed | yes |
+| editor turn | `POST /session/turn` | `session`, `prompt`; and the run's parts: `run`, the name the brain gives the run; `parent`, the unit the batch runs in, or null; `agent`, whose memory it writes; `chatId`; `step` and `steps` (or null); `workdir`, the agent's brain folder relative to the brain root; `desk`; `registration`, the agent's recollector registration, or null | `delivery` (`taken` or `blocked`) once the turn has ended; a fault `session-busy` under 409 while the session carries a turn | `session` and `prompt` only: the run's parts and several turns at once on one editor session not yet (row #1780). Meanwhile the run goes out on the key's road in the brain root, without the desk in its record, and a turn met by `session-busy` asks again every five seconds |
+| run stop | `POST /runs/stop` | `run`, `reason` | `ok` | yes |
+| run clock | not named yet | `run` | `capEnds`: the moment the clocked run of that name, or under that name as its parent, runs out of its bound, the latest where several stand, else null; `keptUntil`: the moment a keep or an open ask on it stands until, else null | no (row #1780). Meanwhile neither is read: no run is kept, and a wait sized on a run's clock ends at its own length |
+| editor cap | not named yet | `workKey`, `agent` | `capSeconds`: the bound a run of that key for that agent carries | no (row #1780). Meanwhile the cap is thirty minutes, the editor runs' clock the agency's `docs/agent-control.md` states |
+| alive | `POST /runs/alive` | `names` | `answered` and `alive`, those of the names a unit, an open execution or a pane's run holds, or null where nobody could say | yes |
+| rest | `GET /rest` | none | `resting` (boolean), `until` (epoch seconds, or null) and `kind` (`limit` or `outage`) | yes |
+| rulebook read | not named yet | `names` | `rulebooks`: each named rulebook's `name` and `text`, trimmed, in the order asked | no (row #1781). Meanwhile a writer's prompt goes without the agency's rulebooks, each left out with its heading |
+| document reload | `POST /documents/reload` | `paths`, relative to the brain root; `now` false; and `agent` and `rooms` | `paths` and `now`, as published on `documents-moved` | `paths` and `now` only: `agent` and `rooms` not yet (row #1781), so which rooms a document concerns is left to the unit holding the rooms |
+
+How a recollector run goes:
+
+- **The cap** is the editor cap for the agent the run writes for: the agency folds in the request wait of the
+  registration that agent's recollectors run on, where that is longer. The brain sizes its own waits on it (the
+  lock's, the launcher's); the run's clock itself is the agency's.
+- **The start:** the brain opens the work key's editor session, which answers the same session for every run of
+  the key, opens the turn's events, and posts the turn with the prompt and the run's parts. The run's name is
+  the brain's: the batch's unit, or the service's unit where the batch runs in none, then the work key, the
+  agent, the room and the moment it starts, so no two runs share one. The agency keeps the run's record and the
+  usage it spent under the work key.
+- **The end** is the turn's `turn-ended`, the one naming the run the brain gave, or, where the agency does not
+  carry that name, the one on the session after the brain's turn started: `answered` with an answer is the
+  run's answer; `answered` with none, `blocked`, `stopped` and `failed` fail the batch with the reason; a
+  `failed` while the agency's rest stands with kind `limit` is a usage limit, and the run stops without a retry.
+  The brain writes no rest.
+- **What the run wrote** is read from the brain repository once the run has ended, under the editing lock the
+  batch holds: every path in the agent's brain folder that git reports added, changed or deleted since the last
+  commit, other agents' folders under it set aside.
+- **The clock** is the agency's: an editor run carries the bound its `docs/agent-control.md` gives it, and past it
+  the agency asks the chat agent whether to keep it or cut it, and cuts it where no answer comes. The brain makes
+  no ask. Past the cap, the brain reads the run's clock: while a keep or an open ask stands on it, it looks again
+  when that ends; where none stands, it stops the run through the run stop and fails the batch as cut at its cap,
+  so a run the agency holds no clock on is never left running.
+- **Alive:** a job's run holding the brain stands while the agency answers it alive, or while nobody could say;
+  a unit runs while the agency answers it alive, and where nobody could say every unit asked is taken as running,
+  so nothing is launched on that pass.
+
+### bmo-job
+
+bmo-job's boundary document is its `docs/api.md`. It holds the TODO items, which a fragment's status and a
+trim's stretch are settled against. The call keeps bmo-job's own conventions: snake_case keys, and an answer read
+as bmo-job reads one, a refusal by its `code`.
+
+| Operation | Route | Sends | Answers | Served |
+|---|---|---|---|---|
+| item states | `POST /todos/states` | `items` | `items`: each item's `id` and `done` (boolean), true where the item is finished | no (row #1785). Meanwhile no item reads as finished, so a piece tied to an item stays open |
+
+### Runs launched apart
+
+Work that must outlive a request runs apart: one run of the brain's own binary in a unit of its own, which the
+brain starts itself as a transient unit of the user's service manager (`systemd-run --user`), named by the unit
+below, described by its title, and collected once it ends. Where a unit of that name already stands the start
+answers `running` and nothing is started, so the unit's name is the run's mutex; a start the service manager
+refuses for any other reason answers `refused` with why. The command is the own command, then the run's words
+below, then `--unit <unit>`: the run knows its unit by it, and its clock, its brain hold and a failure's record
+are named by it. Whether a unit still runs is the agency's alive (「The agency」), which reads what the service
+manager holds.
+
+| Unit | Title | Words |
+|---|---|---|
+| `bmo-digest` | `All pending notes` | `digest` |
+| `bmo-digest-<chatId>` | the room's name | `digest --chat <chatId>` |
+| `bmo-people-digest` | `Rooms in turn` | `people-digest` |
+| `bmo-people-sort-<agent>` | `Sorting the person book` | `people-digest --sort --all --agent <agent>`, or `--person <userId>` for one person, with `--groups <n>` where a sort is bounded |
+| `bmo-people-digest-<agent>-<chatId>` | the room's name | `people-digest --chat <chatId> --agent <agent>`, and `--all` for a catch-up; asked by hand, `--split` (with `--person <userId>` and `--spans <n>`), `--sheets` or `--reform --batches <n>` |
+| `bmo-watch-<id>-<milliseconds>` | `<room's name> watch #<id>` | `watch-runner <id> <unit>` |
 
 - **A room's name** is its title as the receiver's room titles give it; a room with none is `Private chat` where
   its roads are the owner's and `Room <chatId>` otherwise.
@@ -490,25 +520,26 @@ knows its unit by it, and its clock, its brain hold and a failure's record are n
     came due while the brain was down included, wakes its agent in its room as a quiet instruction of kind
     `reminder`, saying how late it comes where it is more than five minutes past; a repeating one moves to its
     first moment still ahead, so missed moments come to one wake, and any other is fired for good. A moment is
-    taken only once the agency has taken its wake.
+    taken only once the receiver has taken its wake.
   - The watch sweep runs every thirty seconds, its first pass thirty seconds after the start, once the agency's
-    running units can be told: it ends, with no memo, every standing watch serving a memory no longer open; fires
+    alive can be told: it ends, with no memo, every standing watch serving a memory no longer open; fires
     every timer whose moment has come, one that came due while the brain was down included, with its memo; then
     launches again the watches nobody holds, as below.
 - **Before a room's session folds,** the agent's worker of that room is launched, unless the agent's book is not
   written from the room; where that cannot be read, it is launched all the same.
 - **A watch's run** is named by its unit: the brain writes the unit and the moment it was armed on the watch
-  before launching it, and the run claims the watch under that name. A launch the agency refuses leaves the
+  before launching it, and the run claims the watch under that name. A launch refused leaves the
   watch standing for a later pass.
-- **Watches nobody holds:** on each pass the brain asks the agency's units running about every standing watch's
+- **Watches nobody holds:** on each pass the brain asks the agency's alive about every standing watch's
   unit, and launches again every condition watch whose unit no run holds, once a minute has passed since it was
   armed, since a run just launched is not yet among the running. A watch past its deadline is launched all the
   same: only a run may check it one last time before it lapses.
 
 ### The receiver
 
-A message is answered as `chatId`, `messageId`, `senderId` (or null), `senderName`, `sentAt`, `text` and
-`replyToMessageId` (or null).
+The receiver's repository states no boundary of its own yet; the paths below are the brain's side, which its
+boundary document is to state. A message is answered as `chatId`, `messageId`, `senderId` (or null),
+`senderName`, `sentAt`, `text` and `replyToMessageId` (or null).
 
 | Operation | Path | Sends | Answers |
 |---|---|---|---|
@@ -528,8 +559,8 @@ A message is answered as `chatId`, `messageId`, `senderId` (or null), `senderNam
 | roads | `/rooms/roads` | `chatId` | `kind` (`owner` or `group`) and `oneToOne` (boolean) |
 | sender is owner | `/messages/sender-is-owner` | `chatId`, `messageId` | `owner` (boolean) |
 | owner spoke | `/rooms/owner-spoke` | `chatId`, `person`, `before`, `seconds` | `owner` (boolean): the person is the owner; `spoke` (boolean): the owner sent a message in the room in that span |
-| rest state | `/rest` | none | `resting` (boolean) and `until` (or null) |
 | owner notice | `/owner/notice` | `code` and its parameters beside it | `ok` |
+| quiet instruction | `/instructions/quiet` | `agent`, `chatId`, `text`, `kind` (`watch` or `reminder`) | `ok`: the instruction is queued for the agent in the room, whose turn it wakes there (row #1783) |
 
 ### The gate
 

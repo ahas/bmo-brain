@@ -1,13 +1,13 @@
 # Working in this repository
 
-This repository is the brain service, `bmo-brain`: each chat agent's memory rows (promises, checks,
-states, situation rules, notes and watches), its brain documents (knowledge, the person book and room
-rules), the fragment index over them, and the recollector runs that write the documents. It owns its own
-database tables and its brain folder. It asks the agency for recollector model sessions and nothing else,
-reads messages and rooms from the receiver, and serves raw material to the gate, which does all reference
-selection. Other units reach it over HTTP only. The tools bound to the brain, memory and fragment, are this
-repository's, under `tools/`, each with its `tool.toml`. The word-chain game is not the brain's: it is its
-own tool repository, `bmo-word-chain`.
+This repository is the brain service, `bmo-brain`: each chat agent's memory rows (promises, checks, states,
+situation rules, notes and watches), its brain documents (knowledge, the person book and room rules), the
+fragment index over them, and the recollector runs that write the documents. It owns its own database tables
+and its brain folder. It asks the agency for recollector model sessions and what they stand on, reads messages
+and rooms from the receiver and item states from bmo-job, and serves raw material to the gate, which does all
+reference selection. Other units reach it over HTTP only. The tools bound to the brain, memory and fragment,
+are this repository's, under `tools/`, each with its `tool.toml`. The word-chain game is not the brain's: it
+is its own tool repository, `bmo-word-chain`.
 
 ## Rules
 

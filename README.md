@@ -47,8 +47,8 @@ deployed, is stated key by key in `docs/boundary-api.md`. It reads:
 - its brain folder, a git repository of the agents' documents, and its prompts folder, this repository's
   `prompts/` as it is deployed;
 - the chat agent's key, which names whose brain it serves, and the owner's number and names;
-- the addresses and tokens of the agency, the receiver and the gate;
-- its own command, the words that start its binary, which every run it launches apart through the agency begins
-  with.
+- the addresses and tokens of the agency, the receiver, the gate and bmo-job;
+- its own command, the words that start its binary, which every run it launches apart as a unit of the user's
+  service manager begins with.
 
 Its policy files under `policy/` are built into the binary.

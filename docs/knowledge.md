@@ -41,7 +41,7 @@ it, and the gate asks its own models about the rows this room may be offered (`f
 - **Each batch goes through these steps in order:**
   1. The digest editor run (work key `digest`) gets the notes and writes the documents.
   2. The documents pass the gate's document sanitiser, the sessions holding them are let go of them and told to
-     read them again through the agency's document reload notice, and only the written places are committed.
+     read them again through the agency's document reload, and only the written places are committed.
      The brain has no remote, so nothing is pushed.
   3. The handed-over note rows are deleted.
 
@@ -102,25 +102,25 @@ it, and the gate asks its own models about the rows this room may be offered (`f
 ## The digest run
 
 - **Only the owner writes an agent's rules, and the digest is that work on a schedule.**
-- **Once an hour the brain's clock asks for the digest run.** The run is launched apart through the agency's
-  unit launch, under the fixed unit name `bmo-digest`, so a run still going makes the next launch answer
-  `running` and the following hour retry; the work never runs inside a request of the service
-  (`boundary-api.md`, 「The digests」).
-- **The run ends at once when no notes are pending or a rest is on,** the rest as the receiver's rest state
+- **Once an hour the brain's clock asks for the digest run.** The run is launched apart by the brain itself
+  (`boundary-api.md`, 「Runs launched apart」), under the fixed unit name `bmo-digest`, so a run still going
+  makes the next launch answer `running` and the following hour retry; the work never runs inside a request of
+  the service (`boundary-api.md`, 「The digests」).
+- **The run ends at once when no notes are pending or a rest is on,** the rest as the agency's rest
   says.
 - **While the digests are paused it starts nothing,** and the first hourly launch that finds the pause holding
   while notes wait, or while a room holds at least the people digest's minimum of unread messages, tells the
   owner through the receiver's owner notice, once for that pause and never in a room, how many notes and which
   rooms' person books are waiting behind it and how to lift it. Whether the pause has been told is the
   `digest_pause_noticed` key.
-- **The editor run:** each batch is one recollector session of the `digest` work key, started through the
+- **The editor run:** each batch is one turn of the `digest` work key's editor session, asked of the
   agency, on the model and reasoning that key resolves to for the agent (`agent-ownership.md`, 「The model each
   recollector runs on」), with the file tools only (read, write, edit, glob, grep), no shell, no web, no
   subagents, its task the digest prompt this repository keeps.
 - **New notes merge into what exists** rather than appending duplicates, and a note contradicting a rule
   replaces the old text outright.
-- **Each batch is a run of the agency's,** opened when the session starts and closed however it ends with what
-  it cost and the size it ended carrying, so a digest at work stands in the live picture as an editor.
+- **Each batch is a run of the agency's,** opened when the turn starts and closed however it ends, with the
+  usage it spent filed under the work key, so a digest at work stands in the live picture as an editor.
 - **When the run reports success, the digest itself deletes exactly the notes it handed over.** The sessions
   concerned are then told to read what changed again, and the digest commits into the brain what the run wrote
   (the room's rules directory, the knowledge library and the common person books of the notes' authors, nothing

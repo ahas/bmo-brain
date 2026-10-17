@@ -13,7 +13,7 @@ and the matcher that judges a condition is the gate's (`boundary-api.md`, 「Mem
 - **An agent reads, matches, wakes on and writes only its own rows.** Every read route takes the agent, and a
   room several agents answer holds rows of each that reach their own agent alone.
 - **Reminders and watches are an agent's the same way.** A reminder or a watch names its agent, and its moment
-  wakes that agent alone in its room, through the agency's quiet instruction.
+  wakes that agent alone in its room, through the receiver's quiet instruction.
 
 ## What a memory is
 
@@ -37,7 +37,7 @@ and the matcher that judges a condition is the gate's (`boundary-api.md`, 「Mem
 
 ## What it is not
 
-- **Not the TODO,** which is the job workers' queue and the agency's. A memory is what the agent must
+- **Not the TODO,** which is the job workers' queue and bmo-job's. A memory is what the agent must
   remember; something that becomes a job stays here until the agent has done what it promised about it.
 - **Not a watch.** A watch wakes the agent that set it; the memories are what that agent was holding when it
   wakes (「Watches」 below).
@@ -248,7 +248,7 @@ There are three roads down, and none of them deletes.
   row is written, and one naming a room by its title, a person by name, a user or chat id the receiver has
   seen, or a bare `id <number>` is refused with the offending phrase named. The titles, the rooms' ids and the
   senders' ids come from the receiver's room titles, and the people's names from its display names. A title
-  that is an awake agent's label, or its name where it has none, by the agency's registration lookup, is not
+  that is an awake agent's label, or its name where it has none, by the agency's registrations, is not
   counted as a room's. The owner's own name is not among them: the owner is in every room.
 - **A global row may not be for one person,** since it is read in rooms that person was never in.
 - **Which rooms it reaches is the row's own field:** the owner's private room (`owner`), group rooms (`group`),
@@ -282,9 +282,9 @@ There are three roads down, and none of them deletes.
 - **The route refuses before anything exists** a check bash cannot parse, a missing setter or note, a name
   over 40 characters, an interval under 15 seconds or over 30 minutes, a wait over 24 hours, an eleventh
   standing watch for one room, and a check already standing for the same room, naming the watch that stands.
-- **What passes is a row in the `watches` table and a run of its own.** The brain asks the agency's unit
-  launch to start the run in a unit named after the watch, outside the brain's own process, and answers at
-  once.
+- **What passes is a row in the `watches` table and a run of its own.** The brain starts the run itself, as
+  every run apart (`boundary-api.md`, 「Runs launched apart」), in a unit named after the watch, outside the
+  brain's own process, and answers at once.
 - **The run checks with bash,** input closed, every interval (a minute by default), cutting a check off after
   30 seconds along with everything it started; a check that exits 0 is the thing having happened.
 - **The check is handed the user's service manager,** so `systemctl --user` answers from inside it; a check
@@ -292,7 +292,7 @@ There are three roads down, and none of them deletes.
   having happened: the first such check comes back at once as one that cannot run, and a later one is waited
   past like a no.
 - **Then the note goes to the room that set the watch** as a quiet instruction for the watch's agent, through
-  the agency, framed as the agent's own note with what the check printed marked as data.
+  the receiver, framed as the agent's own note with what the check printed marked as data.
 - **When the wait (two hours by default) runs out first,** the note comes back saying the check never
   succeeded and how the last one ended; a check whose first run cannot execute at all (exit 126 or 127) comes
   back at once saying so.

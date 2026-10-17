@@ -155,7 +155,7 @@ their way of talking:
   The ids and titles are the receiver's room titles and their senders (`boundary-api.md`, 「The receiver」).
 - **A room title that is an agent's own label is that agent's name, not a room's,** and is not forbidden: a room
   made for a companion carries its name, and a common document names the companion as it names anyone, which
-  tells nothing of the room. Which titles those are is read off the agency's registration lookups.
+  tells nothing of the room. Which titles those are is read off the agency's registrations.
 - **Only literal identifiers are caught.** A sentence carrying a room's circumstances without an id or room name
   passes the check; there, the writer's tilt toward room-only is what stops it.
 - **Writers of the common part receive the forbidden room titles verbatim.**
@@ -428,9 +428,10 @@ alone, so the fragment tool refuses a piece whose bracket leaves the names out (
 - **What it has read is its own.** Each agent's read marks are the receiver's, one per agent and message, so a
   message one agent has read stays unread for another until that agent's run reads it (`boundary-api.md`, 「The
   receiver」, unread messages and read marks).
-- **One launcher, a worker per agent and room.** The launcher goes through every agent's rooms in turn. A worker
-  is the unit `bmo-people-digest-<agent>-<chatId>`, the mutex for one agent's book of one room, and the sort
-  runs as `bmo-people-sort-<agent>`, one per agent. Units are launched through the agency's unit launch.
+- **One launcher, a worker per agent and room.** The launcher goes through every agent's rooms in turn. A
+  worker is the unit `bmo-people-digest-<agent>-<chatId>`, the mutex for one agent's book of one room, and the
+  sort runs as `bmo-people-sort-<agent>`, one per agent. Units are launched by the brain itself
+  (`boundary-api.md`, 「Runs launched apart」).
 
 ### The launcher and the worker
 
@@ -440,17 +441,17 @@ alone, so the fragment tool refuses a piece whose bracket leaves the names out (
   - a room whose session is about to fold launches its own worker first through the before-fold route, so what
     the session is about to forget is written down before it goes;
   - a finished history walk of a room asks for that room's run through the people route;
-  - a rest, as the receiver's rest state says, stops either launch before any session is started.
+  - a rest, as the agency's rest says, stops either launch before any session is started.
 - **The launcher takes every room holding at least ten unread messages** for the agent and runs their workers
   one after another, waiting for each, so two writer sessions never run at once. Every agent's rooms are gone
   through in turn, the brain root's agent first.
-- **How long it waits on a worker:** for as long as the batch the worker is at may run, the end of its session's
-  cap as the agency's cap end says or the keep the agency's clock keep gives it, whichever is later, and a minute
+- **How long it waits on a worker:** for as long as the batch the worker is at may run, the end of its run's
+  cap or the keep standing on it, as the agency's run clock gives them, whichever is later, and a minute
   more; at first, for one editor's cap and that minute. A worker still running past that is left be and counted
   as a failure, and the launcher goes on to the next room.
-- **What it does not start:** a room whose worker already stands is left to it, and no worker is started while a
-  job holds the brain (「A job editing the brain holds the editors off」); a worker the agency refuses is counted as
-  a failure and the next room goes on.
+- **What it does not start:** a room whose worker already stands is left to it, and no worker is started while
+  a job holds the brain (「A job editing the brain holds the editors off」); a worker whose launch is refused is
+  counted as a failure and the next room goes on.
 - **Smallest backlog first:** every room's book is current soon, and the room with years of history takes its
   long turn last.
 - **Catch-up (`all`):** a room with a whole batch or more waiting (a backfilled history, a busy week) is worked
@@ -468,7 +469,7 @@ alone, so the fragment tool refuses a piece whose bracket leaves the names out (
   - Each batch's run carries which batch it is of how many, which the agency's live picture shows.
 - **What the clock covers:** one writer run, one batch or one group of a batch, carries the editor's cap the
   agency's work key gives, thirty minutes or the registration's request wait where that is longer, and the
-  agency's overrun ask is made before it is cut there. A room's run as a whole carries no clock of its own: it
+  agency asks the chat agent before it cuts the run there. A room's run as a whole carries no clock of its own: it
   is bounded by the batches it planned, each under its cap.
 - **Which messages are folded in is marked** through the receiver's read marks, so a message is read into the
   book once and no run reads again what an earlier one handled.
@@ -654,7 +655,7 @@ alone, so the fragment tool refuses a piece whose bracket leaves the names out (
 - **A companion's reset goes first:** its ticket is a front ticket, ahead of every waiting run, and the run still
   holding the lock is stopped rather than waited for.
 - **A wait follows a keep:** each ticket carries the name of its run. A waiting run whose wait runs out while the
-  run ahead of it was kept past its editor's clock by the overrun ask goes on waiting, keeping its place, until
+  run ahead of it was kept past its editor's clock by the agency's ask goes on waiting, keeping its place, until
   the keep ends and a slack after it. Behind a cut, a sheet rewrite or a reform, which hold the lock from outside
   the queue, the wait ends at its own length.
 
@@ -676,9 +677,9 @@ alone, so the fragment tool refuses a piece whose bracket leaves the names out (
   sessions of the room its row is scoped to, or of every room the receiver knows where its row is shared; the
   knowledge index and a document no row stands for (the candidates) tell nobody.
 - **A notice names the path and carries no text,** and before it goes out the path is forgotten in every session
-  holding it (`boundary-api.md`, 「Session document loads」). The notice is the agency's document reload notice,
-  given the agent, the paths and the rooms; the agency reaches each session once, however many of the rooms
-  share it.
+  holding it (`boundary-api.md`, 「Session document loads」). The notice is the agency's document reload,
+  given the agent, the paths and the rooms, which the unit holding the rooms tells each session once, however
+  many of the rooms share it.
 - **Sanitising:** before entering a session, both parts' documents pass the gate's document sanitiser.
 
 ## People whose book is not yet cut
@@ -922,7 +923,7 @@ A verb of its own, the people route with `sort` for one person, for `all`, or fo
 
 - **The stretch:** the holding file's first items, about 16,000 characters, each under its section.
 - **What the run is handed:** the stretch, the heading's piece as it stands, today's date, and how each item
-  number the stretch names stands, as the agency's item states say. It reads no messages.
+  number the stretch names stands, as bmo-job's item states say. It reads no messages.
 - **What it does with each item:** keeps it in the heading's piece, moves it into the piece of its own matter in
   the same part, found through the fragment tool or made new at the ordinary piece size, or, for a work state,
   drops it. An item equal to one already standing folds into it, its confirmed moved forward. Every piece it

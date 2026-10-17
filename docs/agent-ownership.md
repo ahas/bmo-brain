@@ -3,7 +3,7 @@
 Every agent, the chat agent and every companion, keeps its own state. This document states the brain's part of
 that split: the brain's rows, its long-term memory folders and its recollector runs. Everything else an agent
 owns (its sessions, its gate settings, its voice, its usage) is another unit's, and what the brain needs of an
-agent is read from the agency's registration lookups (`boundary-api.md`, 「The agency」).
+agent is read from the agency's registrations (`boundary-api.md`, 「The agency」).
 
 ## The principle
 
@@ -22,13 +22,13 @@ agent is read from the agency's registration lookups (`boundary-api.md`, 「The 
 
 | Registration field | What the brain does with it |
 |---|---|
-| `name` | the value of every `agent` column, and the name every route takes |
+| `name` | the value of every `agent` column, and the name every route takes; it is the agent's registration key |
 | `label` | the name a recollector's task calls the agent by, and a room title that is an agent's own name |
 | `brainFolder` | where its long-term memory lives, relative to the brain root: the brain root itself for the chat agent, a folder of its own for a companion |
+| `awake` | whether its long-term memory is written now: an agent asleep is not recollected |
 | `recollectorRegistration` | the registration its recollectors run on, or null for each recollector's own work key |
-| `reasoning` | how its recollector runs think where they run on its registration |
 
-The chat agent is the registration whose key is the service's configured chat agent's key.
+The chat agent is the registration whose name is the service's configured chat agent's key.
 
 ## The stores split by an owner column
 
@@ -45,7 +45,7 @@ The chat agent is the registration whose key is the service's configured chat ag
   「The turn a request is for」); a write with no agent is refused `no-agent` rather than filed under a default,
   and the `agent` column has no default.
 - **A reminder, a watch and a memory event wake their own agent:** their quiet instruction goes through the
-  agency for the agent the row is, and only that agent's turns take it, in the row's room (`memories.md`).
+  receiver for the agent the row is, and only that agent's turns take it, in the row's room (`memories.md`).
   Nothing of another agent's ever reaches an agent's turns.
 - **Every read names the agent too.** A turn is offered its own agent's rows; the gate's matcher is offered only
   its own agent's condition rows; a reminder or watch wakes its own agent; a room's notes go to its own agent's
@@ -77,9 +77,9 @@ The chat agent is the registration whose key is the service's configured chat ag
 ## The recollectors
 
 - **The recollectors decide what becomes an agent's long-term memory:** the digest and the person-book writer,
-  each a recollector session the brain starts through the agency, and the sheet judgement the brain asks of the
-  gate. The session summariser that writes a chat agent's handoff note is not the brain's; the brain keeps the
-  note it hands in (`boundary-api.md`, 「Chat-session summaries」).
+  each a turn of its work key's editor session the brain asks of the agency, and the sheet judgement the brain
+  asks of the gate. The session summariser that writes a chat agent's handoff note is not the brain's; the
+  brain keeps the note it hands in (`boundary-api.md`, 「Chat-session summaries」).
 - **Each run is for one agent.** It reads the words of the rooms that agent answers, writes into that agent's
   folder and rows, and writes from that agent's own first-person view, under the recollection rule this
   repository keeps. A room several agents answer is read once per agent, and each run writes its own.

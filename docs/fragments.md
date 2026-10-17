@@ -77,7 +77,7 @@ on its behalf, and nothing branches on a kind's name.
   (`[date D · confirmed D]`), or nothing where it carries none. The period a drawn index line shows is read
   from them.
 - **Status:** `open` or `done`. A piece is done when it is tied to items and every one of them is finished, as
-  the agency's item states say; a piece tied to none is open. A library whose pieces never finish (a room rule,
+  bmo-job's item states say; a piece tied to none is open. A library whose pieces never finish (a room rule,
   a system document, a lore piece) keeps every piece open, and each library says for itself whether its pieces
   settle with their items.
 - **Body hash:** a digest of the body as the table last read it, which is how a body edited outside the
@@ -173,9 +173,9 @@ owner normalised to a fixed value so the uniqueness holds across the rows that n
   against what it wrote.
 - **A piece whose file the run deleted goes down** whether or not a write says so, keeping its counts, and a
   write naming it again later raises the row it had.
-- **The desk is the session's.** The agency starts every recollector session with the same tool configuration,
-  so the tools a run is shown are the same for every run; the session's record names its desk, and a call
-  naming no open desk is refused.
+- **The desk is the run's.** The agency runs every editor turn with the same tool configuration, so the tools
+  a run is shown are the same for every run; the run's session record names the desk its turn handed in, and a
+  call naming no open desk is refused.
 - **The index files are drawn from the rows.** Once a batch's rows are written, every library draws its index
   files out of its active rows, in position order: the room part of a person book with one section per person,
   a person's common index, a room's rules index, the knowledge index. Nothing reads them back: they exist for a
@@ -224,7 +224,7 @@ The brain's rows are the source, so their reconcile repairs what can be read off
   again. The title, the keywords and the mark for every agent stay: they are the editor's words and only a
   write changes them.
 - **The agent is read off the path:** the agent whose folder the body lies in, so a row and its body never
-  disagree about whose memory it is. The folders are the agency's registration lookups.
+  disagree about whose memory it is. The folders are the agency's registrations.
 - **A row whose body is gone goes down.** Only a write raises a row again: a piece file standing with no row,
   or with a row that is down, is somebody's leftover until its writer names it.
 - **A brain that is no git repository is passed over,** its libraries' rows left exactly as they stand and the
