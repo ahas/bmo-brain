@@ -362,8 +362,16 @@ summary was lost where none came, as the next fresh session opens with it. The b
 its settings table under `<agent>_pending_summary`, one per agent, the next keep overwriting it; a read answers
 it until a clear forgets it.
 
+The task the summariser is handed for a chat session is this repository's too (「What the brain owns」), and the
+unit that runs the summariser asks for it: the recollection rulebook, headed by its name as a writer's rulebooks
+are, then `session-summary/chat.md`, both with their marks filled as the brain fills its other prompts. The agent
+is named by its registration's label, else its name, through the agency's registrations, and by the name asked
+for where the agency registers none; the Korean words come from `policy/prompts.toml`. A task or rulebook file
+that cannot be read is answered 500 `failed`.
+
 | Route | Body | Answer |
 |---|---|---|
+| `POST /session-summary/task` | `agent` | `task`: the summariser's whole task for that agent's chat session |
 | `POST /session-summary/keep` | `agent`, `note` | `ok` |
 | `POST /session-summary/read` | `agent` | `note` (string or null) |
 | `POST /session-summary/clear` | `agent` | `ok` |

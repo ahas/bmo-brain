@@ -2,7 +2,7 @@
 //! database, the other units in memory, the chat agent's brain as a git repository, a data root beside it, the
 //! prompts the tests' writers are handed, and the words a launched run would start the binary with.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use bmo_brain::api::memories::Withering;
@@ -52,6 +52,11 @@ pub fn caller(base: &str, token: &str) -> Caller {
 /// The routes served over a fresh stage whose chat agent, `AGENT`, keeps its memory at the brain root and whose
 /// owner is `OWNER`.
 pub async fn served() -> Served {
+  served_on(prompts_root()).await
+}
+
+/// The routes served as `served` serves them, reading their prompts from `prompts`.
+pub async fn served_on(prompts: PathBuf) -> Served {
   let scratch = Scratch::new().await;
   let agency = Arc::new(FakeAgency::default());
   let receiver = Arc::new(FakeReceiver::default());
@@ -78,7 +83,7 @@ pub async fn served() -> Served {
     starter: starter.clone(),
     brain_root: brain.path().to_path_buf(),
     data_root: data.path().to_path_buf(),
-    prompts_root: prompts_root(),
+    prompts_root: prompts,
     chat_key: AGENT.to_owned(),
     owner: Some(OWNER),
     owner_names: vec!["Owner".to_owned()],

@@ -126,6 +126,17 @@ pub async fn fragment_writer(
   Ok(parts.join("\n\n"))
 }
 
+/// The chat-session summariser's task (docs/boundary-api.md, 「Chat-session summaries」): the recollection rulebook,
+/// headed by its name, then the chat session's task, both with their marks filled for the agent the note is for, by
+/// the name its turns go by.
+pub fn chat_summary_task(root: &Path, agent: &str) -> Result<String, PromptFailure> {
+  let values = [("agent", agent)];
+  let rulebook = filled(&read_required(&root.join("rules").join("recollection.md"))?, &values);
+  let task = filled(&read_required(&root.join("session-summary").join("chat.md"))?, &values);
+
+  Ok(format!("RULEBOOK prompts/rules/recollection.md:\n{rulebook}\n\n{task}"))
+}
+
 /// The moment a message or a note was written, as the editors are shown it: Korean time with its offset, so the
 /// day an editor copies onto an item is the day the owner and the rooms lived it.
 pub fn seoul_timestamp(epoch_seconds: i64) -> String {
