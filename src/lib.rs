@@ -14,6 +14,7 @@ pub mod reminders;
 pub mod room_rules;
 pub mod schedules;
 pub mod settings;
+pub mod tool_env;
 pub mod watch_runner;
 pub mod watches;
 

@@ -1,7 +1,7 @@
 //! The brain service's binary (docs/boundary-api.md, 「Configuration」 and 「Runs launched apart」): `serve` runs the
 //! migrations, stands the brain's clock and answers the routes on the configured address until it is told to stop;
 //! the run words do one piece of work the brain launched apart, under the unit `--unit` names, and end with its exit
-//! code.
+//! code; `tool-env` writes where the brain's tools find it (「Its tools」) and ends.
 
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -13,6 +13,7 @@ use bmo_brain::config::Config;
 use bmo_brain::migration::migrate;
 use bmo_brain::schedules::clock;
 use bmo_brain::schedules::launches::Launches;
+use bmo_brain::tool_env::{Written, write_env};
 use bmo_brain::watch_runner::{IDLE_SLICE, WatchRun, watch};
 use clap::{Parser, Subcommand};
 
@@ -61,6 +62,8 @@ enum Command {
     #[arg(long)]
     unit: Option<String>,
   },
+  /// The data root's env file written from the configuration: where the brain's tools find its address and token.
+  ToolEnv,
 }
 
 async fn stopped() {
@@ -109,7 +112,7 @@ async fn run(config: &Config, command: Command) -> Result<u8, String> {
   let api = config.api(db);
 
   match command {
-    Command::Serve => unreachable!("serving is no run"),
+    Command::Serve | Command::ToolEnv => unreachable!("neither serving nor the tools' env file is a run"),
     Command::Digest { chat, unit } => commands::memo(api.ground_under(unit.as_deref()), chat)
       .await
       .map_err(|why| why.to_string()),
@@ -153,6 +156,14 @@ async fn main() -> ExitCode {
   };
   let ended = match cli.command {
     Command::Serve => serve(&config).await.map(|()| 0),
+    Command::ToolEnv => write_env(&config).map(|written| {
+      match written {
+        Written::Written(path) => println!("bmo-brain: wrote {}", path.display()),
+        Written::Unchanged(path) => println!("bmo-brain: {} already stands as written", path.display()),
+      }
+
+      0
+    }),
     command => run(&config, command).await,
   };
 

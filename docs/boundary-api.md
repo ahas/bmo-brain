@@ -16,7 +16,12 @@ word-chain data.
 
 The service's binary, `bmo-brain`, reads its configuration from the TOML file its `--config` names, at start, and
 holds it for its life. `bmo-brain --config <file> serve` runs the migrations and then answers on its listen address;
-the same binary with a run's words does that one piece of work and ends (「Runs launched apart」).
+the same binary with a run's words does that one piece of work and ends (「Runs launched apart」), and with
+`tool-env` writes where its tools find it and ends (「Its tools」).
+
+Deployed, the file stands under the data root as `env/brain.toml`, and each release links to it as `brain.toml`;
+a deployment that finds no such file is refused (`testbed.toml`). The service's own address and token reach its
+tools through `env/brain.env`, written from it (「Its tools」).
 
 | Setting | Key | What it is |
 |---|---|---|
@@ -83,8 +88,18 @@ Paths the brain writes into an answer are relative to the brain folder or to the
     for a person's turn) over `runVariables`: `BMO_TURN_AGENT` the agent, `BMO_TURN_CHAT` the room; and an
     editor's `fragmentDesk`. Every other field is passed over.
   - **Where the brain stands:** `BRAIN_ADDRESS` (its base address) and `BRAIN_TOKEN` from the tool's own
-    environment, else from `env/brain.env` under the record's data root, the file the service's unit is
-    configured beside; a tool placed by the host has a clean environment.
+    environment, else from `env/brain.env` under the record's data root; a tool placed by the host has a clean
+    environment.
+  - **That file is written from the configuration** by `bmo-brain --config <file> tool-env`, which every
+    deployment runs before its flip: `BRAIN_ADDRESS` is `http://` and the listen address, an unspecified host
+    (`0.0.0.0`, `::`) answered as the loopback one, and `BRAIN_TOKEN` the configured token. It is written under
+    the configured data root, readable by the user alone, and only where it would change; a value an env file
+    cannot hold bare (empty, or carrying whitespace, a quote, `#`, `$` or `\`) refuses it with exit code 1 and
+    nothing written.
+  - **A deployment places each tool** in its folder's `.placed/` inside the release, the folder the tool host
+    reads: the executable the release's `bin/` holds, the manifest and every schema file its entries name. The
+    steps that do it stand in `testbed.toml`, whose `[tools]` table names `tools/` and whose release binaries
+    include every tool's executable; the repository's own test holds the declaration to every `tool.toml`.
   - **A turn a companion's reset overtook** is refused by the agency before its tools are called; the brain's
     tools read no reset point.
 

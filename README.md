@@ -20,7 +20,7 @@ selects nothing.
 | `prompts/` | the recollectors' tasks and the two rulebooks only they read, which the `prompts` setting points at |
 | `policy/` | the service's own policy, the Korean words the prompts quote among it |
 | `tests/` | the service's tests and the checks that span the repository |
-| `testbed.toml` | the build and test commands, the service unit and the version |
+| `testbed.toml` | the testbed's declaration: how it tests, checks, builds and deploys the repository, the tools' placement and their env file among it |
 
 ## Build and test
 
@@ -33,10 +33,11 @@ cargo fmt --all --check
 
 ## Running
 
-The service runs as the `bmo-brain` unit `testbed.toml` names, with `bmo-brain --config <file> serve`: it runs
-its migrations and answers on its listen address. The same binary given a run's words does one piece of work the
-brain launched apart and ends. Its configuration, a TOML file, is stated key by key in `docs/boundary-api.md`. It
-reads:
+The service runs as `bmo-brain --config <file> serve`: it runs its migrations and answers on its listen address.
+The same binary given a run's words does one piece of work the brain launched apart and ends, and given
+`tool-env` writes the data root's `env/brain.env`, where the brain's tools find its address and token. Its
+configuration, a TOML file standing under the data root as `env/brain.toml` once deployed, is stated key by key
+in `docs/boundary-api.md`. It reads:
 
 - the address it listens on and the bearer token callers present;
 - its database, which holds only the brain's own tables and its own settings;

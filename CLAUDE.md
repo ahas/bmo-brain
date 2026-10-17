@@ -43,7 +43,8 @@ A change moves through three stages in order:
 2. Review: read the whole diff against what the change is for and the document governing it, then
    `cargo clippy --workspace --all-targets -- -D warnings` and `cargo fmt --all --check` (108 columns,
    2-space indentation, as `rustfmt.toml` sets).
-3. Verification: the test targets the change touched, then `cargo test --workspace` once, the command
+3. Verification: the test targets the change touched, then `cargo test --workspace` once, the Cargo suite
    `testbed.toml` declares.
 
-The version is the workspace's, in semver, and `testbed.toml` carries the same one.
+The version is the workspace's, in semver; the testbed's declaration, `testbed.toml`, carries none. It states how
+the testbed tests, checks, builds and deploys the repository, the tools' placement among it.
