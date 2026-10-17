@@ -43,6 +43,10 @@ root = "~/.local/share/bmo-brain"
 link = "deploy"
 data_root = "~/.local/share/bmo/data"
 env_links = [{ link = "brain.toml", target = "env/brain.toml" }]
+# The service's user unit, marked bot: the repository's one service, whose health the deployment waits on.
+units = ["deploy/*.service"]
+# Answers 0 once the service the deployed configuration names answers ready (docs/boundary-api.md, 「Health」).
+health = "~/.local/share/bmo-brain/deploy/bin/bmo-brain --config ~/.local/share/bmo-brain/deploy/brain.toml health"
 
 # Where the brain's tools find it: the data root's env/brain.env, written from the configuration
 # (docs/boundary-api.md, 「Its tools」).

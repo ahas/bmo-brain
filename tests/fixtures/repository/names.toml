@@ -9,3 +9,7 @@ exact_words = ["BMO"]
 
 # Matched anywhere: a Korean name takes its particles directly after it, with no space between.
 anywhere = ["비모"]
+
+# Terms of another unit's protocol that carry one of the names above as part of themselves and name no agent:
+# the testbed's unit key a deployment reads its mark from. Each is set aside before the names are matched.
+allowed = ["X-BMO-Deploy"]

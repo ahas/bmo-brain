@@ -27,6 +27,7 @@ futures-util = "0.3.34"
 libc = "0.2.177"
 memory-rows = { path = "crates/memory-rows" }
 rand = "0.9.2"
+rust-ini = "0.21"
 reqwest = { version = "0.13.5", default-features = false }
 regex = "1.11.1"
 schemars = "1.0.4"
@@ -81,6 +82,8 @@ toml.workspace = true
 # The brain's tools, called in the service's tests against the served routes.
 fragment-tool = { path = "tools/fragment" }
 memory-tool = { path = "tools/memory" }
+# The service's unit file, read in its INI shape by the repository's checks.
+rust-ini.workspace = true
 sqlx.workspace = true
 # The session record and the brain a tool call is made with, in the tools' tests.
 tool-call.workspace = true

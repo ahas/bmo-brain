@@ -372,6 +372,74 @@ fn the_tools_env_file_is_written_before_the_flip_from_the_linked_configuration()
   assert_eq!(text(step, "command"), "bin/bmo-brain --config brain.toml tool-env");
 }
 
+// One key of a unit file's section, as systemd reads it.
+fn unit_key<'a>(unit: &'a ini::Ini, path: &str, section: &str, key: &str) -> &'a str {
+  unit
+    .section(Some(section))
+    .and_then(|keys| keys.get(key))
+    .unwrap_or_else(|| panic!("{path} has `{key}` in [{section}]"))
+}
+
+#[test]
+fn the_service_unit_runs_the_declared_binary_over_the_linked_configuration_as_the_bot() {
+  let declaration = declaration();
+  let deploy = table(&declaration, "deploy");
+  let built: Vec<&str> = table(&declaration, "build")
+    .get("binaries")
+    .and_then(toml::Value::as_array)
+    .expect("testbed.toml names the release's binaries")
+    .iter()
+    .filter_map(toml::Value::as_str)
+    .collect();
+  let link = deploy
+    .get("env_links")
+    .and_then(toml::Value::as_array)
+    .expect("testbed.toml links the configuration into each release")
+    .iter()
+    .filter_map(toml::Value::as_table)
+    .find(|link| text(link, "link") == "brain.toml")
+    .expect("the configuration is linked into each release as brain.toml");
+  // The deploy tree and the data root as a unit names them, and as the health command's shell does.
+  let tree = format!("{}/{}", text(deploy, "root"), text(deploy, "link"));
+  let in_unit = |path: &str| path.replace("~/", "%h/");
+  let configuration = format!("{tree}/{}", text(link, "link"));
+  let units: Vec<String> = tracked_files()
+    .into_iter()
+    .filter(|path| {
+      let parts: Vec<&str> = path.split('/').collect();
+      parts.len() == 2 && parts[0] == "deploy" && parts[1].ends_with(".service")
+    })
+    .collect();
+  let mut bots = Vec::new();
+
+  assert_eq!(
+    deploy.get("units").and_then(toml::Value::as_array),
+    Some(&vec![toml::Value::from("deploy/*.service")])
+  );
+  assert!(built.contains(&"bmo-brain"), "the release holds the service's binary");
+  assert_eq!(units, ["deploy/bmo-brain.service"]);
+
+  for path in &units {
+    let unit = ini::Ini::load_from_file(Path::new(ROOT).join(path)).expect("a unit file reads");
+
+    assert_eq!(unit_key(&unit, path, "Service", "WorkingDirectory"), in_unit(&tree));
+    assert_eq!(
+      unit_key(&unit, path, "Service", "ExecStart"),
+      in_unit(&format!("{tree}/bin/bmo-brain --config {configuration} serve"))
+    );
+    assert_eq!(
+      unit_key(&unit, path, "Unit", "ConditionPathExists"),
+      in_unit(&format!("{}/{}", text(deploy, "data_root"), text(link, "target")))
+    );
+    if unit_key(&unit, path, "Install", "X-BMO-Deploy") == "bot" {
+      bots.push(path.clone());
+    }
+  }
+
+  assert_eq!(bots, ["deploy/bmo-brain.service"], "the service is the repository's one bot unit");
+  assert_eq!(text(deploy, "health"), format!("{tree}/bin/bmo-brain --config {configuration} health"));
+}
+
 #[test]
 fn only_cargo_manifests_at_the_root() {
   let found: Vec<String> = fs::read_dir(ROOT)
@@ -413,8 +481,10 @@ fn no_agent_names_in_tracked_files() {
   let words: Vec<String> = names_list(&names, "words").iter().map(|name| name.to_lowercase()).collect();
   let exact_words = names_list(&names, "exact_words");
   let anywhere = names_list(&names, "anywhere");
+  let allowed = names_list(&names, "allowed");
   let mut found = Vec::new();
   for (path, text) in tracked_texts().into_iter().filter(|(path, _)| path != NAMES_FIXTURE) {
+    let text = allowed.iter().fold(text, |text, term| text.replace(term.as_str(), " "));
     let lowered = text.to_lowercase();
     let held = words
       .iter()

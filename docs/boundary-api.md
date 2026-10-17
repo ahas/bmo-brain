@@ -16,12 +16,23 @@ word-chain data.
 
 The service's binary, `bmo-brain`, reads its configuration from the TOML file its `--config` names, at start, and
 holds it for its life. `bmo-brain --config <file> serve` runs the migrations and then answers on its listen address;
-the same binary with a run's words does that one piece of work and ends (「Runs launched apart」), and with
-`tool-env` writes where its tools find it and ends (「Its tools」).
+the same binary with a run's words does that one piece of work and ends (「Runs launched apart」), with
+`tool-env` writes where its tools find it and ends (「Its tools」), and with `health` asks the service its
+configuration names whether it is ready and ends (「Health」).
 
 Deployed, the file stands under the data root as `env/brain.toml`, and each release links to it as `brain.toml`;
 a deployment that finds no such file is refused (`testbed.toml`). The service's own address and token reach its
 tools through `env/brain.env`, written from it (「Its tools」).
+
+- **The service runs as the user unit `bmo-brain.service`,** this repository's `deploy/bmo-brain.service`, which
+  the deployment links from the deploy tree under `~/.local/share/bmo-brain`. It starts the deploy tree's
+  `bin/bmo-brain` with the deploy tree's `brain.toml` and `serve`, and does not start where the data root holds
+  no `env/brain.toml`.
+- **It is the repository's one service,** marked `bot` for the testbed: every deployment restarts it, waits on
+  its health, `bmo-brain --config <deploy tree>/brain.toml health`, and rolls back to the release before where
+  it does not come up ready or does not stay up.
+- **Its own command, deployed,** is the deploy tree's `bin/bmo-brain`, `--config` and the deploy tree's
+  `brain.toml`, so a run launched apart starts the release that is live when it starts.
 
 | Setting | Key | What it is |
 |---|---|---|
@@ -155,6 +166,10 @@ arguments name none, is refused `no-room`. Nothing is filed under a default agen
 | Route | Answer |
 |---|---|
 | `GET /health` | `ready` (boolean) and `reason` (string or null): not ready where the database does not answer or the brain folder is no git repository, the reason saying which |
+
+`bmo-brain --config <file> health` asks it of the service the file names, at its listen address (an unspecified
+host asked at the loopback one) with its token, waiting at most five seconds: it ends 0 where the service answers
+ready, and 1 otherwise, saying on its error stream why: the reason, the status, or that nothing answered.
 
 ### Memory rows
 

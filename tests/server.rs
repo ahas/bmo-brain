@@ -1,6 +1,7 @@
 //! The service's binary as its unit starts it (docs/boundary-api.md, 「Configuration」 and 「Health」): `serve` over a
 //! configuration file naming a scratch database, a brain repository and a data root of the test's own, answering
-//! its health route with the token and refusing a call without it, and ending cleanly when it is told to stop.
+//! its health route with the token and refusing a call without it, the deployment's health command telling ready
+//! from not ready and from gone, and ending cleanly when it is told to stop.
 
 mod support;
 
@@ -110,11 +111,39 @@ async fn the_binary_serves_on_a_scratch_database_and_stops_when_told() {
   }
 
   let unauthorised = client.get(&health).send().await.map(|response| response.status().as_u16());
+  // The deployment's health command, asked of the running service: ready, then not ready while its brain folder is
+  // no git repository.
+  let ready = asked_health(&file);
+
+  std::fs::rename(brain.path().join(".git"), brain.path().join("git-aside")).unwrap();
+
+  let unready = asked_health(&file);
+
+  std::fs::rename(brain.path().join("git-aside"), brain.path().join(".git")).unwrap();
+
   let ended = terminate(&mut child);
+  let gone = asked_health(&file);
 
   assert_eq!(answer, Some((200, json!({ "ready": true, "reason": null }))));
   assert_eq!(unauthorised.ok(), Some(401));
   assert!(ended.is_some_and(|status| status.success()), "{ended:?}");
+  assert_eq!(ready.0, Some(0), "{}", ready.1);
+  assert_eq!(unready.0, Some(1));
+  assert!(unready.1.contains("the service is not ready: "), "{}", unready.1);
+  assert_eq!(gone.0, Some(1));
+  assert!(gone.1.contains("did not answer"), "{}", gone.1);
+}
+
+// The binary's health ask over a configuration file: its exit code and what it said on its error stream.
+fn asked_health(file: &std::path::Path) -> (Option<i32>, String) {
+  let ran = Command::new(env!("CARGO_BIN_EXE_bmo-brain"))
+    .arg("--config")
+    .arg(file)
+    .arg("health")
+    .output()
+    .unwrap();
+
+  (ran.status.code(), String::from_utf8_lossy(&ran.stderr).into_owned())
 }
 
 #[test]

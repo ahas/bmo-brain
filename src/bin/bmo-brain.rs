@@ -1,7 +1,8 @@
 //! The brain service's binary (docs/boundary-api.md, 「Configuration」 and 「Runs launched apart」): `serve` runs the
 //! migrations, stands the brain's clock and answers the routes on the configured address until it is told to stop;
 //! the run words do one piece of work the brain launched apart, under the unit `--unit` names, and end with its exit
-//! code; `tool-env` writes where the brain's tools find it (「Its tools」) and ends.
+//! code; `tool-env` writes where the brain's tools find it (「Its tools」) and ends; `health` ends 0 only where the
+//! service the configuration names answers ready (「Health」).
 
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -10,6 +11,7 @@ use std::sync::Arc;
 use bmo_brain::api::router;
 use bmo_brain::commands::{self, PeopleRun};
 use bmo_brain::config::Config;
+use bmo_brain::health_check::ask_health;
 use bmo_brain::migration::migrate;
 use bmo_brain::schedules::clock;
 use bmo_brain::schedules::launches::Launches;
@@ -64,6 +66,8 @@ enum Command {
   },
   /// The data root's env file written from the configuration: where the brain's tools find its address and token.
   ToolEnv,
+  /// Whether the service the configuration names answers ready: exit code 0 where it does, 1 where it does not.
+  Health,
 }
 
 async fn stopped() {
@@ -112,7 +116,9 @@ async fn run(config: &Config, command: Command) -> Result<u8, String> {
   let api = config.api(db);
 
   match command {
-    Command::Serve | Command::ToolEnv => unreachable!("neither serving nor the tools' env file is a run"),
+    Command::Serve | Command::ToolEnv | Command::Health => {
+      unreachable!("serving, the tools' env file and the health ask are no runs")
+    }
     Command::Digest { chat, unit } => commands::memo(api.ground_under(unit.as_deref()), chat)
       .await
       .map_err(|why| why.to_string()),
@@ -164,6 +170,7 @@ async fn main() -> ExitCode {
 
       0
     }),
+    Command::Health => ask_health(&config).await.map(|()| 0),
     command => run(&config, command).await,
   };
 

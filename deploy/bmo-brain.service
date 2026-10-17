@@ -1,0 +1,20 @@
+# The brain's user unit (docs/boundary-api.md, 「Configuration」). A deployment links it from the deploy tree
+# and restarts it as the repository's one service, waiting on its health; it runs the release binary over the
+# configuration each release links to the data root's env/brain.toml.
+[Unit]
+Description=bmo-brain: memory rows, brain documents and the recollectors that write them
+After=network-online.target
+# Without its configuration the service does not stand, so the unit does not start where the data root holds none.
+ConditionPathExists=%h/.local/share/bmo/data/env/brain.toml
+
+[Service]
+Type=simple
+WorkingDirectory=%h/.local/share/bmo-brain/deploy
+ExecStart=%h/.local/share/bmo-brain/deploy/bin/bmo-brain --config %h/.local/share/bmo-brain/deploy/brain.toml serve
+Restart=always
+RestartSec=2
+TimeoutStopSec=30
+
+[Install]
+WantedBy=default.target
+X-BMO-Deploy=bot
