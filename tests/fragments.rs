@@ -492,12 +492,12 @@ async fn a_shipped_library_is_brought_to_its_owners_entries_with_the_hand_honour
   let table = Table::of(scratch.db(), &agency, &receiver, Path::new("/brain"), AGENT).await.unwrap();
 
   assert_eq!(
-    table.reconcile_shipped("person-book", &[entry("a", "A", 0)]).await,
+    table.reconcile_shipped("person-book", "Person book", &[entry("a", "A", 0)]).await,
     Err(ShippedFailure::BrainLibrary)
   );
 
   let first = table
-    .reconcile_shipped("lore", &[entry("a", "A", 0), entry("b", "B", 1)])
+    .reconcile_shipped("lore", "Lore", &[entry("a", "A", 0), entry("b", "B", 1)])
     .await
     .unwrap();
 
@@ -526,7 +526,7 @@ async fn a_shipped_library_is_brought_to_its_owners_entries_with_the_hand_honour
     .await;
 
   let second = table
-    .reconcile_shipped("lore", &[entry("a", "A renamed", 0), entry("b", "B", 1)])
+    .reconcile_shipped("lore", "Lore", &[entry("a", "A renamed", 0), entry("b", "B", 1)])
     .await
     .unwrap();
 
@@ -551,7 +551,7 @@ async fn a_shipped_library_is_brought_to_its_owners_entries_with_the_hand_honour
       .active
   );
 
-  let emptied = table.reconcile_shipped("lore", &[]).await.unwrap();
+  let emptied = table.reconcile_shipped("lore", "Lore", &[]).await.unwrap();
 
   assert_eq!(
     emptied.sync,

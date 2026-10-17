@@ -57,6 +57,8 @@ pub trait Library: Sync {
   fn kind(&self) -> &'static str;
   /// Which of its rows a room may be offered.
   fn offering(&self) -> Offering;
+  /// The word a screen calls the kind by.
+  fn label(&self) -> &'static str;
   /// Whether a piece is finished once every item it is tied to is.
   fn settles(&self) -> bool;
   /// Whether a path is one of this library's pieces.
@@ -101,6 +103,10 @@ impl Library for RoomRules {
 
   fn offering(&self) -> Offering {
     Offering::Room
+  }
+
+  fn label(&self) -> &'static str {
+    "Room rules"
   }
 
   fn settles(&self) -> bool {
@@ -161,6 +167,10 @@ impl Library for Knowledge {
 
   fn offering(&self) -> Offering {
     Offering::RoomWithShared
+  }
+
+  fn label(&self) -> &'static str {
+    "Knowledge"
   }
 
   fn settles(&self) -> bool {
@@ -294,6 +304,10 @@ impl Library for PersonBook {
 
   fn offering(&self) -> Offering {
     Offering::RoomPartWithSpeakers
+  }
+
+  fn label(&self) -> &'static str {
+    "Person book"
   }
 
   fn settles(&self) -> bool {

@@ -10,11 +10,13 @@ use std::sync::Arc;
 use bmo_brain::api::memories::Withering;
 use bmo_brain::api::{Api, router};
 use bmo_brain::editors::fragments::store::now_seconds;
+use bmo_brain::ports::agency::Registration;
 use bmo_brain::ports::http::{Caller, Peer, PortFailure};
 use bmo_brain::ports::receiver::{RoadKind, Roads};
 use sea_orm::Value as Sql;
 use serde_json::{Value, json};
 
+use support::agency::{FakeAgency, registration};
 use support::receiver::{FakeReceiver, message};
 use support::scratch::Scratch;
 use support::{AGENT, OTHER_AGENT, ROOM};
@@ -28,14 +30,26 @@ struct Served {
   receiver: Arc<FakeReceiver>,
   caller: Caller,
   base: String,
+  _brain: tempfile::TempDir,
 }
 
 async fn served() -> Served {
   let scratch = Scratch::new().await;
   let receiver = Arc::new(FakeReceiver::default());
+  let agency = FakeAgency::default();
+  let brain = tempfile::tempdir().unwrap();
+
+  *agency.registrations.lock().unwrap() = vec![Registration {
+    brain_folder: String::new(),
+    ..registration(AGENT)
+  }];
+
   let api = Arc::new(Api {
     db: scratch.db().clone(),
+    agency: Arc::new(agency),
     receiver: receiver.clone(),
+    brain_root: brain.path().to_path_buf(),
+    chat_key: AGENT.to_owned(),
     token: TOKEN.to_owned(),
     withering: Withering::default(),
   });
@@ -49,6 +63,7 @@ async fn served() -> Served {
     scratch,
     receiver,
     base,
+    _brain: brain,
   }
 }
 
@@ -62,6 +77,19 @@ fn caller(base: &str, token: &str) -> Caller {
 impl Served {
   async fn post(&self, path: &str, body: Value) -> Value {
     self.caller.post::<Value>(path, &body).await.unwrap()
+  }
+
+  // A route read with GET, as a screen reads it: its status and its body.
+  async fn get(&self, path: &str) -> (u16, Value) {
+    let answer = reqwest::Client::new()
+      .get(format!("{}{path}", self.base))
+      .bearer_auth(TOKEN)
+      .send()
+      .await
+      .unwrap();
+    let status = answer.status().as_u16();
+
+    (status, serde_json::from_slice(&answer.bytes().await.unwrap()).unwrap())
   }
 
   // A memory row of an agent, open and up, set the given seconds ago.
@@ -776,4 +804,124 @@ async fn the_wire_refuses_a_wrong_token_a_body_of_another_shape_and_a_path_it_do
     refused(api.caller.post::<Value>("/memory/nothing", &asked).await.unwrap_err()),
     (404, "no-route".to_owned())
   );
+}
+
+fn entry(slug: &str, title: &str, position: i64) -> Value {
+  json!({
+    "slug": slug,
+    "title": title,
+    "path": format!("docs/{slug}.md"),
+    "position": position,
+    "scope": null,
+    "items": [],
+    "writtenOn": "2026-01-02",
+    "confirmedOn": "2026-03-04",
+    "bodyHash": format!("hash-{slug}"),
+  })
+}
+
+async fn lore_rows(api: &Served) -> Vec<(String, String, bool)> {
+  let rows = sea_orm::ConnectionTrait::query_all(
+    api.scratch.db(),
+    sea_orm::Statement::from_string(
+      sea_orm::DbBackend::Postgres,
+      r#"SELECT "slug", "title", "active", "agent" FROM "fragments" WHERE "kind" = 'lore' ORDER BY "slug""#,
+    ),
+  )
+  .await
+  .unwrap();
+
+  rows
+    .iter()
+    .map(|row| {
+      assert_eq!(row.try_get::<String>("", "agent").unwrap(), AGENT);
+      (
+        row.try_get("", "slug").unwrap(),
+        row.try_get("", "title").unwrap(),
+        row.try_get::<i64>("", "active").unwrap() == 1,
+      )
+    })
+    .collect()
+}
+
+#[tokio::test]
+async fn a_shipped_owner_hands_its_entries_in_and_the_rows_follow_them_with_its_label_kept() {
+  let api = served().await;
+  let first = api
+    .post(
+      "/libraries/reconcile",
+      json!({ "kind": "lore", "label": "Lore", "entries": [entry("a", "A", 0), entry("b", "B", 1)] }),
+    )
+    .await;
+
+  assert_eq!(
+    first,
+    json!({
+      "answered": true,
+      "lines": ["lore: 2 entries · 2 added · 0 updated · 0 raised · 0 taken down · 2 bodies read · 0 settled"],
+    })
+  );
+  assert_eq!(
+    lore_rows(&api).await,
+    [("a".to_owned(), "A".to_owned(), true), ("b".to_owned(), "B".to_owned(), true)]
+  );
+
+  // A renamed entry changes its row, a dropped one goes down, and the label last handed in stands.
+  let second = api
+    .post(
+      "/libraries/reconcile",
+      json!({ "kind": "lore", "label": "World lore", "entries": [entry("a", "A renamed", 0)] }),
+    )
+    .await;
+
+  assert_eq!(
+    second["lines"],
+    json!(["lore: 1 entries · 0 added · 1 updated · 0 raised · 1 taken down · 0 bodies read · 0 settled"])
+  );
+  assert_eq!(
+    lore_rows(&api).await,
+    [("a".to_owned(), "A renamed".to_owned(), true), ("b".to_owned(), "B".to_owned(), false)]
+  );
+
+  let (status, kinds) = api.get("/fragments/kinds").await;
+
+  assert_eq!(status, 200);
+  assert_eq!(
+    kinds,
+    json!({ "kinds": [
+      { "kind": "room-rule", "label": "Room rules" },
+      { "kind": "library-knowledge", "label": "Knowledge" },
+      { "kind": "person-book", "label": "Person book" },
+      { "kind": "lore", "label": "World lore" },
+    ] })
+  );
+}
+
+#[tokio::test]
+async fn a_kind_the_brain_writes_itself_is_refused_and_a_kind_without_its_word_is_not_taken() {
+  let api = served().await;
+  let refused_kind = api
+    .post(
+      "/libraries/reconcile",
+      json!({ "kind": "person-book", "label": "People", "entries": [entry("a", "A", 0)] }),
+    )
+    .await;
+
+  assert_eq!(refused_kind["answered"], json!(false));
+  assert_eq!(refused_kind["refusal"]["code"], json!("brain-library"));
+  assert_eq!(refused_kind["refusal"]["kind"], json!("person-book"));
+  assert!(refused_kind["refusal"]["message"].as_str().unwrap().ends_with('.'));
+  assert_eq!(api.scratch.count(r#"SELECT COUNT(*) FROM "fragments""#, vec![]).await, 0);
+
+  assert_eq!(
+    refused(
+      api
+        .caller
+        .post::<Value>("/libraries/reconcile", &json!({ "kind": "lore", "label": " ", "entries": [] }))
+        .await
+        .unwrap_err()
+    ),
+    (400, "bad-request".to_owned())
+  );
+  assert_eq!(api.scratch.count(r#"SELECT COUNT(*) FROM "fragment_kinds""#, vec![]).await, 0);
 }

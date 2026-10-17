@@ -40,7 +40,9 @@ on its behalf, and nothing branches on a kind's name.
   libraries」 below). The library trait's members are the brain's three libraries; a shipped library is no
   member of it, and the brain names no shipped kind.
 - **Each kind carries the word a screen calls it by,** as its own answer, so a kind added without a name is
-  refused before it can be shown as a slug.
+  refused before it can be shown as a slug: each brain library answers its label as a member of the library
+  trait, and a shipped kind's owner hands its label in with its entries, which the brain keeps as the last one
+  handed in.
 
 ## What one row holds
 

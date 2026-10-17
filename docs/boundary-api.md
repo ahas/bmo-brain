@@ -36,7 +36,8 @@ Paths the brain writes into an answer are relative to the brain folder or to the
 
 - **Its tables:** `memories`, `fragments`, `notes`, `watches`, `reminders` and `session_people`. Every row of
   the first five names its agent in an `agent` column; an insert names its agent, and the column has no
-  default.
+  default. Beside them, `fragment_kinds`: the word a screen calls each shipped kind by, as its owner last handed
+  it in, one row a kind.
 - **Its settings table,** of the key-value shape, for its own keys only:
   - `digest_paused_until` and `digest_pause_noticed`, the owner's pause of both digests and whether the pause
     has been told;
@@ -47,7 +48,8 @@ Paths the brain writes into an answer are relative to the brain folder or to the
   - the chat-session summaries, one key `<agent>_pending_summary` per agent (「Chat-session summaries」).
 - **Its migrations:** the brain's own migrations make the tables and the settings table, each in the shape and
   with the indexes the archive holds it in, so the archive's rows move across as they stand; the one difference
-  is the `agent` column's, which has no default.
+  is the `agent` column's, which has no default. `fragment_kinds` has no archive counterpart: the archive's
+  screens named the kinds in their own code, and the table fills as each owner hands its entries in.
 - **Its folder:** the brain repository and its documents, and under the data root the editing locks with their
   ticket queues and fences, the fragment desks, and the failure logs `digest-failures.log` and
   `people-digest-failures.log`.
@@ -222,12 +224,14 @@ A fragment carries `kind`, `chatId`, `owner`, `agent`, `allAgents`, `slug`, `tit
 
 | Route | Body | Answer |
 |---|---|---|
-| `POST /libraries/reconcile` | `kind`, `label`, `entries` (each `slug`, `title`, `path`, `position`, `scope` or null, `items`, `writtenOn`, `confirmedOn`, `bodyHash`) | a reading of the rows raised, changed and taken down |
+| `POST /libraries/reconcile` | `kind`, `label`, `entries` (each `slug`, `title`, `path`, `position`, `scope` or null, `items`, `writtenOn`, `confirmedOn`, `bodyHash`) | a reading of one line: `<kind>: <n> entries · <n> added · <n> updated · <n> raised · <n> taken down · <n> bodies read · <n> settled` |
+| `GET /fragments/kinds` | none | `kinds`: each kind's `kind` and `label`, the brain's own three first and then every kind an owner has handed in, by kind |
 
 A shipped library is not the brain's. Its owner reads its own index and bodies and hands the entries in whole,
 with the word a screen calls its kind by; the brain brings the kind's rows to them (「The shipped libraries」 in
-`fragments.md`). The brain names no shipped kind: it takes any kind but its own, and a kind the brain writes
-itself is refused `brain-library`.
+`fragments.md`) and keeps the label in `fragment_kinds`, the last one handed in standing. The brain names no
+shipped kind: it takes any kind but its own, and a kind the brain writes itself is refused `brain-library`. A
+body with an empty `kind` or `label` is answered 400. The brain's own kinds answer their labels themselves.
 
 ### Brain documents
 

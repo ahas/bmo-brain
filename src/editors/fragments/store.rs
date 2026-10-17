@@ -58,7 +58,8 @@ pub struct NewRow {
 
 /// One entry of a shipped library as its owner hands it in: everything its row says, read off the owner's index
 /// and the body, which the brain never reads.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ShippedEntry {
   pub slug: String,
   pub title: String,
@@ -561,6 +562,33 @@ pub async fn settle_status(
 }
 
 /// Now, in the seconds the table's own columns keep.
+/// The word a screen calls a shipped kind by kept, the last one handed in standing.
+pub async fn set_kind_label<C: ConnectionTrait>(
+  db: &C,
+  kind: &str,
+  label: &str,
+  now: i64,
+) -> Result<(), Fault> {
+  run(
+    db,
+    r#"INSERT INTO "fragment_kinds" ("kind", "label", "set_at") VALUES ($1, $2, $3)
+       ON CONFLICT ("kind") DO UPDATE SET "label" = EXCLUDED."label", "set_at" = EXCLUDED."set_at""#,
+    vec![kind.into(), label.into(), now.into()],
+  )
+  .await?;
+
+  Ok(())
+}
+
+/// Every shipped kind's label as it was last handed in, by kind.
+pub async fn kind_labels<C: ConnectionTrait>(db: &C) -> Result<Vec<(String, String)>, Fault> {
+  all(db, r#"SELECT "kind", "label" FROM "fragment_kinds" ORDER BY "kind""#, vec![])
+    .await?
+    .iter()
+    .map(|row| Ok((row.try_get("", "kind")?, row.try_get("", "label")?)))
+    .collect()
+}
+
 pub fn now_seconds() -> i64 {
   SystemTime::now()
     .duration_since(UNIX_EPOCH)

@@ -1,12 +1,14 @@
 //! The routes the gate reads a turn's raw material by and hands its facts back on (docs/boundary-api.md, 「Memory
 //! rows」, 「Fragments」 and 「Rooms leaving」): a room's standing memory rows, its matcher's candidates and what the
 //! matcher made of them, the rows a turn's events wake, the fragment rows a room may be offered and what a turn
-//! attached, and a forgotten room let go of. The brain selects nothing here; it answers for one agent at a time,
-//! and every route takes the brain's token and answers by the wire conventions.
+//! attached, and a forgotten room let go of; and a shipped library's entries its owner hands in, with the words a
+//! screen calls every kind by (「Shipped libraries」). The brain selects nothing here; it answers for one agent at a
+//! time, and every route takes the brain's token and answers by the wire conventions.
 
 pub mod fragments;
 pub mod memories;
 
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use axum::extract::rejection::JsonRejection;
@@ -14,7 +16,7 @@ use axum::extract::{FromRequest, Request, State};
 use axum::http::{StatusCode, header};
 use axum::middleware::{self, Next};
 use axum::response::{IntoResponse, Response};
-use axum::routing::post;
+use axum::routing::{get, post};
 use axum::{Json, Router};
 use memory_rows::events::Event;
 use sea_orm::DatabaseConnection;
@@ -25,14 +27,20 @@ use serde_json::{Value, json};
 use self::fragments::Hit;
 use self::memories::Withering;
 use crate::Failure;
-use crate::editors::fragments::store::now_seconds;
+use crate::editors::fragments::store::{ShippedEntry, now_seconds};
+use crate::editors::fragments::{ShippedFailure, Table, kind_labels};
+use crate::ports::agency::Agency;
 use crate::ports::receiver::Receiver;
 
-/// What the routes stand on: the brain's database, the receiver, the token every caller presents, and the
-/// withering stamps the conditions route keeps for the service's life.
+/// What the routes stand on: the brain's database, the agency and the receiver, the brain root and the chat agent's
+/// registration key whose memory it is, the token every caller presents, and the withering stamps the conditions
+/// route keeps for the service's life.
 pub struct Api {
   pub db: DatabaseConnection,
+  pub agency: Arc<dyn Agency>,
   pub receiver: Arc<dyn Receiver>,
+  pub brain_root: PathBuf,
+  pub chat_key: String,
   pub token: String,
   pub withering: Withering,
 }
@@ -127,6 +135,8 @@ pub fn router(api: Arc<Api>) -> Router {
     .route("/fragments/offer", post(fragments_offer))
     .route("/fragments/hits", post(fragments_hits))
     .route("/rooms/forgotten", post(rooms_forgotten))
+    .route("/libraries/reconcile", post(libraries_reconcile))
+    .route("/fragments/kinds", get(fragments_kinds))
     .fallback(no_route)
     .layer(middleware::from_fn_with_state(api.clone(), authorised))
     .with_state(api)
@@ -241,4 +251,46 @@ async fn rooms_forgotten(State(api): State<Arc<Api>>, Body(asked): Body<Forgotte
   api.withering.forget(asked.chat_id);
 
   Ok(Json(json!({ "ok": true })))
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct Reconcile {
+  kind: String,
+  label: String,
+  entries: Vec<ShippedEntry>,
+}
+
+async fn libraries_reconcile(State(api): State<Arc<Api>>, Body(asked): Body<Reconcile>) -> Answer {
+  if asked.kind.trim().is_empty() || asked.label.trim().is_empty() {
+    return Err(ApiError::bad_request(
+      "A shipped library is handed in with a kind and the word a screen calls it by.",
+    ));
+  }
+
+  let table =
+    Table::of(&api.db, api.agency.as_ref(), api.receiver.as_ref(), &api.brain_root, &api.chat_key).await?;
+
+  match table.reconcile_shipped(&asked.kind, &asked.label, &asked.entries).await {
+    Ok(done) => Ok(Json(json!({ "answered": true, "lines": [done.line()] }))),
+    Err(ShippedFailure::BrainLibrary) => Ok(Json(json!({
+      "answered": false,
+      "refusal": {
+        "code": "brain-library",
+        "message": "The kind is one of the brain's own libraries, whose rows only its editors write.",
+        "kind": asked.kind,
+      },
+    }))),
+    Err(ShippedFailure::Failed(failure)) => Err(failure.into()),
+  }
+}
+
+async fn fragments_kinds(State(api): State<Arc<Api>>) -> Answer {
+  let kinds: Vec<Value> = kind_labels(&api.db)
+    .await?
+    .into_iter()
+    .map(|(kind, label)| json!({ "kind": kind, "label": label }))
+    .collect();
+
+  Ok(Json(json!({ "kinds": kinds })))
 }

@@ -66,6 +66,39 @@ pub struct Reconciled {
   pub trouble: Option<String>,
 }
 
+impl Reconciled {
+  /// What the reconcile did as one line of a reading.
+  pub fn line(&self) -> String {
+    match &self.trouble {
+      Some(trouble) => format!("{}: passed over — {trouble}", self.kind),
+      None => format!(
+        "{}: {} entries · {} added · {} updated · {} raised · {} taken down · {} bodies read · {} settled",
+        self.kind,
+        self.entries,
+        self.sync.added,
+        self.sync.updated,
+        self.sync.revived,
+        self.sync.retired,
+        self.reread,
+        self.settled
+      ),
+    }
+  }
+}
+
+/// The word a screen calls every kind by: the brain's own three as each library answers it, then every shipped
+/// kind as its owner last handed it in, by kind.
+pub async fn kind_labels(db: &DatabaseConnection) -> Result<Vec<(String, String)>, Failure> {
+  let mut labels: Vec<(String, String)> = LIBRARIES
+    .iter()
+    .map(|library| (library.kind().to_owned(), library.label().to_owned()))
+    .collect();
+
+  labels.extend(store::kind_labels(db).await?);
+
+  Ok(labels)
+}
+
 /// A piece a writer is handed whole before it writes.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct HandedPiece {
@@ -523,19 +556,23 @@ impl<'a> Table<'a> {
   }
 
   /// A shipped library's rows, the chat agent's, brought to the entries its owner hands in, and every one of its
-  /// rows settled open: a shipped piece is never finished. An empty list takes the library's rows down. A kind
-  /// that is one of the brain's own libraries is refused.
+  /// rows settled open: a shipped piece is never finished. An empty list takes the library's rows down. The word a
+  /// screen calls the kind by is kept as handed in. A kind that is one of the brain's own libraries is refused.
   pub async fn reconcile_shipped(
     &self,
     kind: &str,
+    label: &str,
     entries: &[ShippedEntry],
   ) -> Result<Reconciled, ShippedFailure> {
     if brain_kind(kind) {
       return Err(ShippedFailure::BrainLibrary);
     }
 
-    let (sync, reread) =
-      store::set_rows(self.db, kind, self.brain.root_agent(), entries, now_seconds()).await?;
+    let now = now_seconds();
+    let (sync, reread) = store::set_rows(self.db, kind, self.brain.root_agent(), entries, now).await?;
+
+    store::set_kind_label(self.db, kind, label, now).await?;
+
     let settled = self.settle(kind, false, false, None).await?;
 
     Ok(Reconciled {

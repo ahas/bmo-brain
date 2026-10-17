@@ -1,6 +1,6 @@
 //! The brain's migrations over a database of the test's own: the six tables and the settings table in the
-//! archive's shape with its indexes, an `agent` column that names no default, and a second run that changes
-//! nothing.
+//! archive's shape with its indexes, the shipped kinds' labels beside them, an `agent` column that names no
+//! default, and a second run that changes nothing.
 
 mod support;
 
@@ -10,8 +10,9 @@ use sea_orm::{ConnectionTrait, DbBackend, Statement, Value};
 use support::scratch::Scratch;
 use support::{AGENT, ROOM};
 
-// Each table's columns in their order, as the archive holds them.
-const TABLES: [(&str, &str); 7] = [
+// Each table's columns in their order, as the archive holds them, and the brain's own beside them.
+const TABLES: [(&str, &str); 8] = [
+  ("fragment_kinds", "kind label set_at"),
   (
     "fragments",
     "id kind chat_id owner slug title path scope position active last_hit_at hits set_by set_at hand \
@@ -187,5 +188,5 @@ async fn migrating_again_changes_nothing() {
 
   migrate(&scratch.address()).await.unwrap();
 
-  assert_eq!(scratch.count("SELECT count(*) FROM seaql_migrations", vec![]).await, 1);
+  assert_eq!(scratch.count("SELECT count(*) FROM seaql_migrations", vec![]).await, 2);
 }
