@@ -32,6 +32,8 @@ pub struct FakeAgency {
   pub open: Mutex<BTreeSet<String>>,
   /// The moment each run or unit is kept until; one not set is kept by no ask.
   pub kept: Mutex<BTreeMap<String, i64>>,
+  /// The moment the open session under each unit runs out of its cap; a unit not set has none open.
+  pub cap_ends: Mutex<BTreeMap<String, i64>>,
   pub work_keys: Mutex<BTreeMap<String, WorkKey>>,
   pub finished: Mutex<BTreeSet<i64>>,
   /// What every unit launch answers, where a test set it; otherwise a unit standing answers `running`, and any
@@ -145,6 +147,12 @@ impl Agency for FakeAgency {
   fn kept_until<'a>(&'a self, run: &'a str) -> BoxFuture<'a, Result<Option<i64>, PortFailure>> {
     self.calls.take("kept_until", json!({ "run": run }));
     let until = self.kept.lock().unwrap().get(run).copied();
+    Box::pin(async move { Ok(until) })
+  }
+
+  fn cap_ends<'a>(&'a self, unit: &'a str) -> BoxFuture<'a, Result<Option<i64>, PortFailure>> {
+    self.calls.take("cap_ends", json!({ "unit": unit }));
+    let until = self.cap_ends.lock().unwrap().get(unit).copied();
     Box::pin(async move { Ok(until) })
   }
 

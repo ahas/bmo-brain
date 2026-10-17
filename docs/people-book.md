@@ -442,7 +442,15 @@ alone, so the fragment tool refuses a piece whose bracket leaves the names out (
   - a finished history walk of a room asks for that room's run through the people route;
   - a rest, as the receiver's rest state says, stops either launch before any session is started.
 - **The launcher takes every room holding at least ten unread messages** for the agent and runs their workers
-  one after another, waiting for each, so two writer sessions never run at once.
+  one after another, waiting for each, so two writer sessions never run at once. Every agent's rooms are gone
+  through in turn, the brain root's agent first.
+- **How long it waits on a worker:** for as long as the batch the worker is at may run, the end of its session's
+  cap as the agency's cap end says or the keep the agency's clock keep gives it, whichever is later, and a minute
+  more; at first, for one editor's cap and that minute. A worker still running past that is left be and counted
+  as a failure, and the launcher goes on to the next room.
+- **What it does not start:** a room whose worker already stands is left to it, and no worker is started while a
+  job holds the brain (「A job editing the brain holds the editors off」); a worker the agency refuses is counted as
+  a failure and the next room goes on.
 - **Smallest backlog first:** every room's book is current soon, and the room with years of history takes its
   long turn last.
 - **Catch-up (`all`):** a room with a whole batch or more waiting (a backfilled history, a busy week) is worked

@@ -321,6 +321,7 @@ unit's tables or files.
 | recollector session stop | `/runs/stop` | `run` | `ok` |
 | overrun ask | `/runs/overrun` | `run`, `unit`, `capSeconds` | `keep` (boolean) and `until` (or null) |
 | run open | `/runs/open` | `run` | `open` (boolean): whether a job's run still stands |
+| cap end | `/runs/cap-ends` | `unit` | `until` (or null): the moment the open session started under that unit runs out of its cap, the latest where several stand; null where none stands |
 | clock keep | `/runs/kept-until` | `run`: the run or unit a lock ticket names | `until` (or null): the moment the open overrun ask on it stands until, the keep's end where it was kept and the moment it must be answered by while it is not yet; null where no ask stands open or it was cut |
 | rulebook read | `/rulebooks/read` | `names` | `rulebooks`: each named rulebook's `name` and `text`, trimmed, in the order asked |
 | work key cap and reasoning | `/work-keys/read` | `workKey`, `agent` | `capSeconds`, `reasoning` (or null) |

@@ -44,6 +44,7 @@ async fn the_agency_client_posts_each_operation_and_reads_its_answer() {
     .answer("/runs/overrun", json!({ "keep": true, "until": 1_700_000_600 }))
     .answer("/runs/open", json!({ "open": false }))
     .answer("/runs/kept-until", json!({ "until": 1_700_000_900 }))
+    .answer("/runs/cap-ends", json!({ "until": null }))
     .answer(
       "/rulebooks/read",
       json!({ "rulebooks": [{ "name": "plain-writing", "text": "Write plainly." }] }),
@@ -111,6 +112,8 @@ async fn the_agency_client_posts_each_operation_and_reads_its_answer() {
 
   assert_eq!(agency.kept_until("brain-run").await.unwrap(), Some(1_700_000_900));
   assert_eq!(stub.body_at("/runs/kept-until"), json!({ "run": "brain-run" }));
+  assert_eq!(agency.cap_ends("bmo-digest").await.unwrap(), None);
+  assert_eq!(stub.body_at("/runs/cap-ends"), json!({ "unit": "bmo-digest" }));
 
   let rulebooks = agency.rulebooks(&["plain-writing"]).await.unwrap();
   assert_eq!(

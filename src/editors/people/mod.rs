@@ -6,6 +6,7 @@
 
 pub mod batches;
 pub mod catchup;
+pub mod launcher;
 pub mod prompts;
 pub mod rooms;
 pub mod sort;

@@ -174,6 +174,10 @@ pub trait Agency: Send + Sync {
   /// The moment the open overrun ask on a run or unit stands until, or none where none stands open.
   fn kept_until<'a>(&'a self, run: &'a str) -> BoxFuture<'a, Result<Option<i64>, PortFailure>>;
 
+  /// The moment the open session started under a unit runs out of its cap, the latest where several stand, or
+  /// none where none stands.
+  fn cap_ends<'a>(&'a self, unit: &'a str) -> BoxFuture<'a, Result<Option<i64>, PortFailure>>;
+
   /// The named rulebooks, in the order asked.
   fn rulebooks<'a>(&'a self, names: &'a [&'a str]) -> BoxFuture<'a, Result<Vec<Rulebook>, PortFailure>>;
 
@@ -232,6 +236,11 @@ struct Agents {
 #[derive(Serialize)]
 struct RunAsk<'a> {
   run: &'a str,
+}
+
+#[derive(Serialize)]
+struct UnitAsk<'a> {
+  unit: &'a str,
 }
 
 #[derive(Deserialize)]
@@ -349,6 +358,13 @@ impl Agency for HttpAgency {
   fn kept_until<'a>(&'a self, run: &'a str) -> BoxFuture<'a, Result<Option<i64>, PortFailure>> {
     Box::pin(async move {
       let answer: Kept = self.caller.post("/runs/kept-until", &RunAsk { run }).await?;
+      Ok(answer.until)
+    })
+  }
+
+  fn cap_ends<'a>(&'a self, unit: &'a str) -> BoxFuture<'a, Result<Option<i64>, PortFailure>> {
+    Box::pin(async move {
+      let answer: Kept = self.caller.post("/runs/cap-ends", &UnitAsk { unit }).await?;
       Ok(answer.until)
     })
   }
