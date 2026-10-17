@@ -27,6 +27,7 @@ The service reads its configuration at start and holds it for its life:
 | owner's names | the names the owner goes by in the rooms, counted among the common words ([fragments](fragments.md)) |
 | service unit | the unit the service runs as: a failure notice of a run with no unit of its own names this unit's journal, and a run under a launched unit names that unit's |
 | agency, receiver, gate | each unit's base address and the token it is called with |
+| own command | the words that start this service's binary, which every run the brain launches apart begins with (「Runs launched apart」) |
 | policy | the files under `policy/`, the service's and each crate's own: the common words, the fragment titles' cues, the words an item is named by, and the memory, digest and person-book numbers |
 
 Paths the brain writes into an answer are relative to the brain folder or to the data root, never absolute.
@@ -324,7 +325,8 @@ unit's tables or files.
 | rulebook read | `/rulebooks/read` | `names` | `rulebooks`: each named rulebook's `name` and `text`, trimmed, in the order asked |
 | work key cap and reasoning | `/work-keys/read` | `workKey`, `agent` | `capSeconds`, `reasoning` (or null) |
 | item states | `/items/states` | `items` | `items`: each item's `item` and `finished` (boolean), for a fragment's status and a trim's stretch |
-| unit launch | `/units/launch` | `unit`, `command` (its words, in order) | `outcome`: `launched`, `running` or `refused`, and `why` (or null) |
+| unit launch | `/units/launch` | `unit`, `kind`, `title`, `agent` or null, `command` (its words, in order) | `outcome`: `launched`, `running` (a run of that unit stands, and nothing is started) or `refused`, and `why` (or null) |
+| units running | `/units/running` | `units` | `running`: those of the units a run stands under, as a unit, an open execution or a run the agency's host holds |
 | quiet instruction | `/instructions/quiet` | `agent`, `chatId`, `text`, `kind` or null | `ok` |
 | document reload notice | `/documents/reload` | `agent`, `paths`, `rooms` | `ok` |
 
@@ -350,6 +352,37 @@ What the brain sends and does around one session:
   fails the batch as cut at its cap.
 - **The end:** `answered` with an answer is the run's answer, the files it wrote named from the folder it stands
   in; `answered` with none, `failed`, `overran` and `stopped` fail the batch; `limit` stops it without a retry.
+
+#### Runs launched apart
+
+Work that must outlive a request runs apart: one run of the brain's own binary in a unit of its own, started
+through the agency's unit launch, which answers `running` where a run of that unit already stands, so the unit's
+name is the run's mutex. The command is the own command, then the run's words below, then `--unit <unit>`: the run
+knows its unit by it, and its clock, its brain hold and a failure's record are named by it.
+
+| Unit | `kind` | `agent` | `title` | Words |
+|---|---|---|---|---|
+| `bmo-digest` | `digest` | null | `All pending notes` | `digest` |
+| `bmo-digest-<chatId>` | `digest` | null | the room's name | `digest --chat <chatId>` |
+| `bmo-people-digest` | `people-digest` | null | `Rooms in turn` | `people-digest` |
+| `bmo-people-sort-<agent>` | `people-digest` | the agent | `Sorting the person book` | `people-digest --sort --all --agent <agent>` |
+| `bmo-people-digest-<agent>-<chatId>` | `people-digest` | the agent | the room's name | `people-digest --chat <chatId> --agent <agent>`, and `--all` for a catch-up |
+| `bmo-watch-<id>-<milliseconds>` | `watch` | null | `<room's name> watch #<id>` | `watch-runner <id> <unit>` |
+
+- **A room's name** is its title as the receiver's room titles give it; a room with none is `Private chat` where
+  its roads are the owner's and `Room <chatId>` otherwise.
+- **The due digests:** the memo digest launches `bmo-digest`; the person book launches `bmo-people-digest` and,
+  for every agent keeping a long-term memory, the brain root's first, that agent's `bmo-people-sort-<agent>`, so
+  one agent's sort never waits on another's. Each is launched only where no run of its unit stands.
+- **Before a room's session folds,** the agent's worker of that room is launched, unless the agent's book is not
+  written from the room; where that cannot be read, it is launched all the same.
+- **A watch's run** is named by its unit: the brain writes the unit and the moment it was armed on the watch
+  before launching it, and the run claims the watch under that name. A launch the agency refuses leaves the
+  watch standing for a later pass.
+- **Watches nobody holds:** on each pass the brain asks the agency's units running about every standing watch's
+  unit, and launches again every condition watch whose unit no run holds, once a minute has passed since it was
+  armed, since a run just launched is not yet among the running. A watch past its deadline is launched all the
+  same: only a run may check it one last time before it lapses.
 
 ### The receiver
 

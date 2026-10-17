@@ -11,7 +11,7 @@ use std::time::Duration;
 use axum::http::StatusCode;
 use bmo_brain::ports::agency::{
   Agency, HttpAgency, ItemState, LaunchOutcome, Outcome, Overrun, QuietInstruction, Reload, Rulebook,
-  SessionStart,
+  SessionStart, UnitLaunch,
 };
 use bmo_brain::ports::gate::{Gate, HttpGate, Piece, Sanitised, SheetAsk, SheetPart};
 use bmo_brain::ports::http::{Caller, Patience, Peer, PortFailure, Wait, WireError};
@@ -51,6 +51,7 @@ async fn the_agency_client_posts_each_operation_and_reads_its_answer() {
     .answer("/work-keys/read", json!({ "capSeconds": 1200, "reasoning": null }))
     .answer("/items/states", json!({ "items": [{ "item": 3, "finished": true }, { "item": 4, "finished": false }] }))
     .answer("/units/launch", json!({ "outcome": "refused", "why": "The unit is masked." }))
+    .answer("/units/running", json!({ "running": ["bmo-digest"] }))
     .answer("/instructions/quiet", json!({ "ok": true }))
     .answer("/documents/reload", json!({ "ok": true }));
   let agency = HttpAgency::new(&stub.peer);
@@ -141,14 +142,30 @@ async fn the_agency_client_posts_each_operation_and_reads_its_answer() {
   );
   assert_eq!(stub.body_at("/items/states"), json!({ "items": [3, 4] }));
 
-  let command = vec!["brain-run".to_owned(), "--once".to_owned()];
-  let launch = agency.launch_unit("brain-run", &command).await.unwrap();
+  let asked = UnitLaunch {
+    unit: "brain-run".to_owned(),
+    kind: "digest".to_owned(),
+    title: "All pending notes".to_owned(),
+    agent: None,
+    command: vec!["brain-run".to_owned(), "--once".to_owned()],
+  };
+  let launch = agency.launch_unit(&asked).await.unwrap();
   assert_eq!(launch.outcome, LaunchOutcome::Refused);
   assert_eq!(launch.why.as_deref(), Some("The unit is masked."));
   assert_eq!(
     stub.body_at("/units/launch"),
-    json!({ "unit": "brain-run", "command": ["brain-run", "--once"] })
+    json!({
+      "unit": "brain-run",
+      "kind": "digest",
+      "title": "All pending notes",
+      "agent": null,
+      "command": ["brain-run", "--once"],
+    })
   );
+
+  let units = vec!["bmo-digest".to_owned(), "bmo-people-digest".to_owned()];
+  assert_eq!(agency.units_running(&units).await.unwrap(), ["bmo-digest"]);
+  assert_eq!(stub.body_at("/units/running"), json!({ "units": ["bmo-digest", "bmo-people-digest"] }));
 
   let quiet = QuietInstruction {
     agent: AGENT.to_owned(),

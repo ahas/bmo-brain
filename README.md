@@ -38,4 +38,6 @@ checks; the server binary arrives with its routes, and its configuration is stat
 - its brain folder, a git repository of the agents' documents;
 - the chat agent's key, which names whose brain it serves;
 - the addresses and tokens of the agency, the receiver and the gate;
+- its own command, the words that start its binary, which every run it launches apart through the agency begins
+  with;
 - its policy files under `policy/`.

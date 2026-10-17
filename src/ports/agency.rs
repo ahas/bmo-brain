@@ -96,6 +96,18 @@ pub enum LaunchOutcome {
   Refused,
 }
 
+/// A run to start apart in a unit of its own: the unit, the work it does, what the live picture calls it, the agent
+/// it works for where it works for one, and its command's words in order.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UnitLaunch {
+  pub unit: String,
+  pub kind: String,
+  pub title: String,
+  pub agent: Option<String>,
+  pub command: Vec<String>,
+}
+
 /// A unit launch's answer.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -176,11 +188,10 @@ pub trait Agency: Send + Sync {
   fn item_states<'a>(&'a self, items: &'a [i64]) -> BoxFuture<'a, Result<Vec<ItemState>, PortFailure>>;
 
   /// Launches a unit running a command.
-  fn launch_unit<'a>(
-    &'a self,
-    unit: &'a str,
-    command: &'a [String],
-  ) -> BoxFuture<'a, Result<Launch, PortFailure>>;
+  fn launch_unit<'a>(&'a self, launch: &'a UnitLaunch) -> BoxFuture<'a, Result<Launch, PortFailure>>;
+
+  /// Those of the units a run stands under.
+  fn units_running<'a>(&'a self, units: &'a [String]) -> BoxFuture<'a, Result<Vec<String>, PortFailure>>;
 
   /// Hands an agent a quiet instruction for a room.
   fn quiet_instruction<'a>(
@@ -274,9 +285,13 @@ struct Items {
 }
 
 #[derive(Serialize)]
-struct LaunchAsk<'a> {
-  unit: &'a str,
-  command: &'a [String],
+struct UnitsAsk<'a> {
+  units: &'a [String],
+}
+
+#[derive(Deserialize)]
+struct Running {
+  running: Vec<String>,
 }
 
 impl Agency for HttpAgency {
@@ -363,14 +378,14 @@ impl Agency for HttpAgency {
     })
   }
 
-  fn launch_unit<'a>(
-    &'a self,
-    unit: &'a str,
-    command: &'a [String],
-  ) -> BoxFuture<'a, Result<Launch, PortFailure>> {
+  fn launch_unit<'a>(&'a self, launch: &'a UnitLaunch) -> BoxFuture<'a, Result<Launch, PortFailure>> {
+    Box::pin(async move { self.caller.post("/units/launch", launch).await })
+  }
+
+  fn units_running<'a>(&'a self, units: &'a [String]) -> BoxFuture<'a, Result<Vec<String>, PortFailure>> {
     Box::pin(async move {
-      let ask = LaunchAsk { unit, command };
-      self.caller.post("/units/launch", &ask).await
+      let answer: Running = self.caller.post("/units/running", &UnitsAsk { units }).await?;
+      Ok(answer.running)
     })
   }
 

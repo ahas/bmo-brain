@@ -7,7 +7,7 @@ use std::time::Duration;
 
 use bmo_brain::ports::agency::{
   Agency, ItemState, Launch, LaunchOutcome, Outcome, Overrun, QuietInstruction, Registration, Reload,
-  Rulebook, SessionEnd, SessionStart, WorkKey,
+  Rulebook, SessionEnd, SessionStart, UnitLaunch, WorkKey,
 };
 use bmo_brain::ports::http::PortFailure;
 use futures_util::future::BoxFuture;
@@ -34,7 +34,11 @@ pub struct FakeAgency {
   pub kept: Mutex<BTreeMap<String, i64>>,
   pub work_keys: Mutex<BTreeMap<String, WorkKey>>,
   pub finished: Mutex<BTreeSet<i64>>,
+  /// What every unit launch answers, where a test set it; otherwise a unit standing answers `running`, and any
+  /// other is launched and stands from then on.
   pub launch: Mutex<Option<Launch>>,
+  /// The units a run stands under.
+  pub running: Mutex<BTreeSet<String>>,
   /// What each session does as it starts, standing in for the model's file and fragment tools.
   pub session: Mutex<Option<Session>>,
   pub calls: Calls,
@@ -183,17 +187,26 @@ impl Agency for FakeAgency {
     Box::pin(async move { Ok(states) })
   }
 
-  fn launch_unit<'a>(
-    &'a self,
-    unit: &'a str,
-    command: &'a [String],
-  ) -> BoxFuture<'a, Result<Launch, PortFailure>> {
-    self.calls.take("launch_unit", json!({ "unit": unit, "command": command }));
-    let launch = self.launch.lock().unwrap().clone().unwrap_or(Launch {
-      outcome: LaunchOutcome::Launched,
-      why: None,
+  fn launch_unit<'a>(&'a self, launch: &'a UnitLaunch) -> BoxFuture<'a, Result<Launch, PortFailure>> {
+    self.calls.take("launch_unit", launch);
+    let set = self.launch.lock().unwrap().clone();
+    let mut running = self.running.lock().unwrap();
+    let answer = set.unwrap_or_else(|| {
+      let outcome = if running.insert(launch.unit.clone()) {
+        LaunchOutcome::Launched
+      } else {
+        LaunchOutcome::Running
+      };
+      Launch { outcome, why: None }
     });
-    Box::pin(async move { Ok(launch) })
+    Box::pin(async move { Ok(answer) })
+  }
+
+  fn units_running<'a>(&'a self, units: &'a [String]) -> BoxFuture<'a, Result<Vec<String>, PortFailure>> {
+    self.calls.take("units_running", json!({ "units": units }));
+    let running = self.running.lock().unwrap();
+    let standing = units.iter().filter(|unit| running.contains(*unit)).cloned().collect();
+    Box::pin(async move { Ok(standing) })
   }
 
   fn quiet_instruction<'a>(

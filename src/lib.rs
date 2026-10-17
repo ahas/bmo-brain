@@ -7,6 +7,7 @@ pub mod failure;
 pub mod migration;
 pub mod policy;
 pub mod ports;
+pub mod schedules;
 pub mod settings;
 
 pub use failure::Failure;
