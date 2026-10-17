@@ -305,9 +305,10 @@ There are three roads down, and none of them deletes.
   ends exactly once, so its note is queued exactly once.
 - **Listing and cancelling:** the watch list route lists a room's watches, or every room's, and cancel ends one
   without a note; only the room that set it or the owner's room may cancel it.
-- **Stopping a watch's run ends the watch itself,** and not the run alone: the row is ended before the unit
-  goes, so the clock has nothing standing to launch again, and the room that set it gets the agent's own note
-  saying the watch was stopped and that nothing more is coming.
+- **Stopping a watch's run ends the watch itself,** and not the run alone (the agency asks the brain's watch-stopped
+  route before it stops the unit): the row is ended before the unit goes, so the clock has nothing standing to
+  launch again, and the room that set it gets the agent's own note saying the watch was stopped and that nothing
+  more is coming.
 - **A watch and a reminder:** a watch wakes the agent on a condition, or at a moment at most a week out, in
   the room that set it; a reminder wakes it in its room at a moment of the room's own calendar, however far
   ahead and however often.

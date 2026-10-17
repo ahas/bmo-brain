@@ -1,6 +1,7 @@
 //! The watches' and reminders' routes beside the one that sets a watch (docs/memories.md, 「Watches」;
 //! docs/boundary-api.md, 「Watches and reminders」): a room's watches or every room's listed, one called off, one's
-//! run launched, a run's claim on its watch and its ending of it, and a room's reminders listed.
+//! run launched, a run's claim on its watch and its ending of it, a watch ended before its unit is stopped, and a
+//! reminder set, called off or a room's listed.
 
 use std::sync::Arc;
 
@@ -14,9 +15,10 @@ use super::{Answer, Api, ApiError, Body, reading, refusal};
 use crate::editors::archive::room_name;
 use crate::editors::fragments::store::now_seconds;
 use crate::editors::people::launcher::wall_clock;
+use crate::reminders::{NotSet, REMIND_USAGE, RemindAsked, cancel_reminder, remind, reminders};
 use crate::watches::{
   ListAsked, NotCancelled, Wait, broken_memo, cancel, claim, end_by_run, fired_memo, item_of, lapsed_memo,
-  list, reminders, watch_of,
+  list, stop_of_unit, watch_of,
 };
 
 /// The watches' and reminders' routes.
@@ -27,6 +29,9 @@ pub fn routes() -> Router<Arc<Api>> {
     .route("/watches/launch", post(watches_launch))
     .route("/watches/claim", post(watches_claim))
     .route("/watches/end", post(watches_end))
+    .route("/watches/stopped", post(watches_stopped))
+    .route("/reminders/set", post(reminders_set))
+    .route("/reminders/cancel", post(reminders_cancel))
     .route("/reminders/list", post(reminders_list))
 }
 
@@ -181,6 +186,67 @@ async fn watches_end(State(api): State<Arc<Api>>, Body(asked): Body<EndBody>) ->
   let ended = end_by_run(&api.db, api.agency.as_ref(), watch, &asked.run, state, &memo, now).await?;
 
   Ok(Json(json!({ "ended": ended })))
+}
+
+#[derive(Debug, Deserialize)]
+struct StoppedBody {
+  unit: String,
+}
+
+async fn watches_stopped(State(api): State<Arc<Api>>, Body(asked): Body<StoppedBody>) -> Answer {
+  let ended =
+    stop_of_unit(&api.db, api.agency.as_ref(), api.receiver.as_ref(), &asked.unit, now_seconds()).await?;
+
+  Ok(Json(json!({ "ended": ended })))
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SetBody {
+  agent: String,
+  chat_id: i64,
+  at: Option<String>,
+  every: Option<String>,
+  #[serde(default)]
+  reason: String,
+  memory: Option<String>,
+  user: Option<i64>,
+}
+
+async fn reminders_set(State(api): State<Arc<Api>>, Body(asked): Body<SetBody>) -> Answer {
+  let set = RemindAsked {
+    agent: &asked.agent,
+    chat_id: asked.chat_id,
+    at: asked.at.as_deref(),
+    every: asked.every.as_deref(),
+    reason: &asked.reason,
+    memory: asked.memory.as_deref(),
+    user_id: asked.user,
+  };
+
+  Ok(match remind(&api.db, &set, now_seconds()).await? {
+    Ok(lines) => reading(lines),
+    Err(NotSet::Usage) => {
+      let mut params = Map::new();
+
+      params.insert("verb".to_owned(), json!("reminder_set"));
+      refusal("usage", REMIND_USAGE, params, vec![])
+    }
+    Err(NotSet::Refused(why)) => refusal("reminder-refused", &why, Map::new(), vec![]),
+  })
+}
+
+#[derive(Debug, Deserialize)]
+struct CancelReminder {
+  id: i64,
+}
+
+async fn reminders_cancel(State(api): State<Arc<Api>>, Body(asked): Body<CancelReminder>) -> Answer {
+  Ok(if cancel_reminder(&api.db, asked.id).await? {
+    reading(vec![format!("cancelled #{}", asked.id)])
+  } else {
+    refusal("no-reminder", &format!("no reminder #{}", asked.id), Map::new(), vec![])
+  })
 }
 
 #[derive(Debug, Deserialize)]

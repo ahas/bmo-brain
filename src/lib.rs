@@ -10,6 +10,7 @@ pub mod lifecycle;
 pub mod migration;
 pub mod policy;
 pub mod ports;
+pub mod reminders;
 pub mod room_rules;
 pub mod schedules;
 pub mod settings;

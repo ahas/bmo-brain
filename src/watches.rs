@@ -40,12 +40,15 @@ pub fn bus_unreachable(said: &str) -> bool {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Item {
   pub id: i64,
+  pub slug: String,
   pub kind: String,
   pub chat_id: Option<i64>,
+  pub condition: String,
   pub action: String,
   pub active: bool,
   pub done_at: Option<i64>,
   pub done_text: Option<String>,
+  pub down_reason: Option<String>,
 }
 
 impl Item {
@@ -59,7 +62,8 @@ impl Item {
 pub async fn item_of(db: &DatabaseConnection, id: i64) -> Result<Option<Item>, Failure> {
   let Some(row) = one(
     db,
-    r#"SELECT "id", "type", "chat_id", "action", "active", "done_at", "done_text" FROM "memories" WHERE "id" = $1"#,
+    r#"SELECT "id", "slug", "type", "chat_id", "condition", "action", "active", "done_at", "done_text", "down_reason"
+       FROM "memories" WHERE "id" = $1"#,
     vec![id.into()],
   )
   .await?
@@ -69,12 +73,15 @@ pub async fn item_of(db: &DatabaseConnection, id: i64) -> Result<Option<Item>, F
 
   Ok(Some(Item {
     id: row.try_get("", "id")?,
+    slug: row.try_get("", "slug")?,
     kind: row.try_get("", "type")?,
     chat_id: row.try_get("", "chat_id")?,
+    condition: row.try_get("", "condition")?,
     action: row.try_get("", "action")?,
     active: row.try_get::<i64>("", "active")? != 0,
     done_at: row.try_get("", "done_at")?,
     done_text: row.try_get("", "done_text")?,
+    down_reason: row.try_get("", "down_reason")?,
   }))
 }
 
@@ -718,83 +725,39 @@ pub async fn cancel(
   Ok(if ended == 1 { Ok(()) } else { Err(NotCancelled::Ended) })
 }
 
-/// One reminder as the list route answers it.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Reminder {
-  pub id: i64,
-  pub agent: String,
-  pub chat_id: i64,
-  pub user: Option<i64>,
-  pub due_at: i64,
-  pub every: Option<String>,
-  pub reason: Option<String>,
-  pub item: Option<i64>,
-  pub fired: bool,
-}
-
-impl Reminder {
-  /// The reminder as a session reads it back: its number, its next moment and its rule, whom it is for, the
-  /// memory it serves and why it wakes the agent.
-  pub fn line(&self) -> String {
-    let rule = self.every.as_ref().map_or_else(String::new, |every| format!("every {every}, next "));
-    let fired = if self.fired { " (fired)" } else { "" };
-    let who = self.user.map_or_else(String::new, |user| format!(" for {user}"));
-    let memory = self.item.map_or_else(String::new, |memory| format!(" [memory #{memory}]"));
-
-    format!(
-      "reminder #{}: {rule}{}{fired}{who}{memory}: {}",
-      self.id,
-      clock(self.due_at),
-      self.reason.as_deref().unwrap_or_default()
-    )
-  }
-}
-
-/// A room's reminders, soonest first: those still to come, or with `all` every one it has had; one agent's where
-/// an agent is named.
-pub async fn reminders(
+/// The standing watch a unit holds ended as cancelled before the unit goes, its memo telling the room that set it
+/// that the watch was stopped and nothing more is coming; whether a watch was ended. A standing watch nobody holds
+/// is what the clock launches a new run for, so it ends before its run is stopped.
+pub async fn stop_of_unit(
   db: &DatabaseConnection,
-  chat_id: i64,
-  agent: Option<&str>,
-  all_of_them: bool,
-) -> Result<Vec<Reminder>, Failure> {
-  let mut filter = r#""chat_id" = $1"#.to_owned();
-  let mut values: Vec<sea_orm::Value> = vec![chat_id.into()];
-
-  if let Some(agent) = agent {
-    values.push(agent.into());
-    filter.push_str(r#" AND "agent" = $2"#);
-  }
-
-  if !all_of_them {
-    filter.push_str(r#" AND "fired" = 0"#);
-  }
-
-  let rows = all(
+  agency: &dyn Agency,
+  receiver: &dyn Receiver,
+  unit: &str,
+  now: i64,
+) -> Result<bool, Failure> {
+  let Some(row) = one(
     db,
     &format!(
-      r#"SELECT "id", "agent", "chat_id", "user_id", "due_at", "reason", "memory_id", "every", "fired" FROM "reminders"
-         WHERE {filter} ORDER BY "due_at" ASC"#
+      r#"SELECT {WATCH_COLUMNS}, "condition" FROM "watches" WHERE "state" = 'active' AND "unit" = $1 ORDER BY "id" LIMIT 1"#
     ),
-    values,
+    vec![unit.into()],
   )
-  .await?;
+  .await?
+  else {
+    return Ok(false);
+  };
+  let watch = watch_of_row(&row)?;
+  let condition: Option<String> = row.try_get("", "condition")?;
+  let item = match watch.memory_id {
+    Some(id) => item_of(db, id).await?,
+    None => None,
+  };
+  let room = room_name(receiver, watch.chat_id).await?;
+  let memo = stopped_memo(&watch, &room, item.as_ref(), condition.as_deref());
+  let cancelled = Ending {
+    state: "cancelled",
+    unit: Some(unit),
+  };
 
-  rows
-    .iter()
-    .map(|row| {
-      Ok(Reminder {
-        id: row.try_get("", "id")?,
-        agent: row.try_get("", "agent")?,
-        chat_id: row.try_get("", "chat_id")?,
-        user: row.try_get("", "user_id")?,
-        due_at: row.try_get("", "due_at")?,
-        every: row.try_get("", "every")?,
-        reason: row.try_get("", "reason")?,
-        item: row.try_get("", "memory_id")?,
-        fired: row.try_get::<i64>("", "fired")? != 0,
-      })
-    })
-    .collect()
+  end_with_memo(db, agency, &watch, &cancelled, &memo, now).await
 }

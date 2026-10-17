@@ -206,7 +206,10 @@ moved to another room meanwhile), `already-up` or `already-down`. A slug names o
 | `POST /watches/launch` | `id` | `launched` (boolean) |
 | `POST /watches/claim` | `id`, `run` | `standing` (boolean): whether the watch still stands and is held by this run |
 | `POST /watches/end` | `id`, `run`, `outcome` (`fired`, `lapsed`, `broken`), `exit` and `printed` (what the last check exited with and printed; `printed` is its output where it fired and its error where it broke) | `ended` (boolean): whether this run ended it; its memo is queued once, whichever run ends it first, and a run that no longer holds it ends nothing |
+| `POST /reminders/set` | `agent`, `chatId`, `at` (an ISO moment or `YYYY-MM-DD HH:MM` on the Seoul clock) or `every` (`daily HH:MM`, `weekly <mon…sun> HH:MM` or `monthly <1-31> HH:MM`), `reason`, and optionally `memory` (an id or a slug) and `user` | a reading of the reminder's line; refused `usage` without a reason or with both or neither of `at` and `every`, and `reminder-refused` for a reason over 1000 characters, a moment that does not read or is past, a rule that does not read, or a memory that is gone, another agent's, another room's or no longer open |
+| `POST /reminders/cancel` | `id` | a reading; refused `no-reminder` where there is none; a repeating one goes with every moment after it |
 | `POST /reminders/list` | `chatId`, `agent` or null, `all` | `reminders`, soonest first, the ones still to come or with `all` every one: each `id`, `agent`, `chatId`, `user`, `dueAt`, `every` (the repeat rule or null), `reason`, `item`, `fired`; and `lines`, the same as a session reads them back |
+| `POST /watches/stopped` | `unit` | `ended` (boolean): the standing watch the unit holds ended as cancelled with its memo telling the room that set it nothing more is coming; false where the unit holds none. The agency calls it before it stops a watch's unit, so the clock has nothing standing to launch again |
 
 A watch's run is the brain's own binary, `watch-runner <id> <unit>` (「Runs launched apart」), which claims and ends
 its watch as these routes do. A memo goes to the agent that set the watch, in the room that set it, as a quiet
@@ -449,6 +452,11 @@ knows its unit by it, and its clock, its brain hold and a failure's record are n
   a pass that fails is said on the service's error output and the next goes on.
   - The memo digest is due three minutes after the service starts and every hour after.
   - The person book is due five minutes after it starts and every three hours after.
+  - The reminder pass runs every thirty seconds from the start: every reminder whose moment has come, one that
+    came due while the brain was down included, wakes its agent in its room as a quiet instruction of kind
+    `reminder`, saying how late it comes where it is more than five minutes past; a repeating one moves to its
+    first moment still ahead, so missed moments come to one wake, and any other is fired for good. A moment is
+    taken only once the agency has taken its wake.
   - The watch sweep runs every thirty seconds, its first pass thirty seconds after the start, once the agency's
     running units can be told: it ends, with no memo, every standing watch serving a memory no longer open; fires
     every timer whose moment has come, one that came due while the brain was down included, with its memo; then
@@ -580,3 +588,5 @@ A listing line marks a global row with `global-scope` (`reach`) and a handed-ove
 | `no-watch` | none | a watch cancel naming no watch |
 | `ended` | none | a watch cancel naming a watch that has already ended |
 | `no-owner` | none | a watch cancel while the configuration names no owner, so the owner's room is unknown |
+| `reminder-refused` | none | a reminder set the checks refuse, its sentence saying why |
+| `no-reminder` | none | a reminder cancel naming no reminder |

@@ -115,12 +115,15 @@ fn wait(last_exit: i64) -> Wait<'static> {
 fn open_item() -> Item {
   Item {
     id: 12,
+    slug: "memory-12".into(),
     kind: "promise".into(),
     chat_id: Some(-100),
+    condition: String::new(),
     action: "tell the owner the build result".into(),
     active: true,
     done_at: None,
     done_text: None,
+    down_reason: None,
   }
 }
 
