@@ -41,7 +41,7 @@ impl Served {
   // The second agent registered with a folder of its own.
   fn with_other_agent(&self) {
     self.agency.registrations.lock().unwrap().push(Registration {
-      brain_folder: FOLDER.into(),
+      brain_folder: Some(FOLDER.into()),
       ..registration(OTHER_AGENT)
     });
   }
@@ -404,5 +404,26 @@ async fn what_an_agents_stopped_runs_left_in_its_folder_is_put_back_and_no_other
   assert_eq!(
     api.post("/agents/put-back", json!({ "agent": OTHER_AGENT })).await,
     json!({ "ok": true })
+  );
+}
+
+#[tokio::test]
+async fn the_chat_agents_folder_is_the_brain_root_where_the_agency_names_it_none() {
+  let api = served().await;
+
+  api.agency.registrations.lock().unwrap()[0].brain_folder = None;
+  api.agency.registrations.lock().unwrap().push(Registration {
+    brain_folder: None,
+    ..registration(OTHER_AGENT)
+  });
+
+  assert_eq!(
+    api.post("/agents/lock", json!({ "agent": AGENT })).await,
+    json!({ "path": "people-digest.lock" })
+  );
+  assert_eq!(api.post("/agents/lock", json!({ "agent": OTHER_AGENT })).await, json!({ "path": null }));
+  assert_eq!(
+    api.post("/agents/put-back", json!({ "agent": AGENT })).await["refusal"]["code"],
+    json!("brain-root")
   );
 }

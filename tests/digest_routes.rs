@@ -10,8 +10,8 @@ use std::time::Duration;
 use bmo_brain::api::digests::{PauseAsked, seoul_day_start};
 use bmo_brain::api::holds::locks_free;
 use bmo_brain::editors::lock::{brain_held, brain_holders};
-use bmo_brain::ports::agency::{Launch, LaunchOutcome};
 use bmo_brain::ports::receiver::{RoadKind, Roads, RoomAnswerers};
+use bmo_brain::schedules::apart::{Launch, LaunchOutcome};
 use serde_json::{Value, json};
 
 use support::served::{PROGRAM, Served, served};
@@ -34,9 +34,9 @@ impl Served {
   // reads back as its own.
   fn launched_words(&self) -> Vec<Vec<String>> {
     self
-      .agency
+      .starter
       .calls
-      .of("launch_unit")
+      .of("start")
       .iter()
       .map(|launch| {
         let words: Vec<String> = launch["command"]
@@ -150,16 +150,17 @@ async fn the_memo_digest_starts_only_with_notes_waiting_and_never_while_paused_o
   assert_eq!(api.receiver.notices.lock().unwrap().len(), 1);
   api.post("/digest/pause", json!({ "set": "off" })).await;
 
-  *api.receiver.rest.lock().unwrap() = Some(bmo_brain::ports::receiver::Rest {
+  *api.agency.rest.lock().unwrap() = Some(bmo_brain::ports::agency::Rest {
     resting: true,
     until: None,
+    kind: Some("outage".to_owned()),
   });
   assert_eq!(api.post("/digest/run", json!({})).await, json!({ "outcome": "resting" }));
   assert_eq!(
     api.post("/digest/now", json!({ "agent": AGENT, "chatId": ROOM })).await,
     json!({ "outcome": "resting" })
   );
-  *api.receiver.rest.lock().unwrap() = None;
+  *api.agency.rest.lock().unwrap() = None;
   assert!(api.launched_words().is_empty());
 
   assert_eq!(
@@ -188,7 +189,7 @@ async fn the_memo_digest_starts_only_with_notes_waiting_and_never_while_paused_o
   );
 
   // A launch the agency refuses says why.
-  *api.agency.launch.lock().unwrap() = Some(Launch {
+  *api.starter.answer.lock().unwrap() = Some(Launch {
     outcome: LaunchOutcome::Refused,
     why: Some("no room for another unit".to_owned()),
   });
@@ -351,11 +352,11 @@ async fn a_jobs_hold_stands_while_its_run_does_and_the_wait_answers_once_the_loc
   );
   // A second hold for the same run changes nothing.
   api.post("/brain/hold", json!({ "run": "job-7" })).await;
-  api.agency.open.lock().unwrap().insert("job-7".to_owned());
+  api.agency.alive.lock().unwrap().insert("job-7".to_owned());
   assert_eq!(api.get("/brain/hold").await, (200, json!({ "holders": ["job-7"], "taken": [] })));
 
   // A hold whose run is over is cleared as it is read.
-  api.agency.open.lock().unwrap().clear();
+  api.agency.alive.lock().unwrap().clear();
   assert_eq!(api.get("/brain/hold").await.1["holders"], json!([]));
   assert!(api.bad("/brain/hold", json!({ "run": " " })).await.contains("a job's run"));
 
@@ -386,7 +387,7 @@ async fn a_jobs_hold_on_the_brain_holds_the_editors_off_while_its_run_is_open_bu
 
   api.post("/brain/hold", json!({ "run": "job-1" })).await;
   api.post("/brain/hold", json!({ "run": "job-2" })).await;
-  api.agency.open.lock().unwrap().insert("job-1".to_owned());
+  api.agency.alive.lock().unwrap().insert("job-1".to_owned());
 
   assert_eq!(brain_holders(api.scratch.db(), api.agency.as_ref(), None).await.unwrap(), ["job-1"]);
   // The hold of the run that is over went as it was read.
@@ -399,6 +400,14 @@ async fn a_jobs_hold_on_the_brain_holds_the_editors_off_while_its_run_is_open_bu
   );
   assert!(brain_held(api.scratch.db(), api.agency.as_ref(), None).await);
   assert!(!brain_held(api.scratch.db(), api.agency.as_ref(), Some("job-1")).await);
+
+  // Where nobody can say whether a job's run is alive, its hold stands.
+  api.post("/brain/hold", json!({ "run": "job-3" })).await;
+  *api.agency.unsure.lock().unwrap() = true;
+  assert_eq!(
+    brain_holders(api.scratch.db(), api.agency.as_ref(), None).await.unwrap(),
+    ["job-1", "job-3"]
+  );
 }
 
 #[tokio::test]

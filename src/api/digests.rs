@@ -1,8 +1,8 @@
 //! The digests' routes (docs/knowledge.md, 「The digest run」; docs/people-book.md, 「The launcher and the worker」;
 //! docs/boundary-api.md, 「The digests」): the memo digest asked for by the clock or by a room, the person book in
 //! every form, the owner's pause, and a room's worker before its session folds. What is read or set in a request is
-//! answered there; the work itself is launched apart through the agency, in the unit its form runs under, and the
-//! route answers what came of the launch.
+//! answered there; the work itself is launched apart by the brain, in the unit its form runs under, and the route
+//! answers what came of the launch.
 
 use std::sync::Arc;
 
@@ -29,8 +29,7 @@ use crate::editors::recollection::recollection_for;
 use crate::editors::settle::{
   PauseState, digest_paused, digest_paused_until, pause_digests, resting, resume_digests,
 };
-use crate::ports::agency::{Launch, LaunchOutcome};
-use crate::ports::http::PortFailure;
+use crate::schedules::apart::{Launch, LaunchOutcome};
 use crate::schedules::launches::{BeforeFold, RoomDigest};
 
 /// The digests' routes.
@@ -48,18 +47,17 @@ fn outcome(word: &str) -> Json<Value> {
 }
 
 // What a launch came to, as a route answers it.
-fn launched(unit: &str, launch: Result<Launch, PortFailure>) -> Json<Value> {
+fn launched(unit: &str, launch: Launch) -> Json<Value> {
   match launch {
-    Ok(Launch {
+    Launch {
       outcome: LaunchOutcome::Launched,
       ..
-    }) => Json(json!({ "outcome": "launched", "unit": unit })),
-    Ok(Launch {
+    } => Json(json!({ "outcome": "launched", "unit": unit })),
+    Launch {
       outcome: LaunchOutcome::Running,
       ..
-    }) => Json(json!({ "outcome": "running", "unit": unit })),
-    Ok(Launch { why, .. }) => Json(json!({ "outcome": "refused", "why": why.unwrap_or_default() })),
-    Err(why) => Json(json!({ "outcome": "refused", "why": why.to_string() })),
+    } => Json(json!({ "outcome": "running", "unit": unit })),
+    Launch { why, .. } => Json(json!({ "outcome": "refused", "why": why.unwrap_or_default() })),
   }
 }
 
@@ -92,7 +90,7 @@ async fn run(State(api): State<Arc<Api>>, Body(asked): Body<RunAsked>) -> Answer
   }
 
   // The digest is a full high-effort session; during a rest it must not start.
-  if resting(api.receiver.as_ref()).await? {
+  if resting(api.agency.as_ref()).await? {
     return Ok(outcome("resting"));
   }
 
@@ -131,7 +129,7 @@ struct NowAsked {
 // One room's digest launched where nothing stops it: never during a rest, never for a room with no pending notes,
 // and never beside a digest of the room still running.
 async fn now(State(api): State<Arc<Api>>, Body(asked): Body<NowAsked>) -> Answer {
-  if resting(api.receiver.as_ref()).await? {
+  if resting(api.agency.as_ref()).await? {
     return Ok(outcome("resting"));
   }
 

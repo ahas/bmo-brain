@@ -19,6 +19,7 @@ use bmo_brain::policy::ITEM_WORDS;
 use fragment_desk::desk::{FragmentFilter, FragmentWrite};
 
 use support::agency::{FakeAgency, registration};
+use support::job::FakeJob;
 use support::receiver::FakeReceiver;
 use support::scratch::Scratch;
 use support::{AGENT, OTHER_AGENT, ROOM};
@@ -121,11 +122,11 @@ fn agency() -> FakeAgency {
 
   *agency.registrations.lock().unwrap() = vec![
     bmo_brain::ports::agency::Registration {
-      brain_folder: String::new(),
+      brain_folder: Some(String::new()),
       ..root
     },
     bmo_brain::ports::agency::Registration {
-      brain_folder: COMPANION.into(),
+      brain_folder: Some(COMPANION.into()),
       label: Some("Helper".into()),
       ..companion
     },
@@ -337,7 +338,8 @@ async fn the_table_follows_the_agencys_folders_and_labels() {
   let scratch = Scratch::new().await;
   let agency = agency();
   let receiver = FakeReceiver::default();
-  let table = Table::of(scratch.db(), &agency, &receiver, Path::new("/brain"), AGENT, &[])
+  let job = FakeJob::default();
+  let table = Table::of(scratch.db(), &agency, &receiver, &job, Path::new("/brain"), AGENT, &[])
     .await
     .unwrap();
 
@@ -352,13 +354,14 @@ async fn a_batch_s_writes_become_rows_settle_and_draw_their_agents_index_alone()
   let scratch = Scratch::new().await;
   let agency = agency();
   let receiver = FakeReceiver::default();
+  let job = FakeJob::default();
   let dir = laid_brain(&[
     ("knowledge/restart.md", "# Restart\n\nThe restart of the tool.\n"),
     (&format!("{COMPANION}/knowledge/tea.md"), "# Tea\n\nThe tea notes.\n"),
   ]);
-  let table = Table::of(scratch.db(), &agency, &receiver, dir.path(), AGENT, &[]).await.unwrap();
+  let table = Table::of(scratch.db(), &agency, &receiver, &job, dir.path(), AGENT, &[]).await.unwrap();
 
-  agency.finished.lock().unwrap().insert(758);
+  job.finished.lock().unwrap().insert(758);
   table
     .follow_write(
       &[FragmentWrite {
@@ -436,8 +439,9 @@ async fn a_brain_that_is_no_repository_is_passed_over() {
   let scratch = Scratch::new().await;
   let agency = agency();
   let receiver = FakeReceiver::default();
+  let job = FakeJob::default();
   let dir = tempfile::tempdir().unwrap();
-  let table = Table::of(scratch.db(), &agency, &receiver, dir.path(), AGENT, &[]).await.unwrap();
+  let table = Table::of(scratch.db(), &agency, &receiver, &job, dir.path(), AGENT, &[]).await.unwrap();
   let done = table.reconcile(None).await.unwrap();
 
   assert_eq!(done.len(), 3);
@@ -450,8 +454,9 @@ async fn a_writer_is_handed_the_named_brain_pieces_on_disk_alone() {
   let scratch = Scratch::new().await;
   let agency = agency();
   let receiver = FakeReceiver::default();
+  let job = FakeJob::default();
   let dir = laid_brain(&[("rooms/-5/people/chunks/p9-tools.md", "# Tools\n")]);
-  let table = Table::of(scratch.db(), &agency, &receiver, dir.path(), AGENT, &[]).await.unwrap();
+  let table = Table::of(scratch.db(), &agency, &receiver, &job, dir.path(), AGENT, &[]).await.unwrap();
 
   receiver.names.lock().unwrap().insert(9, "Tester".into());
 
@@ -496,7 +501,8 @@ async fn a_shipped_library_is_brought_to_its_owners_entries_with_the_hand_honour
   let scratch = Scratch::new().await;
   let agency = agency();
   let receiver = FakeReceiver::default();
-  let table = Table::of(scratch.db(), &agency, &receiver, Path::new("/brain"), AGENT, &[])
+  let job = FakeJob::default();
+  let table = Table::of(scratch.db(), &agency, &receiver, &job, Path::new("/brain"), AGENT, &[])
     .await
     .unwrap();
 

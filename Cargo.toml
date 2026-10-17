@@ -37,6 +37,7 @@ serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.138"
 sha2 = "0.10.9"
 sqlx = { version = "0.8.6", default-features = false, features = ["any", "postgres", "sqlite", "runtime-tokio"] }
+sse-stream = "0.2.6"
 tempfile = "3.20.0"
 tokio = { version = "1.47.0", features = ["macros", "rt", "rt-multi-thread", "net", "time", "signal", "io-util", "process"] }
 tool-call = { path = "crates/tool-call" }
@@ -68,13 +69,16 @@ memory-rows.workspace = true
 rand.workspace = true
 # The stretches a document is cut in, a prompt's marks and a sheet's days.
 regex.workspace = true
-# The ports' calls on the agency, the receiver and the gate.
-reqwest.workspace = true
+# The ports' calls on the agency, the receiver, the gate and bmo-job; a GET's query and the agency's event stream.
+reqwest = { workspace = true, features = ["query", "stream"] }
 sea-orm.workspace = true
 sea-orm-migration.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-tokio.workspace = true
+# The agency's event stream, read as server-sent events.
+sse-stream.workspace = true
+# The run name an editor turn's start hands its clock, over a one-shot channel.
+tokio = { workspace = true, features = ["sync"] }
 # The configuration file.
 toml.workspace = true
 

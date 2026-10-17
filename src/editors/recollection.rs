@@ -66,7 +66,7 @@ fn of(brain_root: &Path, registration: Option<&Registration>, agent: &str, folde
 }
 
 // Every awake agent's memory in the order the agency lists them, the chat agent's at the root first where no
-// registration holds the root.
+// registration holds the root. An agent listed with no brain folder keeps no long-term memory.
 async fn every(
   agency: &dyn Agency,
   brain_root: &Path,
@@ -76,18 +76,20 @@ async fn every(
   let mut found: Vec<Recollection> = registrations
     .iter()
     .filter(|registration| registration.awake)
-    .map(|registration| {
-      of(
+    .filter_map(|registration| {
+      let folder = registration.brain_folder.as_deref()?;
+
+      Some(of(
         brain_root,
         Some(registration),
         &registration.name,
-        registration.brain_folder.trim_end_matches('/').to_owned(),
-      )
+        folder.trim_end_matches('/').to_owned(),
+      ))
     })
     .collect();
 
   if !found.iter().any(|one| one.folder.is_empty()) {
-    let chat = registrations.iter().find(|registration| registration.key == chat_key);
+    let chat = registrations.iter().find(|registration| registration.name == chat_key);
 
     found.insert(0, of(brain_root, chat, chat.map_or(chat_key, |chat| chat.name.as_str()), String::new()));
   }

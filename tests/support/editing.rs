@@ -1,21 +1,23 @@
 //! An editor process on a stage of the test's own: a scratch database, the other units in memory, the chat agent's
 //! brain as a git repository at a folder of its own, a data root beside it, and the prompts the tests' writers are
-//! handed. A session the agency starts can stand in for the model, writing files in its folder and rows on its desk.
+//! handed. A turn the agency carries can stand in for the model, writing files in its folder and rows on its desk.
 
 use std::fs;
 use std::path::Path;
 
 use bmo_brain::editors::commits::git;
 use bmo_brain::editors::ground::Ground;
-use bmo_brain::ports::agency::{Outcome, Registration, SessionEnd, SessionStart};
+use bmo_brain::ports::agency::{EditorTurn, Registration, TurnOutcome};
 use fragment_desk::desk::{Desk, FragmentWrite};
 
 use super::AGENT;
 use super::agency::{FakeAgency, Session, registration};
 use super::gate::FakeGate;
+use super::job::FakeJob;
 use super::receiver::FakeReceiver;
 use super::scratch::Scratch;
 use super::sorting::prompts_root;
+use super::starter::FakeStarter;
 
 /// A git repository at a folder, with an identity to commit under.
 pub fn repository(root: &Path) {
@@ -38,6 +40,8 @@ pub struct Stage {
   pub agency: FakeAgency,
   pub receiver: FakeReceiver,
   pub gate: FakeGate,
+  pub job: FakeJob,
+  pub starter: FakeStarter,
   pub brain: tempfile::TempDir,
   pub data: tempfile::TempDir,
   pub address: String,
@@ -52,7 +56,7 @@ impl Stage {
     let brain = tempfile::tempdir().unwrap();
 
     *agency.registrations.lock().unwrap() = vec![Registration {
-      brain_folder: String::new(),
+      brain_folder: Some(String::new()),
       label: Some("Helper".to_owned()),
       ..registration(AGENT)
     }];
@@ -64,6 +68,8 @@ impl Stage {
       agency,
       receiver: FakeReceiver::default(),
       gate: FakeGate::default(),
+      job: FakeJob::default(),
+      starter: FakeStarter::default(),
       brain,
       data: tempfile::tempdir().unwrap(),
       prompts: prompts_root(),
@@ -77,6 +83,8 @@ impl Stage {
       agency: &self.agency,
       receiver: &self.receiver,
       gate: &self.gate,
+      job: &self.job,
+      starter: &self.starter,
       brain_root: self.brain.path(),
       data_root: self.data.path(),
       prompts_root: &self.prompts,
@@ -88,10 +96,11 @@ impl Stage {
     }
   }
 
-  /// Every session from now on writes these files in its folder and these rows on its desk.
+  /// Every turn from now on writes these files in its folder and these rows on its desk.
   pub fn sessions_write(&self, files: Vec<(String, String)>, writes: Vec<FragmentWrite>) {
-    let session = move |start: &SessionStart| {
-      let folder = Path::new(&start.workdir);
+    let brain = self.brain.path().to_path_buf();
+    let session = move |start: &EditorTurn| {
+      let folder = brain.join(&start.workdir);
 
       for (path, text) in &files {
         let at = folder.join(path);
@@ -110,19 +119,9 @@ impl Stage {
     *self.agency.session.lock().unwrap() = Some(Session(Box::new(session)));
   }
 
-  /// The next sessions end with these outcomes and answers, one each.
-  pub fn sessions_end(&self, ends: &[(Outcome, Option<&str>)]) {
-    let mut queued = self.agency.ends.lock().unwrap();
-
-    for (outcome, answer) in ends {
-      queued.push_back(SessionEnd {
-        outcome: *outcome,
-        answer: answer.map(str::to_owned),
-        files_written: vec![],
-        cost: None,
-        size: None,
-      });
-    }
+  /// The next turns end with these outcomes and answers, one each.
+  pub fn sessions_end(&self, ends: &[(TurnOutcome, Option<&str>)]) {
+    self.agency.turns_end(ends);
   }
 }
 

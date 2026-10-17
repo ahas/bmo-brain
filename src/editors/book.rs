@@ -34,7 +34,9 @@ pub async fn room_books(agency: &dyn Agency, brain: &Path, room: i64) -> Result<
   let mut folders = vec![String::new()];
 
   for registration in agency.registrations(None).await? {
-    folders.push(registration.brain_folder.trim_end_matches('/').to_owned());
+    if let Some(folder) = registration.brain_folder {
+      folders.push(folder.trim_end_matches('/').to_owned());
+    }
   }
 
   folders.sort();

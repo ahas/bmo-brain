@@ -270,7 +270,7 @@ impl WaitOn for NoKeep {
 }
 
 /// A wait on another run's lock that goes on for as long as the agency keeps that run past its clock, and its
-/// slack after, by the agency's clock keep.
+/// slack after, by the agency's run clock.
 pub struct FollowKeep<'a> {
   pub agency: &'a dyn Agency,
   pub slack_ms: i64,
@@ -280,8 +280,8 @@ impl WaitOn for FollowKeep<'_> {
   async fn later(&self, holder: Option<&str>) -> Option<i64> {
     let holder = holder?;
 
-    match self.agency.kept_until(holder).await {
-      Ok(until) => until.map(|until| until.saturating_mul(1000).saturating_add(self.slack_ms)),
+    match self.agency.run_clock(holder).await {
+      Ok(clock) => clock.kept_until.map(|until| until.saturating_mul(1000).saturating_add(self.slack_ms)),
       Err(why) => {
         eprintln!("brain lock: whether {holder} is kept could not be read: {why}");
         None
@@ -417,7 +417,8 @@ pub async fn place_brain_hold(db: &DatabaseConnection, run: &str, now: i64) -> R
 }
 
 /// The run names of the jobs holding the brain against a process running as `own_run`: every hold whose job's
-/// run the agency still has open, but that process's own. A hold whose run is over is cleared here.
+/// run the agency answers alive, or that nobody could say of, but that process's own. A hold whose run is over is
+/// cleared here.
 pub async fn brain_holders(
   db: &DatabaseConnection,
   agency: &dyn Agency,
@@ -426,7 +427,9 @@ pub async fn brain_holders(
   let mut holders = vec![];
 
   for (held_by, _) in settings::prefixed(db, HOLD_PREFIX).await? {
-    if !agency.run_open(&held_by).await? {
+    let alive = agency.alive(std::slice::from_ref(&held_by)).await?;
+
+    if alive.is_some_and(|alive| !alive.contains(&held_by)) {
       settings::forget(db, &format!("{HOLD_PREFIX}{held_by}")).await?;
     } else if Some(held_by.as_str()) != own_run {
       holders.push(held_by);

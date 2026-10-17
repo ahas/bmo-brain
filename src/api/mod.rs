@@ -42,11 +42,13 @@ use crate::editors::fragments::Table;
 use crate::editors::ground::Ground;
 use crate::ports::agency::Agency;
 use crate::ports::gate::Gate;
+use crate::ports::job::Job;
 use crate::ports::receiver::Receiver;
+use crate::schedules::apart::Starter;
 use crate::schedules::launches::Launches;
 
 /// What the routes stand on: the brain's database and the address the fragment tool opens it by, the agency, the
-/// receiver and the gate, the brain root, the data root and the prompts folder, the chat agent's registration key
+/// receiver, the gate and bmo-job, what starts a run apart, the brain root, the data root and the prompts folder, the chat agent's registration key
 /// and the owner's number and names, the unit the service runs as and the words that start its binary, the token every caller
 /// presents, and the withering stamps the conditions route keeps for the service's life.
 pub struct Api {
@@ -55,6 +57,8 @@ pub struct Api {
   pub agency: Arc<dyn Agency>,
   pub receiver: Arc<dyn Receiver>,
   pub gate: Arc<dyn Gate>,
+  pub job: Arc<dyn Job>,
+  pub starter: Arc<dyn Starter>,
   pub brain_root: PathBuf,
   pub data_root: PathBuf,
   pub prompts_root: PathBuf,
@@ -82,6 +86,8 @@ impl Api {
       agency: self.agency.as_ref(),
       receiver: self.receiver.as_ref(),
       gate: self.gate.as_ref(),
+      job: self.job.as_ref(),
+      starter: self.starter.as_ref(),
       brain_root: &self.brain_root,
       data_root: &self.data_root,
       prompts_root: &self.prompts_root,

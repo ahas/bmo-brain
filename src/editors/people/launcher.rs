@@ -57,9 +57,8 @@ impl Launcher<'_> {
         return Ok(true);
       }
 
-      let kept = agency.kept_until(unit).await?.unwrap_or(0);
-      let batch = agency.cap_ends(unit).await?.unwrap_or(0);
-      let until = kept.max(batch).saturating_mul(1000);
+      let clock = agency.run_clock(unit).await?;
+      let until = clock.kept_until.unwrap_or(0).max(clock.cap_ends.unwrap_or(0)).saturating_mul(1000);
 
       if until + LAUNCHER_SLACK_MS <= (self.clock)() {
         return Ok(false);

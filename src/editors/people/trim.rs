@@ -383,7 +383,7 @@ fn put_back(root: &Path, trim: &Trim, count: usize) -> Result<(), Failure> {
 }
 
 /// How each item number a stretch names stands, as the run is told: finished, not finished, or unknown to the
-/// agency where its answer leaves the item out.
+/// bmo-job where its answer leaves the item out.
 pub fn item_states_text(states: &HashMap<i64, bool>, named: &[i64]) -> String {
   let lines: Vec<String> = named
     .iter()

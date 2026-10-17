@@ -197,7 +197,7 @@ pub async fn people(launches: &Launches<'_>, run: &PeopleRun) -> Result<bool, Fa
   };
 
   // Every batch is a full high-effort session; during a rest none of them may start.
-  if resting(ground.receiver).await? {
+  if resting(ground.agency).await? {
     return Ok(false);
   }
 

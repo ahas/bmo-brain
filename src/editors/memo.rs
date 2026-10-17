@@ -356,14 +356,14 @@ impl MemoDigest<'_> {
     }
 
     // The digest is a full high-effort session; during a rest it must not start.
-    if resting(ground.receiver).await? {
+    if resting(ground.agency).await? {
       return Ok(0);
     }
 
     // A job editing the brain is waited out before any note is taken on, and the rest and the pause asked again.
     if !pending_notes(db, None).await?.is_empty()
       && wait_for_brain(db, ground.agency, KEY, ground.own_run, HOLD_POLL).await
-      && (resting(ground.receiver).await? || digest_paused(db).await?)
+      && (resting(ground.agency).await? || digest_paused(db).await?)
     {
       return Ok(0);
     }
@@ -821,10 +821,12 @@ impl MemoDigest<'_> {
         chat_id,
         prompt,
         unit: ground.unit,
+        service_unit: ground.service_unit,
         cap_seconds,
         step: None,
         desk: &desk,
         registration: recollection.registration.as_deref(),
+        brain_root: ground.brain_root,
       },
     )
     .await;

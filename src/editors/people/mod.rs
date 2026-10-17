@@ -275,10 +275,12 @@ impl PeopleDigest<'_> {
         chat_id,
         prompt,
         unit: ground.unit,
+        service_unit: ground.service_unit,
         cap_seconds,
         step,
         desk: &scoped,
         registration: self.recollection.registration.as_deref(),
+        brain_root: ground.brain_root,
       },
     )
     .await;

@@ -5,8 +5,9 @@ mod support;
 
 use std::collections::HashSet;
 
-use bmo_brain::ports::agency::{Launch, LaunchOutcome, Registration};
+use bmo_brain::ports::agency::Registration;
 use bmo_brain::ports::receiver::{RoadKind, Roads, RoomAnswerers, RoomTitle};
+use bmo_brain::schedules::apart::{Launch, LaunchOutcome};
 use bmo_brain::schedules::launches::{Launches, RoomDigest, Standing, to_relaunch, watch_unit};
 use sea_orm::Value;
 use serde_json::{Value as Json, json};
@@ -56,7 +57,7 @@ fn launches<'a>(stage: &'a Stage, program: &'a [String]) -> Launches<'a> {
 }
 
 fn launched(stage: &Stage) -> Vec<Json> {
-  stage.agency.calls.of("launch_unit")
+  stage.starter.calls.of("start")
 }
 
 fn words(launch: &Json) -> Vec<String> {
@@ -84,14 +85,12 @@ async fn the_memo_digest_that_came_due_is_launched_where_no_run_of_it_stands() {
     calls[0],
     json!({
       "unit": "bmo-digest",
-      "kind": "digest",
       "title": "All pending notes",
-      "agent": null,
       "command": ["brain", "--config", "brain.toml", "digest", "--unit", "bmo-digest"],
     })
   );
-  // The second launch found the first one standing, which the agency answers as running.
-  assert!(stage.agency.running.lock().unwrap().contains("bmo-digest"));
+  // The second launch found the first one standing, which the service manager answers as running.
+  assert!(stage.starter.standing.lock().unwrap().contains("bmo-digest"));
   assert_eq!(launches.digest("weekly").await, Err("no digest is called weekly".to_owned()));
 }
 
@@ -102,16 +101,16 @@ async fn the_people_digest_launches_its_launcher_and_every_recollecting_agents_s
 
   *stage.agency.registrations.lock().unwrap() = vec![
     Registration {
-      brain_folder: "agents/agent-b/".to_owned(),
+      brain_folder: Some("agents/agent-b/".to_owned()),
       ..registration(OTHER_AGENT)
     },
     Registration {
-      brain_folder: String::new(),
+      brain_folder: Some(String::new()),
       ..registration(AGENT)
     },
     Registration {
       awake: false,
-      brain_folder: "agents/agent-c".to_owned(),
+      brain_folder: Some("agents/agent-c".to_owned()),
       ..registration("agent-c")
     },
   ];
@@ -125,13 +124,9 @@ async fn the_people_digest_launches_its_launcher_and_every_recollecting_agents_s
   let units: Vec<&str> = calls.iter().map(|call| call["unit"].as_str().unwrap()).collect();
 
   assert_eq!(units, ["bmo-people-digest", "bmo-people-sort-agent-a", "bmo-people-sort-agent-b"]);
-  assert_eq!(
-    (calls[0]["title"].clone(), calls[0]["agent"].clone()),
-    (json!("Rooms in turn"), json!(null))
-  );
+  assert_eq!(calls[0]["title"], json!("Rooms in turn"));
   assert_eq!(words(&calls[0])[3..], ["people-digest", "--unit", "bmo-people-digest"]);
   assert_eq!(calls[2]["title"], json!("Sorting the person book"));
-  assert_eq!(calls[2]["agent"], json!(OTHER_AGENT));
   assert_eq!(
     words(&calls[2])[3..],
     [
@@ -152,7 +147,7 @@ async fn the_chat_agent_recollects_at_the_root_where_no_registration_holds_it() 
   let program = program();
 
   *stage.agency.registrations.lock().unwrap() = vec![Registration {
-    brain_folder: "agents/agent-b".to_owned(),
+    brain_folder: Some("agents/agent-b".to_owned()),
     ..registration(OTHER_AGENT)
   }];
 
@@ -185,7 +180,7 @@ async fn a_rooms_digest_is_launched_once_titled_by_the_room_and_a_refusal_is_ans
     ["digest", "--chat", "-100", "--unit", "bmo-digest--100"]
   );
 
-  *stage.agency.launch.lock().unwrap() = Some(Launch {
+  *stage.starter.answer.lock().unwrap() = Some(Launch {
     outcome: LaunchOutcome::Refused,
     why: Some("The unit is masked.".to_owned()),
   });
@@ -239,10 +234,6 @@ async fn a_room_about_to_fold_launches_the_agents_worker_only_where_its_book_is_
 
   assert_eq!(calls.len(), 1);
   assert_eq!(calls[0]["unit"], json!("bmo-people-digest-agent-a--100"));
-  assert_eq!(
-    (calls[0]["kind"].clone(), calls[0]["agent"].clone()),
-    (json!("people-digest"), json!(AGENT))
-  );
   assert_eq!(calls[0]["title"], json!("Room -100"));
   assert_eq!(
     words(&calls[0])[3..],
@@ -265,7 +256,7 @@ async fn a_room_about_to_fold_launches_the_agents_worker_only_where_its_book_is_
       one_to_one: true,
     },
   );
-  stage.agency.running.lock().unwrap().clear();
+  stage.starter.standing.lock().unwrap().clear();
   launches.people_before_fold(ROOM, AGENT).await;
   assert_eq!(launched(&stage).len(), 1);
 }
@@ -282,10 +273,12 @@ async fn a_worker_catches_up_on_asking_stands_once_and_answers_the_agencys_refus
     words(&launched(&stage)[0])[3..],
     ["people-digest", "--chat", "-100", "--agent", AGENT, "--all", "--unit", unit]
   );
+  // The service manager holds what was started, and the agency answers it alive.
+  stage.agency.alive.lock().unwrap().insert(unit.to_owned());
   assert!(launches.standing(unit).await);
   assert!(!launches.standing("bmo-people-digest-agent-a--200").await);
 
-  *stage.agency.launch.lock().unwrap() = Some(Launch {
+  *stage.starter.answer.lock().unwrap() = Some(Launch {
     outcome: LaunchOutcome::Refused,
     why: Some("No host takes it.".to_owned()),
   });
@@ -354,7 +347,7 @@ async fn the_watches_nobody_holds_are_launched_again_each_in_a_run_of_its_own() 
   let fresh = standing_watch(&stage, "condition", Some("bmo-watch-fresh"), Some(now - 10)).await;
   let timer = standing_watch(&stage, "timer", None, None).await;
 
-  stage.agency.running.lock().unwrap().insert("bmo-watch-held".to_owned());
+  stage.agency.alive.lock().unwrap().insert("bmo-watch-held".to_owned());
   launches.relaunch_watches(now_ms).await.unwrap();
 
   let calls = launched(&stage);
@@ -362,10 +355,7 @@ async fn the_watches_nobody_holds_are_launched_again_each_in_a_run_of_its_own() 
 
   assert_eq!(calls.len(), 1);
   assert_eq!(calls[0]["unit"], json!(unit));
-  assert_eq!(
-    (calls[0]["kind"].clone(), calls[0]["title"].clone()),
-    (json!("watch"), json!(format!("Private chat watch #{lost}")))
-  );
+  assert_eq!(calls[0]["title"], json!(format!("Private chat watch #{lost}")));
   assert_eq!(
     words(&calls[0])[3..],
     [
@@ -391,10 +381,28 @@ async fn the_watches_nobody_holds_are_launched_again_each_in_a_run_of_its_own() 
   assert!(!launches.launch_watch_of(held, now_ms + 2).await.unwrap());
 
   // A refused launch leaves the watch standing for a later pass.
-  *stage.agency.launch.lock().unwrap() = Some(Launch {
+  *stage.starter.answer.lock().unwrap() = Some(Launch {
     outcome: LaunchOutcome::Refused,
     why: Some("No host takes it.".to_owned()),
   });
   assert!(!launches.launch_watch_of(lost, now_ms + 3).await.unwrap());
   assert_eq!(watch_column(&stage, lost, "state").await.as_deref(), Some("active"));
+}
+
+#[tokio::test]
+async fn where_nobody_can_say_which_runs_stand_no_watch_is_launched_again() {
+  let stage = Stage::new().await;
+  let program = program();
+  let launches = launches(&stage, &program);
+  let now_ms = 1_700_000_000_000;
+
+  standing_watch(&stage, "condition", Some("bmo-watch-old"), Some(now_ms / 1000 - 600)).await;
+  *stage.agency.unsure.lock().unwrap() = true;
+  launches.relaunch_watches(now_ms).await.unwrap();
+
+  assert!(launched(&stage).is_empty());
+  assert!(
+    launches.standing("bmo-watch-old").await,
+    "a unit nobody can speak for is taken as standing"
+  );
 }

@@ -12,7 +12,9 @@ use crate::api::memories::Withering;
 use crate::ports::agency::HttpAgency;
 use crate::ports::gate::HttpGate;
 use crate::ports::http::Peer;
+use crate::ports::job::HttpJob;
 use crate::ports::receiver::HttpReceiver;
+use crate::schedules::apart::UserUnits;
 
 /// The configuration, key by key as the file writes it.
 #[derive(Clone, Debug, Deserialize)]
@@ -32,6 +34,7 @@ pub struct Config {
   pub agency: Peer,
   pub receiver: Peer,
   pub gate: Peer,
+  pub job: Peer,
   pub own_command: Vec<String>,
 }
 
@@ -60,6 +63,8 @@ impl Config {
       agency: Arc::new(HttpAgency::new(&self.agency)),
       receiver: Arc::new(HttpReceiver::new(&self.receiver)),
       gate: Arc::new(HttpGate::new(&self.gate)),
+      job: Arc::new(HttpJob::new(&self.job)),
+      starter: Arc::new(UserUnits::default()),
       brain_root: self.brain.clone(),
       data_root: self.data_root.clone(),
       prompts_root: self.prompts.clone(),

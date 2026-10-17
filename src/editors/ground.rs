@@ -1,5 +1,5 @@
 //! What one editor process stands on (docs/boundary-api.md, 「Configuration」): the brain's database and the
-//! address the fragment tool opens it by, the agency, the receiver and the gate, the brain root, the data root and
+//! address the fragment tool opens it by, the agency, the receiver, the gate and bmo-job, what starts a run apart, the brain root, the data root and
 //! the prompts folder, the chat agent's registration key, the unit the service runs as, and — where the process was
 //! launched apart — the unit it runs in and the job run it works for.
 
@@ -14,7 +14,9 @@ use super::settle::journal_record;
 use crate::Failure;
 use crate::ports::agency::Agency;
 use crate::ports::gate::Gate;
+use crate::ports::job::Job;
 use crate::ports::receiver::Receiver;
+use crate::schedules::apart::Starter;
 
 /// Everything an editor run reaches beside the folder it writes.
 #[derive(Clone, Copy)]
@@ -25,6 +27,9 @@ pub struct Ground<'a> {
   pub agency: &'a dyn Agency,
   pub receiver: &'a dyn Receiver,
   pub gate: &'a dyn Gate,
+  pub job: &'a dyn Job,
+  /// What starts the brain's runs apart.
+  pub starter: &'a dyn Starter,
   /// The brain root, the chat agent's folder and the one every other agent's folder stands under.
   pub brain_root: &'a Path,
   /// Where the editing locks, the fragment desks and the failure logs live.
@@ -54,7 +59,16 @@ impl<'a> Ground<'a> {
 
   /// The fragment table over the brain as the agency registers its folders now.
   pub async fn table(&self) -> Result<Table<'a>, Failure> {
-    Table::of(self.db, self.agency, self.receiver, self.brain_root, self.chat_key, self.owner_names).await
+    Table::of(
+      self.db,
+      self.agency,
+      self.receiver,
+      self.job,
+      self.brain_root,
+      self.chat_key,
+      self.owner_names,
+    )
+    .await
   }
 
   /// Where the desks of the runs in flight stand.

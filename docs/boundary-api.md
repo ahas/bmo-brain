@@ -470,9 +470,10 @@ How a recollector run goes:
   commit, other agents' folders under it set aside.
 - **The clock** is the agency's: an editor run carries the bound its `docs/agent-control.md` gives it, and past it
   the agency asks the chat agent whether to keep it or cut it, and cuts it where no answer comes. The brain makes
-  no ask. Past the cap, the brain reads the run's clock: while a keep or an open ask stands on it, it looks again
-  when that ends; where none stands, it stops the run through the run stop and fails the batch as cut at its cap,
-  so a run the agency holds no clock on is never left running.
+  no ask. Past the cap, the brain reads the run's clock, by the batch's unit or by the run where it runs in none:
+  while the run's bound has not run out or a keep or an open ask stands on it, it looks again when the later of
+  them ends; where none stands, it stops the run through the run stop and fails the batch as cut at its cap, so a
+  run the agency holds no clock on is never left running.
 - **Alive:** a job's run holding the brain stands while the agency answers it alive, or while nobody could say;
   a unit runs while the agency answers it alive, and where nobody could say every unit asked is taken as running,
   so nothing is launched on that pass.

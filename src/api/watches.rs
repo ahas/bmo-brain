@@ -183,7 +183,7 @@ async fn watches_end(State(api): State<Arc<Api>>, Body(asked): Body<EndBody>) ->
       ),
     ),
   };
-  let ended = end_by_run(&api.db, api.agency.as_ref(), watch, &asked.run, state, &memo, now).await?;
+  let ended = end_by_run(&api.db, api.receiver.as_ref(), watch, &asked.run, state, &memo, now).await?;
 
   Ok(Json(json!({ "ended": ended })))
 }
@@ -194,8 +194,7 @@ struct StoppedBody {
 }
 
 async fn watches_stopped(State(api): State<Arc<Api>>, Body(asked): Body<StoppedBody>) -> Answer {
-  let ended =
-    stop_of_unit(&api.db, api.agency.as_ref(), api.receiver.as_ref(), &asked.unit, now_seconds()).await?;
+  let ended = stop_of_unit(&api.db, api.receiver.as_ref(), &asked.unit, now_seconds()).await?;
 
   Ok(Json(json!({ "ended": ended })))
 }

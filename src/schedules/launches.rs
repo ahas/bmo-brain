@@ -1,8 +1,8 @@
 //! What the brain's scheduled work starts apart (docs/boundary-api.md, 「Runs launched apart」): a digest that came
 //! due launched where no run of its unit stands (docs/knowledge.md, docs/people-book.md), one room's digest or
 //! person-book worker, and the checks of the watches that no run holds launched again, each in a run of its own
-//! (docs/memories.md, 「Watches」). Every run is one of the brain's own binary, started through the agency's unit
-//! launch, which also says which units a run stands under.
+//! (docs/memories.md, 「Watches」). Every run is one of the brain's own binary, which the brain starts itself as a
+//! unit of the user's service manager; whether a unit still runs is the agency's alive.
 
 use std::collections::HashSet;
 
@@ -14,8 +14,7 @@ use crate::editors::archive::{book_room, room_name};
 use crate::editors::ground::Ground;
 use crate::editors::people::{LAUNCHER_UNIT, sort_unit};
 use crate::editors::recollection::recollections;
-use crate::ports::agency::{Launch, LaunchOutcome, UnitLaunch};
-use crate::ports::http::PortFailure;
+use crate::schedules::apart::{Launch, LaunchOutcome, UnitLaunch};
 
 // How long after it was armed a check is left to its run before a pass may take it for one nobody holds: a run
 // just launched is not yet among the running.
@@ -28,9 +27,6 @@ pub const MEMO_UNIT: &str = "bmo-digest";
 const MEMO_WORDS: &str = "digest";
 const PEOPLE_WORDS: &str = "people-digest";
 const WATCH_WORDS: &str = "watch-runner";
-const MEMO_KIND: &str = "digest";
-const PEOPLE_KIND: &str = "people-digest";
-const WATCH_KIND: &str = "watch";
 
 /// One active watch, as much of it as a launch reads.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -80,7 +76,7 @@ pub enum BeforeFold {
   Refused(String),
 }
 
-/// What asking for one room's digest came to: a run of it already standing, one launched, or the agency's refusal,
+/// What asking for one room's digest came to: a run of it already standing, one launched, or why it was refused,
 /// the first two under the unit the room's digest goes by.
 #[derive(Debug, PartialEq, Eq)]
 pub enum RoomDigest {
@@ -107,36 +103,25 @@ impl Launches<'_> {
       .collect()
   }
 
-  /// One run started apart through the agency: its unit, the work it does, what it is titled, the agent it works
-  /// for where it works for one, and its words.
-  pub async fn launch(
-    &self,
-    unit: &str,
-    kind: &str,
-    title: &str,
-    agent: Option<&str>,
-    words: &[&str],
-  ) -> Result<Launch, PortFailure> {
+  /// One run started apart: its unit, what it is titled, and its words.
+  pub async fn launch(&self, unit: &str, title: &str, words: &[&str]) -> Launch {
     let launch = UnitLaunch {
       unit: unit.to_owned(),
-      kind: kind.to_owned(),
       title: title.to_owned(),
-      agent: agent.map(str::to_owned),
       command: self.command(unit, words),
     };
 
-    self.ground.agency.launch_unit(&launch).await
+    self.ground.starter.start(&launch).await
   }
 
   // A run started apart where no run of its unit stands, a refusal said in the log.
-  async fn detached(&self, unit: &str, kind: &str, title: &str, agent: Option<&str>, words: &[&str]) {
-    match self.launch(unit, kind, title, agent, words).await {
-      Ok(Launch {
-        outcome: LaunchOutcome::Refused,
-        why,
-      }) => eprintln!("{unit} launch failed: {}", why.unwrap_or_default()),
-      Ok(_) => {}
-      Err(why) => eprintln!("{unit} launch failed: {why}"),
+  async fn detached(&self, unit: &str, title: &str, words: &[&str]) {
+    if let Launch {
+      outcome: LaunchOutcome::Refused,
+      why,
+    } = self.launch(unit, title, words).await
+    {
+      eprintln!("{unit} launch failed: {}", why.unwrap_or_default());
     }
   }
 
@@ -159,26 +144,26 @@ impl Launches<'_> {
   }
 
   /// The memo digest of every room's pending notes launched where no run of it stands.
-  pub async fn memo_digest(&self) -> Result<Launch, PortFailure> {
-    self.launch(MEMO_UNIT, MEMO_KIND, "All pending notes", None, &[MEMO_WORDS]).await
+  pub async fn memo_digest(&self) -> Launch {
+    self.launch(MEMO_UNIT, "All pending notes", &[MEMO_WORDS]).await
   }
 
   /// A run of the person book asked for by hand, in the unit its form runs under: the sort in the agent's sort unit,
   /// a room's work in the agent's worker of the room, and the launcher in its own. Answers the unit and what came of
   /// the launch.
-  pub async fn people_run(&self, run: &PeopleRun, agent: &str) -> (String, Result<Launch, PortFailure>) {
-    let (unit, title, for_agent) = if run.sort {
-      (sort_unit(agent), "Sorting the person book".to_owned(), Some(agent))
+  pub async fn people_run(&self, run: &PeopleRun, agent: &str) -> (String, Launch) {
+    let (unit, title) = if run.sort {
+      (sort_unit(agent), "Sorting the person book".to_owned())
     } else if let Some(chat_id) = run.chat {
       let title = self.room_name(chat_id).await.unwrap_or_else(|_| chat_id.to_string());
 
-      (crate::editors::people::worker_unit(chat_id, agent), title, Some(agent))
+      (crate::editors::people::worker_unit(chat_id, agent), title)
     } else {
-      (LAUNCHER_UNIT.to_owned(), "Rooms in turn".to_owned(), None)
+      (LAUNCHER_UNIT.to_owned(), "Rooms in turn".to_owned())
     };
     let words = run.words(agent);
     let words: Vec<&str> = words.iter().map(String::as_str).collect();
-    let launched = self.launch(&unit, PEOPLE_KIND, &title, for_agent, &words).await;
+    let launched = self.launch(&unit, &title, &words).await;
 
     (unit, launched)
   }
@@ -187,24 +172,15 @@ impl Launches<'_> {
   /// agent's sort, each in a unit of its own so one agent's sort never waits on another's.
   pub async fn digest(&self, digest: &str) -> Result<(), String> {
     match digest {
-      "memo" => match self.memo_digest().await {
-        Ok(Launch {
-          outcome: LaunchOutcome::Refused,
-          why,
-        }) => eprintln!("{MEMO_UNIT} launch failed: {}", why.unwrap_or_default()),
-        Ok(_) => {}
-        Err(why) => eprintln!("{MEMO_UNIT} launch failed: {why}"),
-      },
+      "memo" => self.detached(MEMO_UNIT, "All pending notes", &[MEMO_WORDS]).await,
       "people" => {
-        self.detached(LAUNCHER_UNIT, PEOPLE_KIND, "Rooms in turn", None, &[PEOPLE_WORDS]).await;
+        self.detached(LAUNCHER_UNIT, "Rooms in turn", &[PEOPLE_WORDS]).await;
 
         for agent in self.recollectors().await.map_err(|why| why.to_string())? {
           self
             .detached(
               &sort_unit(&agent),
-              PEOPLE_KIND,
               "Sorting the person book",
-              Some(&agent),
               &[PEOPLE_WORDS, "--sort", "--all", "--agent", &agent],
             )
             .await;
@@ -222,7 +198,7 @@ impl Launches<'_> {
     let unit = room_digest_unit(chat_id);
     let title = self.room_name(chat_id).await?;
     let chat = chat_id.to_string();
-    let launch = self.launch(&unit, MEMO_KIND, &title, None, &[MEMO_WORDS, "--chat", &chat]).await?;
+    let launch = self.launch(&unit, &title, &[MEMO_WORDS, "--chat", &chat]).await;
 
     Ok(match launch.outcome {
       LaunchOutcome::Launched => RoomDigest::Launched(unit),
@@ -244,30 +220,26 @@ impl Launches<'_> {
     let chat = chat_id.to_string();
     let words = [PEOPLE_WORDS, "--chat", &chat, "--agent", agent];
 
-    match self.launch(&unit, PEOPLE_KIND, &title, Some(agent), &words).await {
-      Ok(Launch {
+    match self.launch(&unit, &title, &words).await {
+      Launch {
         outcome: LaunchOutcome::Launched,
         ..
-      }) => BeforeFold::Launched(unit),
-      Ok(Launch {
+      } => BeforeFold::Launched(unit),
+      Launch {
         outcome: LaunchOutcome::Running,
         ..
-      }) => BeforeFold::Running(unit),
-      Ok(Launch { why, .. }) => {
+      } => BeforeFold::Running(unit),
+      Launch { why, .. } => {
         let why = why.unwrap_or_default();
 
         eprintln!("{unit} launch failed: {why}");
         BeforeFold::Refused(why)
       }
-      Err(why) => {
-        eprintln!("{unit} launch failed: {why}");
-        BeforeFold::Refused(why.to_string())
-      }
     }
   }
 
   /// One agent's book of one room written in its own unit: a room with a whole batch or more waiting worked until
-  /// its backlog is gone. A run of it already standing is taken as started; the agency's refusal is answered.
+  /// its backlog is gone. A run of it already standing is taken as started; a refusal is answered.
   pub async fn people_worker(
     &self,
     unit: &str,
@@ -283,27 +255,28 @@ impl Launches<'_> {
       words.push("--all");
     }
 
-    match self.launch(unit, PEOPLE_KIND, &title, Some(agent), &words).await {
-      Ok(Launch {
+    match self.launch(unit, &title, &words).await {
+      Launch {
         outcome: LaunchOutcome::Refused,
         why,
-      }) => Err(why.unwrap_or_default()),
-      Ok(_) => Ok(()),
-      Err(why) => Err(why.to_string()),
+      } => Err(why.unwrap_or_default()),
+      _ => Ok(()),
     }
   }
 
-  // The units of these a run stands under; where the agency could not say, none.
+  // The units of these a run stands under, as the agency's alive says; where nobody could say, or the agency could
+  // not be asked, every one, so nothing is launched beside a run that may stand.
   async fn held(&self, units: &[String]) -> HashSet<String> {
     if units.is_empty() {
       return HashSet::new();
     }
 
-    match self.ground.agency.units_running(units).await {
-      Ok(running) => running.into_iter().collect(),
+    match self.ground.agency.alive(units).await {
+      Ok(Some(alive)) => alive.into_iter().collect(),
+      Ok(None) => units.iter().cloned().collect(),
       Err(why) => {
         eprintln!("brain: which runs stand could not be read: {why}");
-        HashSet::new()
+        units.iter().cloned().collect()
       }
     }
   }
@@ -366,7 +339,7 @@ impl Launches<'_> {
   }
 
   // One watch put in a run of its own: the unit it runs under and the moment it was armed written on the watch,
-  // then the run. A launch the agency refuses leaves the watch standing for a later pass.
+  // then the run. A launch refused leaves the watch standing for a later pass.
   async fn launch_watch(&self, watch: &Standing, now_ms: i64) -> Result<bool, Failure> {
     let unit = watch_unit(watch.id, now_ms);
     let armed = run(
@@ -382,10 +355,10 @@ impl Launches<'_> {
 
     let title = format!("{} watch #{}", self.room_name(watch.chat_id).await?, watch.id);
     let id = watch.id.to_string();
-    let launch = self.launch(&unit, WATCH_KIND, &title, None, &[WATCH_WORDS, &id, &unit]).await?;
+    let launch = self.launch(&unit, &title, &[WATCH_WORDS, &id, &unit]).await;
 
     if launch.outcome == LaunchOutcome::Refused {
-      eprintln!("failed to launch {unit}: the agency refused ({})", launch.why.unwrap_or_default());
+      eprintln!("failed to launch {unit}: {}", launch.why.unwrap_or_default());
       return Ok(false);
     }
 

@@ -1,13 +1,21 @@
-//! An editor's run as the agency keeps it (`docs/boundary-api.md`, 「The agency」): which batch it is of how
-//! many, and the clock the brain keeps on its session, asking the agency before it cuts the session at its
-//! cap.
+//! An editor's run as the agency carries it (`docs/boundary-api.md`, 「The agency」): which batch it is of how many,
+//! its turn on the work key's editor session — asked again while the session carries another — and the brain's
+//! watch on it past its cap. The run's clock is the agency's; past the cap the brain reads it, and stops the run
+//! only where no bound, keep or open ask stands on it.
 
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+use tokio::sync::oneshot;
 use tokio::time::Instant;
 
 use crate::Failure;
-use crate::ports::agency::{Agency, Overrun, SessionEnd};
+use crate::ports::agency::{Agency, EditorTurn, TurnEnd, TurnFault};
+
+/// How long a turn met by a session carrying another waits before it is asked again.
+pub const BUSY_AGAIN: Duration = Duration::from_secs(5);
+
+// How soon the cap is looked at again where it passed before the run said what it goes out as.
+const NOT_YET_STARTED: Duration = Duration::from_secs(1);
 
 /// Which batch a run is, of how many.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -16,63 +24,101 @@ pub struct Step {
   pub steps: i64,
 }
 
-/// A session's end, and whether the clock cut it there.
-#[derive(Debug, Clone, PartialEq)]
-pub struct Waited {
-  pub end: SessionEnd,
+/// A turn's end, and whether the brain stopped it at its cap.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Turned {
+  pub end: TurnEnd,
   pub cut: bool,
+}
+
+/// Why a run cut at its cap failed, as a person reads it.
+pub fn cut_at(cap_seconds: i64) -> String {
+  format!(
+    "The model run went past its {}-minute limit and was stopped.",
+    (cap_seconds as f64 / 60.0).round()
+  )
 }
 
 fn seconds(seconds: i64) -> Duration {
   Duration::from_secs(u64::try_from(seconds).unwrap_or(0))
 }
 
-// The moment a Unix time stands for on the clock the waits run on.
-fn instant_of(unix: i64) -> Instant {
-  let now = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |since| since.as_secs());
-  let ahead = u64::try_from(unix).unwrap_or(0).saturating_sub(now);
-
-  Instant::now() + Duration::from_secs(ahead)
+fn unix_now() -> i64 {
+  SystemTime::now()
+    .duration_since(UNIX_EPOCH)
+    .map_or(0, |since| i64::try_from(since.as_secs()).unwrap_or(0))
 }
 
-/// A run's session waited out under its clock: once it passes its cap the agency is asked whether it is kept
-/// going, the ask naming the unit the batch runs in, or the run where it runs in none. Kept, the ask is made
-/// again at the moment the answer names, or one cap later where it names none; not kept, or where the ask
-/// has no answer, the session is stopped and waited for to its end.
-pub async fn wait(
-  agency: &dyn Agency,
-  run: &str,
-  unit: Option<&str>,
-  cap_seconds: i64,
-) -> Result<Waited, Failure> {
-  let clock = unit.unwrap_or(run);
-  let ended = agency.wait_session(run);
-  let mut look_at = Instant::now() + seconds(cap_seconds);
+// The moment a Unix time stands for on the clock the waits run on.
+fn instant_of(unix: i64) -> Instant {
+  Instant::now() + seconds(unix.saturating_sub(unix_now()))
+}
 
-  tokio::pin!(ended);
+/// One turn of a work key's editor session carried to its end: the session opened, the turn asked again every
+/// little while the session carries another, and the run watched past its cap. The clock is read by the unit the
+/// batch runs in, or by the run where it runs in none.
+pub async fn turn(
+  agency: &dyn Agency,
+  work_key: &str,
+  mut asked: EditorTurn,
+  cap_seconds: i64,
+) -> Result<Turned, Failure> {
+  asked.session = agency.editor_session(work_key).await?;
+
+  loop {
+    match watched(agency, &asked, cap_seconds).await {
+      Err(TurnFault::Busy) => tokio::time::sleep(BUSY_AGAIN).await,
+      Err(TurnFault::Failed(why)) => return Err(why.into()),
+      Ok(turned) => return Ok(turned),
+    }
+  }
+}
+
+// The turn carried while the cap is watched: past it, the run's clock is read, and where no bound, keep or open ask
+// stands on it any longer the run is stopped and its end waited for.
+async fn watched(agency: &dyn Agency, asked: &EditorTurn, cap_seconds: i64) -> Result<Turned, TurnFault> {
+  let (started, mut heard) = oneshot::channel();
+  let carried = agency.editor_turn(asked, started);
+  let mut run: Option<String> = None;
+  let mut listening = true;
+  let mut cut = false;
+  let look = tokio::time::sleep(seconds(cap_seconds));
+
+  tokio::pin!(carried);
+  tokio::pin!(look);
 
   loop {
     tokio::select! {
-      end = &mut ended => return Ok(Waited { end: end?, cut: false }),
-      () = tokio::time::sleep_until(look_at) => {
-        match agency.ask_overrun(run, clock, cap_seconds).await {
-          Ok(Overrun { keep: true, until }) => {
-            look_at = until.map_or_else(|| Instant::now() + seconds(cap_seconds), instant_of);
+      end = &mut carried => return end.map(|end| Turned { end, cut }),
+      began = &mut heard, if listening => {
+        listening = false;
+        run = began.ok();
+      }
+      () = &mut look, if !cut => {
+        let Some(going) = run.clone() else {
+          look.as_mut().reset(Instant::now() + NOT_YET_STARTED);
+          continue;
+        };
+        let name = asked.parent.as_deref().unwrap_or(&going);
+
+        match agency.run_clock(name).await {
+          Ok(clock) => {
+            let later = clock.kept_until.unwrap_or(0).max(clock.cap_ends.unwrap_or(0));
+
+            if later > unix_now() {
+              look.as_mut().reset(instant_of(later));
+              continue;
+            }
           }
-          Ok(_) => break,
-          Err(why) => {
-            eprintln!("{run}: the overrun ask had no answer, so the run is cut at its cap: {why}");
-            break;
-          }
+          Err(why) => eprintln!("{going}: its clock could not be read, so it is cut at its cap: {why}"),
         }
+
+        if let Err(why) = agency.stop_run(&going, &cut_at(cap_seconds)).await {
+          eprintln!("{going}: the run could not be stopped at its cap: {why}");
+        }
+
+        cut = true;
       }
     }
   }
-
-  agency.stop_session(run).await?;
-
-  Ok(Waited {
-    end: ended.await?,
-    cut: true,
-  })
 }

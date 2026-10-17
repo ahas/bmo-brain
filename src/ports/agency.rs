@@ -1,136 +1,140 @@
-//! The agency port: the registrations, the recollector sessions and the work keys they run on, a job's run, its
-//! clock keep and items, the rulebooks every document writer shares, the units launched and the notices handed to
-//! an agent (`docs/boundary-api.md`, 「The agency」).
+//! The agency port: the registrations, the editor sessions the recollector runs go out as and the event stream
+//! their turns end on, a run's stop, its clock and the cap a run is given, which names are alive, the rest, the
+//! rulebooks every document writer shares and the documents that moved (`docs/boundary-api.md`, 「The agency」).
+//!
+//! Where the agency serves no route yet for what the brain needs of it, the client answers the nearest behaviour
+//! that table states without making a call, so the brain stands with what is served now.
 
+use futures_util::StreamExt;
 use futures_util::future::BoxFuture;
 use serde::{Deserialize, Serialize};
+use sse_stream::SseStream;
+use tokio::sync::oneshot;
 
-use crate::ports::http::{Caller, Done, Peer, PortFailure};
+use crate::ports::http::{Caller, Peer, PortFailure};
 
-/// One agent's registration.
+/// The cap an editor run is given while the agency serves no editor-cap read: the bound its `docs/agent-control.md`
+/// gives an editor run, thirty minutes.
+pub const EDITOR_CAP_SECONDS: i64 = 30 * 60;
+
+/// How long after its turn was answered the brain still waits for the turn's end on the event stream.
+pub const END_GRACE: std::time::Duration = std::time::Duration::from_secs(10);
+
+/// One agent as the agency lists it. Its name is its registration key; an agent listed with no brain folder keeps
+/// no long-term memory.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Registration {
   pub name: String,
+  #[serde(default)]
   pub label: Option<String>,
-  pub key: String,
-  pub brain_folder: String,
+  #[serde(default)]
+  pub brain_folder: Option<String>,
+  /// An agent listed without saying is taken as awake: the agency lists the agents it stands.
+  #[serde(default = "listed_awake")]
   pub awake: bool,
+  #[serde(default)]
   pub recollector_registration: Option<String>,
-  pub reasoning: Option<String>,
 }
 
-/// A recollector session to start.
+fn listed_awake() -> bool {
+  true
+}
+
+/// One turn of an editor work key's session: the session and the prompt, and the run's parts.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct SessionStart {
-  pub work_key: String,
+pub struct EditorTurn {
+  pub session: String,
+  pub prompt: String,
+  /// The name the brain gives the run.
+  pub run: String,
+  /// The unit the batch runs in, or none.
+  pub parent: Option<String>,
+  /// The agent whose memory the run writes.
   pub agent: String,
   pub chat_id: i64,
-  /// The unit the batch runs in, or none where it runs in none.
-  pub unit: Option<String>,
-  pub cap_seconds: i64,
   /// Which batch it is, and of how many, or none for a run that is no batch of a planned run.
   pub step: Option<i64>,
   pub steps: Option<i64>,
-  pub prompt: String,
-  pub tools: Vec<String>,
+  /// The agent's brain folder, relative to the brain root: empty for the root.
   pub workdir: String,
   pub desk: String,
+  /// The registration the agent's recollectors run on, or none for the key's own road.
   pub registration: Option<String>,
 }
 
-/// How a recollector session ended.
+/// How a turn ended.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
-pub enum Outcome {
+pub enum TurnOutcome {
   Answered,
-  Failed,
-  Overran,
+  /// The program waits on a person, so the turn gave no answer.
+  Blocked,
   Stopped,
-  /// The session reached a usage limit; the agency has rested its login.
-  Limit,
+  Failed,
 }
 
-/// A recollector session's end.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SessionEnd {
-  pub outcome: Outcome,
+/// A turn's end, as the agency publishes it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TurnEnd {
+  /// The run the turn went out as.
+  pub run: String,
+  pub outcome: TurnOutcome,
+  #[serde(default)]
   pub answer: Option<String>,
-  pub files_written: Vec<String>,
-  pub cost: Option<f64>,
-  pub size: Option<i64>,
+  #[serde(default)]
+  pub reason: Option<String>,
 }
 
-/// An overrun ask's answer: whether the run is kept going, and until when.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+/// Why a turn came to no end.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TurnFault {
+  /// The session carries a turn already, so this one was not taken.
+  Busy,
+  /// The call did not come to the turn's end.
+  Failed(PortFailure),
+}
+
+impl From<PortFailure> for TurnFault {
+  fn from(failure: PortFailure) -> Self {
+    Self::Failed(failure)
+  }
+}
+
+/// A run's clock, by its name or the name it runs under: when its bound runs out, and until when a keep or an open
+/// ask on it stands. Each is none where none stands.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct Overrun {
-  pub keep: bool,
+pub struct RunClock {
+  pub cap_ends: Option<i64>,
+  pub kept_until: Option<i64>,
+}
+
+/// Whether the deployment rests, until when, and why.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Rest {
+  pub resting: bool,
+  #[serde(default)]
   pub until: Option<i64>,
-}
-
-/// A work key's cap and reasoning, for one agent.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct WorkKey {
-  pub cap_seconds: i64,
-  pub reasoning: Option<String>,
-}
-
-/// One item's state.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ItemState {
-  pub item: i64,
-  pub finished: bool,
-}
-
-/// What came of a unit launch.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "kebab-case")]
-pub enum LaunchOutcome {
-  Launched,
-  Running,
-  Refused,
-}
-
-/// A run to start apart in a unit of its own: the unit, the work it does, what the live picture calls it, the agent
-/// it works for where it works for one, and its command's words in order.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct UnitLaunch {
-  pub unit: String,
-  pub kind: String,
-  pub title: String,
-  pub agent: Option<String>,
-  pub command: Vec<String>,
-}
-
-/// A unit launch's answer.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Launch {
-  pub outcome: LaunchOutcome,
-  pub why: Option<String>,
-}
-
-/// A quiet instruction handed to an agent in a room.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct QuietInstruction {
-  pub agent: String,
-  pub chat_id: i64,
-  pub text: String,
+  /// `limit` or `outage`.
+  #[serde(default)]
   pub kind: Option<String>,
 }
 
-/// The documents an agent should read again, and the rooms they bear on.
+impl Rest {
+  /// Whether the rest stands for a usage limit.
+  pub fn for_limit(&self) -> bool {
+    self.resting && self.kind.as_deref() == Some("limit")
+  }
+}
+
+/// The documents an agent's sessions should read again, and the rooms they bear on.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Reload {
   pub agent: String,
+  /// Relative to the brain root.
   pub paths: Vec<String>,
   pub rooms: Vec<i64>,
 }
@@ -151,59 +155,37 @@ pub trait Agency: Send + Sync {
     agent: Option<&'a str>,
   ) -> BoxFuture<'a, Result<Vec<Registration>, PortFailure>>;
 
-  /// Starts a recollector session and answers its run.
-  fn start_session<'a>(&'a self, start: &'a SessionStart) -> BoxFuture<'a, Result<String, PortFailure>>;
+  /// The editor session of a work key, as its id.
+  fn editor_session<'a>(&'a self, work_key: &'a str) -> BoxFuture<'a, Result<String, PortFailure>>;
 
-  /// Waits for a run's session to end.
-  fn wait_session<'a>(&'a self, run: &'a str) -> BoxFuture<'a, Result<SessionEnd, PortFailure>>;
-
-  /// Stops a run's session.
-  fn stop_session<'a>(&'a self, run: &'a str) -> BoxFuture<'a, Result<bool, PortFailure>>;
-
-  /// Asks whether a run past its cap is kept going.
-  fn ask_overrun<'a>(
+  /// One turn carried to its end: the run it goes out as handed to `started` once the turn has started, and its
+  /// end answered.
+  fn editor_turn<'a>(
     &'a self,
-    run: &'a str,
-    unit: &'a str,
-    cap_seconds: i64,
-  ) -> BoxFuture<'a, Result<Overrun, PortFailure>>;
+    turn: &'a EditorTurn,
+    started: oneshot::Sender<String>,
+  ) -> BoxFuture<'a, Result<TurnEnd, TurnFault>>;
 
-  /// Whether a job's run still stands.
-  fn run_open<'a>(&'a self, run: &'a str) -> BoxFuture<'a, Result<bool, PortFailure>>;
+  /// A run stopped, with why.
+  fn stop_run<'a>(&'a self, run: &'a str, reason: &'a str) -> BoxFuture<'a, Result<bool, PortFailure>>;
 
-  /// The moment the open overrun ask on a run or unit stands until, or none where none stands open.
-  fn kept_until<'a>(&'a self, run: &'a str) -> BoxFuture<'a, Result<Option<i64>, PortFailure>>;
+  /// The clock of the run of that name, or of the runs under it.
+  fn run_clock<'a>(&'a self, name: &'a str) -> BoxFuture<'a, Result<RunClock, PortFailure>>;
 
-  /// The moment the open session started under a unit runs out of its cap, the latest where several stand, or
-  /// none where none stands.
-  fn cap_ends<'a>(&'a self, unit: &'a str) -> BoxFuture<'a, Result<Option<i64>, PortFailure>>;
+  /// The cap a run of a work key carries for an agent, in seconds.
+  fn editor_cap<'a>(&'a self, work_key: &'a str, agent: &'a str)
+  -> BoxFuture<'a, Result<i64, PortFailure>>;
 
-  /// The named rulebooks, in the order asked.
+  /// Those of the names a unit, an open execution or a pane's run holds, or none where nobody could say.
+  fn alive<'a>(&'a self, names: &'a [String]) -> BoxFuture<'a, Result<Option<Vec<String>>, PortFailure>>;
+
+  /// Whether the deployment rests.
+  fn rest(&self) -> BoxFuture<'_, Result<Rest, PortFailure>>;
+
+  /// Those of the named rulebooks the agency hands over, in the order asked.
   fn rulebooks<'a>(&'a self, names: &'a [&'a str]) -> BoxFuture<'a, Result<Vec<Rulebook>, PortFailure>>;
 
-  /// A work key's cap and reasoning for an agent.
-  fn work_key<'a>(
-    &'a self,
-    work_key: &'a str,
-    agent: &'a str,
-  ) -> BoxFuture<'a, Result<WorkKey, PortFailure>>;
-
-  /// Whether each item is finished.
-  fn item_states<'a>(&'a self, items: &'a [i64]) -> BoxFuture<'a, Result<Vec<ItemState>, PortFailure>>;
-
-  /// Launches a unit running a command.
-  fn launch_unit<'a>(&'a self, launch: &'a UnitLaunch) -> BoxFuture<'a, Result<Launch, PortFailure>>;
-
-  /// Those of the units a run stands under.
-  fn units_running<'a>(&'a self, units: &'a [String]) -> BoxFuture<'a, Result<Vec<String>, PortFailure>>;
-
-  /// Hands an agent a quiet instruction for a room.
-  fn quiet_instruction<'a>(
-    &'a self,
-    instruction: &'a QuietInstruction,
-  ) -> BoxFuture<'a, Result<bool, PortFailure>>;
-
-  /// Tells an agent that documents changed.
+  /// Tells the agency which documents moved.
   fn reload_documents<'a>(&'a self, reload: &'a Reload) -> BoxFuture<'a, Result<bool, PortFailure>>;
 }
 
@@ -221,11 +203,87 @@ impl HttpAgency {
   pub fn with_caller(caller: Caller) -> Self {
     Self { caller }
   }
-}
 
-#[derive(Serialize)]
-struct AgentAsk<'a> {
-  agent: Option<&'a str>,
+  // The turn posted while its events are read off the stream opened before it: the run it went out as handed on
+  // once it started, and its end answered.
+  async fn carried(
+    &self,
+    turn: &EditorTurn,
+    started: oneshot::Sender<String>,
+  ) -> Result<TurnEnd, TurnFault> {
+    let stream = self.caller.open("/events", &[("kinds", "turn-started,turn-ended")]).await?;
+    let mut events = std::pin::pin!(SseStream::from_bytes_stream(stream.bytes_stream()));
+    let posted = self.caller.post::<Delivered>("/session/turn", turn);
+    let mut posted = std::pin::pin!(posted);
+    let mut started = Some(started);
+    let mut run: Option<String> = None;
+    let mut delivered: Option<Delivery> = None;
+    let mut grace = std::pin::pin!(tokio::time::sleep(std::time::Duration::MAX / 4));
+    let events_url = self.caller.url("/events");
+
+    loop {
+      tokio::select! {
+        answer = &mut posted, if delivered.is_none() => match answer {
+          Ok(answer) => {
+            delivered = Some(answer.delivery);
+            grace.as_mut().reset(tokio::time::Instant::now() + END_GRACE);
+          }
+          Err(PortFailure::Answered { answer: Some(error), .. }) if error.code == "session-busy" => {
+            return Err(TurnFault::Busy);
+          }
+          Err(failure) => return Err(failure.into()),
+        },
+        event = events.next() => {
+          let event = match event {
+            Some(Ok(event)) => event,
+            Some(Err(why)) => {
+              return Err(TurnFault::Failed(PortFailure::Transport { url: events_url, why: why.to_string() }));
+            }
+            None => {
+              return Err(TurnFault::Failed(PortFailure::Transport {
+                url: events_url,
+                why: "the event stream ended before the turn did".to_owned(),
+              }));
+            }
+          };
+          let Some(data) = event.data.as_deref() else { continue };
+
+          match event.event.as_deref() {
+            Some("turn-started") => {
+              let Ok(begun) = serde_json::from_str::<Begun>(data) else { continue };
+
+              if run.is_none() && (begun.run == turn.run || begun.session == turn.session) {
+                if let Some(started) = started.take() {
+                  let _ = started.send(begun.run.clone());
+                }
+                run = Some(begun.run);
+              }
+            }
+            Some("turn-ended") => {
+              let Ok(ended) = serde_json::from_str::<Ended>(data) else { continue };
+              let ours = ended.end.run == turn.run
+                || run.as_deref() == Some(ended.end.run.as_str())
+                || (run.is_none() && ended.session == turn.session);
+
+              if ours {
+                return Ok(ended.end);
+              }
+            }
+            _ => {}
+          }
+        }
+        () = &mut grace, if delivered.is_some() => {
+          return match (delivered, run) {
+            (Some(Delivery::Blocked), Some(run)) => Ok(TurnEnd { run, outcome: TurnOutcome::Blocked, answer: None, reason: None }),
+            _ => Err(TurnFault::Failed(PortFailure::Transport {
+              url: events_url,
+              why: "the turn was answered but its end never came on the event stream".to_owned(),
+            })),
+          };
+        }
+      }
+    }
+  }
 }
 
 #[derive(Deserialize)]
@@ -234,73 +292,81 @@ struct Agents {
 }
 
 #[derive(Serialize)]
-struct RunAsk<'a> {
-  run: &'a str,
+struct Scope {
+  kind: &'static str,
 }
 
 #[derive(Serialize)]
-struct UnitAsk<'a> {
-  unit: &'a str,
+struct SessionAsk<'a> {
+  agent: &'a str,
+  scope: Scope,
 }
 
 #[derive(Deserialize)]
-struct Started {
+struct Session {
+  id: String,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+enum Delivery {
+  Taken,
+  Blocked,
+}
+
+#[derive(Deserialize)]
+struct Delivered {
+  delivery: Delivery,
+}
+
+#[derive(Deserialize)]
+struct Begun {
+  session: String,
   run: String,
 }
 
+#[derive(Deserialize)]
+struct Ended {
+  session: String,
+  #[serde(flatten)]
+  end: TurnEnd,
+}
+
 #[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct OverrunAsk<'a> {
+struct StopAsk<'a> {
   run: &'a str,
-  unit: &'a str,
-  cap_seconds: i64,
+  reason: &'a str,
 }
 
 #[derive(Deserialize)]
-struct Open {
-  open: bool,
-}
-
-#[derive(Deserialize)]
-struct Kept {
-  until: Option<i64>,
+struct Stopped {
+  ok: bool,
 }
 
 #[derive(Serialize)]
-struct RulebooksAsk<'a> {
-  names: &'a [&'a str],
+struct NamesAsk<'a> {
+  names: &'a [String],
 }
 
 #[derive(Deserialize)]
-struct Rulebooks {
-  rulebooks: Vec<Rulebook>,
+struct Alive {
+  answered: bool,
+  #[serde(default)]
+  alive: Option<Vec<String>>,
 }
 
 #[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct WorkKeyAsk<'a> {
-  work_key: &'a str,
+struct ReloadAsk<'a> {
+  paths: &'a [String],
+  now: bool,
   agent: &'a str,
-}
-
-#[derive(Serialize)]
-struct ItemsAsk<'a> {
-  items: &'a [i64],
+  rooms: &'a [i64],
 }
 
 #[derive(Deserialize)]
-struct Items {
-  items: Vec<ItemState>,
-}
-
-#[derive(Serialize)]
-struct UnitsAsk<'a> {
-  units: &'a [String],
-}
-
-#[derive(Deserialize)]
-struct Running {
-  running: Vec<String>,
+struct Reloaded {
+  #[allow(dead_code)]
+  paths: Vec<String>,
 }
 
 impl Agency for HttpAgency {
@@ -309,116 +375,88 @@ impl Agency for HttpAgency {
     agent: Option<&'a str>,
   ) -> BoxFuture<'a, Result<Vec<Registration>, PortFailure>> {
     Box::pin(async move {
-      let answer: Agents = self.caller.post("/registrations/lookup", &AgentAsk { agent }).await?;
-      Ok(answer.agents)
+      let answer: Agents = self.caller.get("/agents", &[]).await?;
+
+      Ok(
+        answer
+          .agents
+          .into_iter()
+          .filter(|known| agent.is_none_or(|agent| known.name == agent))
+          .collect(),
+      )
     })
   }
 
-  fn start_session<'a>(&'a self, start: &'a SessionStart) -> BoxFuture<'a, Result<String, PortFailure>> {
+  fn editor_session<'a>(&'a self, work_key: &'a str) -> BoxFuture<'a, Result<String, PortFailure>> {
     Box::pin(async move {
-      let answer: Started = self.caller.post("/runs/start", start).await?;
-      Ok(answer.run)
-    })
-  }
-
-  fn wait_session<'a>(&'a self, run: &'a str) -> BoxFuture<'a, Result<SessionEnd, PortFailure>> {
-    Box::pin(async move { self.caller.post("/runs/wait", &RunAsk { run }).await })
-  }
-
-  fn stop_session<'a>(&'a self, run: &'a str) -> BoxFuture<'a, Result<bool, PortFailure>> {
-    Box::pin(async move {
-      let answer: Done = self.caller.post("/runs/stop", &RunAsk { run }).await?;
-      Ok(answer.ok)
-    })
-  }
-
-  fn ask_overrun<'a>(
-    &'a self,
-    run: &'a str,
-    unit: &'a str,
-    cap_seconds: i64,
-  ) -> BoxFuture<'a, Result<Overrun, PortFailure>> {
-    Box::pin(async move {
-      let ask = OverrunAsk {
-        run,
-        unit,
-        cap_seconds,
+      let ask = SessionAsk {
+        agent: work_key,
+        scope: Scope { kind: "editor" },
       };
-      self.caller.post("/runs/overrun", &ask).await
+      let session: Session = self.caller.post("/session/start", &ask).await?;
+
+      Ok(session.id)
     })
   }
 
-  fn run_open<'a>(&'a self, run: &'a str) -> BoxFuture<'a, Result<bool, PortFailure>> {
-    Box::pin(async move {
-      let answer: Open = self.caller.post("/runs/open", &RunAsk { run }).await?;
-      Ok(answer.open)
-    })
-  }
-
-  fn kept_until<'a>(&'a self, run: &'a str) -> BoxFuture<'a, Result<Option<i64>, PortFailure>> {
-    Box::pin(async move {
-      let answer: Kept = self.caller.post("/runs/kept-until", &RunAsk { run }).await?;
-      Ok(answer.until)
-    })
-  }
-
-  fn cap_ends<'a>(&'a self, unit: &'a str) -> BoxFuture<'a, Result<Option<i64>, PortFailure>> {
-    Box::pin(async move {
-      let answer: Kept = self.caller.post("/runs/cap-ends", &UnitAsk { unit }).await?;
-      Ok(answer.until)
-    })
-  }
-
-  fn rulebooks<'a>(&'a self, names: &'a [&'a str]) -> BoxFuture<'a, Result<Vec<Rulebook>, PortFailure>> {
-    Box::pin(async move {
-      let answer: Rulebooks = self.caller.post("/rulebooks/read", &RulebooksAsk { names }).await?;
-      Ok(answer.rulebooks)
-    })
-  }
-
-  fn work_key<'a>(
+  fn editor_turn<'a>(
     &'a self,
-    work_key: &'a str,
-    agent: &'a str,
-  ) -> BoxFuture<'a, Result<WorkKey, PortFailure>> {
-    Box::pin(async move {
-      let ask = WorkKeyAsk { work_key, agent };
-      self.caller.post("/work-keys/read", &ask).await
-    })
+    turn: &'a EditorTurn,
+    started: oneshot::Sender<String>,
+  ) -> BoxFuture<'a, Result<TurnEnd, TurnFault>> {
+    Box::pin(self.carried(turn, started))
   }
 
-  fn item_states<'a>(&'a self, items: &'a [i64]) -> BoxFuture<'a, Result<Vec<ItemState>, PortFailure>> {
+  fn stop_run<'a>(&'a self, run: &'a str, reason: &'a str) -> BoxFuture<'a, Result<bool, PortFailure>> {
     Box::pin(async move {
-      let answer: Items = self.caller.post("/items/states", &ItemsAsk { items }).await?;
-      Ok(answer.items)
-    })
-  }
+      let answer: Stopped = self.caller.post("/runs/stop", &StopAsk { run, reason }).await?;
 
-  fn launch_unit<'a>(&'a self, launch: &'a UnitLaunch) -> BoxFuture<'a, Result<Launch, PortFailure>> {
-    Box::pin(async move { self.caller.post("/units/launch", launch).await })
-  }
-
-  fn units_running<'a>(&'a self, units: &'a [String]) -> BoxFuture<'a, Result<Vec<String>, PortFailure>> {
-    Box::pin(async move {
-      let answer: Running = self.caller.post("/units/running", &UnitsAsk { units }).await?;
-      Ok(answer.running)
-    })
-  }
-
-  fn quiet_instruction<'a>(
-    &'a self,
-    instruction: &'a QuietInstruction,
-  ) -> BoxFuture<'a, Result<bool, PortFailure>> {
-    Box::pin(async move {
-      let answer: Done = self.caller.post("/instructions/quiet", instruction).await?;
       Ok(answer.ok)
     })
+  }
+
+  /// No route is served for a run's clock yet (the brain's `docs/boundary-api.md`, 「The agency」), so no run is kept.
+  fn run_clock<'a>(&'a self, _name: &'a str) -> BoxFuture<'a, Result<RunClock, PortFailure>> {
+    Box::pin(async move { Ok(RunClock::default()) })
+  }
+
+  /// No route is served for an editor's cap yet, so it is the bound the agency documents for an editor run.
+  fn editor_cap<'a>(
+    &'a self,
+    _work_key: &'a str,
+    _agent: &'a str,
+  ) -> BoxFuture<'a, Result<i64, PortFailure>> {
+    Box::pin(async move { Ok(EDITOR_CAP_SECONDS) })
+  }
+
+  fn alive<'a>(&'a self, names: &'a [String]) -> BoxFuture<'a, Result<Option<Vec<String>>, PortFailure>> {
+    Box::pin(async move {
+      let answer: Alive = self.caller.post("/runs/alive", &NamesAsk { names }).await?;
+
+      Ok(answer.answered.then(|| answer.alive.unwrap_or_default()))
+    })
+  }
+
+  fn rest(&self) -> BoxFuture<'_, Result<Rest, PortFailure>> {
+    Box::pin(async move { self.caller.get("/rest", &[]).await })
+  }
+
+  /// No route is served for the rulebooks yet, so none is handed over.
+  fn rulebooks<'a>(&'a self, _names: &'a [&'a str]) -> BoxFuture<'a, Result<Vec<Rulebook>, PortFailure>> {
+    Box::pin(async move { Ok(vec![]) })
   }
 
   fn reload_documents<'a>(&'a self, reload: &'a Reload) -> BoxFuture<'a, Result<bool, PortFailure>> {
     Box::pin(async move {
-      let answer: Done = self.caller.post("/documents/reload", reload).await?;
-      Ok(answer.ok)
+      let ask = ReloadAsk {
+        paths: &reload.paths,
+        now: false,
+        agent: &reload.agent,
+        rooms: &reload.rooms,
+      };
+      let _: Reloaded = self.caller.post("/documents/reload", &ask).await?;
+
+      Ok(true)
     })
   }
 }

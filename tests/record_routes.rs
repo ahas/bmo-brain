@@ -5,8 +5,8 @@
 
 mod support;
 
-use bmo_brain::ports::agency::{Launch, LaunchOutcome};
 use bmo_brain::ports::receiver::{RoadKind, Roads, RoomTitle};
+use bmo_brain::schedules::apart::{Launch, LaunchOutcome};
 use chrono::{Duration, FixedOffset, Utc};
 use serde_json::{Map, Value, json};
 
@@ -126,9 +126,9 @@ impl Served {
   // The watches whose runs were launched, in order.
   fn launched(&self) -> Vec<i64> {
     self
-      .agency
+      .starter
       .calls
-      .of("launch_unit")
+      .of("start")
       .iter()
       .filter_map(|launch| {
         let words: Vec<&str> = launch["command"].as_array()?.iter().filter_map(Value::as_str).collect();
@@ -1020,7 +1020,7 @@ async fn a_watch_is_set_in_a_run_of_its_own_and_not_twice() {
   // The watch is armed under the unit its run was launched as.
   assert_eq!(
     api.text(&format!(r#"SELECT "unit" FROM "watches" WHERE "id" = {id}"#)).await,
-    api.agency.calls.of("launch_unit")[0]["unit"].as_str().map(str::to_owned)
+    api.starter.calls.of("start")[0]["unit"].as_str().map(str::to_owned)
   );
 
   let again = api.call("/watches/set", watch(Some("test  -e /tmp/never-there"), json!({}))).await;
@@ -1029,7 +1029,7 @@ async fn a_watch_is_set_in_a_run_of_its_own_and_not_twice() {
   assert_eq!(again.err, format!("already watching this as #{id}"));
 
   // A check whose run never came up ends its row, so nothing stands that nobody watches.
-  *api.agency.launch.lock().unwrap() = Some(Launch {
+  *api.starter.answer.lock().unwrap() = Some(Launch {
     outcome: LaunchOutcome::Refused,
     why: Some("the unit could not start".to_owned()),
   });

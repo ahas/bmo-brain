@@ -15,7 +15,7 @@ use bmo_brain::editors::people::prompts::SUCCESS_MARKER;
 use bmo_brain::editors::people::rooms::{recorded_day, sheet_names};
 use bmo_brain::editors::people::{PeopleDigest, chats_to_digest, sort_unit, worker_unit};
 use bmo_brain::editors::recollection::recollection_for;
-use bmo_brain::ports::agency::Outcome;
+use bmo_brain::ports::agency::TurnOutcome;
 use fragment_desk::desk::Beside;
 use serde_json::json;
 
@@ -151,7 +151,7 @@ async fn a_rooms_messages_are_folded_in_marked_sorted_committed_and_announced() 
   let stage = talked().await;
 
   stage.sessions_write(vec![(PIECE.to_owned(), BODY.to_owned())], vec![row_write(PIECE, TITLE, &[])]);
-  stage.sessions_end(&[(Outcome::Answered, Some(&format!("Wrote the book.\n{SUCCESS_MARKER}")))]);
+  stage.sessions_end(&[(TurnOutcome::Answered, Some(&format!("Wrote the book.\n{SUCCESS_MARKER}")))]);
   stage.gate.sheets.lock().unwrap().push_back(Some(SHEET.to_owned()));
 
   let failed = digest(&stage).await.digest_chat(ROOM, Duration::ZERO).await.unwrap();
@@ -159,11 +159,15 @@ async fn a_rooms_messages_are_folded_in_marked_sorted_committed_and_announced() 
   assert!(!failed);
 
   // One planned batch of the twelve, on the person-book key, told which batch it is.
-  let starts = stage.agency.calls.of("start_session");
+  let starts = stage.agency.calls.of("editor_turn");
 
   assert_eq!(starts.len(), 1);
   assert_eq!(
-    (starts[0]["workKey"].clone(), starts[0]["step"].clone(), starts[0]["steps"].clone()),
+    (
+      stage.agency.calls.of("editor_session")[0]["agent"].clone(),
+      starts[0]["step"].clone(),
+      starts[0]["steps"].clone()
+    ),
     (json!("people-digest"), json!(1), json!(1))
   );
   assert!(
@@ -209,15 +213,15 @@ async fn a_batch_that_fails_three_times_is_put_back_left_unmarked_and_told() {
 
   stage.sessions_write(vec![(PIECE.to_owned(), BODY.to_owned())], vec![row_write(PIECE, TITLE, &[])]);
   stage.sessions_end(&[
-    (Outcome::Answered, Some("Wrote it.")),
-    (Outcome::Failed, None),
-    (Outcome::Answered, Some("Done.")),
+    (TurnOutcome::Answered, Some("Wrote it.")),
+    (TurnOutcome::Failed, None),
+    (TurnOutcome::Answered, Some("Done.")),
   ]);
 
   let failed = digest(&stage).await.digest_chat(ROOM, Duration::ZERO).await.unwrap();
 
   assert!(failed);
-  assert_eq!(stage.agency.calls.of("start_session").len(), 3);
+  assert_eq!(stage.agency.calls.of("editor_turn").len(), 3);
   assert!(marked(&stage).is_empty());
   assert!(!stage.brain.path().join(PIECE).exists());
   assert!(store::rows(stage.scratch.db(), &of_kind("person-book")).await.unwrap().is_empty());
@@ -238,12 +242,12 @@ async fn a_usage_limit_stops_the_room_with_its_messages_unmarked_and_nobody_told
   let stage = talked().await;
 
   stage.sessions_write(vec![(PIECE.to_owned(), BODY.to_owned())], vec![]);
-  stage.sessions_end(&[(Outcome::Limit, None)]);
+  stage.agency.limited();
 
   let stopped = digest(&stage).await.digest_chat(ROOM, Duration::ZERO).await;
 
   assert!(matches!(stopped, Err(bmo_brain::editors::people::Stopped::Limit(_))));
-  assert_eq!(stage.agency.calls.of("start_session").len(), 1);
+  assert_eq!(stage.agency.calls.of("editor_turn").len(), 1);
   assert!(marked(&stage).is_empty());
   assert!(!stage.brain.path().join(PIECE).exists());
   assert!(stage.receiver.notices.lock().unwrap().is_empty());

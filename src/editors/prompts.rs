@@ -95,7 +95,8 @@ pub fn filled(template: &str, values: &[(&str, &str)]) -> String {
 
 /// A task an editor that writes the brain's pieces is handed: the editor's task document under the prompts
 /// folder with its marks filled, behind the rulebooks every such editor reads, each headed by its name. This
-/// repository's rulebooks are filled as the task is; the agency's go in as they are handed over.
+/// repository's rulebooks are filled as the task is; the agency's go in as they are handed over, and one the agency
+/// does not hand over is left out with its heading.
 pub async fn fragment_writer(
   prompts: Prompts<'_>,
   editor: &str,
@@ -109,14 +110,10 @@ pub async fn fragment_writer(
 
   for (name, agency) in RULEBOOKS {
     let text = if agency {
-      handed
-        .iter()
-        .find(|rulebook| rulebook.name == name)
-        .map(|rulebook| rulebook.text.trim().to_owned())
-        .ok_or_else(|| PromptFailure::Unread {
-          path: PathBuf::from(format!("rules/{name}.md")),
-          why: "the agency did not hand it over".to_owned(),
-        })?
+      match handed.iter().find(|rulebook| rulebook.name == name) {
+        Some(rulebook) => rulebook.text.trim().to_owned(),
+        None => continue,
+      }
     } else {
       filled(&read_required(&prompts.root.join("rules").join(format!("{name}.md")))?, values)
     };

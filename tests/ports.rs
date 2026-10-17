@@ -10,177 +10,94 @@ use std::time::Duration;
 
 use axum::http::StatusCode;
 use bmo_brain::ports::agency::{
-  Agency, HttpAgency, ItemState, LaunchOutcome, Outcome, Overrun, QuietInstruction, Reload, Rulebook,
-  SessionStart, UnitLaunch,
+  Agency, EDITOR_CAP_SECONDS, EditorTurn, HttpAgency, Registration, Reload, Rest, RunClock, TurnEnd,
+  TurnFault, TurnOutcome,
 };
 use bmo_brain::ports::gate::{Gate, HttpGate, Piece, Sanitised, SheetAsk, SheetPart};
 use bmo_brain::ports::http::{Caller, Patience, Peer, PortFailure, Wait, WireError};
+use bmo_brain::ports::job::{HttpJob, ItemState, Job};
 use bmo_brain::ports::receiver::{
-  HttpReceiver, OwnerNotice, OwnerSpoke, Receiver, Rest, RoadKind, RoomCount, RoomSince,
+  HttpReceiver, OwnerNotice, OwnerSpoke, QuietInstruction, Receiver, RoadKind, RoomCount, RoomSince,
 };
 use futures_util::future::BoxFuture;
 use serde_json::json;
 use support::agency::FakeAgency;
 use support::gate::FakeGate;
 use support::receiver::{FakeReceiver, message};
-use support::stub::Stub;
+use support::stub::{Stub, TOKEN};
 use support::{AGENT, MESSAGE, OTHER_AGENT, OWNER, ROOM};
+use tokio::sync::oneshot;
 
 #[tokio::test]
-async fn the_agency_client_posts_each_operation_and_reads_its_answer() {
+async fn the_agency_client_calls_each_route_as_the_agency_documents_it() {
   let stub = Stub::start().await;
   stub
     .answer(
-      "/registrations/lookup",
-      json!({ "agents": [{ "name": AGENT, "label": null, "key": "key-a", "brainFolder": "agents/agent-a",
-        "awake": true, "recollectorRegistration": "local", "reasoning": "high" }] }),
+      "/agents",
+      json!({ "agents": [
+        { "name": AGENT, "kind": "companion", "label": null, "brainFolder": "agents/agent-a", "awake": true,
+          "recollectorRegistration": "local" },
+        { "name": OTHER_AGENT, "kind": "worker", "label": "Other" },
+      ], "roles": [] }),
     )
-    .answer("/runs/start", json!({ "run": "run-7" }))
     .answer(
-      "/runs/wait",
-      json!({ "outcome": "limit", "answer": null, "filesWritten": ["people/1.md"], "cost": 0.5, "size": 900 }),
+      "/session/start",
+      json!({ "id": "people-digest@editor", "agent": "people-digest", "scope": { "kind": "editor" } }),
     )
     .answer("/runs/stop", json!({ "ok": true }))
-    .answer("/runs/overrun", json!({ "keep": true, "until": 1_700_000_600 }))
-    .answer("/runs/open", json!({ "open": false }))
-    .answer("/runs/kept-until", json!({ "until": 1_700_000_900 }))
-    .answer("/runs/cap-ends", json!({ "until": null }))
-    .answer(
-      "/rulebooks/read",
-      json!({ "rulebooks": [{ "name": "plain-writing", "text": "Write plainly." }] }),
-    )
-    .answer("/work-keys/read", json!({ "capSeconds": 1200, "reasoning": null }))
-    .answer("/items/states", json!({ "items": [{ "item": 3, "finished": true }, { "item": 4, "finished": false }] }))
-    .answer("/units/launch", json!({ "outcome": "refused", "why": "The unit is masked." }))
-    .answer("/units/running", json!({ "running": ["bmo-digest"] }))
-    .answer("/instructions/quiet", json!({ "ok": true }))
-    .answer("/documents/reload", json!({ "ok": true }));
+    .answer("/runs/alive", json!({ "answered": true, "alive": ["bmo-digest"] }))
+    .answer("/rest", json!({ "resting": true, "until": 1_700_003_600, "kind": "limit" }))
+    .answer("/documents/reload", json!({ "paths": ["knowledge/a.md"], "now": false }));
   let agency = HttpAgency::new(&stub.peer);
 
-  let known = agency.registrations(Some(AGENT)).await.unwrap();
-  assert_eq!(stub.body_at("/registrations/lookup"), json!({ "agent": AGENT }));
-  assert_eq!(known.len(), 1);
-  assert_eq!(known[0].brain_folder, "agents/agent-a");
-  assert_eq!(known[0].recollector_registration.as_deref(), Some("local"));
-
-  let start = SessionStart {
-    work_key: "people-digest".to_owned(),
-    agent: AGENT.to_owned(),
-    chat_id: ROOM,
-    unit: Some("brain-run".to_owned()),
-    cap_seconds: 1800,
-    step: Some(2),
-    steps: Some(5),
-    prompt: "Read the room.".to_owned(),
-    tools: vec!["fragment".to_owned()],
-    workdir: "agents/agent-a".to_owned(),
-    desk: "desk-1".to_owned(),
-    registration: None,
-  };
-  assert_eq!(agency.start_session(&start).await.unwrap(), "run-7");
+  let all = agency.registrations(None).await.unwrap();
+  assert_eq!(all.len(), 2);
+  assert_eq!(all[0].brain_folder.as_deref(), Some("agents/agent-a"));
+  assert_eq!(all[0].recollector_registration.as_deref(), Some("local"));
   assert_eq!(
-    stub.body_at("/runs/start"),
-    json!({ "workKey": "people-digest", "agent": AGENT, "chatId": ROOM, "unit": "brain-run",
-      "capSeconds": 1800, "step": 2, "steps": 5, "prompt": "Read the room.", "tools": ["fragment"],
-      "workdir": "agents/agent-a", "desk": "desk-1", "registration": null })
+    all[1],
+    Registration {
+      name: OTHER_AGENT.to_owned(),
+      label: Some("Other".to_owned()),
+      brain_folder: None,
+      awake: true,
+      recollector_registration: None,
+    },
+    "an agent listed with no brain folder keeps none, and is taken as awake"
+  );
+  let named = agency.registrations(Some(OTHER_AGENT)).await.unwrap();
+  assert_eq!(named.iter().map(|known| known.name.as_str()).collect::<Vec<_>>(), [OTHER_AGENT]);
+  let read: Vec<_> = stub.taken().into_iter().filter(|taken| taken.path == "/agents").collect();
+  assert_eq!(read.len(), 2);
+  assert!(read.iter().all(|taken| taken.method == "GET" && taken.bearer.as_deref() == Some(TOKEN)));
+
+  assert_eq!(agency.editor_session("people-digest").await.unwrap(), "people-digest@editor");
+  assert_eq!(
+    stub.body_at("/session/start"),
+    json!({ "agent": "people-digest", "scope": { "kind": "editor" } })
   );
 
-  let end = agency.wait_session("run-7").await.unwrap();
-  assert_eq!(stub.body_at("/runs/wait"), json!({ "run": "run-7" }));
-  assert_eq!(end.outcome, Outcome::Limit);
-  assert_eq!(end.files_written, ["people/1.md"]);
-  assert_eq!((end.cost, end.size), (Some(0.5), Some(900)));
-
-  assert!(agency.stop_session("run-7").await.unwrap());
-  assert_eq!(stub.body_at("/runs/stop"), json!({ "run": "run-7" }));
-
-  let overrun = agency.ask_overrun("run-7", "brain-run", 600).await.unwrap();
+  assert!(agency.stop_run("turn:people-digest:1", "cut at its cap").await.unwrap());
   assert_eq!(
-    overrun,
-    Overrun {
-      keep: true,
-      until: Some(1_700_000_600)
-    }
-  );
-  assert_eq!(
-    stub.body_at("/runs/overrun"),
-    json!({ "run": "run-7", "unit": "brain-run", "capSeconds": 600 })
-  );
-
-  assert!(!agency.run_open("run-7").await.unwrap());
-  assert_eq!(stub.body_at("/runs/open"), json!({ "run": "run-7" }));
-
-  assert_eq!(agency.kept_until("brain-run").await.unwrap(), Some(1_700_000_900));
-  assert_eq!(stub.body_at("/runs/kept-until"), json!({ "run": "brain-run" }));
-  assert_eq!(agency.cap_ends("bmo-digest").await.unwrap(), None);
-  assert_eq!(stub.body_at("/runs/cap-ends"), json!({ "unit": "bmo-digest" }));
-
-  let rulebooks = agency.rulebooks(&["plain-writing"]).await.unwrap();
-  assert_eq!(
-    rulebooks,
-    [Rulebook {
-      name: "plain-writing".to_owned(),
-      text: "Write plainly.".to_owned()
-    }]
-  );
-  assert_eq!(stub.body_at("/rulebooks/read"), json!({ "names": ["plain-writing"] }));
-
-  let key = agency.work_key("people-digest", AGENT).await.unwrap();
-  assert_eq!((key.cap_seconds, key.reasoning), (1200, None));
-  assert_eq!(stub.body_at("/work-keys/read"), json!({ "workKey": "people-digest", "agent": AGENT }));
-
-  let states = agency.item_states(&[3, 4]).await.unwrap();
-  assert_eq!(
-    states,
-    [
-      ItemState {
-        item: 3,
-        finished: true
-      },
-      ItemState {
-        item: 4,
-        finished: false
-      }
-    ]
-  );
-  assert_eq!(stub.body_at("/items/states"), json!({ "items": [3, 4] }));
-
-  let asked = UnitLaunch {
-    unit: "brain-run".to_owned(),
-    kind: "digest".to_owned(),
-    title: "All pending notes".to_owned(),
-    agent: None,
-    command: vec!["brain-run".to_owned(), "--once".to_owned()],
-  };
-  let launch = agency.launch_unit(&asked).await.unwrap();
-  assert_eq!(launch.outcome, LaunchOutcome::Refused);
-  assert_eq!(launch.why.as_deref(), Some("The unit is masked."));
-  assert_eq!(
-    stub.body_at("/units/launch"),
-    json!({
-      "unit": "brain-run",
-      "kind": "digest",
-      "title": "All pending notes",
-      "agent": null,
-      "command": ["brain-run", "--once"],
-    })
+    stub.body_at("/runs/stop"),
+    json!({ "run": "turn:people-digest:1", "reason": "cut at its cap" })
   );
 
   let units = vec!["bmo-digest".to_owned(), "bmo-people-digest".to_owned()];
-  assert_eq!(agency.units_running(&units).await.unwrap(), ["bmo-digest"]);
-  assert_eq!(stub.body_at("/units/running"), json!({ "units": ["bmo-digest", "bmo-people-digest"] }));
+  assert_eq!(agency.alive(&units).await.unwrap(), Some(vec!["bmo-digest".to_owned()]));
+  assert_eq!(stub.body_at("/runs/alive"), json!({ "names": ["bmo-digest", "bmo-people-digest"] }));
 
-  let quiet = QuietInstruction {
-    agent: AGENT.to_owned(),
-    chat_id: ROOM,
-    text: "The book was read again.".to_owned(),
-    kind: None,
-  };
-  assert!(agency.quiet_instruction(&quiet).await.unwrap());
+  let rest = agency.rest().await.unwrap();
   assert_eq!(
-    stub.body_at("/instructions/quiet"),
-    json!({ "agent": AGENT, "chatId": ROOM, "text": "The book was read again.", "kind": null })
+    rest,
+    Rest {
+      resting: true,
+      until: Some(1_700_003_600),
+      kind: Some("limit".to_owned())
+    }
   );
+  assert!(rest.for_limit());
+  assert_eq!(stub.taken().iter().find(|taken| taken.path == "/rest").unwrap().method, "GET");
 
   let reload = Reload {
     agent: AGENT.to_owned(),
@@ -190,8 +107,157 @@ async fn the_agency_client_posts_each_operation_and_reads_its_answer() {
   assert!(agency.reload_documents(&reload).await.unwrap());
   assert_eq!(
     stub.body_at("/documents/reload"),
-    json!({ "agent": AGENT, "paths": ["knowledge/a.md"], "rooms": [ROOM] })
+    json!({ "paths": ["knowledge/a.md"], "now": false, "agent": AGENT, "rooms": [ROOM] })
   );
+
+  // What the agency serves no route for yet is answered without a call: no clock, the documented editor bound, and
+  // no rulebook handed over.
+  let before = stub.taken().len();
+  assert_eq!(agency.run_clock("bmo-people-digest").await.unwrap(), RunClock::default());
+  assert_eq!(agency.editor_cap("people-digest", AGENT).await.unwrap(), EDITOR_CAP_SECONDS);
+  assert!(agency.rulebooks(&["plain-writing"]).await.unwrap().is_empty());
+  assert_eq!(stub.taken().len(), before);
+}
+
+#[tokio::test]
+async fn nobody_saying_which_runs_are_alive_answers_none() {
+  let stub = Stub::start().await;
+  stub.answer("/runs/alive", json!({ "answered": false, "alive": null }));
+
+  let alive = HttpAgency::new(&stub.peer).alive(&["bmo-digest".to_owned()]).await.unwrap();
+
+  assert_eq!(alive, None);
+}
+
+fn editor_turn() -> EditorTurn {
+  EditorTurn {
+    session: "people-digest@editor".to_owned(),
+    prompt: "Read the room.".to_owned(),
+    run: "bmo-people-digest:people-digest:agent-a:-100:1".to_owned(),
+    parent: Some("bmo-people-digest".to_owned()),
+    agent: AGENT.to_owned(),
+    chat_id: ROOM,
+    step: Some(2),
+    steps: Some(5),
+    workdir: "agents/agent-a".to_owned(),
+    desk: "/data/fragment-desks/a.json".to_owned(),
+    registration: None,
+  }
+}
+
+#[tokio::test]
+async fn an_editor_turn_is_posted_and_its_end_read_off_the_event_stream() {
+  let stub = Stub::start().await;
+  stub.answer("/session/turn", json!({ "delivery": "taken" })).answer_events(
+    "/events",
+    "/session/turn",
+    vec![
+      (
+        "turn-started",
+        json!({ "session": "worker-x@worker", "run": "turn:worker-x:1", "at": 1 }),
+      ),
+      (
+        "turn-started",
+        json!({ "session": "people-digest@editor", "run": "turn:people-digest:2", "at": 2 }),
+      ),
+      (
+        "turn-ended",
+        json!({ "session": "worker-x@worker", "run": "turn:worker-x:1", "outcome": "failed" }),
+      ),
+      (
+        "turn-ended",
+        json!({ "session": "people-digest@editor", "run": "turn:people-digest:2", "outcome": "answered",
+          "answer": "All folded in. DONE" }),
+      ),
+    ],
+  );
+  let agency = HttpAgency::new(&stub.peer);
+  let turn = editor_turn();
+  let (started, heard) = oneshot::channel();
+
+  let end = agency.editor_turn(&turn, started).await.unwrap();
+
+  assert_eq!(heard.await.unwrap(), "turn:people-digest:2", "another session's turn is not this one");
+  assert_eq!(
+    end,
+    TurnEnd {
+      run: "turn:people-digest:2".to_owned(),
+      outcome: TurnOutcome::Answered,
+      answer: Some("All folded in. DONE".to_owned()),
+      reason: None,
+    }
+  );
+  let opened = stub.taken().into_iter().find(|taken| taken.path == "/events").unwrap();
+  assert_eq!(opened.method, "GET");
+  assert_eq!(opened.query.as_deref(), Some("kinds=turn-started%2Cturn-ended"));
+  assert_eq!(
+    stub.body_at("/session/turn"),
+    json!({ "session": "people-digest@editor", "prompt": "Read the room.",
+      "run": "bmo-people-digest:people-digest:agent-a:-100:1", "parent": "bmo-people-digest", "agent": AGENT,
+      "chatId": ROOM, "step": 2, "steps": 5, "workdir": "agents/agent-a", "desk": "/data/fragment-desks/a.json",
+      "registration": null })
+  );
+}
+
+#[tokio::test]
+async fn a_turn_the_agency_names_by_the_brains_run_is_read_by_that_name() {
+  let stub = Stub::start().await;
+  let turn = editor_turn();
+  stub.answer("/session/turn", json!({ "delivery": "taken" })).answer_events(
+    "/events",
+    "/session/turn",
+    vec![
+      ("turn-started", json!({ "session": "people-digest@editor", "run": turn.run, "at": 2 })),
+      (
+        "turn-ended",
+        json!({ "session": "people-digest@editor", "run": turn.run, "outcome": "failed",
+          "reason": "no login answered" }),
+      ),
+    ],
+  );
+  let (started, _heard) = oneshot::channel();
+
+  let end = HttpAgency::new(&stub.peer).editor_turn(&turn, started).await.unwrap();
+
+  assert_eq!((end.run.as_str(), end.outcome), (turn.run.as_str(), TurnOutcome::Failed));
+  assert_eq!(end.reason.as_deref(), Some("no login answered"));
+}
+
+#[tokio::test]
+async fn a_session_carrying_another_turn_is_read_as_busy() {
+  let stub = Stub::start().await;
+  stub
+    .answer_with(
+      "/session/turn",
+      StatusCode::CONFLICT,
+      json!({ "code": "session-busy", "error": "people-digest@editor is in a turn" }),
+    )
+    .answer_events("/events", "/never", vec![]);
+  let (started, _heard) = oneshot::channel();
+
+  let fault = HttpAgency::new(&stub.peer).editor_turn(&editor_turn(), started).await.unwrap_err();
+
+  assert_eq!(fault, TurnFault::Busy);
+}
+
+#[tokio::test]
+async fn the_job_client_reads_item_states_and_no_route_as_none_finished() {
+  let stub = Stub::start().await;
+  stub.answer(
+    "/todos/states",
+    json!({ "items": [{ "id": 3, "done": true }, { "id": 4, "done": false }] }),
+  );
+
+  let states = HttpJob::new(&stub.peer).item_states(&[3, 4]).await.unwrap();
+
+  assert_eq!(states, [ItemState { id: 3, done: true }, ItemState { id: 4, done: false }]);
+  assert_eq!(stub.body_at("/todos/states"), json!({ "items": [3, 4] }));
+
+  let unserved = Stub::start().await;
+  let states = HttpJob::new(&unserved.peer).item_states(&[5]).await.unwrap();
+
+  assert_eq!(states, [ItemState { id: 5, done: false }]);
+  assert_eq!(unserved.taken().len(), 1);
 }
 
 #[tokio::test]
@@ -225,7 +291,7 @@ async fn the_receiver_client_posts_each_operation_and_reads_its_answer() {
     .answer("/rooms/roads", json!({ "kind": "owner", "oneToOne": true }))
     .answer("/messages/sender-is-owner", json!({ "owner": true }))
     .answer("/rooms/owner-spoke", json!({ "owner": false, "spoke": true }))
-    .answer("/rest", json!({ "resting": true, "until": 1_700_003_600 }))
+    .answer("/instructions/quiet", json!({ "answered": true, "ok": true }))
     .answer("/owner/notice", json!({ "ok": true }));
   let receiver = HttpReceiver::new(&stub.peer);
 
@@ -323,14 +389,17 @@ async fn the_receiver_client_posts_each_operation_and_reads_its_answer() {
     json!({ "chatId": ROOM, "person": 7, "before": 1_700_000_000, "seconds": 3600 })
   );
 
+  let quiet = QuietInstruction {
+    agent: AGENT.to_owned(),
+    chat_id: ROOM,
+    text: "Watch #4 fired.".to_owned(),
+    kind: Some("watch".to_owned()),
+  };
+  assert!(receiver.quiet_instruction(&quiet).await.unwrap());
   assert_eq!(
-    receiver.rest_state().await.unwrap(),
-    Rest {
-      resting: true,
-      until: Some(1_700_003_600)
-    }
+    stub.body_at("/instructions/quiet"),
+    json!({ "agent": AGENT, "chatId": ROOM, "text": "Watch #4 fired.", "kind": "watch" })
   );
-  assert_eq!(stub.body_at("/rest"), json!({}));
 
   let mut params = serde_json::Map::new();
   params.insert("agent".to_owned(), json!(AGENT));
@@ -392,12 +461,12 @@ async fn the_gate_client_posts_each_operation_and_reads_a_refusal_as_an_answer()
 async fn an_error_answer_is_read_and_never_offered_again() {
   let stub = Stub::start().await;
   stub.answer_with(
-    "/runs/open",
+    "/runs/alive",
     StatusCode::CONFLICT,
     json!({ "code": "not-ready", "error": "The service is not ready." }),
   );
 
-  let failure = HttpAgency::new(&stub.peer).run_open("run-1").await.unwrap_err();
+  let failure = HttpAgency::new(&stub.peer).alive(&["run-1".to_owned()]).await.unwrap_err();
 
   let PortFailure::Answered { status, answer, .. } = failure else { panic!("{failure}") };
   assert_eq!(status, 409);
@@ -416,7 +485,7 @@ async fn an_answer_of_another_shape_is_undecodable() {
   let stub = Stub::start().await;
   stub.answer("/rest", json!({ "sleeping": true }));
 
-  let failure = HttpReceiver::new(&stub.peer).rest_state().await.unwrap_err();
+  let failure = HttpAgency::new(&stub.peer).rest().await.unwrap_err();
 
   assert!(matches!(failure, PortFailure::Undecodable { .. }), "{failure}");
 }

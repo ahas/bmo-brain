@@ -49,9 +49,9 @@ fn agency() -> FakeAgency {
   let mut companion = registration(OTHER_AGENT);
   let mut asleep = registration("agent-c");
 
-  chat.brain_folder = String::new();
+  chat.brain_folder = Some(String::new());
   chat.label = Some("Chat".into());
-  companion.brain_folder = format!("agents/{OTHER_AGENT}/");
+  companion.brain_folder = Some(format!("agents/{OTHER_AGENT}/"));
   companion.recollector_registration = Some("road-b".into());
   asleep.awake = false;
   *agency.registrations.lock().unwrap() = vec![companion, chat, asleep];
@@ -90,7 +90,7 @@ async fn the_chat_agent_stands_at_the_root_before_its_registration_says_so() {
   let agency = FakeAgency::default();
   let mut companion = registration(OTHER_AGENT);
 
-  companion.brain_folder = format!("agents/{OTHER_AGENT}");
+  companion.brain_folder = Some(format!("agents/{OTHER_AGENT}"));
   *agency.registrations.lock().unwrap() = vec![companion];
 
   let root = recollection_for(&agency, Path::new("/brain"), AGENT, AGENT).await.unwrap().unwrap();
@@ -98,4 +98,23 @@ async fn the_chat_agent_stands_at_the_root_before_its_registration_says_so() {
   assert_eq!(root.folder, "");
   assert_eq!(root.label, AGENT);
   assert_eq!(recollections(&agency, Path::new("/brain"), AGENT).await.unwrap().len(), 2);
+}
+
+#[tokio::test]
+async fn an_agent_the_agency_names_no_brain_folder_keeps_no_memory_and_the_chat_agent_stays_at_the_root() {
+  let agency = FakeAgency::default();
+  let mut chat = registration(AGENT);
+  let mut worker = registration("worker-a");
+
+  chat.brain_folder = None;
+  chat.label = Some("Chat".into());
+  worker.brain_folder = None;
+  *agency.registrations.lock().unwrap() = vec![chat, worker];
+
+  let found = recollections(&agency, Path::new("/brain"), AGENT).await.unwrap();
+
+  assert_eq!(found.len(), 1);
+  assert_eq!((found[0].agent.as_str(), found[0].folder.as_str()), (AGENT, ""));
+  assert_eq!(found[0].label, "Chat", "the chat agent is still named by its registration's label");
+  assert_eq!(recollection_for(&agency, Path::new("/brain"), AGENT, "worker-a").await.unwrap(), None);
 }

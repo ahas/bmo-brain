@@ -148,16 +148,22 @@ pub struct AgentHolding {
 }
 
 /// The agent's folder as the agency registers it, relative to the brain root: empty for the brain root, none where
-/// the agency registers no such agent.
-pub async fn agent_folder(agency: &dyn Agency, agent: &str) -> Result<Option<String>, Failure> {
-  Ok(
-    agency
-      .registrations(Some(agent))
-      .await?
-      .into_iter()
-      .find(|registration| registration.name == agent)
-      .map(|registration| registration.brain_folder.trim_end_matches('/').to_owned()),
-  )
+/// the agency registers no such agent or names it no folder. The chat agent's, `chat_key`'s, is the brain root
+/// wherever the agency names it none.
+pub async fn agent_folder(
+  agency: &dyn Agency,
+  chat_key: &str,
+  agent: &str,
+) -> Result<Option<String>, Failure> {
+  let folder = agency
+    .registrations(Some(agent))
+    .await?
+    .into_iter()
+    .find(|registration| registration.name == agent)
+    .and_then(|registration| registration.brain_folder)
+    .map(|folder| folder.trim_end_matches('/').to_owned());
+
+  Ok(folder.or_else(|| (agent == chat_key).then(String::new)))
 }
 
 /// What an agent holds of the brain, its folder named where the agency registers one and it stands.

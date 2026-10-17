@@ -133,7 +133,7 @@ async fn a_rooms_books_are_the_rooms_folders_that_stand_in_every_agents_folder()
   let agency = FakeAgency::default();
   let mut other = registration(OTHER_AGENT);
 
-  other.brain_folder = format!("agents/{OTHER_AGENT}/");
+  other.brain_folder = Some(format!("agents/{OTHER_AGENT}/"));
   *agency.registrations.lock().unwrap() = vec![registration(AGENT), other];
 
   fs::create_dir_all(brain.join("rooms/-5/people")).unwrap();

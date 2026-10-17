@@ -86,8 +86,8 @@ pub async fn clean_documents(gate: &dyn Gate, root: &Path, paths: &[PathBuf]) ->
 }
 
 /// The sessions holding a stale copy of what a run rewrote told to read it again, through the agency's document
-/// reload notice: the agent whose documents they are, the paths relative to the brain folder, and the rooms whose
-/// sessions read them. Nothing is said where no path changed.
+/// reload: the agent whose documents they are, the paths relative to the brain root, and the rooms whose sessions
+/// read them. Nothing is said where no path changed.
 pub async fn announce_reload(agency: &dyn Agency, agent: &str, paths: &[String], rooms: &[i64]) {
   if paths.is_empty() {
     return;
@@ -394,9 +394,9 @@ where
   Ok(true)
 }
 
-/// Whether the agents rest now, which no editor run starts during.
-pub async fn resting(receiver: &dyn Receiver) -> Result<bool, Failure> {
-  Ok(receiver.rest_state().await?.resting)
+/// Whether the deployment rests now, as the agency says, which no editor run starts during.
+pub async fn resting(agency: &dyn Agency) -> Result<bool, Failure> {
+  Ok(agency.rest().await?.resting)
 }
 
 /// The number of notes waiting for the memo digest.

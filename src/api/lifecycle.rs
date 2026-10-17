@@ -73,7 +73,7 @@ struct AgentAsked {
 }
 
 async fn agent_reset(State(api): State<Arc<Api>>, Body(asked): Body<AgentAsked>) -> Answer {
-  let folder = agent_folder(api.agency.as_ref(), &asked.agent).await?;
+  let folder = agent_folder(api.agency.as_ref(), &api.chat_key, &asked.agent).await?;
 
   // The brain root is the chat agent's whole memory, and no reset takes it.
   if asked.agent == api.chat_key || folder.as_deref() == Some("") {
@@ -107,7 +107,7 @@ struct AgentNamed {
 }
 
 async fn agent_removed(State(api): State<Arc<Api>>, Body(asked): Body<AgentNamed>) -> Answer {
-  let left = match agent_folder(api.agency.as_ref(), &asked.agent).await? {
+  let left = match agent_folder(api.agency.as_ref(), &api.chat_key, &asked.agent).await? {
     Some(folder) if !folder.is_empty() => lock::forget(&api.data_root, &folder),
     _ => vec![],
   };
@@ -116,7 +116,7 @@ async fn agent_removed(State(api): State<Arc<Api>>, Body(asked): Body<AgentNamed
 }
 
 async fn agent_fence(State(api): State<Arc<Api>>, Body(asked): Body<AgentNamed>) -> Answer {
-  if let Some(folder) = agent_folder(api.agency.as_ref(), &asked.agent).await? {
+  if let Some(folder) = agent_folder(api.agency.as_ref(), &api.chat_key, &asked.agent).await? {
     lock::fence(&api.data_root, &folder).map_err(|why| {
       Failure::Disk(format!("{}: {why}", brain_lock_path(&api.data_root, &folder).display()))
     })?;
@@ -127,7 +127,7 @@ async fn agent_fence(State(api): State<Arc<Api>>, Body(asked): Body<AgentNamed>)
 
 async fn agent_lock(State(api): State<Arc<Api>>, Body(asked): Body<AgentNamed>) -> Answer {
   // The lock's path as it stands under any data root, which is the path relative to this one.
-  let path = agent_folder(api.agency.as_ref(), &asked.agent)
+  let path = agent_folder(api.agency.as_ref(), &api.chat_key, &asked.agent)
     .await?
     .map(|folder| brain_lock_path(Path::new(""), &folder).to_string_lossy().into_owned());
 
@@ -149,7 +149,7 @@ async fn agent_book_since(State(api): State<Arc<Api>>, Body(asked): Body<BookSin
 }
 
 async fn agent_put_back(State(api): State<Arc<Api>>, Body(asked): Body<AgentNamed>) -> Answer {
-  let folder = agent_folder(api.agency.as_ref(), &asked.agent).await?;
+  let folder = agent_folder(api.agency.as_ref(), &api.chat_key, &asked.agent).await?;
 
   if asked.agent == api.chat_key || folder.as_deref() == Some("") {
     return brain_root();

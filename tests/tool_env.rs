@@ -28,7 +28,7 @@ fn configuration(folder: &Path, data: &Path, listen: &str, token: &str) -> std::
     format!("own_command = [{}]", quoted("bmo-brain")),
   ];
 
-  for peer in ["agency", "receiver", "gate"] {
+  for peer in ["agency", "receiver", "gate", "job"] {
     config.extend([
       format!("[{peer}]"),
       format!("base = {}", quoted("http://127.0.0.1:9")),

@@ -20,16 +20,16 @@ impl Served {
   // The units launched so far, in order.
   fn launched(&self) -> Vec<String> {
     self
-      .agency
+      .starter
       .calls
-      .of("launch_unit")
+      .of("start")
       .iter()
       .map(|launch| launch["unit"].as_str().unwrap().to_owned())
       .collect()
   }
 
   fn memos(&self) -> Vec<Value> {
-    self.agency.calls.of("quiet_instruction")
+    self.receiver.calls.of("quiet_instruction")
   }
 
   async fn state_of(&self, id: i64) -> String {

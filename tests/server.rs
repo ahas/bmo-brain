@@ -69,7 +69,7 @@ async fn the_binary_serves_on_a_scratch_database_and_stops_when_told() {
     format!("own_command = [{}]", quoted(env!("CARGO_BIN_EXE_bmo-brain"))),
   ];
 
-  for peer in ["agency", "receiver", "gate"] {
+  for peer in ["agency", "receiver", "gate", "job"] {
     config.extend([
       format!("[{peer}]"),
       format!("base = {}", quoted(&nowhere)),

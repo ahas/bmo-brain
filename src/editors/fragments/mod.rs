@@ -26,6 +26,7 @@ use self::store::{NewRow, Row, ShippedEntry, now_seconds, of_kind};
 use crate::Failure;
 use crate::policy::COMMON_WORDS;
 use crate::ports::agency::Agency;
+use crate::ports::job::Job;
 use crate::ports::receiver::Receiver;
 
 /// The fragment table and the brain it follows, as one batch stands on them.
@@ -33,6 +34,8 @@ pub struct Table<'a> {
   pub db: &'a DatabaseConnection,
   pub agency: &'a dyn Agency,
   pub receiver: &'a dyn Receiver,
+  /// Whether the items a piece is tied to are finished.
+  pub job: &'a dyn Job,
   pub brain: Brain,
   /// The names the write checks read.
   pub names: Names,
@@ -164,6 +167,7 @@ impl<'a> Table<'a> {
     db: &'a DatabaseConnection,
     agency: &'a dyn Agency,
     receiver: &'a dyn Receiver,
+    job: &'a dyn Job,
     brain_root: &Path,
     chat_key: &str,
     owner_names: &[String],
@@ -175,6 +179,7 @@ impl<'a> Table<'a> {
       db,
       agency,
       receiver,
+      job,
       brain,
       names,
     })
@@ -491,12 +496,12 @@ impl<'a> Table<'a> {
       .collect();
     let finished: HashSet<i64> = if settles && !items.is_empty() {
       self
-        .agency
+        .job
         .item_states(&items)
         .await?
         .into_iter()
-        .filter(|state| state.finished)
-        .map(|state| state.item)
+        .filter(|state| state.done)
+        .map(|state| state.id)
         .collect()
     } else {
       HashSet::new()

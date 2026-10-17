@@ -1,5 +1,6 @@
-//! How a port reaches its unit: one POST of a JSON body under the unit's base address, behind the unit's
-//! token, offered again only while the connection is refused (`docs/boundary-api.md`, 「Wire conventions」).
+//! How a port reaches its unit: a POST of a JSON body, a GET with its query or a GET held open for the events it
+//! streams, under the unit's base address and behind the unit's token, offered again only while the connection is
+//! refused (`docs/boundary-api.md`, 「Wire conventions」 and 「Calls the brain makes」).
 
 use std::fmt;
 use std::io;
@@ -180,6 +181,52 @@ impl Caller {
       url: url.clone(),
       why: error.to_string(),
     })?;
+    let answer = self
+      .send(&url, || {
+        self
+          .client
+          .post(&url)
+          .bearer_auth(&self.token)
+          .header(CONTENT_TYPE, "application/json")
+          .body(body.clone())
+      })
+      .await?;
+
+    decoded(url, answer).await
+  }
+
+  /// Asks for `path` with the query's fields, as a GET, and decodes a successful answer as the operation's, offered
+  /// again on the same terms as a post.
+  pub async fn get<T: DeserializeOwned>(
+    &self,
+    path: &str,
+    query: &[(&str, &str)],
+  ) -> Result<T, PortFailure> {
+    let url = self.url(path);
+    let answer = self.send(&url, || self.client.get(&url).bearer_auth(&self.token).query(query)).await?;
+
+    decoded(url, answer).await
+  }
+
+  /// Opens `path` with the query's fields as a GET whose answer goes on arriving, a stream of server-sent events,
+  /// and answers it once its head says it succeeded.
+  pub async fn open(&self, path: &str, query: &[(&str, &str)]) -> Result<reqwest::Response, PortFailure> {
+    let url = self.url(path);
+    let answer = self.send(&url, || self.client.get(&url).bearer_auth(&self.token).query(query)).await?;
+
+    if answer.status().is_success() {
+      return Ok(answer);
+    }
+
+    Err(failed(url, answer).await)
+  }
+
+  // The request sent, offered again only while the connection is refused and the patience window lasts.
+  async fn send(
+    &self,
+    url: &str,
+    request: impl Fn() -> reqwest::RequestBuilder,
+  ) -> Result<reqwest::Response, PortFailure> {
     let Patience {
       window,
       every,
@@ -187,42 +234,19 @@ impl Caller {
     } = &self.patience;
     let mut waited = Duration::ZERO;
     loop {
-      let request = self
-        .client
-        .post(&url)
-        .bearer_auth(&self.token)
-        .header(CONTENT_TYPE, "application/json")
-        .body(body.clone());
-      let error = match request.send().await {
-        Ok(answer) => {
-          let status = answer.status();
-          let bytes = answer.bytes().await.map_err(|error| PortFailure::Transport {
-            url: url.clone(),
-            why: chain(&error),
-          })?;
-          if !status.is_success() {
-            return Err(PortFailure::Answered {
-              url,
-              status: status.as_u16(),
-              answer: serde_json::from_slice(&bytes).ok(),
-            });
-          }
-          return serde_json::from_slice(&bytes).map_err(|error| PortFailure::Undecodable {
-            url,
-            why: error.to_string(),
-          });
-        }
+      let error = match request().send().await {
+        Ok(answer) => return Ok(answer),
         Err(error) => error,
       };
       if !refused(&error) {
         return Err(PortFailure::Transport {
-          url,
+          url: url.to_owned(),
           why: chain(&error),
         });
       }
       if every.is_zero() || waited + *every > *window {
         return Err(PortFailure::Unreachable {
-          url,
+          url: url.to_owned(),
           waited,
           why: chain(&error),
         });
@@ -230,6 +254,40 @@ impl Caller {
       waiter.wait(*every).await;
       waited += *every;
     }
+  }
+}
+
+// A successful answer read as the operation's, and any other as the failure it is.
+async fn decoded<T: DeserializeOwned>(url: String, answer: reqwest::Response) -> Result<T, PortFailure> {
+  if !answer.status().is_success() {
+    return Err(failed(url, answer).await);
+  }
+
+  let bytes = answer.bytes().await.map_err(|error| PortFailure::Transport {
+    url: url.clone(),
+    why: chain(&error),
+  })?;
+
+  serde_json::from_slice(&bytes).map_err(|error| PortFailure::Undecodable {
+    url,
+    why: error.to_string(),
+  })
+}
+
+// An answer that is no success, with the error shape it carried where it carried one.
+async fn failed(url: String, answer: reqwest::Response) -> PortFailure {
+  let status = answer.status().as_u16();
+
+  match answer.bytes().await {
+    Ok(bytes) => PortFailure::Answered {
+      url,
+      status,
+      answer: serde_json::from_slice(&bytes).ok(),
+    },
+    Err(error) => PortFailure::Transport {
+      url,
+      why: chain(&error),
+    },
   }
 }
 

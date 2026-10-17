@@ -1,7 +1,8 @@
 //! The brain's own git repository as the editors write it (docs/people-book.md, 「Where it lives」): what a run
-//! wrote committed by the paths it names, a folder put back to its last commit, and a removed folder's removal
-//! committed. The brain has no remote, so nothing is pushed.
+//! changed in a folder read off it, what a run wrote committed by the paths it names, a folder put back to its last
+//! commit, and a removed folder's removal committed. The brain has no remote, so nothing is pushed.
 
+use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -35,6 +36,35 @@ pub fn git_once(root: &Path, args: &[&str]) -> Result<String, String> {
     .to_owned();
 
   if done.status.success() { Ok(said) } else { Err(said) }
+}
+
+/// The files changed in a folder of the brain since its last commit, relative to the brain root: every one git reports
+/// added, changed or deleted there, the folders under it that `beside` names set aside. `folder` is relative to the
+/// brain root, empty for the root itself.
+pub fn changed_in(brain: &Path, folder: &str, beside: &[String]) -> Result<BTreeSet<String>, String> {
+  let within = if folder.is_empty() { ".".to_owned() } else { folder.to_owned() };
+  let set_aside: Vec<String> = beside.iter().map(|other| format!(":(exclude){other}")).collect();
+  let mut args = vec![
+    "ls-files",
+    "-z",
+    "--full-name",
+    "--modified",
+    "--deleted",
+    "--others",
+    "--exclude-standard",
+    "--",
+  ];
+
+  args.push(&within);
+  args.extend(set_aside.iter().map(String::as_str));
+
+  Ok(
+    git(brain, &args)?
+      .split('\0')
+      .filter(|path| !path.is_empty())
+      .map(str::to_owned)
+      .collect(),
+  )
 }
 
 /// Git run in the repository, again after a pause while another command holds its index.

@@ -1,6 +1,6 @@
 //! A watch's run (docs/memories.md, 「Watches」): a check run with its input closed and cut off with everything it
 //! started, the memos a watch's ending sends its agent, the run checking its watch until it fires, lapses or
-//! breaks, handing its memo to the agency and ending the watch once, and the brain's binary running it as the agency
+//! breaks, handing its memo to the receiver and ending the watch once, and the brain's binary running it as the brain
 //! launches it.
 
 mod support;
@@ -281,7 +281,6 @@ impl Served {
   fn run(&self) -> WatchRun<'_> {
     WatchRun {
       db: self.scratch.db(),
-      agency: self.agency.as_ref(),
       receiver: self.receiver.as_ref(),
       cwd: self.data.path(),
       slice: Duration::from_millis(50),
@@ -307,7 +306,7 @@ impl Served {
   }
 
   fn memos(&self) -> Vec<Value> {
-    self.agency.calls.of("quiet_instruction")
+    self.receiver.calls.of("quiet_instruction")
   }
 }
 
@@ -394,24 +393,24 @@ async fn a_run_that_no_longer_holds_its_watch_stops_and_writes_nothing() {
 }
 
 #[tokio::test]
-async fn a_memo_the_agency_will_not_take_leaves_the_watch_standing() {
+async fn a_memo_the_receiver_will_not_take_leaves_the_watch_standing() {
   let api = served().await;
   let id = watch_row(&api.scratch, "true", 600, UNIT).await;
 
-  *api.agency.quiet_refused.lock().unwrap() = true;
+  *api.receiver.quiet_refused.lock().unwrap() = true;
 
   assert!(matches!(watch(&api.run(), id, UNIT).await, Err(Failure::Refused(_))));
   assert_eq!(api.state(id).await.0, "active");
 }
 
-// The binary run on one watch as the agency launches it, over stub agency and receiver servers, with `env` set on
-// its environment: what it ended with, and the agency stub the memo went to.
+// The binary run on one watch as the brain launches it, over stub agency and receiver servers, with `env` set on
+// its environment: what it ended with, and the receiver stub the memo went to.
 async fn launched(scratch: &Scratch, id: i64, env: &[(&str, String)]) -> (std::process::Output, Stub) {
   let agency = Stub::start().await;
   let receiver = Stub::start().await;
   let data = tempfile::tempdir().unwrap();
 
-  agency.answer("/instructions/quiet", json!({ "ok": true }));
+  receiver.answer("/instructions/quiet", json!({ "answered": true, "ok": true }));
   receiver.answer(
     "/rooms/titles",
     json!({ "rooms": [{ "chatId": ROOM, "title": "Family Room", "senders": [] }] }),
@@ -435,6 +434,7 @@ async fn launched(scratch: &Scratch, id: i64, env: &[(&str, String)]) -> (std::p
     peer("agency", &agency),
     peer("receiver", &receiver),
     "[gate]\nbase = \"http://127.0.0.1:1/\"\ntoken = \"t\"".to_owned(),
+    "[job]\nbase = \"http://127.0.0.1:1/\"\ntoken = \"t\"".to_owned(),
   ]
   .join("\n");
   let file = data.path().join("brain.toml");
@@ -451,19 +451,19 @@ async fn launched(scratch: &Scratch, id: i64, env: &[(&str, String)]) -> (std::p
     .await
     .unwrap();
 
-  (ran, agency)
+  (ran, receiver)
 }
 
 #[tokio::test]
-async fn the_binary_runs_a_watch_as_the_agency_launches_it() {
+async fn the_binary_runs_a_watch_as_the_brain_launches_it() {
   let scratch = Scratch::new().await;
   let id = watch_row(&scratch, "echo ready", 600, UNIT).await;
-  let (ran, agency) = launched(&scratch, id, &[]).await;
+  let (ran, receiver) = launched(&scratch, id, &[]).await;
 
   assert!(ran.status.success(), "{}", String::from_utf8_lossy(&ran.stderr));
   assert!(String::from_utf8_lossy(&ran.stdout).contains(&format!("watch #{id}: the check succeeded")));
 
-  let memo = agency.body_at("/instructions/quiet");
+  let memo = receiver.body_at("/instructions/quiet");
 
   assert_eq!(
     (memo["agent"].clone(), memo["chatId"].clone(), memo["kind"].clone()),

@@ -5,4 +5,5 @@
 pub mod agency;
 pub mod gate;
 pub mod http;
+pub mod job;
 pub mod receiver;

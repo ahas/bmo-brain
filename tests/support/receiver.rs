@@ -1,13 +1,14 @@
 //! The receiver in memory: the messages a test lays down, each agent's read marks on them, the rooms,
-//! names, roads, own numbers and rest a test sets, the owner as `OWNER`, and every call recorded.
+//! names, roads and own numbers a test sets, the owner as `OWNER`, the quiet instructions it takes, and every call
+//! recorded.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Mutex;
 
 use bmo_brain::ports::http::PortFailure;
 use bmo_brain::ports::receiver::{
-  Message, OwnerNotice, OwnerSpoke, PersonName, Receiver, Rest, RoadKind, Roads, RoomAnswerers, RoomCount,
-  RoomSince, RoomTitle,
+  Message, OwnerNotice, OwnerSpoke, PersonName, QuietInstruction, Receiver, RoadKind, Roads, RoomAnswerers,
+  RoomCount, RoomSince, RoomTitle,
 };
 use futures_util::future::BoxFuture;
 use serde_json::json;
@@ -27,7 +28,8 @@ pub struct FakeReceiver {
   pub waiting: Mutex<BTreeSet<String>>,
   /// Each room's roads; a room not set is a group that is no one-to-one.
   pub roads: Mutex<BTreeMap<i64, Roads>>,
-  pub rest: Mutex<Option<Rest>>,
+  /// Whether a quiet instruction is refused rather than taken.
+  pub quiet_refused: Mutex<bool>,
   /// The sender each agent's own words stand under, by agent and room.
   pub own_numbers: Mutex<BTreeMap<(String, i64), i64>>,
   pub notices: Mutex<Vec<OwnerNotice>>,
@@ -294,13 +296,13 @@ impl Receiver for FakeReceiver {
     Box::pin(async move { Ok(answer) })
   }
 
-  fn rest_state(&self) -> BoxFuture<'_, Result<Rest, PortFailure>> {
-    self.calls.take("rest_state", json!({}));
-    let rest = self.rest.lock().unwrap().unwrap_or(Rest {
-      resting: false,
-      until: None,
-    });
-    Box::pin(async move { Ok(rest) })
+  fn quiet_instruction<'a>(
+    &'a self,
+    instruction: &'a QuietInstruction,
+  ) -> BoxFuture<'a, Result<bool, PortFailure>> {
+    self.calls.take("quiet_instruction", instruction);
+    let taken = !*self.quiet_refused.lock().unwrap();
+    Box::pin(async move { Ok(taken) })
   }
 
   fn notify_owner<'a>(&'a self, notice: &'a OwnerNotice) -> BoxFuture<'a, Result<bool, PortFailure>> {

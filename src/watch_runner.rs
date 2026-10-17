@@ -1,5 +1,5 @@
-//! The half of a watch that does the watching (docs/memories.md, 「Watches」): the run the agency launches for a
-//! watch, which checks every interval until the check succeeds, the wait runs out, or the watch stops being its own
+//! The half of a watch that does the watching (docs/memories.md, 「Watches」): the run the brain launches apart for
+//! a watch, which checks every interval until the check succeeds, the wait runs out, or the watch stops being its own
 //! (cancelled, or handed to a run launched after it), and ends its watch with the memo of how it went.
 //!
 //! The row decides everything. A run only ever writes a watch that names its own unit, so a run the clock replaced
@@ -16,7 +16,6 @@ use tokio::io::{AsyncRead, AsyncReadExt};
 use crate::Failure;
 use crate::editors::archive::room_name;
 use crate::editors::fragments::store::now_seconds;
-use crate::ports::agency::Agency;
 use crate::ports::receiver::Receiver;
 use crate::watches::{
   TIMED_OUT_EXIT, Wait, broken_memo, bus_unreachable, end_by_run, fired_memo, item_of, lapsed_memo,
@@ -175,11 +174,10 @@ pub async fn run_check(condition: &str, cwd: &Path, timeout: Duration) -> Check 
   }
 }
 
-/// What a watch's run stands on: the brain's database, the agency its memos go through, the receiver its room
-/// names come from, and the folder its checks run in.
+/// What a watch's run stands on: the brain's database, the receiver its memos go through and its room names come
+/// from, and the folder its checks run in.
 pub struct WatchRun<'a> {
   pub db: &'a DatabaseConnection,
-  pub agency: &'a dyn Agency,
   pub receiver: &'a dyn Receiver,
   pub cwd: &'a Path,
   /// How often a waiting run looks at its watch.
@@ -230,14 +228,14 @@ pub async fn watch(run: &WatchRun<'_>, id: i64, unit: &str) -> Result<&'static s
       if checks == 1 && (check.cannot_run() || check.undecided()) {
         let memo = broken_memo(watch, &room, item.as_ref(), &condition, check.exit, &check.stderr);
 
-        end_by_run(db, run.agency, watch, unit, "broken", &memo, now_seconds()).await?;
+        end_by_run(db, run.receiver, watch, unit, "broken", &memo, now_seconds()).await?;
         return Ok("the check could not run");
       }
 
       if check.exit == 0 && !check.undecided() {
         let memo = fired_memo(watch, &room, item.as_ref(), &condition, at, &check.stdout);
 
-        end_by_run(db, run.agency, watch, unit, "fired", &memo, now_seconds()).await?;
+        end_by_run(db, run.receiver, watch, unit, "fired", &memo, now_seconds()).await?;
         return Ok("the check succeeded");
       }
 
@@ -250,7 +248,7 @@ pub async fn watch(run: &WatchRun<'_>, id: i64, unit: &str) -> Result<&'static s
         };
         let memo = lapsed_memo(watch, &room, item.as_ref(), &wait);
 
-        end_by_run(db, run.agency, watch, unit, "lapsed", &memo, now_seconds()).await?;
+        end_by_run(db, run.receiver, watch, unit, "lapsed", &memo, now_seconds()).await?;
         return Ok("the wait ran out");
       }
 

@@ -1,6 +1,6 @@
 //! The receiver port: the messages of a room and an agent's read marks on them, the rooms and the people in
-//! them, the reading of a promise, the roads, the owner's word and rest, and a notice to the owner
-//! (`docs/boundary-api.md`, 「The receiver」).
+//! them, the reading of a promise, the roads, the owner's word, a notice to the owner, and the quiet instructions that
+//! wake an agent in a room (`docs/boundary-api.md`, 「The receiver」).
 
 use futures_util::future::BoxFuture;
 use serde::{Deserialize, Serialize};
@@ -86,12 +86,15 @@ pub struct OwnerSpoke {
   pub spoke: bool,
 }
 
-/// Whether the agents rest, and until when.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+/// A quiet instruction for an agent in a room, whose turn there it wakes: a watch's memo or a reminder's wake.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct Rest {
-  pub resting: bool,
-  pub until: Option<i64>,
+pub struct QuietInstruction {
+  pub agent: String,
+  pub chat_id: i64,
+  pub text: String,
+  /// `watch` or `reminder`.
+  pub kind: Option<String>,
 }
 
 /// A notice to the owner: its code and the code's own parameters, which the web unit's language packs
@@ -202,8 +205,11 @@ pub trait Receiver: Send + Sync {
     seconds: i64,
   ) -> BoxFuture<'_, Result<OwnerSpoke, PortFailure>>;
 
-  /// Whether the agents rest.
-  fn rest_state(&self) -> BoxFuture<'_, Result<Rest, PortFailure>>;
+  /// Hands an agent a quiet instruction for a room: whether it was taken.
+  fn quiet_instruction<'a>(
+    &'a self,
+    instruction: &'a QuietInstruction,
+  ) -> BoxFuture<'a, Result<bool, PortFailure>>;
 
   /// Tells the owner a notice.
   fn notify_owner<'a>(&'a self, notice: &'a OwnerNotice) -> BoxFuture<'a, Result<bool, PortFailure>>;
@@ -568,8 +574,14 @@ impl Receiver for HttpReceiver {
     })
   }
 
-  fn rest_state(&self) -> BoxFuture<'_, Result<Rest, PortFailure>> {
-    Box::pin(async move { self.caller.post("/rest", &Nothing {}).await })
+  fn quiet_instruction<'a>(
+    &'a self,
+    instruction: &'a QuietInstruction,
+  ) -> BoxFuture<'a, Result<bool, PortFailure>> {
+    Box::pin(async move {
+      let answer: Done = self.caller.post("/instructions/quiet", instruction).await?;
+      Ok(answer.ok)
+    })
   }
 
   fn notify_owner<'a>(&'a self, notice: &'a OwnerNotice) -> BoxFuture<'a, Result<bool, PortFailure>> {

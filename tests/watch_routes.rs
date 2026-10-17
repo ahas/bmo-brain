@@ -133,7 +133,7 @@ async fn a_watch_is_called_off_only_by_the_room_that_set_it_or_the_owners_and_on
     api.post("/watches/list", json!({ "by": ROOM, "all": true })).await["watches"][0]["state"],
     json!("cancelled")
   );
-  assert!(api.agency.calls.of("quiet_instruction").is_empty());
+  assert!(api.receiver.calls.of("quiet_instruction").is_empty());
 }
 
 #[tokio::test]
@@ -161,7 +161,7 @@ async fn a_run_claims_its_watch_and_ends_it_once_with_its_memo() {
       .await,
     json!({ "ended": false })
   );
-  assert!(api.agency.calls.of("quiet_instruction").is_empty());
+  assert!(api.receiver.calls.of("quiet_instruction").is_empty());
   assert_eq!(
     api
       .post(
@@ -178,7 +178,7 @@ async fn a_run_claims_its_watch_and_ends_it_once_with_its_memo() {
     json!({ "ended": false })
   );
 
-  let memos = api.agency.calls.of("quiet_instruction");
+  let memos = api.receiver.calls.of("quiet_instruction");
 
   assert_eq!(memos.len(), 1);
   assert_eq!(
@@ -231,7 +231,7 @@ async fn a_lapsed_or_broken_ending_tells_how_the_check_went() {
     json!({ "ended": true })
   );
 
-  let memos = api.agency.calls.of("quiet_instruction");
+  let memos = api.receiver.calls.of("quiet_instruction");
 
   assert!(memos[0]["text"].as_str().unwrap().contains("ran out before it came true"));
   assert!(memos[0]["text"].as_str().unwrap().contains("exited 1."));

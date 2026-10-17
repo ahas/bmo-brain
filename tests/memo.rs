@@ -13,7 +13,7 @@ use bmo_brain::editors::memo::{
   DIGEST_FAILED, FAILURE_LOG, MemoDigest, RULE_CANDIDATE, SUCCESS_MARKER, added_candidates,
   batches_by_owner, candidate_notice, failure_notice, owner_only_problems, put_back_reason,
 };
-use bmo_brain::ports::agency::Outcome;
+use bmo_brain::ports::agency::TurnOutcome;
 use sea_orm::Value;
 use serde_json::json;
 
@@ -127,7 +127,7 @@ async fn a_rooms_notes_are_filed_into_the_agents_library_committed_and_announced
     vec![(CHUNK_PATH.to_owned(), CHUNK.to_owned())],
     vec![row_write(CHUNK_PATH, TITLE, &["tea"])],
   );
-  stage.sessions_end(&[(Outcome::Answered, Some(&format!("Filed the note.\n{SUCCESS_MARKER}")))]);
+  stage.sessions_end(&[(TurnOutcome::Answered, Some(&format!("Filed the note.\n{SUCCESS_MARKER}")))]);
 
   assert_eq!(
     MemoDigest {
@@ -140,15 +140,15 @@ async fn a_rooms_notes_are_filed_into_the_agents_library_committed_and_announced
   );
 
   // The run was asked for on the digest key, in the agent's folder, told the note is the owner's.
-  let starts = stage.agency.calls.of("start_session");
+  let starts = stage.agency.calls.of("editor_turn");
 
   assert_eq!(starts.len(), 1);
   assert_eq!(
-    (starts[0]["workKey"].clone(), starts[0]["agent"].clone()),
+    (stage.agency.calls.of("editor_session")[0]["agent"].clone(), starts[0]["agent"].clone()),
     (json!("digest"), json!(AGENT))
   );
   assert_eq!(starts[0]["chatId"], json!(ROOM));
-  assert_eq!(starts[0]["workdir"], json!(stage.brain.path().to_string_lossy()));
+  assert_eq!(starts[0]["workdir"], json!(""));
   assert!(starts[0]["prompt"].as_str().unwrap().contains("| owner | this chat |"));
   assert!(starts[0]["prompt"].as_str().unwrap().contains("Tea is served at four in this room"));
 
@@ -196,7 +196,7 @@ async fn a_run_without_its_marker_is_put_back_and_told_to_the_owner_with_its_not
     vec![(CHUNK_PATH.to_owned(), CHUNK.to_owned())],
     vec![row_write(CHUNK_PATH, TITLE, &["tea"])],
   );
-  stage.sessions_end(&[(Outcome::Answered, Some("Filed the note, I think."))]);
+  stage.sessions_end(&[(TurnOutcome::Answered, Some("Filed the note, I think."))]);
 
   assert_eq!(
     MemoDigest {
@@ -233,7 +233,7 @@ async fn a_usage_limit_stops_the_digest_with_its_notes_left_and_nobody_told() {
   let stage = noted().await;
 
   stage.sessions_write(vec![(CHUNK_PATH.to_owned(), CHUNK.to_owned())], vec![]);
-  stage.sessions_end(&[(Outcome::Limit, None)]);
+  stage.agency.limited();
 
   assert_eq!(
     MemoDigest {
@@ -262,7 +262,7 @@ async fn a_note_by_anyone_but_the_owner_is_no_owners_and_may_not_touch_a_rule_fo
       ..row_write(CHUNK_PATH, TITLE, &["tea"])
     }],
   );
-  stage.sessions_end(&[(Outcome::Answered, Some(SUCCESS_MARKER))]);
+  stage.sessions_end(&[(TurnOutcome::Answered, Some(SUCCESS_MARKER))]);
 
   assert_eq!(
     MemoDigest {
@@ -274,7 +274,7 @@ async fn a_note_by_anyone_but_the_owner_is_no_owners_and_may_not_touch_a_rule_fo
     1
   );
 
-  let starts = stage.agency.calls.of("start_session");
+  let starts = stage.agency.calls.of("editor_turn");
 
   assert!(starts[0]["prompt"].as_str().unwrap().contains("| member | this chat |"));
   assert_eq!(notes_left(&stage).await, 1);

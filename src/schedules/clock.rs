@@ -56,15 +56,13 @@ pub async fn watch_sweep(api: &Api) -> Result<(), String> {
   let now = now_seconds();
 
   end_with_closed_memories(&api.db, now).await.map_err(|why| why.to_string())?;
-  fire_timers(&api.db, api.agency.as_ref(), api.receiver.as_ref(), now)
-    .await
-    .map_err(|why| why.to_string())?;
+  fire_timers(&api.db, api.receiver.as_ref(), now).await.map_err(|why| why.to_string())?;
   api.launches().relaunch_watches(wall_clock()).await.map_err(|why| why.to_string())
 }
 
 /// One pass of the reminders: every one whose moment has come woken in its room.
 pub async fn reminder_pass(api: &Api) -> Result<(), String> {
-  fire_due(&api.db, api.agency.as_ref(), api.receiver.as_ref(), now_seconds())
+  fire_due(&api.db, api.receiver.as_ref(), now_seconds())
     .await
     .map(drop)
     .map_err(|why| why.to_string())

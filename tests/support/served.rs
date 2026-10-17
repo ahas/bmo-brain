@@ -14,9 +14,11 @@ use serde_json::Value;
 use super::agency::{FakeAgency, registration};
 use super::editing::repository;
 use super::gate::FakeGate;
+use super::job::FakeJob;
 use super::receiver::FakeReceiver;
 use super::scratch::Scratch;
 use super::sorting::prompts_root;
+use super::starter::FakeStarter;
 use super::{AGENT, OWNER};
 
 /// The token the served routes are called with.
@@ -31,6 +33,8 @@ pub struct Served {
   pub agency: Arc<FakeAgency>,
   pub receiver: Arc<FakeReceiver>,
   pub gate: Arc<FakeGate>,
+  pub job: Arc<FakeJob>,
+  pub starter: Arc<FakeStarter>,
   pub caller: Caller,
   pub base: String,
   pub brain: tempfile::TempDir,
@@ -52,11 +56,13 @@ pub async fn served() -> Served {
   let agency = Arc::new(FakeAgency::default());
   let receiver = Arc::new(FakeReceiver::default());
   let gate = Arc::new(FakeGate::default());
+  let job = Arc::new(FakeJob::default());
+  let starter = Arc::new(FakeStarter::default());
   let brain = tempfile::tempdir().unwrap();
   let data = tempfile::tempdir().unwrap();
 
   *agency.registrations.lock().unwrap() = vec![Registration {
-    brain_folder: String::new(),
+    brain_folder: Some(String::new()),
     label: Some("Helper".to_owned()),
     ..registration(AGENT)
   }];
@@ -68,6 +74,8 @@ pub async fn served() -> Served {
     agency: agency.clone(),
     receiver: receiver.clone(),
     gate: gate.clone(),
+    job: job.clone(),
+    starter: starter.clone(),
     brain_root: brain.path().to_path_buf(),
     data_root: data.path().to_path_buf(),
     prompts_root: prompts_root(),
@@ -93,6 +101,8 @@ pub async fn served() -> Served {
     agency,
     receiver,
     gate,
+    job,
+    starter,
     base,
     brain,
     data,

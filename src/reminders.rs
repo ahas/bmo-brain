@@ -13,8 +13,7 @@ use serde::Serialize;
 
 use crate::Failure;
 use crate::editors::archive::room_name;
-use crate::ports::agency::{Agency, QuietInstruction};
-use crate::ports::receiver::Receiver;
+use crate::ports::receiver::{QuietInstruction, Receiver};
 use crate::watches::{Item, item_of};
 
 /// How far past its moment a wake goes before it is told it comes late: a few ticks, so a wake delayed only by
@@ -542,11 +541,11 @@ async fn due(db: &DatabaseConnection, now: i64) -> Result<Vec<Reminder>, Failure
 }
 
 // One moment of a reminder taken: the row done with that moment, fired for good or moved to `next` for a repeating
-// one, and its wake handed to the agency, both or neither. False where the row no longer stands at the moment it was
+// one, and its wake handed to the receiver, both or neither. False where the row no longer stands at the moment it was
 // read at.
 async fn fire(
   db: &DatabaseConnection,
-  agency: &dyn Agency,
+  receiver: &dyn Receiver,
   reminder: &Reminder,
   wake: &str,
   next: Option<i64>,
@@ -584,7 +583,7 @@ async fn fire(
     kind: Some(WAKE_KIND.to_owned()),
   };
 
-  match agency.quiet_instruction(&instruction).await {
+  match receiver.quiet_instruction(&instruction).await {
     Ok(true) => {
       transaction.commit().await?;
 
@@ -606,7 +605,6 @@ async fn fire(
 /// Every reminder whose moment has come at `now`, in epoch seconds, woken in its own room; how many were.
 pub async fn fire_due(
   db: &DatabaseConnection,
-  agency: &dyn Agency,
   receiver: &dyn Receiver,
   now: i64,
 ) -> Result<usize, Failure> {
@@ -620,7 +618,7 @@ pub async fn fire_due(
     };
     let room = room_name(receiver, reminder.chat_id).await?;
 
-    if fire(db, agency, &reminder, &wake(&reminder, &room, memory.as_ref(), now, next), next).await? {
+    if fire(db, receiver, &reminder, &wake(&reminder, &room, memory.as_ref(), now, next), next).await? {
       fired += 1;
     }
   }

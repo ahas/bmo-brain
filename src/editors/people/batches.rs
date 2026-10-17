@@ -521,7 +521,7 @@ impl RoomWork for RoomRun<'_, '_> {
   }
 
   async fn resting(&mut self) -> Result<bool, Failure> {
-    resting(self.digest.ground.receiver).await
+    resting(self.digest.ground.agency).await
   }
 
   async fn paused(&mut self) -> Result<bool, Failure> {

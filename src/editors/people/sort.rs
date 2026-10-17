@@ -568,7 +568,7 @@ pub trait SortRoom: FailureCounts {
     message: &str,
     writes: &[FragmentWrite],
   ) -> impl Future<Output = Result<(), Failure>>;
-  /// Whether each of these item numbers is finished, as far as the agency knows them.
+  /// Whether each of these item numbers is finished, as far as bmo-job knows them.
   fn item_states(&mut self, ids: &[i64]) -> impl Future<Output = Result<HashMap<i64, bool>, Failure>>;
   fn record(&mut self, key: &str, count: i64) -> impl Future<Output = Result<(), Failure>>;
   fn clear(&mut self, key: &str) -> impl Future<Output = Result<(), Failure>>;
@@ -1147,7 +1147,7 @@ impl SortRoom for &PeopleDigest<'_> {
   }
 
   async fn resting(&mut self) -> Result<bool, Failure> {
-    resting(self.ground.receiver).await
+    resting(self.ground.agency).await
   }
 
   async fn lock(&mut self) -> Result<Option<HeldLock>, Failure> {
@@ -1212,9 +1212,9 @@ impl SortRoom for &PeopleDigest<'_> {
       return Ok(HashMap::new());
     }
 
-    let states = self.ground.agency.item_states(&unique).await?;
+    let states = self.ground.job.item_states(&unique).await?;
 
-    Ok(states.into_iter().map(|state| (state.item, state.finished)).collect())
+    Ok(states.into_iter().map(|state| (state.id, state.done)).collect())
   }
 
   async fn record(&mut self, key: &str, count: i64) -> Result<(), Failure> {

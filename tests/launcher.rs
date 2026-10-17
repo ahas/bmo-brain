@@ -8,8 +8,9 @@ mod support;
 use std::time::Duration;
 
 use bmo_brain::editors::people::launcher::{LAUNCHER_SLACK_MS, Launcher, wall_clock};
-use bmo_brain::ports::agency::{Launch, LaunchOutcome, Registration};
+use bmo_brain::ports::agency::{Registration, RunClock};
 use bmo_brain::ports::receiver::{Message, RoomAnswerers};
+use bmo_brain::schedules::apart::{Launch, LaunchOutcome};
 use bmo_brain::schedules::launches::Launches;
 use serde_json::Value;
 
@@ -49,14 +50,14 @@ async fn rooms(agents: &[&str]) -> Stage {
 
 // Every launch answered as started, the worker gone by the time the launcher looks.
 fn workers_end_at_once(stage: &Stage) {
-  *stage.agency.launch.lock().unwrap() = Some(Launch {
+  *stage.starter.answer.lock().unwrap() = Some(Launch {
     outcome: LaunchOutcome::Launched,
     why: None,
   });
 }
 
 fn launched(stage: &Stage) -> Vec<Value> {
-  stage.agency.calls.of("launch_unit")
+  stage.starter.calls.of("start")
 }
 
 fn units(stage: &Stage) -> Vec<String> {
@@ -114,7 +115,7 @@ async fn a_worker_already_standing_is_left_to_itself_and_the_next_room_goes_on()
   let stage = rooms(&[AGENT]).await;
 
   workers_end_at_once(&stage);
-  stage.agency.running.lock().unwrap().insert("bmo-people-digest-agent-a--200".to_owned());
+  stage.agency.alive.lock().unwrap().insert("bmo-people-digest-agent-a--200".to_owned());
 
   assert!(!launch(&stage).await);
   assert_eq!(units(&stage), ["bmo-people-digest-agent-a--100", "bmo-people-digest-agent-a--400"]);
@@ -124,7 +125,7 @@ async fn a_worker_already_standing_is_left_to_itself_and_the_next_room_goes_on()
 async fn a_refused_worker_counts_as_a_failure_and_every_room_is_still_tried() {
   let stage = rooms(&[AGENT]).await;
 
-  *stage.agency.launch.lock().unwrap() = Some(Launch {
+  *stage.starter.answer.lock().unwrap() = Some(Launch {
     outcome: LaunchOutcome::Refused,
     why: Some("No host takes it.".to_owned()),
   });
@@ -139,11 +140,11 @@ async fn every_agents_rooms_are_gone_through_in_turn_the_brain_roots_agent_first
 
   *stage.agency.registrations.lock().unwrap() = vec![
     Registration {
-      brain_folder: "agents/agent-b".to_owned(),
+      brain_folder: Some("agents/agent-b".to_owned()),
       ..registration(OTHER_AGENT)
     },
     Registration {
-      brain_folder: String::new(),
+      brain_folder: Some(String::new()),
       ..registration(AGENT)
     },
   ];
@@ -176,12 +177,12 @@ async fn waited(stage: &Stage, ends_after: Option<Duration>) -> (bool, u64) {
     clock: &clock,
   };
 
-  stage.agency.running.lock().unwrap().insert(WORKER.to_owned());
+  stage.agency.alive.lock().unwrap().insert(WORKER.to_owned());
 
   let ending = async {
     if let Some(after) = ends_after {
       tokio::time::sleep(after).await;
-      stage.agency.running.lock().unwrap().remove(WORKER);
+      stage.agency.alive.lock().unwrap().remove(WORKER);
     }
   };
   let (ended, ()) = tokio::join!(launcher.wait_for_kept(WORKER), ending);
@@ -219,9 +220,20 @@ async fn the_wait_follows_the_batch_a_worker_is_at_and_the_keep_the_agency_gave_
   let later = Stage::new().await;
   let base = BASE_MS / 1000;
 
-  kept.agency.cap_ends.lock().unwrap().insert(WORKER.to_owned(), base + 2_000);
-  kept.agency.kept.lock().unwrap().insert(WORKER.to_owned(), base + 2_500);
-  later.agency.cap_ends.lock().unwrap().insert(WORKER.to_owned(), base + 3_000);
+  kept.agency.clocks.lock().unwrap().insert(
+    WORKER.to_owned(),
+    RunClock {
+      cap_ends: Some(base + 2_000),
+      kept_until: Some(base + 2_500),
+    },
+  );
+  later.agency.clocks.lock().unwrap().insert(
+    WORKER.to_owned(),
+    RunClock {
+      cap_ends: Some(base + 3_000),
+      kept_until: None,
+    },
+  );
   tokio::time::pause();
 
   let (ended, seconds) = waited(&kept, None).await;

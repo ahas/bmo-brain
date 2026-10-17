@@ -1,6 +1,6 @@
 //! The watches an agent sets itself, as their runs and the routes read and end them (docs/memories.md,
 //! 「Watches」): the memos a watch's ending sends the agent that set it, the watch ended exactly once with its memo
-//! handed to the agency, a run's claim on its watch, a room's watches and reminders listed, and a watch called
+//! handed to the receiver, a run's claim on its watch, a room's watches and reminders listed, and a watch called
 //! off. Setting one is the memory rows' crate's; launching its run is the launches'.
 
 use brain_support::clock::clock;
@@ -13,8 +13,7 @@ pub use memory_rows::watches::{Watch, watch_name};
 
 use crate::Failure;
 use crate::editors::archive::room_name;
-use crate::ports::agency::{Agency, QuietInstruction};
-use crate::ports::receiver::Receiver;
+use crate::ports::receiver::{QuietInstruction, Receiver};
 
 /// The exit recorded for a check that was cut off.
 pub const TIMED_OUT_EXIT: i64 = -1;
@@ -358,11 +357,11 @@ pub struct Ending<'a> {
   pub unit: Option<&'a str>,
 }
 
-/// A standing watch ended with its memo handed to the agency for the agent that set it, both or neither: the watch
-/// is ended only once the agency has taken the memo. False where another run or pass ended it first.
+/// A standing watch ended with its memo handed to the receiver for the agent that set it, both or neither: the
+/// watch is ended only once the receiver has taken the memo. False where another run or pass ended it first.
 pub async fn end_with_memo(
   db: &DatabaseConnection,
-  agency: &dyn Agency,
+  receiver: &dyn Receiver,
   watch: &Watch,
   ending: &Ending<'_>,
   memo: &str,
@@ -407,7 +406,7 @@ pub async fn end_with_memo(
     kind: Some(MEMO_KIND.to_owned()),
   };
 
-  match agency.quiet_instruction(&instruction).await {
+  match receiver.quiet_instruction(&instruction).await {
     Ok(true) => {
       transaction.commit().await?;
 
@@ -430,7 +429,7 @@ pub async fn end_with_memo(
 /// run's first.
 pub async fn end_by_run(
   db: &DatabaseConnection,
-  agency: &dyn Agency,
+  receiver: &dyn Receiver,
   watch: &Watch,
   unit: &str,
   state: &'static str,
@@ -439,7 +438,7 @@ pub async fn end_by_run(
 ) -> Result<bool, Failure> {
   end_with_memo(
     db,
-    agency,
+    receiver,
     watch,
     &Ending {
       state,
@@ -499,7 +498,6 @@ pub async fn end_with_closed_memories(db: &DatabaseConnection, now: i64) -> Resu
 /// many were.
 pub async fn fire_timers(
   db: &DatabaseConnection,
-  agency: &dyn Agency,
   receiver: &dyn Receiver,
   now: i64,
 ) -> Result<usize, Failure> {
@@ -526,7 +524,7 @@ pub async fn fire_timers(
       unit: None,
     };
 
-    if end_with_memo(db, agency, &watch, &ending, &timer_memo(&watch, &room, item.as_ref()), now).await? {
+    if end_with_memo(db, receiver, &watch, &ending, &timer_memo(&watch, &room, item.as_ref()), now).await? {
       fired += 1;
     }
   }
@@ -730,7 +728,6 @@ pub async fn cancel(
 /// is what the clock launches a new run for, so it ends before its run is stopped.
 pub async fn stop_of_unit(
   db: &DatabaseConnection,
-  agency: &dyn Agency,
   receiver: &dyn Receiver,
   unit: &str,
   now: i64,
@@ -759,5 +756,5 @@ pub async fn stop_of_unit(
     unit: Some(unit),
   };
 
-  end_with_memo(db, agency, &watch, &cancelled, &memo, now).await
+  end_with_memo(db, receiver, &watch, &cancelled, &memo, now).await
 }

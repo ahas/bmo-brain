@@ -225,18 +225,8 @@ async fn a_reminder_whose_moment_came_wakes_its_agent_once_and_a_repeating_one_m
   let daily = api.reminder(AGENT, now - 60, Some("daily 09:00"), None).await;
   let later = api.reminder(AGENT, now + HOUR, None, None).await;
 
-  assert_eq!(
-    fire_due(api.scratch.db(), api.agency.as_ref(), api.receiver.as_ref(), now)
-      .await
-      .unwrap(),
-    2
-  );
-  assert_eq!(
-    fire_due(api.scratch.db(), api.agency.as_ref(), api.receiver.as_ref(), now)
-      .await
-      .unwrap(),
-    0
-  );
+  assert_eq!(fire_due(api.scratch.db(), api.receiver.as_ref(), now).await.unwrap(), 2);
+  assert_eq!(fire_due(api.scratch.db(), api.receiver.as_ref(), now).await.unwrap(), 0);
 
   let fired =
     |id: i64| api.scratch.count(r#"SELECT "fired" FROM "reminders" WHERE "id" = $1"#, vec![id.into()]);
@@ -252,7 +242,7 @@ async fn a_reminder_whose_moment_came_wakes_its_agent_once_and_a_repeating_one_m
       > now
   );
 
-  let wakes = api.agency.calls.of("quiet_instruction");
+  let wakes = api.receiver.calls.of("quiet_instruction");
 
   assert_eq!(wakes.len(), 2);
   assert_eq!(
@@ -269,14 +259,10 @@ async fn a_reminder_whose_moment_came_wakes_its_agent_once_and_a_repeating_one_m
   // A wake the agency will not take leaves the moment standing for the next pass.
   let refused = api.reminder(AGENT, now - 60, None, None).await;
 
-  *api.agency.quiet_refused.lock().unwrap() = true;
-  assert!(
-    fire_due(api.scratch.db(), api.agency.as_ref(), api.receiver.as_ref(), now)
-      .await
-      .is_err()
-  );
+  *api.receiver.quiet_refused.lock().unwrap() = true;
+  assert!(fire_due(api.scratch.db(), api.receiver.as_ref(), now).await.is_err());
   assert_eq!(fired(refused).await, 0);
-  *api.agency.quiet_refused.lock().unwrap() = false;
+  *api.receiver.quiet_refused.lock().unwrap() = false;
 
   // The clock's pass is the same firing, every thirty seconds from the start.
   reminder_pass(&api.api).await.unwrap();
@@ -360,7 +346,7 @@ async fn a_watch_is_ended_with_its_memo_before_its_unit_is_stopped() {
 
   assert_eq!(set["answered"], json!(true), "{set}");
 
-  let unit = api.agency.calls.of("launch_unit")[0]["unit"].as_str().unwrap().to_owned();
+  let unit = api.starter.calls.of("start")[0]["unit"].as_str().unwrap().to_owned();
 
   assert_eq!(api.post("/watches/stopped", json!({ "unit": unit })).await, json!({ "ended": true }));
   assert_eq!(api.post("/watches/stopped", json!({ "unit": unit })).await, json!({ "ended": false }));
@@ -369,7 +355,7 @@ async fn a_watch_is_ended_with_its_memo_before_its_unit_is_stopped() {
     json!({ "ended": false })
   );
 
-  let memos = api.agency.calls.of("quiet_instruction");
+  let memos = api.receiver.calls.of("quiet_instruction");
   let text = memos[0]["text"].as_str().unwrap();
 
   assert_eq!(memos.len(), 1);

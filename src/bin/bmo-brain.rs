@@ -134,7 +134,6 @@ async fn run(config: &Config, command: Command) -> Result<u8, String> {
       let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("/"));
       let watched = WatchRun {
         db: &api.db,
-        agency: api.agency.as_ref(),
         receiver: api.receiver.as_ref(),
         cwd: &cwd,
         slice: IDLE_SLICE,

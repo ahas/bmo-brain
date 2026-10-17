@@ -77,3 +77,33 @@ async fn a_task_that_is_not_there_is_no_prompt() {
     Err(PromptFailure::Unread { .. })
   ));
 }
+
+#[tokio::test]
+async fn a_rulebook_the_agency_does_not_hand_over_is_left_out_with_its_heading() {
+  let dir = tempfile::tempdir().unwrap();
+  let root = dir.path();
+
+  fs::create_dir_all(root.join("rules")).unwrap();
+  fs::create_dir_all(root.join("people")).unwrap();
+  fs::write(root.join("rules/fragment-tool.md"), "The fragment tool rulebook.").unwrap();
+  fs::write(root.join("rules/recollection.md"), "The recollection rulebook.").unwrap();
+  fs::write(root.join("people/task.md"), "Write the book.").unwrap();
+
+  let agency = FakeAgency::default();
+  *agency.no_rulebooks.lock().unwrap() = true;
+  let prompts = Prompts {
+    agency: &agency,
+    root,
+  };
+  let prompt = fragment_writer(prompts, "people", "task.md", &[]).await.unwrap();
+
+  assert_eq!(
+    prompt,
+    [
+      "RULEBOOK prompts/rules/fragment-tool.md:\nThe fragment tool rulebook.",
+      "RULEBOOK prompts/rules/recollection.md:\nThe recollection rulebook.",
+      "Write the book.",
+    ]
+    .join("\n\n")
+  );
+}
