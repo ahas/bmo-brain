@@ -26,6 +26,7 @@ pub const TOKEN: &str = "brain-token";
 pub const PROGRAM: [&str; 3] = ["bmo-brain", "--config", "brain.toml"];
 
 pub struct Served {
+  pub api: Arc<Api>,
   pub scratch: Scratch,
   pub agency: Arc<FakeAgency>,
   pub receiver: Arc<FakeReceiver>,
@@ -81,9 +82,12 @@ pub async fn served() -> Served {
   let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
   let base = format!("http://{}", listener.local_addr().unwrap());
 
-  tokio::spawn(async move { axum::serve(listener, router(api)).await.unwrap() });
+  let routed = api.clone();
+
+  tokio::spawn(async move { axum::serve(listener, router(routed)).await.unwrap() });
 
   Served {
+    api,
     caller: caller(&base, TOKEN),
     scratch,
     agency,

@@ -445,6 +445,14 @@ knows its unit by it, and its clock, its brain hold and a failure's record are n
 - **The due digests:** the memo digest launches `bmo-digest`; the person book launches `bmo-people-digest` and,
   for every agent keeping a long-term memory, the brain root's first, that agent's `bmo-people-sort-<agent>`, so
   one agent's sort never waits on another's. Each is launched only where no run of its unit stands.
+- **The brain's clock** runs inside `serve`, each pass on its own period and never overlapping the one before it;
+  a pass that fails is said on the service's error output and the next goes on.
+  - The memo digest is due three minutes after the service starts and every hour after.
+  - The person book is due five minutes after it starts and every three hours after.
+  - The watch sweep runs every thirty seconds, its first pass thirty seconds after the start, once the agency's
+    running units can be told: it ends, with no memo, every standing watch serving a memory no longer open; fires
+    every timer whose moment has come, one that came due while the brain was down included, with its memo; then
+    launches again the watches nobody holds, as below.
 - **Before a room's session folds,** the agent's worker of that room is launched, unless the agent's book is not
   written from the room; where that cannot be read, it is launched all the same.
 - **A watch's run** is named by its unit: the brain writes the unit and the moment it was armed on the watch

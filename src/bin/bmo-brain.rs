@@ -1,6 +1,7 @@
 //! The brain service's binary (docs/boundary-api.md, 「Configuration」 and 「Runs launched apart」): `serve` runs the
-//! migrations and answers the routes on the configured address until it is told to stop; the run words do one
-//! piece of work the brain launched apart, under the unit `--unit` names, and end with its exit code.
+//! migrations, stands the brain's clock and answers the routes on the configured address until it is told to stop;
+//! the run words do one piece of work the brain launched apart, under the unit `--unit` names, and end with its exit
+//! code.
 
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -10,6 +11,7 @@ use bmo_brain::api::router;
 use bmo_brain::commands::{self, PeopleRun};
 use bmo_brain::config::Config;
 use bmo_brain::migration::migrate;
+use bmo_brain::schedules::clock;
 use bmo_brain::schedules::launches::Launches;
 use bmo_brain::watch_runner::{IDLE_SLICE, WatchRun, watch};
 use clap::{Parser, Subcommand};
@@ -89,10 +91,17 @@ async fn serve(config: &Config) -> Result<(), String> {
 
   println!("bmo-brain: answering on {}", config.listen);
 
-  axum::serve(listener, router(api))
+  let clock = clock::stand(api.clone());
+  let served = axum::serve(listener, router(api))
     .with_graceful_shutdown(stopped())
     .await
-    .map_err(|why| why.to_string())
+    .map_err(|why| why.to_string());
+
+  for pass in clock {
+    pass.abort();
+  }
+
+  served
 }
 
 async fn run(config: &Config, command: Command) -> Result<u8, String> {

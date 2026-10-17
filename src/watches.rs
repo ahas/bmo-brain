@@ -12,7 +12,9 @@ use serde::Serialize;
 pub use memory_rows::watches::{Watch, watch_name};
 
 use crate::Failure;
+use crate::editors::archive::room_name;
 use crate::ports::agency::{Agency, QuietInstruction};
+use crate::ports::receiver::Receiver;
 
 /// The exit recorded for a check that was cut off.
 pub const TIMED_OUT_EXIT: i64 = -1;
@@ -440,6 +442,89 @@ pub async fn end_by_run(
     now,
   )
   .await
+}
+
+fn watch_of_row(row: &QueryResult) -> Result<Watch, Failure> {
+  Ok(Watch {
+    id: row.try_get("", "id")?,
+    chat_id: row.try_get("", "chat_id")?,
+    by_chat: row.try_get("", "by_chat")?,
+    name: row.try_get("", "name")?,
+    note: row.try_get("", "note")?,
+    memory_id: row.try_get("", "memory_id")?,
+    created_at: row.try_get("", "created_at")?,
+  })
+}
+
+const WATCH_COLUMNS: &str = r#""id", "chat_id", "by_chat", "name", "note", "memory_id", "created_at""#;
+
+/// Every standing watch serving a memory that is no longer open ended, with no memo: the agent closing the row
+/// already knows, and a run holding a check stops when it next claims its watch. How many were.
+pub async fn end_with_closed_memories(db: &DatabaseConnection, now: i64) -> Result<usize, Failure> {
+  let serving = all(
+    db,
+    &format!(r#"SELECT {WATCH_COLUMNS} FROM "watches" WHERE "state" = 'active' AND "memory_id" IS NOT NULL ORDER BY "id""#),
+    vec![],
+  )
+  .await?;
+  let mut ended = 0;
+
+  for row in serving {
+    let watch = watch_of_row(&row)?;
+    let Some(memory_id) = watch.memory_id else { continue };
+
+    if item_of(db, memory_id).await?.is_some_and(|item| item.open()) {
+      continue;
+    }
+
+    ended += run(
+      db,
+      r#"UPDATE "watches" SET "state" = 'cancelled', "ended_at" = $1 WHERE "id" = $2 AND "state" = 'active'"#,
+      vec![now.into(), watch.id.into()],
+    )
+    .await? as usize;
+  }
+
+  Ok(ended)
+}
+
+/// Every timer whose moment has come at `now`, in epoch seconds, fired with its memo to the room that set it; how
+/// many were.
+pub async fn fire_timers(
+  db: &DatabaseConnection,
+  agency: &dyn Agency,
+  receiver: &dyn Receiver,
+  now: i64,
+) -> Result<usize, Failure> {
+  let due = all(
+    db,
+    &format!(
+      r#"SELECT {WATCH_COLUMNS} FROM "watches"
+         WHERE "state" = 'active' AND "kind" = 'timer' AND COALESCE("due_at", 0) <= $1 ORDER BY "id""#
+    ),
+    vec![now.into()],
+  )
+  .await?;
+  let mut fired = 0;
+
+  for row in due {
+    let watch = watch_of_row(&row)?;
+    let item = match watch.memory_id {
+      Some(id) => item_of(db, id).await?,
+      None => None,
+    };
+    let room = room_name(receiver, watch.chat_id).await?;
+    let ending = Ending {
+      state: "fired",
+      unit: None,
+    };
+
+    if end_with_memo(db, agency, &watch, &ending, &timer_memo(&watch, &room, item.as_ref()), now).await? {
+      fired += 1;
+    }
+  }
+
+  Ok(fired)
 }
 
 /// One watch as the list route answers it.
