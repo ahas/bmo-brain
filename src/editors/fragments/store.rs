@@ -122,8 +122,67 @@ fn row_of(row: &QueryResult) -> Result<Row, Fault> {
   })
 }
 
+/// What a row has come to beside what it says: how often and when a turn last attached it, who set it and when,
+/// and when a person's hand was laid on its standing.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Standing {
+  pub last_hit_at: Option<i64>,
+  pub hits: i64,
+  pub set_by: Option<i64>,
+  pub set_at: i64,
+  pub hand_at: Option<i64>,
+}
+
+fn standing_of(row: &QueryResult) -> Result<Standing, Fault> {
+  Ok(Standing {
+    last_hit_at: row.try_get("", "last_hit_at")?,
+    hits: row.try_get("", "hits")?,
+    set_by: row.try_get("", "set_by")?,
+    set_at: row.try_get("", "set_at")?,
+    hand_at: row.try_get("", "hand_at")?,
+  })
+}
+
 /// The rows a filter asks for, in the order their entries stand: by kind, room, position and id.
 pub async fn rows<C: ConnectionTrait>(db: &C, filter: &FragmentFilter) -> Result<Vec<Row>, Fault> {
+  filtered(db, filter).await?.iter().map(row_of).collect()
+}
+
+/// The rows a filter asks for as [`rows`] reads them, each with what it has come to.
+pub async fn rows_standing<C: ConnectionTrait>(
+  db: &C,
+  filter: &FragmentFilter,
+) -> Result<Vec<(Row, Standing)>, Fault> {
+  filtered(db, filter)
+    .await?
+    .iter()
+    .map(|row| Ok((row_of(row)?, standing_of(row)?)))
+    .collect()
+}
+
+/// A turn's attaching of one row counted on it: the active row of that kind, room, owner and slug that the agent
+/// may read, its own or one marked for every agent.
+pub async fn count_hit<C: ConnectionTrait>(
+  db: &C,
+  agent: &str,
+  hit: (&str, Option<i64>, Option<i64>, &str),
+  now: i64,
+) -> Result<(), Fault> {
+  let (kind, chat_id, owner, slug) = hit;
+
+  run(
+    db,
+    r#"UPDATE "fragments" SET "hits" = "hits" + 1, "last_hit_at" = $1
+       WHERE "kind" = $2 AND "chat_id" IS NOT DISTINCT FROM $3 AND "owner" IS NOT DISTINCT FROM $4
+         AND "slug" = $5 AND "active" = 1 AND ("agent" = $6 OR "all_agents" = 1)"#,
+    vec![now.into(), kind.into(), chat_id.into(), owner.into(), slug.into(), agent.into()],
+  )
+  .await?;
+
+  Ok(())
+}
+
+async fn filtered<C: ConnectionTrait>(db: &C, filter: &FragmentFilter) -> Result<Vec<QueryResult>, Fault> {
   let mut terms = vec![];
   let mut values: Vec<sea_orm::Value> = vec![];
   let next = |value: sea_orm::Value, values: &mut Vec<sea_orm::Value>| {
@@ -171,7 +230,7 @@ pub async fn rows<C: ConnectionTrait>(db: &C, filter: &FragmentFilter) -> Result
     r#"SELECT * FROM "fragments" {filtered} ORDER BY "kind", COALESCE("chat_id", 0), "position", "id""#
   );
 
-  all(db, &sql, values).await?.iter().map(row_of).collect()
+  all(db, &sql, values).await
 }
 
 /// A filter for one kind.

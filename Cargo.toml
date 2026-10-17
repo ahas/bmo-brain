@@ -37,6 +37,8 @@ edition.workspace = true
 publish = false
 
 [dependencies]
+# The routes the service answers on.
+axum.workspace = true
 brain-support.workspace = true
 # The moments the editors' prompts show.
 chrono.workspace = true
@@ -45,6 +47,8 @@ fragment-desk.workspace = true
 futures-util.workspace = true
 # Whether a lock ticket's process lives, and the account's home a commit's git reads.
 libc.workspace = true
+# The events a memory row waits on.
+memory-rows.workspace = true
 # A desk's file name.
 rand.workspace = true
 # The stretches a document is cut in, a prompt's marks and a sheet's days.
@@ -58,9 +62,6 @@ serde_json.workspace = true
 tokio.workspace = true
 
 [dev-dependencies]
-# The stub servers the ports' clients are tested against.
-axum.workspace = true
-memory-rows.workspace = true
 sqlx.workspace = true
 # The brain folders the editors' tests lay down.
 tempfile.workspace = true

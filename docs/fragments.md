@@ -103,7 +103,8 @@ owner normalised to a fixed value so the uniqueness holds across the rows that n
 - **A room's pieces and the shared ones:** room rules of that room; knowledge chunks of that room and the
   shared ones; the room part of the person book of that room, where it keeps one; the common part of the people
   who have spoken in that room, as the receiver says; every shipped piece.
-- **Where several indexes stand together,** the common books follow the room's part, by the person's id.
+- **Where several indexes stand together,** the common books follow the room's part, by the person's id, and
+  the room's knowledge chunks and the shared ones stand as one index, in position order.
 - **The bodies are read through the document routes,** which refuse a slug outside what the room may be
   offered (`knowledge.md`, `people-book.md`).
 - **What a turn leaves on a row:** the gate hands back the pieces it attached, and the brain writes each one's

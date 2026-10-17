@@ -38,10 +38,25 @@ pub struct Said<'a> {
   pub standing: Option<&'a Row>,
 }
 
+/// Which of a library's rows a room may be offered (docs/fragments.md, 「What a room may be offered」), each read
+/// among the active rows of the turn's agent and those marked for every agent.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Offering {
+  /// The rows of the room alone.
+  Room,
+  /// The rows of the room and those naming no room, as one index in position order.
+  RoomWithShared,
+  /// The room's part where the room keeps one, then the part naming no room of each person who has spoken in
+  /// the room, by the person's number.
+  RoomPartWithSpeakers,
+}
+
 /// A library its editors write, read inside one agent's folder: every path it is asked about is relative to
 /// that folder. A new brain library is added as one more member.
 pub trait Library: Sync {
   fn kind(&self) -> &'static str;
+  /// Which of its rows a room may be offered.
+  fn offering(&self) -> Offering;
   /// Whether a piece is finished once every item it is tied to is.
   fn settles(&self) -> bool;
   /// Whether a path is one of this library's pieces.
@@ -82,6 +97,10 @@ impl RoomRules {
 impl Library for RoomRules {
   fn kind(&self) -> &'static str {
     "room-rule"
+  }
+
+  fn offering(&self) -> Offering {
+    Offering::Room
   }
 
   fn settles(&self) -> bool {
@@ -138,6 +157,10 @@ impl Knowledge {
 impl Library for Knowledge {
   fn kind(&self) -> &'static str {
     "library-knowledge"
+  }
+
+  fn offering(&self) -> Offering {
+    Offering::RoomWithShared
   }
 
   fn settles(&self) -> bool {
@@ -267,6 +290,10 @@ impl PersonBook {
 impl Library for PersonBook {
   fn kind(&self) -> &'static str {
     "person-book"
+  }
+
+  fn offering(&self) -> Offering {
+    Offering::RoomPartWithSpeakers
   }
 
   fn settles(&self) -> bool {

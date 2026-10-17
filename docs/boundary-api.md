@@ -142,7 +142,11 @@ The rows the gate reads and the facts it hands back:
 | `POST /memory/standing` | `agent`, `chatId` | `rows`: the room's open rows that wait on nothing and the errands whose event has come, oldest first. States unmoved for twelve hours are released first. |
 | `POST /memory/conditions` | `agent`, `chatId` | `rows`: `slug`, `condition`, `action` of every open row with a condition, the room's own and the global rows whose reach takes in the room's kind. Rows unmatched for sixty days are withered first, at most once an hour for a room. |
 | `POST /memory/matched` | `agent`, `chatId`, `matched` (slugs), `spent` (slugs) | `ok`. A matched row's count and last match are written; a spent row is taken down with the matcher as its reason. |
-| `POST /memory/events` | `agent`, `chatId`, `events` (each `kind`, `item` or null) | `rows`: the rows the events wake, by the event alone. An errand's first meeting is written on it. |
+| `POST /memory/events` | `agent`, `chatId`, `events` (each `kind`, `item` or null) | `rows`: the rows the events wake, by the event alone: the room's situation rows and the global rows that reach it. Every errand an event wakes, of any agent and room, has its first meeting written on it, and each row answered its count and last match. |
+
+`POST /memory/standing` and `POST /memory/events` answer each row whole, in the row shape below. A row's kind of
+room is read off the receiver's roads: a global row reaches the room where its `reach` is `all` or the room's
+kind (`owner` or `group`).
 
 The console's routes:
 
@@ -195,7 +199,7 @@ The rows the gate reads, and what it hands back:
 | Route | Body | Answer |
 |---|---|---|
 | `POST /fragments/offer` | `agent`, `chatId`, `kinds` | `fragments`: the active rows of those kinds the turn's agent may be offered in the room, in position order (「What a room may be offered」 in `fragments.md`) |
-| `POST /fragments/hits` | `agent`, `chatId`, `attached` (each `kind`, `chatId`, `owner`, `slug`) | `ok`; each attached row's count and last hit are written |
+| `POST /fragments/hits` | `agent`, `chatId`, `attached` (each `kind`, `chatId`, `owner`, `slug`) | `ok`; each attached row's count and last hit are written, the row found by those four among the active rows the turn's agent may read |
 
 The console's and the hand writer's routes:
 
