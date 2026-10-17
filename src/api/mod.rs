@@ -1,9 +1,11 @@
 //! The brain's routes (docs/boundary-api.md, 「Routes the brain serves」): what the gate reads a turn's raw material
 //! by and hands its facts back on, the memory tools' and the fragment table's routes, the shipped libraries, the
-//! digests, the brain holds and the chat-session summaries, each subject in a module of its own. The brain selects
+//! digests, the brain holds, the chat-session summaries and the console's switches, each subject in a module of its
+//! own. The brain selects
 //! nothing; it answers for one agent at a time, and every route takes the brain's token and answers by the wire
 //! conventions.
 
+pub mod console;
 pub mod digests;
 pub mod fragments;
 pub mod gate;
@@ -97,12 +99,14 @@ impl Api {
   }
 }
 
-/// A non-2xx answer: its status, its code and the English sentence saying what went wrong.
+/// A non-2xx answer: its status, its code, the English sentence saying what went wrong, and for a conflict the
+/// refusal code of the row's state.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ApiError {
   pub status: StatusCode,
   pub code: &'static str,
   pub error: String,
+  pub refusal: Option<&'static str>,
 }
 
 impl ApiError {
@@ -112,6 +116,27 @@ impl ApiError {
       status: StatusCode::BAD_REQUEST,
       code: "bad-request",
       error: error.into(),
+      refusal: None,
+    }
+  }
+
+  /// A row the request names that does not exist.
+  pub fn not_found(error: impl Into<String>) -> Self {
+    Self {
+      status: StatusCode::NOT_FOUND,
+      code: "not-found",
+      error: error.into(),
+      refusal: None,
+    }
+  }
+
+  /// A request the row's state contradicts, with the refusal code naming that state.
+  pub fn conflict(refusal: &'static str, error: impl Into<String>) -> Self {
+    Self {
+      status: StatusCode::CONFLICT,
+      code: "conflict",
+      error: error.into(),
+      refusal: Some(refusal),
     }
   }
 }
@@ -122,13 +147,19 @@ impl From<Failure> for ApiError {
       status: StatusCode::INTERNAL_SERVER_ERROR,
       code: "failed",
       error: failure.to_string(),
+      refusal: None,
     }
   }
 }
 
 impl IntoResponse for ApiError {
   fn into_response(self) -> Response {
-    (self.status, Json(json!({ "code": self.code, "error": self.error }))).into_response()
+    let body = match self.refusal {
+      Some(refusal) => json!({ "code": self.code, "error": self.error, "refusal": refusal }),
+      None => json!({ "code": self.code, "error": self.error }),
+    };
+
+    (self.status, Json(body)).into_response()
   }
 }
 
@@ -191,6 +222,7 @@ async fn authorised(State(api): State<Arc<Api>>, request: Request, next: Next) -
       status: StatusCode::UNAUTHORIZED,
       code: "unauthorized",
       error: "The bearer token is missing or wrong.".to_owned(),
+      refusal: None,
     }
     .into_response();
   }
@@ -203,6 +235,7 @@ async fn no_route() -> ApiError {
     status: StatusCode::NOT_FOUND,
     code: "no-route",
     error: "No route answers at this method and path.".to_owned(),
+    refusal: None,
   }
 }
 
@@ -229,6 +262,7 @@ pub fn router(api: Arc<Api>) -> Router {
     .merge(digests::routes())
     .merge(holds::routes())
     .merge(summaries::routes())
+    .merge(console::routes())
     .fallback(no_route)
     .layer(middleware::from_fn_with_state(api.clone(), authorised))
     .with_state(api)

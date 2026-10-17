@@ -50,7 +50,8 @@ pub struct MemoryRow {
   pub moved_at: Option<i64>,
 }
 
-fn row_of(row: &QueryResult) -> Result<MemoryRow, Failure> {
+/// A memory row read whole off the table.
+pub fn row_of(row: &QueryResult) -> Result<MemoryRow, Failure> {
   Ok(MemoryRow {
     id: row.try_get("", "id")?,
     agent: row.try_get("", "agent")?,

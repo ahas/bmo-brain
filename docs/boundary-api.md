@@ -96,7 +96,7 @@ Every non-2xx answer carries `code` (a string below) and `error` (an English sen
 | 404 | `no-route` | no route at this method and path |
 | 404 | `not-found` | the row or run the request names does not exist |
 | 409 | `not-ready` | the service is up but cannot answer yet: its database or brain folder is not open |
-| 409 | `conflict` | the request contradicts the row's state; the answer carries the refusal code as well |
+| 409 | `conflict` | the request contradicts the row's state; the answer carries the refusal code as well, in `refusal` |
 | 500 | `failed` | the service failed while answering; the sentence is the failure |
 
 ## The turn a request is for
@@ -159,14 +159,15 @@ The console's routes:
 
 | Route | Body | Answer |
 |---|---|---|
-| `GET /memories` | query `agent` and `chat`, both optional | `memories`: every row, newest first |
-| `POST /memories/active` | `slug`, `active`, `why` (required to take a row down) | `ok` and the row as it now stands |
+| `GET /memories` | query `agent` and `chat`, both optional | `memories`: every row, or one agent's, or one room's, newest first; 400 where `chat` does not start with a whole number |
+| `POST /memories/active` | `slug`, `active`, `why` (required to take a row down) | `ok` and `memory`, the row as it now stands |
 
 A row carries `id`, `agent`, `slug`, `type`, `chatId`, `reach`, `condition`, `action`, `forUser`, `messageId`,
 `todoId`, `setBy`, `setAt`, `active`, `lastHitAt`, `hits`, `doneAt`, `doneText`, `downReason`, `downAt`,
 `candidateWhy`, `candidateAt`, `event` (`kind`, `item`), `eventMetAt` and `movedAt`. `POST /memories/active`
-answers 400 when `slug` or `active` is missing or when a row taken down carries no `why`, 404 for no such row,
-and 409 with the code `missing`, `other-room`, `already-up` or `already-down`.
+answers 400 when `slug` or `active` is missing or when a row taken down carries no `why`, 404 `not-found` for no
+such row, and 409 `conflict` with the refusal `missing` (the row went while it was changed), `other-room` (it
+moved to another room meanwhile), `already-up` or `already-down`. A slug names one row whatever its agent.
 
 ### Notes
 
@@ -213,7 +214,7 @@ The console's and the hand writer's routes:
 | Route | Body | Answer |
 |---|---|---|
 | `GET /fragments` | query `kind`, `chat`, `person`, `item`, `text`, `down`, all optional | `fragments`: the rows that are up, or with `down` every row, narrowed by a kind, a room, a person, an item, or a word their title or a keyword carries; 400 for a kind there is none of |
-| `POST /fragments/active` | `kind`, `slug`, `active`, `chatId` or null, `owner` or null | `ok` and the row; 404 for no such row |
+| `POST /fragments/active` | `kind`, `slug`, `active`, `chatId` or null, `owner` or null, `agent` or null | `ok` and `fragment`, the row as it now stands, its standing and its hand set to `active` (「A standing set by hand」 in `fragments.md`); the row is the named agent's, the chat agent's where none is named. 400 for a kind there is none of or a field missing, 404 `not-found` for no such row |
 | `POST /fragments/write` | `path`, `title`, `keywords`, `items`, `shared` or null, `chatId` or null, `forEveryAgent` or null | a reading of the row's index line; refused `row-refused` where the row checks refuse it, with the reasons; the index files are drawn after it. A knowledge chunk new to the table names `shared` or a `chatId` |
 | `POST /fragments/remove` | `path` | a reading; refused `body-stands` where the file still stands |
 | `POST /fragments/check` | `kind` or null | `drift` (each `trouble`: `unlisted`, `bodiless` or `moved`, with `kind`, `chatId`, `owner`, `slug` and `said`) and `titles` (each refused title's `kind`, `chatId`, `owner`, `slug`, `path`, `title` and `problem`, and `counted`: each brain kind's refused and standing rows) (「The drift check」 in `fragments.md`) |

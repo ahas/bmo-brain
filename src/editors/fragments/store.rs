@@ -589,6 +589,38 @@ pub async fn kind_labels<C: ConnectionTrait>(db: &C) -> Result<Vec<(String, Stri
     .collect()
 }
 
+/// A person's standing laid on one row of an agent, named by its kind, room, owner and slug: its standing and its
+/// hand both set to `active`, nothing else written. The row as it then stands, or none where no row is named so.
+pub async fn set_hand<C: ConnectionTrait>(
+  db: &C,
+  agent: &str,
+  named: (&str, Option<i64>, Option<i64>, &str),
+  active: bool,
+  now: i64,
+) -> Result<Option<(Row, Standing)>, Fault> {
+  let (kind, chat_id, owner, slug) = named;
+  let row = one(
+    db,
+    r#"UPDATE "fragments" SET "active" = $1, "hand" = $1, "hand_at" = $2
+       WHERE "kind" = $3 AND "agent" = $4 AND COALESCE("chat_id", 0) = $5 AND COALESCE("owner", 0) = $6
+         AND "slug" = $7
+       RETURNING *"#,
+    vec![
+      i64::from(active).into(),
+      now.into(),
+      kind.into(),
+      agent.into(),
+      chat_id.unwrap_or(0).into(),
+      owner.unwrap_or(0).into(),
+      slug.into(),
+    ],
+  )
+  .await?;
+
+  row.map(|row| Ok((row_of(&row)?, standing_of(&row)?))).transpose()
+}
+
+/// The moment now, in whole seconds.
 pub fn now_seconds() -> i64 {
   SystemTime::now()
     .duration_since(UNIX_EPOCH)
