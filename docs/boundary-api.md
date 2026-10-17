@@ -246,8 +246,7 @@ A watch's run is the brain's own binary, `watch-runner <id> <unit>` (「Runs lau
 its watch as these routes do. A memo goes to the agent that set the watch, in the room that set it, as a quiet
 instruction of kind `watch`; the watch is ended only once the receiver has taken the memo.
 
-The agency does not call `POST /watches/stopped` yet before it stops a watch's unit (row #1782), and no tool
-sets or cancels a reminder yet: the send tool's remind entry, whose repository is not made, is to post
+No tool sets or cancels a reminder yet: the send tool's remind entry, whose repository is not made, is to post
 `POST /reminders/set` and `POST /reminders/cancel` (row #1784).
 
 ### Fragments
@@ -446,17 +445,17 @@ agency which documents moved.
 
 | Operation | Route | Sends | Answers | Served |
 |---|---|---|---|---|
-| registrations | `GET /agents` | none | `agents`: each agent's `name`, which is its registration key, `label` (or null), `brainFolder` (relative to the brain root, empty for the root), `awake`, `recollectorRegistration` (or null) | `name` and `label` only; `brainFolder`, `awake` and `recollectorRegistration` not yet (row #1781). Meanwhile an agent answered with no brain folder keeps no long-term memory, so only the chat agent, at the root, is recollected |
+| registrations | `GET /agents` | none | `agents`: every agent, the resting among them, each its `name`, which is its registration key, `label` (or null), `awake`, `brainFolder` (relative to the brain root, empty for the root, or null for an agent that keeps no long-term memory), `recollectorRegistration` (or null) | yes |
 | editor session | `POST /session/start` | `agent`: the work key; `scope`: `{"kind": "editor"}` | `id`, `agent`, `scope` | yes |
 | the turn's events | `GET /events?kinds=turn-started,turn-ended` | none | server-sent events: `turn-started` with `session`, `run`, `at`; `turn-ended` with `session`, `run`, `outcome` (`answered`, `blocked`, `stopped` or `failed`), `answer` where it answered, `reason` where it failed | yes |
-| editor turn | `POST /session/turn` | `session`, `prompt`; and the run's parts: `run`, the name the brain gives the run; `parent`, the unit the batch runs in, or null; `agent`, whose memory it writes; `chatId`; `step` and `steps` (or null); `workdir`, the agent's brain folder relative to the brain root; `desk`; `registration`, the agent's recollector registration, or null | `delivery` (`taken` or `blocked`) once the turn has ended; a fault `session-busy` under 409 while the session carries a turn | `session` and `prompt` only: the run's parts and several turns at once on one editor session not yet (row #1780). Meanwhile the run goes out on the key's road in the brain root, without the desk in its record, and a turn met by `session-busy` asks again every five seconds |
+| editor turn | `POST /session/turn` | `session`, `prompt`; and the run's parts: `run`, the name the brain gives the run; `parent`, the unit the batch runs in, or null; `agent`, whose memory it writes; `chatId`; `step` and `steps` (or null); `workdir`, the agent's brain folder relative to the brain root; `desk`; `registration`, the agent's recollector registration, or null | `delivery` (`taken` or `blocked`) once the turn has ended; several turns go at once on one editor session, and a fault `session-busy` under 409 answers only a turn whose `run` is already going there, which asks again every five seconds; a `workdir` that leaves the brain root is refused under 422 | yes |
 | run stop | `POST /runs/stop` | `run`, `reason` | `ok` | yes |
-| run clock | not named yet | `run` | `capEnds`: the moment the clocked run of that name, or under that name as its parent, runs out of its bound, the latest where several stand, else null; `keptUntil`: the moment a keep or an open ask on it stands until, else null | no (row #1780). Meanwhile neither is read: no run is kept, and a wait sized on a run's clock ends at its own length |
-| editor cap | not named yet | `workKey`, `agent` | `capSeconds`: the bound a run of that key for that agent carries | no (row #1780). Meanwhile the cap is thirty minutes, the editor runs' clock the agency's `docs/agent-control.md` states |
+| run clock | `GET /runs/clock?run=` | `run` | `capEnds`: the moment the clocked run of that name, or under that name as its parent, runs out of its bound, the latest where several stand, else null; `keptUntil`: the moment a keep or an open ask on it stands until, else null; both in epoch milliseconds | yes |
+| editor cap | `GET /editors/cap?workKey=&agent=` | `workKey`, `agent` | `capSeconds`: the bound a run of that key for that agent carries | yes |
 | alive | `POST /runs/alive` | `names` | `answered` and `alive`, those of the names a unit, an open execution or a pane's run holds, or null where nobody could say | yes |
 | rest | `GET /rest` | none | `resting` (boolean), `until` (epoch seconds, or null) and `kind` (`limit` or `outage`) | yes |
-| rulebook read | not named yet | `names` | `rulebooks`: each named rulebook's `name` and `text`, trimmed, in the order asked | no (row #1781). Meanwhile a writer's prompt goes without the agency's rulebooks, each left out with its heading |
-| document reload | `POST /documents/reload` | `paths`, relative to the brain root; `now` false; and `agent` and `rooms` | `paths` and `now`, as published on `documents-moved` | `paths` and `now` only: `agent` and `rooms` not yet (row #1781), so which rooms a document concerns is left to the unit holding the rooms |
+| rulebook read | `GET /rulebooks?names=` | `names`, comma-separated | `rulebooks`: each named rulebook's `name` and `text`, trimmed, in the order asked; a name that is none of the agency's refused under 404 | yes |
+| document reload | `POST /documents/reload` | `paths`, relative to the brain root; `now` false; and `agent` and `rooms` | `paths`, `now`, `agent` and `rooms`, as published on `documents-moved`, which the unit holding the rooms tells only that agent's sessions in those rooms | yes |
 
 How a recollector run goes:
 
@@ -468,11 +467,10 @@ How a recollector run goes:
   the brain's: the batch's unit, or the service's unit where the batch runs in none, then the work key, the
   agent, the room and the moment it starts, so no two runs share one. The agency keeps the run's record and the
   usage it spent under the work key.
-- **The end** is the turn's `turn-ended`, the one naming the run the brain gave, or, where the agency does not
-  carry that name, the one on the session after the brain's turn started: `answered` with an answer is the
-  run's answer; `answered` with none, `blocked`, `stopped` and `failed` fail the batch with the reason; a
-  `failed` while the agency's rest stands with kind `limit` is a usage limit, and the run stops without a retry.
-  The brain writes no rest.
+- **The end** is the turn's `turn-ended`, the one naming the run the brain gave, since several turns go on one
+  session at once: `answered` with an answer is the run's answer; `answered` with none, `blocked`, `stopped` and
+  `failed` fail the batch with the reason; a `failed` while the agency's rest stands with kind `limit` is a usage
+  limit, and the run stops without a retry. The brain writes no rest.
 - **What the run wrote** is read from the brain repository once the run has ended, under the editing lock the
   batch holds: every path in the agent's brain folder that git reports added, changed or deleted since the last
   commit, other agents' folders under it set aside.

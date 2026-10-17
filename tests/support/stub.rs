@@ -103,18 +103,31 @@ impl Stub {
   }
 }
 
-// The events of a stream, once the path they wait on was asked, and then nothing more while the stream stays open.
+/// What an event's `run` names to stand for the `run` the request it waits on carried, a name the asker makes up
+/// as it asks.
+pub const ASKED_RUN: &str = "<the run asked>";
+
+// The events of a stream, once the path they wait on was asked, and then nothing more while the stream stays open;
+// an event's `run` of `ASKED_RUN` is sent as the run that request named.
 fn streamed(book: Arc<Mutex<Book>>, events: Events) -> Response {
   let waited = stream::once(async move {
-    while !book.lock().unwrap().taken.iter().any(|taken| taken.path == events.after) {
+    let asked = loop {
+      let taken = book.lock().unwrap().taken.iter().find(|taken| taken.path == events.after).cloned();
+
+      if let Some(taken) = taken {
+        break taken.body["run"].clone();
+      }
+
       tokio::time::sleep(Duration::from_millis(10)).await;
-    }
-    stream::iter(
-      events
-        .events
-        .into_iter()
-        .map(|(kind, data)| Ok::<_, Infallible>(Event::default().event(kind).data(data.to_string()))),
-    )
+    };
+
+    stream::iter(events.events.into_iter().map(move |(kind, mut data)| {
+      if data["run"] == ASKED_RUN {
+        data["run"] = asked.clone();
+      }
+
+      Ok::<_, Infallible>(Event::default().event(kind).data(data.to_string()))
+    }))
   })
   .flatten()
   .chain(stream::pending());

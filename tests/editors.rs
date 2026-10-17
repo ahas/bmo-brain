@@ -16,7 +16,7 @@ use serde_json::json;
 
 use support::agency::{CAP_SECONDS, FakeAgency, Session, registration};
 use support::editing::repository;
-use support::stub::Stub;
+use support::stub::{ASKED_RUN, Stub};
 use support::{AGENT, OTHER_AGENT, ROOM};
 
 const KEY: &str = "people-digest";
@@ -386,13 +386,10 @@ async fn an_editor_run_goes_over_the_agencys_routes_as_it_documents_them() {
       "/events",
       "/session/turn",
       vec![
-        (
-          "turn-started",
-          json!({ "session": "people-digest@editor", "run": "turn:people-digest:5", "at": 5 }),
-        ),
+        ("turn-started", json!({ "session": "people-digest@editor", "run": ASKED_RUN, "at": 5 })),
         (
           "turn-ended",
-          json!({ "session": "people-digest@editor", "run": "turn:people-digest:5", "outcome": "answered",
+          json!({ "session": "people-digest@editor", "run": ASKED_RUN, "outcome": "answered",
             "answer": "DONE" }),
         ),
       ],
@@ -401,12 +398,13 @@ async fn an_editor_run_goes_over_the_agencys_routes_as_it_documents_them() {
   std::fs::write(desk.folder().join("knowledge/a.md"), "written").unwrap();
 
   let answered = answer_at_desk(&HttpAgency::new(&stub.peer), ask(&desk, None, None)).await.unwrap();
+  let run = stub.body_at("/session/turn")["run"].as_str().unwrap().to_owned();
 
   assert_eq!(
     answered,
     Answer::Answered {
       answer: "DONE".to_owned(),
-      run: "turn:people-digest:5".to_owned(),
+      run,
       writes: vec![],
       wrote: BTreeSet::from([desk.folder().join("knowledge/a.md")]),
     }

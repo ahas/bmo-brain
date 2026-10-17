@@ -1,9 +1,6 @@
 //! The agency port: the registrations, the editor sessions the recollector runs go out as and the event stream
 //! their turns end on, a run's stop, its clock and the cap a run is given, which names are alive, the rest, the
 //! rulebooks every document writer shares and the documents that moved (`docs/boundary-api.md`, 「The agency」).
-//!
-//! Where the agency serves no route yet for what the brain needs of it, the client answers the nearest behaviour
-//! that table states without making a call, so the brain stands with what is served now.
 
 use futures_util::StreamExt;
 use futures_util::future::BoxFuture;
@@ -12,10 +9,6 @@ use sse_stream::SseStream;
 use tokio::sync::oneshot;
 
 use crate::ports::http::{Caller, Peer, PortFailure};
-
-/// The cap an editor run is given while the agency serves no editor-cap read: the bound its `docs/agent-control.md`
-/// gives an editor run, thirty minutes.
-pub const EDITOR_CAP_SECONDS: i64 = 30 * 60;
 
 /// How long after its turn was answered the brain still waits for the turn's end on the event stream.
 pub const END_GRACE: std::time::Duration = std::time::Duration::from_secs(10);
@@ -252,7 +245,7 @@ impl HttpAgency {
             Some("turn-started") => {
               let Ok(begun) = serde_json::from_str::<Begun>(data) else { continue };
 
-              if run.is_none() && (begun.run == turn.run || begun.session == turn.session) {
+              if run.is_none() && begun.run == turn.run {
                 if let Some(started) = started.take() {
                   let _ = started.send(begun.run.clone());
                 }
@@ -261,11 +254,7 @@ impl HttpAgency {
             }
             Some("turn-ended") => {
               let Ok(ended) = serde_json::from_str::<Ended>(data) else { continue };
-              let ours = ended.end.run == turn.run
-                || run.as_deref() == Some(ended.end.run.as_str())
-                || (run.is_none() && ended.session == turn.session);
-
-              if ours {
+              if ended.end.run == turn.run {
                 return Ok(ended.end);
               }
             }
@@ -321,15 +310,24 @@ struct Delivered {
 
 #[derive(Deserialize)]
 struct Begun {
-  session: String,
   run: String,
 }
 
 #[derive(Deserialize)]
 struct Ended {
-  session: String,
   #[serde(flatten)]
   end: TurnEnd,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct Cap {
+  cap_seconds: i64,
+}
+
+#[derive(Deserialize)]
+struct Rulebooks {
+  rulebooks: Vec<Rulebook>,
 }
 
 #[derive(Serialize)]
@@ -415,18 +413,20 @@ impl Agency for HttpAgency {
     })
   }
 
-  /// No route is served for a run's clock yet (the brain's `docs/boundary-api.md`, 「The agency」), so no run is kept.
-  fn run_clock<'a>(&'a self, _name: &'a str) -> BoxFuture<'a, Result<RunClock, PortFailure>> {
-    Box::pin(async move { Ok(RunClock::default()) })
+  fn run_clock<'a>(&'a self, name: &'a str) -> BoxFuture<'a, Result<RunClock, PortFailure>> {
+    Box::pin(async move { self.caller.get("/runs/clock", &[("run", name)]).await })
   }
 
-  /// No route is served for an editor's cap yet, so it is the bound the agency documents for an editor run.
   fn editor_cap<'a>(
     &'a self,
-    _work_key: &'a str,
-    _agent: &'a str,
+    work_key: &'a str,
+    agent: &'a str,
   ) -> BoxFuture<'a, Result<i64, PortFailure>> {
-    Box::pin(async move { Ok(EDITOR_CAP_SECONDS) })
+    Box::pin(async move {
+      let cap: Cap = self.caller.get("/editors/cap", &[("workKey", work_key), ("agent", agent)]).await?;
+
+      Ok(cap.cap_seconds)
+    })
   }
 
   fn alive<'a>(&'a self, names: &'a [String]) -> BoxFuture<'a, Result<Option<Vec<String>>, PortFailure>> {
@@ -441,9 +441,13 @@ impl Agency for HttpAgency {
     Box::pin(async move { self.caller.get("/rest", &[]).await })
   }
 
-  /// No route is served for the rulebooks yet, so none is handed over.
-  fn rulebooks<'a>(&'a self, _names: &'a [&'a str]) -> BoxFuture<'a, Result<Vec<Rulebook>, PortFailure>> {
-    Box::pin(async move { Ok(vec![]) })
+  fn rulebooks<'a>(&'a self, names: &'a [&'a str]) -> BoxFuture<'a, Result<Vec<Rulebook>, PortFailure>> {
+    Box::pin(async move {
+      let names = names.join(",");
+      let answer: Rulebooks = self.caller.get("/rulebooks", &[("names", names.as_str())]).await?;
+
+      Ok(answer.rulebooks)
+    })
   }
 
   fn reload_documents<'a>(&'a self, reload: &'a Reload) -> BoxFuture<'a, Result<bool, PortFailure>> {

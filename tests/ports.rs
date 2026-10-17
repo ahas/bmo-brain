@@ -10,8 +10,8 @@ use std::time::Duration;
 
 use axum::http::StatusCode;
 use bmo_brain::ports::agency::{
-  Agency, EDITOR_CAP_SECONDS, EditorTurn, HttpAgency, Registration, Reload, Rest, RunClock, TurnEnd,
-  TurnFault, TurnOutcome,
+  Agency, EditorTurn, HttpAgency, Registration, Reload, Rest, Rulebook, RunClock, TurnEnd, TurnFault,
+  TurnOutcome,
 };
 use bmo_brain::ports::gate::{Gate, HttpGate, Piece, Sanitised, SheetAsk, SheetPart};
 use bmo_brain::ports::http::{Caller, Patience, Peer, PortFailure, Wait, WireError};
@@ -47,7 +47,16 @@ async fn the_agency_client_calls_each_route_as_the_agency_documents_it() {
     .answer("/runs/stop", json!({ "ok": true }))
     .answer("/runs/alive", json!({ "answered": true, "alive": ["bmo-digest"] }))
     .answer("/rest", json!({ "resting": true, "until": 1_700_003_600, "kind": "limit" }))
-    .answer("/documents/reload", json!({ "paths": ["knowledge/a.md"], "now": false }));
+    .answer(
+      "/documents/reload",
+      json!({ "paths": ["knowledge/a.md"], "now": false, "agent": AGENT, "rooms": [ROOM] }),
+    )
+    .answer("/runs/clock", json!({ "capEnds": 1_700_000_000_000_i64, "keptUntil": null }))
+    .answer("/editors/cap", json!({ "capSeconds": 2_400 }))
+    .answer(
+      "/rulebooks",
+      json!({ "rulebooks": [{ "name": "plain-writing", "text": "Write plainly." }] }),
+    );
   let agency = HttpAgency::new(&stub.peer);
 
   let all = agency.registrations(None).await.unwrap();
@@ -110,13 +119,26 @@ async fn the_agency_client_calls_each_route_as_the_agency_documents_it() {
     json!({ "paths": ["knowledge/a.md"], "now": false, "agent": AGENT, "rooms": [ROOM] })
   );
 
-  // What the agency serves no route for yet is answered without a call: no clock, the documented editor bound, and
-  // no rulebook handed over.
-  let before = stub.taken().len();
-  assert_eq!(agency.run_clock("bmo-people-digest").await.unwrap(), RunClock::default());
-  assert_eq!(agency.editor_cap("people-digest", AGENT).await.unwrap(), EDITOR_CAP_SECONDS);
-  assert!(agency.rulebooks(&["plain-writing"]).await.unwrap().is_empty());
-  assert_eq!(stub.taken().len(), before);
+  let query = |path: &str| stub.taken().into_iter().find(|taken| taken.path == path).unwrap().query;
+
+  assert_eq!(
+    agency.run_clock("bmo-people-digest").await.unwrap(),
+    RunClock {
+      cap_ends: Some(1_700_000_000_000),
+      kept_until: None,
+    }
+  );
+  assert_eq!(query("/runs/clock").as_deref(), Some("run=bmo-people-digest"));
+  assert_eq!(agency.editor_cap("people-digest", AGENT).await.unwrap(), 2_400);
+  assert_eq!(query("/editors/cap"), Some(format!("workKey=people-digest&agent={AGENT}")));
+  assert_eq!(
+    agency.rulebooks(&["plain-writing", "self-preservation"]).await.unwrap(),
+    [Rulebook {
+      name: "plain-writing".to_owned(),
+      text: "Write plainly.".to_owned(),
+    }]
+  );
+  assert_eq!(query("/rulebooks").as_deref(), Some("names=plain-writing%2Cself-preservation"));
 }
 
 #[tokio::test]
@@ -148,6 +170,8 @@ fn editor_turn() -> EditorTurn {
 #[tokio::test]
 async fn an_editor_turn_is_posted_and_its_end_read_off_the_event_stream() {
   let stub = Stub::start().await;
+  let turn = editor_turn();
+  let other = "bmo-people-digest:people-digest:agent-b:-200:1";
   stub.answer("/session/turn", json!({ "delivery": "taken" })).answer_events(
     "/events",
     "/session/turn",
@@ -156,32 +180,29 @@ async fn an_editor_turn_is_posted_and_its_end_read_off_the_event_stream() {
         "turn-started",
         json!({ "session": "worker-x@worker", "run": "turn:worker-x:1", "at": 1 }),
       ),
+      ("turn-started", json!({ "session": "people-digest@editor", "run": other, "at": 2 })),
+      ("turn-started", json!({ "session": "people-digest@editor", "run": turn.run, "at": 3 })),
       (
-        "turn-started",
-        json!({ "session": "people-digest@editor", "run": "turn:people-digest:2", "at": 2 }),
+        "turn-ended",
+        json!({ "session": "people-digest@editor", "run": other, "outcome": "failed" }),
       ),
       (
         "turn-ended",
-        json!({ "session": "worker-x@worker", "run": "turn:worker-x:1", "outcome": "failed" }),
-      ),
-      (
-        "turn-ended",
-        json!({ "session": "people-digest@editor", "run": "turn:people-digest:2", "outcome": "answered",
+        json!({ "session": "people-digest@editor", "run": turn.run, "outcome": "answered",
           "answer": "All folded in. DONE" }),
       ),
     ],
   );
   let agency = HttpAgency::new(&stub.peer);
-  let turn = editor_turn();
   let (started, heard) = oneshot::channel();
 
   let end = agency.editor_turn(&turn, started).await.unwrap();
 
-  assert_eq!(heard.await.unwrap(), "turn:people-digest:2", "another session's turn is not this one");
+  assert_eq!(heard.await.unwrap(), turn.run, "another turn on the same session is not this one");
   assert_eq!(
     end,
     TurnEnd {
-      run: "turn:people-digest:2".to_owned(),
+      run: turn.run.clone(),
       outcome: TurnOutcome::Answered,
       answer: Some("All folded in. DONE".to_owned()),
       reason: None,
