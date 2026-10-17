@@ -1,6 +1,8 @@
 //! The fragment tool's work on a desk, read through an opened desk over a SQLite fragment table and a
 //! brain folder on disk, as a run's calls reach it.
 
+mod support;
+
 use std::fs;
 use std::path::Path;
 
@@ -9,6 +11,8 @@ use fragment_desk::meta::body_hash;
 use fragment_desk::ops::{Open, Query, WriteRequest, normalized};
 use fragment_desk::rows::AgentFolder;
 use sqlx::{Connection, SqliteConnection};
+
+use support::libraries;
 
 const ROOM: i64 = -100;
 const STANDING: &str = "A note on the order of a deploy, read when a deploy has to be run again.";
@@ -117,7 +121,7 @@ fn a_path_climbs_out_only_where_its_normal_form_does() {
 async fn a_run_finds_its_rows_writes_a_new_piece_and_owes_nothing_after() {
   let root = tempfile::tempdir().unwrap();
   let path = opened(root.path()).await;
-  let mut open = Open::at(&path, folders()).await.unwrap();
+  let mut open = Open::at(&path, folders(), libraries()).await.unwrap();
 
   let found = open.search(&Query::default()).unwrap();
 
@@ -149,7 +153,7 @@ async fn a_run_finds_its_rows_writes_a_new_piece_and_owes_nothing_after() {
 async fn a_write_that_cannot_stand_is_refused_and_leaves_the_desk_as_it_was() {
   let root = tempfile::tempdir().unwrap();
   let path = opened(root.path()).await;
-  let mut open = Open::at(&path, folders()).await.unwrap();
+  let mut open = Open::at(&path, folders(), libraries()).await.unwrap();
 
   assert!(refusal(open.write(&request("knowledge/deploy.md", "Too short.", &[]))).contains("too short"));
   assert!(
@@ -169,5 +173,20 @@ async fn a_write_that_cannot_stand_is_refused_and_leaves_the_desk_as_it_was() {
 
   assert!(repeats.starts_with("knowledge/deploy.md would be a new piece"), "{repeats}");
   assert!(repeats.contains("- greeting [chat:-100]"), "{repeats}");
+  assert!(open.desk.writes.is_empty());
+}
+
+#[tokio::test]
+async fn a_desk_opened_with_no_library_reads_its_rows_but_takes_and_owes_no_piece() {
+  let root = tempfile::tempdir().unwrap();
+  let path = opened(root.path()).await;
+  let mut open = Open::at(&path, folders(), vec![]).await.unwrap();
+
+  assert_eq!(open.search(&Query::default()).unwrap().len(), 1);
+  assert!(open.owed().is_empty());
+  assert_eq!(
+    refusal(open.write(&request("knowledge/deploy.md", STANDING, &["deploy-order"]))),
+    "knowledge/deploy.md is no piece of a brain library: this desk was handed none."
+  );
   assert!(open.desk.writes.is_empty());
 }

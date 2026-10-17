@@ -15,7 +15,7 @@ use sea_orm::DatabaseConnection;
 use serde_json::{Map, Value, json};
 
 use super::book::{KNOWLEDGE_ROOT, PEOPLE_ROOT, ROOMS_ROOT};
-use super::fragments::libraries::{Knowledge, Library};
+use super::fragments::libraries::{DeskLibrary, Knowledge};
 use super::fragments::store;
 use super::recollection::Recollection;
 use crate::Failure;

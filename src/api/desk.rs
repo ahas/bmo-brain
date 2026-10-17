@@ -19,7 +19,7 @@ use serde_json::Map;
 
 use super::{Answer, Api, ApiError, Body, reading, refusal};
 use crate::editors::desk::desk_dir;
-use crate::editors::fragments::libraries::Brain;
+use crate::editors::fragments::libraries::{Brain, on_the_desk};
 
 /// The fragment tool's routes.
 pub fn routes() -> Router<Arc<Api>> {
@@ -77,7 +77,7 @@ async fn opened(api: &Api, named: &str) -> Result<Desked<(PathBuf, Open)>, ApiEr
     })
     .collect();
 
-  Ok(Open::at(&path, folders).await.map(|open| (path, open)))
+  Ok(Open::at(&path, folders, on_the_desk()).await.map(|open| (path, open)))
 }
 
 // A call that writes: the desk is read, changed and saved whole, or left as it was on a refusal.

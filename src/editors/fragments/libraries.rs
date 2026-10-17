@@ -8,6 +8,8 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 
+pub use fragment_desk::libraries::Library as DeskLibrary;
+use fragment_desk::libraries::PiecePlace as DeskPlace;
 use regex::Regex;
 
 use super::narrow::index_line;
@@ -52,17 +54,16 @@ pub enum Offering {
 }
 
 /// A library its editors write, read inside one agent's folder: every path it is asked about is relative to
-/// that folder. A new brain library is added as one more member.
-pub trait Library: Sync {
-  fn kind(&self) -> &'static str;
+/// that folder. A new brain library is added as one more member. What the fragment desk asks of it — its kind,
+/// which paths are its pieces, which row a piece answers to and what a refusal calls its pieces — it answers as a
+/// member of the desk's own library trait, which the desk is handed the members of.
+pub trait Library: DeskLibrary {
   /// Which of its rows a room may be offered.
   fn offering(&self) -> Offering;
   /// The word a screen calls the kind by.
   fn label(&self) -> &'static str;
   /// Whether a piece is finished once every item it is tied to is.
   fn settles(&self) -> bool;
-  /// Whether a path is one of this library's pieces.
-  fn owns(&self, path: &str) -> bool;
   /// The row one of its pieces answers to.
   fn place(&self, path: &str, said: &Said<'_>) -> Option<PiecePlace>;
   /// The index file a row of this library stands in.
@@ -96,11 +97,29 @@ impl RoomRules {
   }
 }
 
-impl Library for RoomRules {
+impl DeskLibrary for RoomRules {
   fn kind(&self) -> &'static str {
     "room-rule"
   }
 
+  fn owns(&self, path: &str) -> bool {
+    Self::rule_at(path).is_some()
+  }
+
+  fn piece_place(&self, path: &str, shared: Option<bool>, room: Option<i64>) -> Option<DeskPlace> {
+    on_desk(self, path, shared, room)
+  }
+
+  fn pieces(&self) -> &'static str {
+    "a room rule chunk"
+  }
+
+  fn not_pieces(&self) -> &'static [&'static str] {
+    &["an index.md"]
+  }
+}
+
+impl Library for RoomRules {
   fn offering(&self) -> Offering {
     Offering::Room
   }
@@ -111,10 +130,6 @@ impl Library for RoomRules {
 
   fn settles(&self) -> bool {
     false
-  }
-
-  fn owns(&self, path: &str) -> bool {
-    Self::rule_at(path).is_some()
   }
 
   fn place(&self, path: &str, _said: &Said<'_>) -> Option<PiecePlace> {
@@ -160,11 +175,29 @@ impl Knowledge {
   }
 }
 
-impl Library for Knowledge {
+impl DeskLibrary for Knowledge {
   fn kind(&self) -> &'static str {
     "library-knowledge"
   }
 
+  fn owns(&self, path: &str) -> bool {
+    Self::chunk_slug(path).is_some()
+  }
+
+  fn piece_place(&self, path: &str, shared: Option<bool>, room: Option<i64>) -> Option<DeskPlace> {
+    on_desk(self, path, shared, room)
+  }
+
+  fn pieces(&self) -> &'static str {
+    "a knowledge chunk"
+  }
+
+  fn not_pieces(&self) -> &'static [&'static str] {
+    &["knowledge/candidates.md", "an index.md"]
+  }
+}
+
+impl Library for Knowledge {
   fn offering(&self) -> Offering {
     Offering::RoomWithShared
   }
@@ -175,10 +208,6 @@ impl Library for Knowledge {
 
   fn settles(&self) -> bool {
     true
-  }
-
-  fn owns(&self, path: &str) -> bool {
-    Self::chunk_slug(path).is_some()
   }
 
   fn place(&self, path: &str, said: &Said<'_>) -> Option<PiecePlace> {
@@ -297,11 +326,29 @@ impl PersonBook {
   }
 }
 
-impl Library for PersonBook {
+impl DeskLibrary for PersonBook {
   fn kind(&self) -> &'static str {
     "person-book"
   }
 
+  fn owns(&self, path: &str) -> bool {
+    Self::piece_at(path).is_some()
+  }
+
+  fn piece_place(&self, path: &str, shared: Option<bool>, room: Option<i64>) -> Option<DeskPlace> {
+    on_desk(self, path, shared, room)
+  }
+
+  fn pieces(&self) -> &'static str {
+    "a person-book piece under chunks/"
+  }
+
+  fn not_pieces(&self) -> &'static [&'static str] {
+    &["a standing sheet", "an index.md"]
+  }
+}
+
+impl Library for PersonBook {
   fn offering(&self) -> Offering {
     Offering::RoomPartWithSpeakers
   }
@@ -312,10 +359,6 @@ impl Library for PersonBook {
 
   fn settles(&self) -> bool {
     true
-  }
-
-  fn owns(&self, path: &str) -> bool {
-    Self::piece_at(path).is_some()
   }
 
   fn place(&self, path: &str, _said: &Said<'_>) -> Option<PiecePlace> {
@@ -357,6 +400,35 @@ impl Library for PersonBook {
 
 /// The libraries the editors write, in the order they are asked.
 pub const LIBRARIES: [&dyn Library; 3] = [&RoomRules, &Knowledge, &PersonBook];
+
+/// The same libraries as a fragment desk is handed them, in the same order.
+pub fn on_the_desk() -> Vec<&'static dyn DeskLibrary> {
+  LIBRARIES.into_iter().map(|library| library as &'static dyn DeskLibrary).collect()
+}
+
+// The row a piece answers to as the desk asks it: what the write said of its scope and the batch's room, with no
+// standing row read, since the desk lays the batch's writes over the table itself.
+fn on_desk(
+  library: &dyn Library,
+  path: &str,
+  shared: Option<bool>,
+  room: Option<i64>,
+) -> Option<DeskPlace> {
+  library
+    .place(
+      path,
+      &Said {
+        shared,
+        room,
+        standing: None,
+      },
+    )
+    .map(|placed| DeskPlace {
+      owner: placed.owner,
+      slug: placed.slug,
+      scope: placed.scope,
+    })
+}
 
 /// Whether a kind is one of the brain's own libraries.
 pub fn brain_kind(kind: &str) -> bool {

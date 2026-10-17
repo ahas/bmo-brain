@@ -123,12 +123,17 @@ fn unique<T: Clone + Eq + std::hash::Hash>(values: impl IntoIterator<Item = T>) 
 
 impl Open {
   /// The desk at this path, read afresh, with the rows of the database it names, among the agents'
-  /// folders the caller read from the agency's registration: every awake agent that has one.
-  pub async fn at(path: &Path, folders: Vec<AgentFolder>) -> Desked<Self> {
+  /// folders the caller read from the agency's registration (every awake agent that has one) and the libraries
+  /// the caller hands in, asked in that order; with none, the desk takes no piece.
+  pub async fn at(
+    path: &Path,
+    folders: Vec<AgentFolder>,
+    libraries: Vec<&'static dyn Library>,
+  ) -> Desked<Self> {
     let desk = Desk::read(path)?;
     let names = desk.names()?.clone();
     let rows = Rows::open(Path::new(&desk.db)).await?;
-    let folders = Folders::new(folders, &names.agent_key);
+    let folders = Folders::new(folders, &names.agent_key).holding(libraries);
 
     Ok(Self {
       desk,
@@ -269,7 +274,7 @@ impl Open {
 
       table.push(DeskRow {
         path: write.path.clone(),
-        kind: library.kind.to_owned(),
+        kind: library.kind().to_owned(),
         owner: place.owner,
         slug: place.slug,
         scope: place.scope,
@@ -328,7 +333,7 @@ impl Open {
   }
 
   // The written library a path is a piece of, where the run may write it, or a refusal saying which.
-  fn writable_library(&self, path: &str) -> Desked<&'static Library> {
+  fn writable_library(&self, path: &str) -> Desked<&'static dyn Library> {
     if path.is_empty() || path.starts_with('/') || normalized(path).starts_with("..") {
       return refused(
         "out-of-place",
@@ -338,12 +343,7 @@ impl Open {
 
     let brain = self.brain_side(path);
     let Some(library) = self.folders.library_owning(&brain) else {
-      return refused(
-        "out-of-place",
-        format!(
-          "{path} is no piece of a brain library: a room rule chunk, a knowledge chunk or a person-book piece under chunks/. A standing sheet, knowledge/candidates.md and an index.md are not pieces and have no row."
-        ),
-      );
+      return refused("out-of-place", self.folders.no_piece(path));
     };
 
     if !in_places(&self.desk.places, path) {
@@ -368,14 +368,14 @@ impl Open {
   }
 
   // Whether the table or this batch already holds a row standing at a path.
-  fn stands_at(&self, library: &Library, path: &str) -> Desked<bool> {
+  fn stands_at(&self, library: &dyn Library, path: &str) -> Desked<bool> {
     if let Some(write) = self.latest_writes().into_iter().find(|write| write.path == path) {
       return Ok(!write.removed);
     }
 
     let brain = self.brain_side(path);
     let filter = FragmentFilter {
-      kind: Some(library.kind.to_owned()),
+      kind: Some(library.kind().to_owned()),
       active: Some(true),
       ..FragmentFilter::default()
     };
@@ -386,7 +386,7 @@ impl Open {
   // The rows of the same library that may already hold the matter of a new piece.
   fn overlapping(
     &self,
-    library: &Library,
+    library: &dyn Library,
     write: &FragmentWrite,
     spared: &HashSet<String>,
   ) -> Desked<Vec<DeskRow>> {
@@ -395,7 +395,10 @@ impl Open {
         .rows()?
         .into_iter()
         .filter(|one| {
-          if !one.active || one.kind != library.kind || one.path == write.path || spared.contains(&one.path)
+          if !one.active
+            || one.kind != library.kind()
+            || one.path == write.path
+            || spared.contains(&one.path)
           {
             return false;
           }

@@ -1,10 +1,7 @@
-//! The brain libraries an editor writes, as the desk asks them about a path: whether the path is one of
-//! their pieces, and which row it answers to, each read in every agent's folder
-//! (`docs/agent-ownership.md`).
-
-use std::sync::LazyLock;
-
-use regex::Regex;
+//! The libraries an editor writes, as the desk asks them about a path, read in every agent's folder
+//! (docs/fragments.md, 「An editor writes the row through the fragment tool」). The desk names no library of its
+//! own: its caller hands in the members, each answering for itself whether a path is one of its pieces and which
+//! row the piece answers to. A desk handed none takes no piece.
 
 use crate::rows::AgentFolder;
 
@@ -16,98 +13,34 @@ pub struct PiecePlace {
   pub scope: Option<String>,
 }
 
-/// A library its editors write: the kind its rows carry, and how it reads a path inside one agent's
-/// folder.
-pub struct Library {
-  pub kind: &'static str,
-  owns: fn(&str) -> bool,
-  place: fn(&str, Option<bool>, Option<i64>) -> Option<PiecePlace>,
-}
-
-static RULE_PATH: LazyLock<Regex> =
-  LazyLock::new(|| Regex::new(r"^rooms/(-?[0-9]+)/rules/([a-z0-9-]+)\.md$").unwrap());
-static KNOWLEDGE_CHUNK: LazyLock<Regex> =
-  LazyLock::new(|| Regex::new(r"^knowledge/([a-z0-9-]+)\.md$").unwrap());
-static ROOM_PERSON_PIECE: LazyLock<Regex> =
-  LazyLock::new(|| Regex::new(r"^rooms/(-?[0-9]+)/people/chunks/(p([0-9]+)-[a-z0-9-]+)\.md$").unwrap());
-static COMMON_PERSON_PIECE: LazyLock<Regex> =
-  LazyLock::new(|| Regex::new(r"^people/([0-9]+)/chunks/(c([0-9]+)-[a-z0-9-]+)\.md$").unwrap());
-
-fn rule_slug(path: &str) -> Option<String> {
-  RULE_PATH.captures(path).map(|rule| rule[2].to_owned()).filter(|slug| slug != "index")
-}
-
-fn chunk_slug(path: &str) -> Option<String> {
-  KNOWLEDGE_CHUNK
-    .captures(path)
-    .map(|chunk| chunk[1].to_owned())
-    .filter(|slug| slug != "index" && slug != "candidates")
-}
-
-fn person_piece(path: &str) -> Option<(i64, String)> {
-  if let Some(room) = ROOM_PERSON_PIECE.captures(path) {
-    return Some((room[3].parse().ok()?, room[2].to_owned()));
+/// A library its editors write, as the desk asks it: every path it is asked about is relative to the folder of
+/// the agent whose memory it is.
+pub trait Library: Sync {
+  /// The kind its rows carry.
+  fn kind(&self) -> &'static str;
+  /// Whether a path is one of its pieces.
+  fn owns(&self, path: &str) -> bool;
+  /// The row one of its pieces answers to, given whether the write said the piece is every room's and the room of
+  /// the batch that wrote it; none where the piece cannot stand as a row.
+  fn piece_place(&self, path: &str, shared: Option<bool>, room: Option<i64>) -> Option<PiecePlace>;
+  /// What its pieces are called, as a refusal of a path no library owns names them.
+  fn pieces(&self) -> &'static str;
+  /// The files beside its pieces that are no pieces and have no row, as that refusal names them.
+  fn not_pieces(&self) -> &'static [&'static str] {
+    &[]
   }
-
-  let common = COMMON_PERSON_PIECE.captures(path)?;
-
-  (common[1] == common[3]).then(|| Some((common[1].parse().ok()?, common[2].to_owned())))?
 }
-
-/// The three libraries an editor writes, in the order they are asked.
-pub const LIBRARIES: [Library; 3] = [
-  Library {
-    kind: "room-rule",
-    owns: |path| rule_slug(path).is_some(),
-    place: |path, _, _| {
-      rule_slug(path).map(|slug| PiecePlace {
-        owner: None,
-        slug,
-        scope: None,
-      })
-    },
-  },
-  Library {
-    kind: "library-knowledge",
-    owns: |path| chunk_slug(path).is_some(),
-    place: |path, shared, room| {
-      // The scope is the writer's to choose; one that does not say belongs to the batch's room.
-      let slug = chunk_slug(path)?;
-      let chat_id = if shared == Some(true) { None } else { room };
-
-      if chat_id.is_none() && shared != Some(true) {
-        return None;
-      }
-
-      let scope = chat_id.map_or_else(|| "[shared]".to_owned(), |room| format!("[chat:{room}]"));
-
-      Some(PiecePlace {
-        owner: None,
-        slug,
-        scope: Some(scope),
-      })
-    },
-  },
-  Library {
-    kind: "person-book",
-    owns: |path| person_piece(path).is_some(),
-    place: |path, _, _| {
-      person_piece(path).map(|(owner, slug)| PiecePlace {
-        owner: Some(owner),
-        slug,
-        scope: None,
-      })
-    },
-  },
-];
 
 /// Every agent's folder, the chat agent's at the brain root among them even where the folders handed in
-/// name none there.
-pub struct Folders(Vec<AgentFolder>);
+/// name none there, and the libraries the caller handed in, in the order they are asked.
+pub struct Folders {
+  folders: Vec<AgentFolder>,
+  libraries: Vec<&'static dyn Library>,
+}
 
 impl Folders {
   /// The folders as the agency's registration names them, each without a closing `/`, and the chat
-  /// agent's key for the brain root.
+  /// agent's key for the brain root; holding no library until some are handed in.
   pub fn new(read: Vec<AgentFolder>, agent_key: &str) -> Self {
     let read: Vec<AgentFolder> = read
       .into_iter()
@@ -116,26 +49,33 @@ impl Folders {
         ..one
       })
       .collect();
-
-    if read.iter().any(|one| one.folder.is_empty()) {
-      Self(read)
+    let folders = if read.iter().any(|one| one.folder.is_empty()) {
+      read
     } else {
-      Self(
-        [AgentFolder {
-          agent: agent_key.to_owned(),
-          folder: String::new(),
-        }]
-        .into_iter()
-        .chain(read)
-        .collect(),
-      )
+      [AgentFolder {
+        agent: agent_key.to_owned(),
+        folder: String::new(),
+      }]
+      .into_iter()
+      .chain(read)
+      .collect()
+    };
+
+    Self {
+      folders,
+      libraries: vec![],
     }
+  }
+
+  /// The same folders holding these libraries, asked in this order.
+  pub fn holding(self, libraries: Vec<&'static dyn Library>) -> Self {
+    Self { libraries, ..self }
   }
 
   /// Whose memory a path relative to the brain root is, and the path relative to that agent's
   /// folder: the agent whose folder is the longest that holds it.
   pub fn agent_of<'a>(&'a self, path: &'a str) -> (&'a str, &'a str) {
-    let mut folders: Vec<&AgentFolder> = self.0.iter().collect();
+    let mut folders: Vec<&AgentFolder> = self.folders.iter().collect();
 
     folders.sort_by_key(|one| std::cmp::Reverse(one.folder.len()));
 
@@ -153,22 +93,66 @@ impl Folders {
   }
 
   /// The written library a brain path is a piece of, read inside the folder that holds it.
-  pub fn library_owning(&self, path: &str) -> Option<&'static Library> {
+  pub fn library_owning(&self, path: &str) -> Option<&'static dyn Library> {
     let (_, inner) = self.agent_of(path);
 
-    LIBRARIES.iter().find(|library| (library.owns)(inner))
+    self.libraries.iter().copied().find(|library| library.owns(inner))
   }
 
   /// The row a piece of a library answers to.
   pub fn place(
     &self,
-    library: &Library,
+    library: &dyn Library,
     path: &str,
     shared: Option<bool>,
     room: Option<i64>,
   ) -> Option<PiecePlace> {
-    (library.place)(self.agent_of(path).1, shared, room)
+    library.piece_place(self.agent_of(path).1, shared, room)
   }
+
+  /// Why a path is no piece of any library held: what each library's pieces are called, and the files beside
+  /// them that are not pieces.
+  pub fn no_piece(&self, path: &str) -> String {
+    if self.libraries.is_empty() {
+      return format!("{path} is no piece of a brain library: this desk was handed none.");
+    }
+
+    let pieces: Vec<&str> = self.libraries.iter().map(|library| library.pieces()).collect();
+    let mut beside: Vec<&str> = vec![];
+
+    for name in self.libraries.iter().flat_map(|library| library.not_pieces().iter().copied()) {
+      if !beside.contains(&name) {
+        beside.push(name);
+      }
+    }
+
+    let mut said = format!("{path} is no piece of a brain library: {}.", listed(&pieces, "or"));
+
+    if !beside.is_empty() {
+      let verb = if beside.len() == 1 { "is no piece and has" } else { "are not pieces and have" };
+
+      said.push_str(&format!(" {} {verb} no row.", capitalized(&listed(&beside, "and"))));
+    }
+
+    said
+  }
+}
+
+// Words listed as a sentence lists them: `a`, `a or b`, `a, b or c`.
+fn listed(words: &[&str], last: &str) -> String {
+  match words {
+    [] => String::new(),
+    [one] => (*one).to_owned(),
+    [rest @ .., final_one] => format!("{} {last} {final_one}", rest.join(", ")),
+  }
+}
+
+fn capitalized(text: &str) -> String {
+  let mut characters = text.chars();
+
+  characters
+    .next()
+    .map_or_else(String::new, |first| first.to_uppercase().chain(characters).collect())
 }
 
 /// A path relative to an agent's folder, as a path relative to the brain root.

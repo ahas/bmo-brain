@@ -138,6 +138,11 @@ owner normalised to a fixed value so the uniqueness holds across the rows that n
   off the path by the library the path belongs to; the dates, the body hash and the body's own item numbers
   are read off the body; the status is settled against the item states; a new piece's position is the end of
   its index.
+- **The desk asks the libraries it is handed.** The desk names no kind and no path of its own: the brain hands
+  it the library trait's members as it opens a desk, and the desk asks each, in order, whether a path is one of
+  its pieces, which row a piece answers to given what the write said of its scope and the batch's room, and
+  what its pieces are called and which files beside them are not pieces, which is what a refusal of a path no
+  library owns says. A desk handed no library takes no piece, and refuses every write as out of place.
 - **Every call is checked as it is made,** and a refused call writes nothing and says why, so the writer puts
   it right inside the same run (`boundary-api.md`, 「Fragment refusals」):
   - a path that is no piece of a brain library, or a piece outside the folder of the agent the run remembers
