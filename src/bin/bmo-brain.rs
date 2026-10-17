@@ -11,6 +11,7 @@ use bmo_brain::commands::{self, PeopleRun};
 use bmo_brain::config::Config;
 use bmo_brain::migration::migrate;
 use bmo_brain::schedules::launches::Launches;
+use bmo_brain::watch_runner::{IDLE_SLICE, WatchRun, watch};
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
@@ -43,6 +44,17 @@ enum Command {
   PeopleDigest {
     #[command(flatten)]
     run: PeopleRun,
+    /// The unit this run was launched under.
+    #[arg(long)]
+    unit: Option<String>,
+  },
+  /// One watch watched by the run holding it, until its check succeeds, its wait runs out or it stops being this
+  /// run's.
+  WatchRunner {
+    /// The watch.
+    id: i64,
+    /// The unit whose run holds the watch.
+    run: String,
     /// The unit this run was launched under.
     #[arg(long)]
     unit: Option<String>,
@@ -99,6 +111,23 @@ async fn run(config: &Config, command: Command) -> Result<u8, String> {
       };
 
       commands::people(&launches, &run).await.map(u8::from).map_err(|why| why.to_string())
+    }
+    Command::WatchRunner { id, run, unit: _ } => {
+      let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("/"));
+      let watched = WatchRun {
+        db: &api.db,
+        agency: api.agency.as_ref(),
+        receiver: api.receiver.as_ref(),
+        cwd: &cwd,
+        slice: IDLE_SLICE,
+      };
+      let ending = watch(&watched, id, &run)
+        .await
+        .map_err(|why| format!("watch #{id} run failed: {why}"))?;
+
+      println!("watch #{id}: {ending}");
+
+      Ok(0)
     }
   }
 }

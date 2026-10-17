@@ -10,13 +10,12 @@ use brain_support::database::{all, run};
 
 use crate::Failure;
 use crate::commands::PeopleRun;
-use crate::editors::archive::{book_room, chat_title};
+use crate::editors::archive::{book_room, room_name};
 use crate::editors::ground::Ground;
 use crate::editors::people::{LAUNCHER_UNIT, sort_unit};
 use crate::editors::recollection::recollections;
 use crate::ports::agency::{Launch, LaunchOutcome, UnitLaunch};
 use crate::ports::http::PortFailure;
-use crate::ports::receiver::RoadKind;
 
 // How long after it was armed a check is left to its run before a pass may take it for one nobody holds: a run
 // just launched is not yet among the running.
@@ -143,17 +142,7 @@ impl Launches<'_> {
 
   /// A room as a run's title names it: its title, or the owner's private chat, or its number.
   pub async fn room_name(&self, chat_id: i64) -> Result<String, Failure> {
-    let receiver = self.ground.receiver;
-
-    if let Some(title) = chat_title(receiver, chat_id).await? {
-      return Ok(title);
-    }
-
-    Ok(if receiver.roads(chat_id).await?.kind == RoadKind::Owner {
-      "Private chat".to_owned()
-    } else {
-      format!("Room {chat_id}")
-    })
+    room_name(self.ground.receiver, chat_id).await
   }
 
   /// The agents keeping a long-term memory, the brain root's first.

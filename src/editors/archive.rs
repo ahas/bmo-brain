@@ -12,7 +12,7 @@ use sea_orm::{DatabaseConnection, QueryResult};
 use crate::Failure;
 use crate::editors::book::ROOMS_ROOT;
 pub use crate::ports::receiver::Message;
-use crate::ports::receiver::{Receiver, RoomSince};
+use crate::ports::receiver::{Receiver, RoadKind, RoomSince};
 use crate::settings;
 
 /// One note waiting for the memo digest.
@@ -92,6 +92,19 @@ pub async fn chat_title(receiver: &dyn Receiver, chat_id: i64) -> Result<Option<
   let rooms = receiver.room_titles().await?;
 
   Ok(rooms.into_iter().find(|room| room.chat_id == chat_id).and_then(|room| room.title))
+}
+
+/// A room as a run's title and a watch's memo name it: its title, or the owner's private chat, or its number.
+pub async fn room_name(receiver: &dyn Receiver, chat_id: i64) -> Result<String, Failure> {
+  if let Some(title) = chat_title(receiver, chat_id).await? {
+    return Ok(title);
+  }
+
+  Ok(if receiver.roads(chat_id).await?.kind == RoadKind::Owner {
+    "Private chat".to_owned()
+  } else {
+    format!("Room {chat_id}")
+  })
 }
 
 /// Every room title the receiver holds, which a common document may not carry.

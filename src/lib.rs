@@ -12,5 +12,7 @@ pub mod ports;
 pub mod room_rules;
 pub mod schedules;
 pub mod settings;
+pub mod watch_runner;
+pub mod watches;
 
 pub use failure::Failure;

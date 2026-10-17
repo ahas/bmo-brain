@@ -186,12 +186,16 @@ moved to another room meanwhile), `already-up` or `already-down`. A slug names o
 
 | Route | Body | Answer |
 |---|---|---|
-| `POST /watches/list` | `agent`, `by`, `all` | `watches`: `id`, `agent`, `by`, `name`, `note`, `check`, `every`, `within`, `at`, `item`, `state` (`waiting`, `fired`, `lapsed`, `broken`, `cancelled`), `setAt`, `endedAt` |
-| `POST /watches/cancel` | `agent`, `id`, `by` | `ok`; refused `not-theirs` where `by` is neither the room that set it nor the owner's room |
+| `POST /watches/list` | `by` (the room that set them) or null for every room, `agent` or null, `all` | `watches`, oldest first, the standing ones or with `all` every one: each `id`, `agent`, `chatId`, `by`, `kind` (`condition` or `timer`), `name` (as a line shows it), `note`, `check`, `every` (seconds), `dueAt`, `deadlineAt`, `state` (`active`, `fired`, `lapsed`, `broken`, `cancelled`), `unit`, `lastCheckedAt`, `lastExit`, `item`, `setAt`, `endedAt`; and `lines`, the same watches as a session reads them back |
+| `POST /watches/cancel` | `id`, `by` | a reading; refused `no-watch` for no such watch, `not-theirs` where `by` is neither the room that set it nor the owner's room, `ended` where it has already ended, and `no-owner` where the configuration names no owner |
 | `POST /watches/launch` | `id` | `launched` (boolean) |
-| `POST /watches/claim` | `id`, `run` | `standing` (boolean): whether the watch still stands for this run |
-| `POST /watches/end` | `id`, `run`, `outcome` (`fired`, `lapsed`, `broken`), `printed` | `ok`; the memo is queued once, whichever run ends it first |
-| `POST /reminders/list` | `agent`, `chatId` | `reminders`: `id`, `agent`, `chatId`, `text`, `at`, `repeat` |
+| `POST /watches/claim` | `id`, `run` | `standing` (boolean): whether the watch still stands and is held by this run |
+| `POST /watches/end` | `id`, `run`, `outcome` (`fired`, `lapsed`, `broken`), `exit` and `printed` (what the last check exited with and printed; `printed` is its output where it fired and its error where it broke) | `ended` (boolean): whether this run ended it; its memo is queued once, whichever run ends it first, and a run that no longer holds it ends nothing |
+| `POST /reminders/list` | `chatId`, `agent` or null, `all` | `reminders`, soonest first, the ones still to come or with `all` every one: each `id`, `agent`, `chatId`, `user`, `dueAt`, `every` (the repeat rule or null), `reason`, `item`, `fired`; and `lines`, the same as a session reads them back |
+
+A watch's run is the brain's own binary, `watch-runner <id> <unit>` (「Runs launched apart」), which claims and ends
+its watch as these routes do. A memo goes to the agent that set the watch, in the room that set it, as a quiet
+instruction of kind `watch`; the watch is ended only once the agency has taken the memo.
 
 ### Fragments
 
@@ -548,3 +552,6 @@ A listing line marks a global row with `global-scope` (`reach`) and a handed-ove
 | `too-few-batches` | `needed`, `given` | a reform whose folded messages do not fit the batches it was given |
 | `brain-root` | none | an agent reset names the agent whose folder is the brain root |
 | `not-theirs` | none | a watch cancelled from a room that neither set it nor is the owner's |
+| `no-watch` | none | a watch cancel naming no watch |
+| `ended` | none | a watch cancel naming a watch that has already ended |
+| `no-owner` | none | a watch cancel while the configuration names no owner, so the owner's room is unknown |

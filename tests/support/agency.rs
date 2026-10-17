@@ -43,6 +43,8 @@ pub struct FakeAgency {
   pub running: Mutex<BTreeSet<String>>,
   /// What each session does as it starts, standing in for the model's file and fragment tools.
   pub session: Mutex<Option<Session>>,
+  /// Whether a quiet instruction is refused rather than taken.
+  pub quiet_refused: Mutex<bool>,
   pub calls: Calls,
 }
 
@@ -222,7 +224,8 @@ impl Agency for FakeAgency {
     instruction: &'a QuietInstruction,
   ) -> BoxFuture<'a, Result<bool, PortFailure>> {
     self.calls.take("quiet_instruction", instruction);
-    Box::pin(async move { Ok(true) })
+    let taken = !*self.quiet_refused.lock().unwrap();
+    Box::pin(async move { Ok(taken) })
   }
 
   fn reload_documents<'a>(&'a self, reload: &'a Reload) -> BoxFuture<'a, Result<bool, PortFailure>> {

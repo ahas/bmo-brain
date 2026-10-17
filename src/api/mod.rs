@@ -16,6 +16,7 @@ pub mod records;
 pub mod room_rules;
 pub mod summaries;
 pub mod table;
+pub mod watches;
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -283,6 +284,7 @@ pub fn router(api: Arc<Api>) -> Router {
     .merge(console::routes())
     .merge(room_rules::routes())
     .merge(desk::routes())
+    .merge(watches::routes())
     .fallback(no_route)
     .layer(middleware::from_fn_with_state(api.clone(), authorised))
     .with_state(api)
