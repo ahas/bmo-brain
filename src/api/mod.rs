@@ -8,9 +8,11 @@
 pub mod console;
 pub mod desk;
 pub mod digests;
+pub mod documents;
 pub mod fragments;
 pub mod gate;
 pub mod holds;
+pub mod lifecycle;
 pub mod memories;
 pub mod records;
 pub mod room_rules;
@@ -285,6 +287,8 @@ pub fn router(api: Arc<Api>) -> Router {
     .merge(room_rules::routes())
     .merge(desk::routes())
     .merge(watches::routes())
+    .merge(documents::routes())
+    .merge(lifecycle::routes())
     .fallback(no_route)
     .layer(middleware::from_fn_with_state(api.clone(), authorised))
     .with_state(api)

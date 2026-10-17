@@ -279,10 +279,11 @@ body with an empty `kind` or `label` is answered 400. The brain's own kinds answ
 
 | Route | Body | Answer |
 |---|---|---|
-| `POST /knowledge/read` | `agent`, `chatId`, `slugs` | `documents`: `slug`, `path`, `text`, `version`; a slug outside the room's own and the shared chunks is refused `out-of-room` |
-| `POST /people/read` | `agent`, `chatId`, `senders`, `slugs` | `sheets` (per sender, the common sheet and the room sheet where the room keeps one and the file is under its ceiling) and `pieces`, each `path`, `text`, `version`, `owner`; a slug of another shape, a room piece of another room or a common piece of somebody who never spoke in the room is refused `out-of-room` |
+| `POST /knowledge/read` | `agent`, `chatId`, `slugs` | `documents`, in the order asked: `slug`, `path`, `text`, `version`; a slug that is not among the knowledge chunks the room may be offered (its own and the shared ones, 「What a room may be offered」 in `fragments.md`) is refused `out-of-room` with those `slugs`, and nothing is read |
+| `POST /people/read` | `agent`, `chatId`, `senders`, `slugs` | `sheets`: for each sender in turn, the person's common sheet, then their sheet of this room where the room keeps a room part, each `person`, `part` (`common` or `room`), `path`, `text`, `version`, a sheet that is missing, empty or over its ceiling left out, and none at all for an agent keeping no long-term memory; and `pieces`, in the order asked: `slug`, `path`, `text`, `version`, `owner`; a slug that is not among the person-book pieces the room may be offered (its room part where it keeps one, the common pieces of those who spoke in it) is refused `out-of-room` with those `slugs` |
 
-`version` is the body's hash; a session holds a document by its path and version.
+`text` is the file trimmed, and `version` its hash; a session holds a document by its path and version. A path is
+relative to the brain root, and a piece whose file is gone is left out.
 
 ### Owner room rules
 
@@ -360,16 +361,17 @@ sentence naming the form it takes.
 | Route | Body | Answer |
 |---|---|---|
 | `POST /rooms/forgotten` | `chatId` | `ok`; the room's withering stamps are let go |
-| `POST /rooms/removed` | `chatId`, `preview` (boolean) | `took`: the count of the room's rows per table, its settings keys (each agent's day its book of the room starts reading) and the room folders per agent; with `preview` false they are removed and the brain repository committed |
+| `POST /rooms/removed` | `chatId`, `preview` (boolean) | `took`: `rows`, the count of the room's rows per table (`memories`, `fragments`, `notes`, `reminders`, and `watches` the room set or that watch it), `settings`, its keys (each agent's day its book of the room starts reading), and `folders`, the room's folder under each agent's, relative to the brain root; with `preview` false the rows and keys are removed, and each folder is removed and its removal committed under the editing lock of the agent's folder it stands in; `couldNot` lists what could not be removed |
 
 ### Agents forgetting
 
 | Route | Body | Answer |
 |---|---|---|
-| `POST /agents/reset` | `agent`, `preview` (boolean) | `took`: the count of the agent's rows per table and whether its brain folder stands; with `preview` false its folder is fenced, its editing lock taken ahead of every waiter, its open recollector runs stopped and what they left unwritten put back, its rows and folder removed and the brain repository committed, the folder fenced again and the lock let go; `couldNot` lists what it could not do |
-| `POST /agents/removed` | `agent` | `ok`; the agent's editing lock, its ticket queue and its fence are removed |
+| `POST /agents/reset` | `agent`, `preview` (boolean) | `took`: `rows`, the count of the agent's rows per table (`memories`, `reminders`, `watches`, `notes`, `fragments`), and `folder`, its brain folder relative to the brain root where it stands, else null; with `preview` false every program still working in its folder is killed, the folder fenced and its editing lock taken ahead of every waiter (a taker still holding it killed rather than waited for), what a stopped run left unwritten put back, its rows removed, its read marks forgotten at the receiver, its book of every room it answers made to read from now, its folder removed and the removal committed, the folder fenced again and the lock let go; `couldNot` lists what it could not do. Its recollector runs are the agency's to stop, which the agency's own reset does first |
+| `POST /agents/removed` | `agent` | `ok` and `left`, what could not be removed; the agent's editing lock, its ticket queue and its fence are removed. The folder is the one the agency registers for the agent, so the agency calls this before it forgets the registration; an agent it registers no folder for has nothing to remove |
 
-The chat agent's folder is the brain root, so `POST /agents/reset` refuses it `brain-root`.
+An agent's folder is its registration's brain folder. The chat agent's is the brain root, so `POST /agents/reset`
+refuses it `brain-root`.
 
 ## Calls the brain makes
 

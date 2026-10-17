@@ -6,6 +6,7 @@ pub mod commands;
 pub mod config;
 pub mod editors;
 pub mod failure;
+pub mod lifecycle;
 pub mod migration;
 pub mod policy;
 pub mod ports;
