@@ -9,16 +9,23 @@ server the same binary starts as `bmo-brain mcp` and the skill that tells a harn
 `docs/boundary-api.md` states every route, event, tool and code; `docs/openapi.json` is the same contract in
 machine form, generated from the client's types.
 
+## Personal data
+
+No personal data stands in this repository: no person's name, handle, account id, mail address, telephone
+number, home path, host name, domain, token or private network address, in code, comments, documents, test
+fixtures or commit messages. `docs/PERSONAL-DATA.md` states the rule and the check that holds it.
+
 ## Layout
 
 | Folder | Holds |
 |---|---|
+| `.graph/` | the code dependency graph: its settings and its nodes, one feature to a node |
 | `src/` | the service's own package: its store, routes, clock, MCP server and OpenAPI document |
 | `crates/` | `client/`, the crate `bmo-brain-client`, every body and member as a Rust type and one method for each route |
 | `package/` | the TypeScript package `bmo-brain-client`, generated from `docs/openapi.json`: every body as a type and a typed call for each route |
 | `migrations/` | the database's migrations, built into the binary |
 | `skills/` | `brain-harness/`, the plugin's skill |
-| `docs/` | the boundary document and the OpenAPI document |
+| `docs/` | the boundary document, the OpenAPI document and the personal-data rule |
 | `tests/` | the service's tests and the checks that span the repository |
 | `deploy/` | the service's user unit, `bmo-brain.service`, which a deployment links from the deploy tree |
 

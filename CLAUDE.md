@@ -20,8 +20,10 @@ rules it keeps.
   repository's own crates. `tests/repository.rs` fails on any other.
 - **English only** in code, comments, strings, tests and documents, and in commit messages. What a machine
   reads is a status code and a kebab-case code; the sentence beside it is English.
-- **No agent names, owner names, host names, home paths or private network addresses** in code, documents
-  or commits. Tests use neutral names such as `writer-a` and `room:a`. `tests/repository.rs` fails on these.
+- **No personal data** in code, comments, documents, test fixtures or commits: no agent, owner, host or
+  company name, mail address, telephone number, home path, token or private network address. Tests use
+  neutral names such as `writer-a` and `room:a`. `docs/PERSONAL-DATA.md` states the rule, and
+  `tests/repository.rs` names the file, line and kind of each value it finds.
 - **Tests live in `tests/`.** A crate's tests are in its own `tests/`; checks that span the repository and the
   service's own tests are in the root `tests/`. No test module sits in `src/`.
 - **No directory named after its parent** (no `x/x`), and **only Cargo manifests at the root**: the root

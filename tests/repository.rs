@@ -1,13 +1,15 @@
 //! Checks that span the repository: what its packages may depend on, its layout, the testbed's declaration
-//! and the service's unit, and what no tracked file may hold (Hangul in Rust source, agent names, home
-//! paths and private network addresses).
+//! and the service's unit, and what no tracked file may hold (Hangul in Rust source, agent names, and the
+//! personal data `docs/PERSONAL-DATA.md` names).
 
+use std::collections::BTreeSet;
 use std::fs;
 use std::io::ErrorKind;
-use std::net::Ipv4Addr;
 use std::path::{Component, Path};
 use std::process::Command;
+use std::sync::LazyLock;
 
+use regex::Regex;
 use serde_json::Value;
 
 const ROOT: &str = env!("CARGO_MANIFEST_DIR");
@@ -57,9 +59,6 @@ const HANGUL: [(u32, u32); 6] = [
   (0xD7B0, 0xD7FF),
   (0xFFA0, 0xFFDC),
 ];
-
-/// Path prefixes a home directory is written under.
-const HOME_PREFIXES: [&str; 2] = ["/home/", "/Users/"];
 
 fn metadata() -> Value {
   let cargo = std::env::var("CARGO").unwrap_or_else(|_| "cargo".to_owned());
@@ -143,30 +142,58 @@ fn names_list(names: &toml::Table, key: &str) -> Vec<String> {
     .collect()
 }
 
-/// An address in a range only a private network uses: the private ranges, and the shared range
-/// carrier-grade and overlay networks hand out.
-fn is_private_network(address: Ipv4Addr) -> bool {
-  let [first, second, ..] = address.octets();
-  address.is_private() || (first == 100 && second & 0b1100_0000 == 0b0100_0000)
+/// One form no tracked file may hold, and the kind the check reports it as (`docs/PERSONAL-DATA.md`).
+struct PersonalData {
+  kind: &'static str,
+  pattern: Regex,
 }
 
-fn private_addresses(text: &str) -> Vec<Ipv4Addr> {
-  text
-    .split(|character: char| !character.is_ascii_digit() && character != '.')
-    .filter_map(|run| run.trim_matches('.').parse::<Ipv4Addr>().ok())
-    .filter(|&address| is_private_network(address))
+/// The forms no tracked file may hold, each with the kind the check reports it as. No value is admitted:
+/// every form a line holds fails (`docs/PERSONAL-DATA.md`).
+fn personal_data() -> &'static [PersonalData] {
+  static FORMS: LazyLock<Vec<PersonalData>> = LazyLock::new(|| {
+    let form = |kind, source: &str| PersonalData {
+      kind,
+      pattern: Regex::new(source).expect("a personal-data form"),
+    };
+
+    vec![
+      form("a mail address", r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}"),
+      form("a home path", r"(?:/home/|/Users/|[A-Za-z]:\\Users\\)[A-Za-z0-9._-]+"),
+      form("a telephone number", r"\b01[016789][-. ]?[0-9]{3,4}[-. ][0-9]{4}\b"),
+      form("a telephone number", r"\b0[2-9][0-9]?[-. ][0-9]{3,4}[-. ][0-9]{4}\b"),
+      form("a telephone number", r"\+\d{1,3}[-. ]\d{2,4}[-. ]\d{3,4}"),
+      form("a telephone number", r"\+\d{9,15}\b"),
+      form("a token", r"\bgh[pousr]_[A-Za-z0-9]{20,}"),
+      form("a token", r"\bgithub_pat_[A-Za-z0-9_]{20,}"),
+      form("a token", r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b"),
+      form("a token", r"\bsk-[A-Za-z0-9_-]{20,}"),
+      form("a token", r"\bxox[baprs]-[A-Za-z0-9-]{10,}"),
+      form("a token", r"\bAIza[0-9A-Za-z_-]{35}"),
+      form("a token", r"\bglpat-[A-Za-z0-9_-]{20,}"),
+      form("a token", r"\bnpm_[A-Za-z0-9]{36}\b"),
+      form("a token", r"-----BEGIN (?:[A-Z]+ )?PRIVATE KEY-----"),
+      form("a private network address", r"\b10\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\b"),
+      form("a private network address", r"\b192\.168\.[0-9]{1,3}\.[0-9]{1,3}\b"),
+      form("a private network address", r"\b172\.(?:1[6-9]|2[0-9]|3[01])\.[0-9]{1,3}\.[0-9]{1,3}\b"),
+      form(
+        "a private network address",
+        r"\b100\.(?:6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])\.[0-9]{1,3}\.[0-9]{1,3}\b",
+      ),
+      form("a private network address", r"(?i)\b(?:f[cd][0-9a-f]{2}|fe80):"),
+    ]
+  });
+
+  FORMS.as_slice()
+}
+
+/// The kinds a line holds, each found by its form.
+fn personal_data_in(line: &str) -> BTreeSet<&'static str> {
+  personal_data()
+    .iter()
+    .filter(|form| form.pattern.is_match(line))
+    .map(|form| form.kind)
     .collect()
-}
-
-fn holds_home_path(text: &str) -> bool {
-  HOME_PREFIXES.iter().any(|prefix| {
-    text.match_indices(prefix).any(|(start, found)| {
-      text[start + found.len()..]
-        .chars()
-        .next()
-        .is_some_and(|next| is_word_character(next) || next == '.')
-    })
-  })
 }
 
 #[test]
@@ -368,20 +395,41 @@ fn no_agent_names_in_tracked_files() {
 }
 
 #[test]
-fn no_home_paths_in_tracked_files() {
-  let found: Vec<String> = tracked_texts()
-    .into_iter()
-    .filter(|(_, text)| holds_home_path(text))
-    .map(|(path, _)| path)
-    .collect();
-  assert!(found.is_empty(), "home paths in tracked files: {found:?}");
+fn no_personal_data_in_tracked_files() {
+  let mut found = Vec::new();
+
+  for (path, text) in tracked_texts() {
+    for (index, line) in text.lines().enumerate() {
+      for kind in personal_data_in(line) {
+        found.push(format!("{path}:{}: {kind}", index + 1));
+      }
+    }
+  }
+
+  assert!(found.is_empty(), "personal data in tracked files (docs/PERSONAL-DATA.md): {found:#?}");
 }
 
 #[test]
-fn no_private_network_addresses_in_tracked_files() {
-  let mut found = Vec::new();
-  for (path, text) in tracked_texts() {
-    found.extend(private_addresses(&text).into_iter().map(|address| format!("{path}: {address}")));
+fn the_personal_data_check_finds_each_form() {
+  // The forms are put together here so that this file does not itself hold one.
+  let (at, user, folder) = ("@", "tester", "notes");
+  let (prefix, middle, last) = ("010", "1234", "5678");
+  let (network, unit) = ("10", "0");
+  let body = "a".repeat(36);
+
+  let examples = [
+    ("a mail address", format!("{user}{at}tester.test")),
+    ("a home path", format!("/home/{user}/{folder}")),
+    ("a telephone number", format!("{prefix}-{middle}-{last}")),
+    ("a token", format!("ghp_{body}")),
+    ("a private network address", format!("{network}.{unit}.{unit}.1")),
+  ];
+
+  for (kind, text) in examples {
+    assert!(personal_data_in(&text).contains(kind), "{kind} is not found in its own form");
   }
-  assert!(found.is_empty(), "private network addresses in tracked files: {found:?}");
+
+  for text in ["a neutral line", "writer-a", "room:a", "release 1.2.3"] {
+    assert!(personal_data_in(text).is_empty(), "the check flags the neutral line {text}");
+  }
 }
