@@ -5,12 +5,13 @@ members = ["crates/client"]
 resolver = "3"
 
 [workspace.package]
-version = "0.1.0-rev.1"
+version = "0.1.0-rev.2"
 edition = "2024"
 
 [workspace.dependencies]
 axum = { version = "0.8.4", default-features = false, features = ["http1", "json", "query", "tokio"] }
 bmo-brain-client = { path = "crates/client" }
+chrono = { version = "0.4.45", default-features = false, features = ["std"] }
 clap = { version = "4.5.40", features = ["derive", "env"] }
 futures-util = "0.3.34"
 hex = "0.4.3"
@@ -45,8 +46,10 @@ path = "src/main.rs"
 [dependencies]
 # The routes the service answers on.
 axum.workspace = true
-# The wire types, and the client the MCP server and the health command call through.
+# The wire types, and the client the MCP server, the health ask and the command call through.
 bmo-brain-client.workspace = true
+# The moments a command reads and prints.
+chrono.workspace = true
 # The binary's command line.
 clap.workspace = true
 # The event stream.

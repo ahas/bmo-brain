@@ -243,6 +243,62 @@ What the brain holds under a scope a caller gave it is the scope's holding: `sco
 matched for thirty days, counted from its last match or else its creation, to `off`, with `memory.changed`.
 Remembered again, nothing withers; a withered row stays `off` until a client moves it.
 
+## The command
+
+`bmo-brain` is the service and its command in one binary. The platform's `bmo` asks it `nouns` and hands a
+command whose leading words match a declared noun to it, the noun's words included.
+
+- **`bmo-brain nouns`** prints the nouns it carries, one a line: `memory`, `note`, `fragment`, `watch set`,
+  `watch list`, `reminder list`, `brain hold` and `brain wait`. No noun carries a mark: every command asks
+  the service's routes over HTTP, so it runs wherever the service is reachable.
+- **The service asked** is the one the configuration names: the file `--config` gives, else the one
+  `BMO_BRAIN_CONFIG` names, else the `brain.toml` a deployment links in the directory above the binary's.
+  The command reads the configuration's `listen` (an unspecified host asked at the loopback one) and `token`,
+  and calls the routes through the brain's client.
+- **Moments** are given as epoch milliseconds or an RFC 3339 time, and printed as RFC 3339 in UTC to the
+  millisecond. **Labels** are given as `key=value`, one `--label` each. **A condition** is a JSON object.
+- **`--via <road>`**, which `bmo` hands on after the noun, is taken and passed over: the brain reads no turn.
+- **Output** begins each member on a line, prefixed with the noun, and prints its text as it stands. **Ending:**
+  0 where the command finished; 1 where the brain refused or a value did not read, with `bmo-brain: <the
+  refusal>` on standard error; 2 where the words are no form the command takes.
+
+| Noun | Form | Route |
+|---|---|---|
+| `memory` | `add --scope <scope> --kind <kind> --text <text>` | `POST /memories` |
+| | `update <id>` | `PATCH /memories/{memoryId}` |
+| | `done <id> [--text <text>]` | `PATCH /memories/{memoryId}` |
+| | `retire <id>`, `revive <id>`, `candidate <id>` | `PATCH /memories/{memoryId}` |
+| | `list` | `GET /memories` |
+| `note` | `--scope <scope> --actor <name> [--text <text>]` | `POST /notes` |
+| `fragment` | `list`, `write <key>`, `remove <key>`, `switch <key>`, `sync <library>` | the fragment and library routes above |
+| `watch set` | `--scope <scope> --setter <name>` and one condition | `POST /watches` |
+| `watch list` | | `GET /watches` |
+| `reminder list` | `[--scope <scope>]`, or `--cancel <id>` | `GET /reminders`, `DELETE /reminders/{reminderId}` |
+| `brain hold` | `--holder <name> --reason <text> [--ttl-ms <n>]` | `POST /locks` |
+| `brain wait` | `[--wait-ms <n>]` | `GET /locks` with `waitMs` |
+
+- **`memory add`** takes `--scope`, `--kind` (also as `--type`) and `--text` required, then `--subject`,
+  `--condition` (one flag each, an object kept as given), `--label`, `--due` and `--state`; `--text -` reads
+  standard input. **`memory update`** takes at least one of `--text`, `--state`, `--label` (replacing the
+  labels whole), `--due` or `--no-due`. **`memory done`** moves a row to `done`, with the text it ends on
+  where `--text` gives one. **`memory list`** narrows by `--scope`, `--scope-prefix`, `--subject`, `--kind`,
+  `--state`, `--label` (`key` or `key=value`), `--due-before`, `--q`, `--after` and `--limit`.
+- **`note`** takes `--scope` and `--actor` required, then `--subject` and `--text`; with no `--text` it reads
+  standard input.
+- **`fragment list`** narrows by `--kind`, `--scope`, `--subject`, `--library`, `--state`, `--q`, `--ids`,
+  `--keys`, `--after` and `--limit`. **`fragment write <key>`** takes `--kind` and `--text` required, then
+  `--scope`, `--subject`, `--title`, `--path`, `--library`, `--state` and `--label`. **`fragment switch
+  <key>`** takes `--state` or `--off-for` (one flag each, replacing the scopes it was off for). **`fragment
+  sync <library>`** takes `--dry-run`.
+- **`watch set`** takes exactly one condition: `--at` a moment, `--memory` a row with the `--state` it waits
+  for, or `--external` a key. **`watch list`** narrows by `--scope`, `--setter`, `--holder`, `--state`,
+  `--after` and `--limit`.
+- **`reminder list`** narrows by `--scope`, `--due-before`, `--fired` or `--waiting`, `--after` and
+  `--limit`; `--cancel <id>` cancels the reminder it names instead of listing.
+- **`brain hold`** takes `--holder` and `--reason` required, and `--ttl-ms` for how long it stands; with none
+  it stands until it is let go. **`brain wait`** waits `--wait-ms` (ten minutes where none is given) for no
+  lock to stand, and narrows with `--after` and `--limit`.
+
 ## The harness plugin
 
 The plugin is `brain-harness`: the MCP server `bmo-brain mcp` starts on standard input and output, and the skill

@@ -51,7 +51,10 @@ async fn a_fragment_is_written_whole_and_keeps_its_switches_where_a_write_names_
   assert_eq!(rewritten.text, "Tea at five");
 
   assert_eq!(refused(client.fragment_put("a b", &fragment("knowledge", None, "x")).await).0, 400);
-  assert_eq!(refused(client.fragment_put(&"k".repeat(201), &fragment("knowledge", None, "x")).await).0, 400);
+  assert_eq!(
+    refused(client.fragment_put(&"k".repeat(201), &fragment("knowledge", None, "x")).await).0,
+    400
+  );
   assert_eq!(refused(client.fragment_switch("coffee", &FragmentSwitch::default()).await).0, 404);
   client.fragment_remove("tea").await.unwrap();
   assert_eq!(refused(client.fragment_remove("tea").await), (404, "not-found".into()));

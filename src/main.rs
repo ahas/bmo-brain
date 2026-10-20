@@ -1,14 +1,16 @@
-//! The `bmo-brain` command (docs/boundary-api.md, 「Configuration」 and 「The harness plugin」): `serve` runs the
-//! migrations, stands the clock and answers the routes until it is told to stop; `health` ends 0 only where the
-//! service its configuration names answers ready; `mcp` serves the harness tools over MCP on standard input and
-//! output; `openapi` prints the OpenAPI document.
+//! The `bmo-brain` command (docs/boundary-api.md, 「Configuration」, 「The command」 and 「The harness plugin」):
+//! `serve` runs the migrations, stands the clock and answers the routes until it is told to stop; `health`
+//! ends 0 only where the service its configuration names answers ready; `mcp` serves the harness tools over
+//! MCP on standard input and output; `openapi` prints the OpenAPI document; `nouns` declares the nouns `bmo`
+//! dispatches to this binary, and each noun asks the brain's own routes.
 
 use std::path::PathBuf;
 use std::process::ExitCode;
 
 use bmo_brain::api::{Brain, router};
 use bmo_brain::clock;
-use bmo_brain::config::{Config, HEALTH_PATIENCE};
+use bmo_brain::command::{self, NOUNS};
+use bmo_brain::config::{self, Config, HEALTH_PATIENCE};
 use bmo_brain::mcp::BrainServer;
 use bmo_brain::openapi::openapi_json;
 use bmo_brain::store::Store;
@@ -18,11 +20,15 @@ use rmcp::ServiceExt;
 use rmcp::transport::stdio;
 
 #[derive(Parser)]
-#[command(name = "bmo-brain", version, about = "The brain service and its harness plugin.")]
+#[command(name = "bmo-brain", version, about = "The brain service and its command.")]
 struct Command {
-  /// The configuration file, which serving and the health ask read.
-  #[arg(long, global = true)]
+  /// The configuration file; `BMO_BRAIN_CONFIG` where none is given, and the one a deployment links
+  /// beside the binary for a noun command.
+  #[arg(long, global = true, env = "BMO_BRAIN_CONFIG")]
   config: Option<PathBuf>,
+  /// The road the caller's turn is read on, handed on by `bmo`; the brain reads no turn and passes it over.
+  #[arg(long, global = true, value_name = "road", hide = true)]
+  via: Option<String>,
   #[command(subcommand)]
   verb: Verb,
 }
@@ -44,6 +50,35 @@ enum Verb {
   },
   /// Prints the OpenAPI document.
   Openapi,
+  /// Prints the nouns `bmo` dispatches to this command, one a line.
+  Nouns,
+  /// The memory rows.
+  Memory {
+    #[command(subcommand)]
+    word: command::memory::Word,
+  },
+  /// A note kept for a later reading.
+  Note(command::note::Asked),
+  /// The fragment table and the libraries it is synced from.
+  Fragment {
+    #[command(subcommand)]
+    word: command::fragment::Word,
+  },
+  /// The watches.
+  Watch {
+    #[command(subcommand)]
+    word: command::watch::Word,
+  },
+  /// The reminders.
+  Reminder {
+    #[command(subcommand)]
+    word: command::reminder::Word,
+  },
+  /// The locks that say who is editing the store.
+  Brain {
+    #[command(subcommand)]
+    word: command::lock::Word,
+  },
 }
 
 async fn stopped() {
@@ -123,9 +158,38 @@ fn configured(path: Option<&PathBuf>) -> Result<Config, String> {
   Config::read(path).map_err(|why| format!("the configuration could not be read: {why}"))
 }
 
+/// The service a noun command asks: the configuration `--config` or `BMO_BRAIN_CONFIG` names, else the one
+/// a deployment links beside the binary's directory.
+fn command_client(path: Option<&PathBuf>) -> Result<BrainClient, String> {
+  let path = path
+    .cloned()
+    .or_else(config::beside_binary)
+    .ok_or("--config names no configuration file, and none stands beside the binary")?;
+  let config = Config::read(&path).map_err(|why| format!("the configuration could not be read: {why}"))?;
+  BrainClient::new(&config.base_address(), config.token)
+    .map_err(|why| format!("the brain's address did not read: {why}"))
+}
+
+/// Runs one noun's command and prints its lines.
+async fn noun<F, Fut>(config: Option<&PathBuf>, run: F) -> Result<(), String>
+where
+  F: FnOnce(BrainClient) -> Fut,
+  Fut: std::future::Future<Output = Result<Vec<String>, String>>,
+{
+  let client = command_client(config)?;
+  for line in run(client).await? {
+    println!("{line}");
+  }
+  Ok(())
+}
+
 #[tokio::main]
 async fn main() -> ExitCode {
-  let Command { config, verb } = Command::parse();
+  let Command {
+    config,
+    via: _,
+    verb,
+  } = Command::parse();
   let ended = match verb {
     Verb::Serve => match configured(config.as_ref()) {
       Ok(config) => serve(&config).await,
@@ -139,6 +203,28 @@ async fn main() -> ExitCode {
     Verb::Openapi => {
       print!("{}", openapi_json());
       Ok(())
+    }
+    Verb::Nouns => {
+      NOUNS.iter().for_each(|noun| println!("{noun}"));
+      Ok(())
+    }
+    Verb::Memory { word } => {
+      noun(config.as_ref(), |client| async move { command::memory::run(&client, word).await }).await
+    }
+    Verb::Note(asked) => {
+      noun(config.as_ref(), |client| async move { command::note::run(&client, asked).await }).await
+    }
+    Verb::Fragment { word } => {
+      noun(config.as_ref(), |client| async move { command::fragment::run(&client, word).await }).await
+    }
+    Verb::Watch { word } => {
+      noun(config.as_ref(), |client| async move { command::watch::run(&client, word).await }).await
+    }
+    Verb::Reminder { word } => {
+      noun(config.as_ref(), |client| async move { command::reminder::run(&client, word).await }).await
+    }
+    Verb::Brain { word } => {
+      noun(config.as_ref(), |client| async move { command::lock::run(&client, word).await }).await
     }
   };
   match ended {

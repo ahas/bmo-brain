@@ -176,10 +176,11 @@ dependencies = [
 
 [[package]]
 name = "bmo-brain"
-version = "0.1.0-rev.1"
+version = "0.1.0-rev.2"
 dependencies = [
  "axum",
  "bmo-brain-client",
+ "chrono",
  "clap",
  "futures-util",
  "hex",
@@ -197,7 +198,7 @@ dependencies = [
 
 [[package]]
 name = "bmo-brain-client"
-version = "0.1.0-rev.1"
+version = "0.1.0-rev.2"
 dependencies = [
  "reqwest",
  "schemars",
