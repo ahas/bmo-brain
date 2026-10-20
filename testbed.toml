@@ -9,6 +9,11 @@ languages = ["cargo"]
 # The tests make their own scratch databases on the server, so no template is named.
 [test.database]
 
+# The TypeScript client under package/, a project of its own with its manifest and lockfile; the check step
+# below runs its manifest's check script. The repository's tests stay the Cargo suite's.
+[projects]
+paths = ["package"]
+
 [check]
 quick = ["layout", "dependencies"]
 base_libraries = ["bmo-chat", "bmo-chat-client", "bmo-ui"]
@@ -26,6 +31,12 @@ lane = "wide"
 [[check.step]]
 id = "fmt"
 command = "cargo fmt --all --check"
+
+# The TypeScript client: its types as docs/openapi.json generates them now, its typecheck and its tests.
+[[check.step]]
+id = "brain-client"
+command = "bun install --frozen-lockfile && bun run check"
+dir = "package"
 
 [build]
 # The service's binary, which also starts the harness plugin's MCP server.

@@ -331,9 +331,21 @@ reads on `GET /events`. The server sends no notifications.
 
 ## The client
 
-`bmo-brain-client`, under `crates/client`, carries every body and member above as a Rust type and one method
-for each route. The OpenAPI document is generated from those types, so the client and the document cannot
-differ.
+The service publishes its client in two languages, both from `docs/openapi.json`:
+
+- **Rust:** `bmo-brain-client`, under `crates/client`, carries every body and member above as a Rust type
+  and one method for each route. The document is generated from those types, so the crate and the
+  document cannot differ.
+- **TypeScript:** the package `bmo-brain-client`, under `package/`, carries the document's bodies as the
+  types `openapi-typescript` generates and a typed call for each route over `openapi-fetch`. Every call
+  carries the bearer token, and the call asks for JSON, so `GET /events` answers a page; a caller that
+  reads the live stream reads server-sent events from the same route itself. `bun run generate` writes the
+  types from the document, and the package's check fails where they differ.
+
+A downstream checkout installs the TypeScript package from its pack: `bun pm pack` in `package/` makes
+`bmo-brain-client-<version>.tgz`, which the checkout adds by path. The package and the document both carry
+the service's version, and the package's tests fail where its types or its version differ from the
+document.
 
 ## Codes
 

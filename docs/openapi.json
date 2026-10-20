@@ -1720,7 +1720,7 @@
   "info": {
     "description": "Memory as middleware: memory rows, notes, watches, reminders, fragments and the libraries they come from, knowledge readings and locks, stored and served through this API. The service never executes: it opens no session, runs no model, calls no other service and registers no hook. A member belongs to an opaque scope and, where it is about someone or something, to an opaque subjectKey; the caller decides what they mean. Time is the one thing the service acts on: a reminder whose time comes and a watch whose condition holds become events (reminder.due, watch.fired) that a client reads and acts on. A person sheet is a fragment of kind person keyed by its subjectKey. Bodies are JSON with camelCase keys, times are epoch milliseconds, lists are pages of items and more, and every failure is the error shape with its status. The harness plugin's tools, each a thin call of one route, are stated under x-tools.",
     "title": "bmo-brain",
-    "version": "0.1.0-rev.2"
+    "version": "0.1.0-rev.3"
   },
   "openapi": "3.1.0",
   "paths": {

@@ -15,6 +15,7 @@ machine form, generated from the client's types.
 |---|---|
 | `src/` | the service's own package: its store, routes, clock, MCP server and OpenAPI document |
 | `crates/` | `client/`, the crate `bmo-brain-client`, every body and member as a Rust type and one method for each route |
+| `package/` | the TypeScript package `bmo-brain-client`, generated from `docs/openapi.json`: every body as a type and a typed call for each route |
 | `migrations/` | the database's migrations, built into the binary |
 | `skills/` | `brain-harness/`, the plugin's skill |
 | `docs/` | the boundary document and the OpenAPI document |
@@ -30,10 +31,25 @@ cargo build --workspace
 cargo test --workspace
 cargo clippy --workspace --all-targets -- -D warnings
 cargo fmt --all --check
+bun install --cwd package --frozen-lockfile
+bun run --cwd package check
 ```
 
 The tests make their own databases on the PostgreSQL server `BMO_TEST_POSTGRES` names, the local socket's where
 it names none.
+
+## Clients
+
+The service publishes its client in two languages, both from `docs/openapi.json`: the Rust crate
+`bmo-brain-client` under `crates/client`, and the TypeScript package `bmo-brain-client` under `package/`.
+
+- A downstream checkout installs the TypeScript package from its pack: `bun pm pack` in `package/` makes
+  `bmo-brain-client-<version>.tgz`, which the checkout adds by path. The package's version is the service's.
+- `brainClient(<address>, <token>)` answers a client whose calls are the document's routes, typed by it:
+  `brain.GET("/memories/{memoryId}", { params: { path: { memoryId } } })`. Every call carries the token,
+  and `GET /events` answers a page; a caller reading the live stream reads server-sent events itself.
+- `bun run --cwd package generate` writes the package's types from the document, and its check fails where
+  the committed types differ.
 
 ## Running
 
