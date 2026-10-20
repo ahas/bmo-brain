@@ -1,0 +1,118 @@
+[
+  {
+    "id": "service/clock",
+    "title": "Clock",
+    "what": "The brain's clock: every second it fires the reminders and watches whose moment has come and lets run-out locks go; every minute it withers forgotten scopes and drops events past their window.",
+    "files": [
+      "src/clock.rs",
+      "docs/boundary-api.md"
+    ],
+    "symbols": [
+      "TICK",
+      "tick",
+      "slow",
+      "stand"
+    ],
+    "aliases": [],
+    "needs": [
+      "service/storage",
+      "watch/reminders",
+      "watch/watches",
+      "service/locks",
+      "service/scopes",
+      "api/events"
+    ],
+    "base": "7e5d71741fb07c958272de60444b5e9cfeb70a5f",
+    "changed": 1792497811529
+  },
+  {
+    "id": "service/locks",
+    "title": "Locks",
+    "what": "The locks that say who is editing the store: taken by a holder for a time or until let go, waited on by other writers, and expired by the clock.",
+    "files": [
+      "src/store/locks.rs",
+      "crates/client/src/holdings.rs",
+      "docs/boundary-api.md"
+    ],
+    "symbols": [
+      "Lock",
+      "NewLock",
+      "LocksQuery",
+      "LONGEST_WAIT_MS"
+    ],
+    "aliases": [],
+    "needs": [
+      "service/storage"
+    ],
+    "base": "7e5d71741fb07c958272de60444b5e9cfeb70a5f",
+    "changed": 1792497708078
+  },
+  {
+    "id": "service/scopes",
+    "title": "Scopes",
+    "what": "What the brain holds under a caller's scope: its counts read, the scope marked forgotten or remembered, and everything under it let go of.",
+    "files": [
+      "src/store/scopes.rs",
+      "crates/client/src/holdings.rs",
+      "docs/boundary-api.md"
+    ],
+    "symbols": [
+      "ScopeState",
+      "ScopeCounts",
+      "ScopeHolding",
+      "ScopeChange",
+      "WITHER_AFTER_MS"
+    ],
+    "aliases": [],
+    "needs": [
+      "service/storage"
+    ],
+    "base": "7e5d71741fb07c958272de60444b5e9cfeb70a5f",
+    "changed": 1792497708085
+  },
+  {
+    "id": "service/settings",
+    "title": "Settings and deployment",
+    "what": "The configuration file bmo-brain reads at start and the user unit a deployment runs it as: the listen address, the bearer token, the database and the health wait.",
+    "files": [
+      "src/config.rs",
+      "deploy/bmo-brain.service",
+      "docs/boundary-api.md"
+    ],
+    "symbols": [
+      "Config",
+      "HEALTH_PATIENCE",
+      "beside_binary"
+    ],
+    "aliases": [],
+    "needs": [],
+    "base": "7e5d71741fb07c958272de60444b5e9cfeb70a5f",
+    "changed": 1792497708109
+  },
+  {
+    "id": "service/storage",
+    "title": "Store",
+    "what": "The brain's PostgreSQL store: its pool and migrations built into the binary, the faults every route answers with, and the paging, naming, text and event helpers the resources share.",
+    "files": [
+      "src/store/mod.rs",
+      "migrations/0001_brain.sql",
+      "docs/boundary-api.md"
+    ],
+    "symbols": [
+      "Store",
+      "Fault",
+      "MIGRATOR",
+      "Held",
+      "now",
+      "PAGE",
+      "MOST",
+      "TEXT_MOST",
+      "FRAGMENT_MOST",
+      "version"
+    ],
+    "aliases": [],
+    "needs": [],
+    "base": "7e5d71741fb07c958272de60444b5e9cfeb70a5f",
+    "changed": 1792497708092
+  }
+]

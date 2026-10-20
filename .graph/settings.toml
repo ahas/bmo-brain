@@ -1,0 +1,13 @@
+repository = "bmo-brain"
+base = false
+
+[coverage]
+# The root package's src/, the client crate's src/ and the TypeScript package, but these: the two crate roots,
+# which only list their modules and re-exports, and the types generated from the OpenAPI document.
+layout = "bmo-next"
+roots = ["package/"]
+unindexed = [
+  "src/lib.rs",
+  "crates/client/src/lib.rs",
+  "package/openapi.d.ts",
+]

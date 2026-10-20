@@ -1,0 +1,49 @@
+[
+  {
+    "id": "memory/notes",
+    "title": "Notes",
+    "what": "Notes kept for a later reading, each with its scope, optional subject key and author, listed and added under src/store/memories.rs.",
+    "files": [
+      "src/store/memories.rs",
+      "crates/client/src/memories.rs",
+      "docs/boundary-api.md"
+    ],
+    "symbols": [
+      "Note",
+      "NewNote",
+      "NotesQuery"
+    ],
+    "aliases": [],
+    "needs": [
+      "service/storage"
+    ],
+    "base": "7e5d71741fb07c958272de60444b5e9cfeb70a5f",
+    "changed": 1792497708038
+  },
+  {
+    "id": "memory/rows",
+    "title": "Memory rows",
+    "what": "Memory rows with their states, conditions and due moments, the moves a change may make between states, and the matches a reading records on them.",
+    "files": [
+      "src/store/memories.rs",
+      "crates/client/src/memories.rs",
+      "docs/boundary-api.md"
+    ],
+    "symbols": [
+      "Memory",
+      "MemoryState",
+      "MemoryChange",
+      "NewMemory",
+      "MemoryMatch",
+      "NewMemoryMatch",
+      "MemoriesQuery"
+    ],
+    "aliases": [],
+    "needs": [
+      "service/storage",
+      "watch/watches"
+    ],
+    "base": "7e5d71741fb07c958272de60444b5e9cfeb70a5f",
+    "changed": 1792497708033
+  }
+]

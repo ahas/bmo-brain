@@ -1,0 +1,80 @@
+[
+  {
+    "id": "fragment/fragments",
+    "title": "Fragments",
+    "what": "Pieces of reference text keyed by the caller: written whole, switched, removed, merged, split and hit, with their kinds and the counts a reading records.",
+    "files": [
+      "src/store/fragments.rs",
+      "crates/client/src/fragments.rs",
+      "docs/boundary-api.md"
+    ],
+    "symbols": [
+      "Fragment",
+      "FragmentState",
+      "FragmentWrite",
+      "FragmentSwitch",
+      "FragmentMerge",
+      "FragmentPiece",
+      "FragmentSplit",
+      "FragmentHits",
+      "FragmentHitsRecorded",
+      "FragmentKind",
+      "KindWords",
+      "FragmentsQuery"
+    ],
+    "aliases": [],
+    "needs": [
+      "service/storage"
+    ],
+    "base": "7e5d71741fb07c958272de60444b5e9cfeb70a5f",
+    "changed": 1792497708058
+  },
+  {
+    "id": "fragment/knowledge",
+    "title": "Knowledge reads",
+    "what": "The reading a caller makes before acting: the active fragments and standing rows held under a set of scopes, narrowed by key, kind and subject.",
+    "files": [
+      "src/store/fragments.rs",
+      "crates/client/src/fragments.rs",
+      "docs/boundary-api.md"
+    ],
+    "symbols": [
+      "Knowledge",
+      "KnowledgeQuery"
+    ],
+    "aliases": [],
+    "needs": [
+      "service/storage",
+      "memory/rows",
+      "fragment/fragments"
+    ],
+    "base": "7e5d71741fb07c958272de60444b5e9cfeb70a5f",
+    "changed": 1792497708072
+  },
+  {
+    "id": "fragment/libraries",
+    "title": "Libraries",
+    "what": "Named sets of documents a caller hands in whole, and the sync that brings their fragments in line with the documents, reporting the drift first where asked.",
+    "files": [
+      "src/store/libraries.rs",
+      "crates/client/src/fragments.rs",
+      "docs/boundary-api.md"
+    ],
+    "symbols": [
+      "Library",
+      "LibraryDocument",
+      "LibraryPut",
+      "LibrarySync",
+      "LibrarySyncAsk",
+      "Drift",
+      "DriftChange"
+    ],
+    "aliases": [],
+    "needs": [
+      "service/storage",
+      "fragment/fragments"
+    ],
+    "base": "7e5d71741fb07c958272de60444b5e9cfeb70a5f",
+    "changed": 1792497708065
+  }
+]

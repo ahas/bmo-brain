@@ -1,0 +1,34 @@
+[
+  {
+    "id": "command/cli",
+    "title": "bmo-brain command",
+    "what": "The bmo-brain binary: serve, health, mcp, openapi and nouns, and the nouns bmo dispatches to it, each word asking the service through the brain's client.",
+    "files": [
+      "src/main.rs",
+      "src/command/mod.rs",
+      "src/command/memory.rs",
+      "src/command/note.rs",
+      "src/command/fragment.rs",
+      "src/command/watch.rs",
+      "src/command/reminder.rs",
+      "src/command/lock.rs",
+      "docs/boundary-api.md"
+    ],
+    "symbols": [
+      "NOUNS",
+      "moment",
+      "moment_text",
+      "labels",
+      "labels_text",
+      "object",
+      "text_of"
+    ],
+    "aliases": [],
+    "needs": [
+      "api/client",
+      "service/settings"
+    ],
+    "base": "7e5d71741fb07c958272de60444b5e9cfeb70a5f",
+    "changed": 1792497708026
+  }
+]
