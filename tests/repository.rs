@@ -1,5 +1,5 @@
 //! Checks that span the repository: what its packages may depend on, its layout, the testbed's declaration
-//! held to every tool's manifest, and what no tracked file may hold (Hangul in Rust source, agent names, home
+//! and the service's unit, and what no tracked file may hold (Hangul in Rust source, agent names, home
 //! paths and private network addresses).
 
 use std::fs;
@@ -172,12 +172,17 @@ fn holds_home_path(text: &str) -> bool {
 #[test]
 fn depends_on_no_bmo_package_but_the_base_libraries() {
   let metadata = metadata();
+  let packages = metadata["packages"].as_array().expect("metadata lists packages");
+  let own: Vec<&str> = packages
+    .iter()
+    .map(|package| package["name"].as_str().expect("a package has a name"))
+    .collect();
   let mut refused = Vec::new();
-  for package in metadata["packages"].as_array().expect("metadata lists packages") {
+  for package in packages {
     let owner = package["name"].as_str().expect("a package has a name");
     for dependency in package["dependencies"].as_array().expect("a package lists its dependencies") {
       let name = dependency["name"].as_str().expect("a dependency has a name");
-      let foreign_bmo = name.starts_with("bmo-") && !BASE_LIBRARIES.contains(&name);
+      let foreign_bmo = name.starts_with("bmo-") && !BASE_LIBRARIES.contains(&name) && !own.contains(&name);
       if foreign_bmo || OLD_SHARED_CRATES.contains(&name) {
         refused.push(format!("{owner} -> {name}"));
       }
@@ -218,29 +223,6 @@ fn text<'a>(within: &'a toml::Table, key: &str) -> &'a str {
     .unwrap_or_else(|| panic!("`{key}` is a string"))
 }
 
-fn deploy_step<'a>(declaration: &'a toml::Table, id: &str) -> &'a toml::Table {
-  table(declaration, "deploy")
-    .get("step")
-    .and_then(toml::Value::as_array)
-    .expect("testbed.toml declares deploy steps")
-    .iter()
-    .filter_map(toml::Value::as_table)
-    .find(|step| step.get("id").and_then(toml::Value::as_str) == Some(id))
-    .unwrap_or_else(|| panic!("testbed.toml declares the deploy step `{id}`"))
-}
-
-/// The workspace's binary targets.
-fn binary_targets() -> Vec<String> {
-  metadata()["packages"]
-    .as_array()
-    .expect("metadata lists packages")
-    .iter()
-    .flat_map(|package| package["targets"].as_array().expect("a package lists its targets"))
-    .filter(|target| target["kind"].as_array().is_some_and(|kinds| kinds.contains(&Value::from("bin"))))
-    .map(|target| target["name"].as_str().expect("a target has a name").to_owned())
-    .collect()
-}
-
 #[test]
 fn the_testbed_declaration_is_in_the_testbeds_format_and_carries_no_version() {
   let declaration = declaration();
@@ -259,117 +241,6 @@ fn the_testbed_declaration_is_in_the_testbeds_format_and_carries_no_version() {
     table(&declaration, "test").get("languages").and_then(toml::Value::as_array),
     Some(&vec![toml::Value::from("cargo")])
   );
-}
-
-#[test]
-fn the_testbed_declaration_builds_and_places_every_tool() {
-  let declaration = declaration();
-  let built: Vec<&str> = table(&declaration, "build")
-    .get("binaries")
-    .and_then(toml::Value::as_array)
-    .expect("testbed.toml names the release's binaries")
-    .iter()
-    .map(|binary| binary.as_str().expect("a binary is named by a string"))
-    .collect();
-  let targets = binary_targets();
-  let mut tools = Vec::new();
-
-  assert_eq!(text(table(&declaration, "tools"), "dir"), "tools");
-  for binary in &built {
-    assert!(
-      targets.iter().any(|target| target == binary),
-      "`{binary}` is no binary of the workspace"
-    );
-  }
-  assert!(built.contains(&"bmo-brain"), "the release holds the service's binary");
-
-  for manifest_path in tracked_files().into_iter().filter(|path| {
-    let parts: Vec<&str> = path.split('/').collect();
-    parts.len() == 3 && parts[0] == "tools" && parts[2] == "tool.toml"
-  }) {
-    let folder = Path::new(&manifest_path).parent().expect("a manifest stands in its folder");
-    let name = folder.file_name().expect("a tool folder has a name").to_string_lossy().into_owned();
-    let manifest: toml::Table = text_of(&manifest_path)
-      .expect("a tool's manifest is text")
-      .parse()
-      .expect("a tool's manifest is TOML");
-    let executable = table(&manifest, "tool")
-      .get("run")
-      .and_then(toml::Value::as_array)
-      .and_then(|run| run.first())
-      .and_then(toml::Value::as_str)
-      .unwrap_or_else(|| panic!("{manifest_path} names the executable it runs"));
-    let mut schemas: Vec<&str> = Vec::new();
-
-    for entry in manifest.get("entry").and_then(toml::Value::as_array).into_iter().flatten() {
-      for key in ["input", "output"] {
-        if let Some(schema) = entry.get(key).and_then(toml::Value::as_str)
-          && !schemas.contains(&schema)
-        {
-          schemas.push(schema);
-        }
-      }
-    }
-
-    for schema in &schemas {
-      assert!(
-        Path::new(ROOT).join(folder).join(schema).is_file(),
-        "{manifest_path} names {schema}, which is not beside it"
-      );
-    }
-    assert!(
-      built.contains(&executable),
-      "the release's binaries hold `{executable}` for tools/{name}"
-    );
-
-    let placed = format!("tools/{name}/.placed");
-    let copied: Vec<String> = [format!("bin/{executable}"), format!("tools/{name}/tool.toml")]
-      .into_iter()
-      .chain(schemas.iter().map(|schema| format!("tools/{name}/{schema}")))
-      .collect();
-    let command =
-      format!("set -eu\nrm -rf {placed}\nmkdir -p {placed}\ncp {} {placed}/\n", copied.join(" "));
-    let step = deploy_step(&declaration, &format!("place-{name}"));
-
-    assert_eq!(text(step, "phase"), "before-flip", "tools/{name} is placed before the flip");
-    assert_eq!(text(step, "command"), command, "tools/{name} is placed as its manifest says");
-    tools.push(name);
-  }
-
-  let placing: Vec<&str> = table(&declaration, "deploy")
-    .get("step")
-    .and_then(toml::Value::as_array)
-    .expect("testbed.toml declares deploy steps")
-    .iter()
-    .filter_map(|step| step.get("id").and_then(toml::Value::as_str))
-    .filter_map(|id| id.strip_prefix("place-"))
-    .collect();
-
-  assert!(!tools.is_empty(), "no tool manifest was found under tools/");
-  assert!(
-    placing.iter().all(|placed| tools.iter().any(|tool| tool == placed)),
-    "every placing step names a tool folder: {placing:?}"
-  );
-}
-
-#[test]
-fn the_tools_env_file_is_written_before_the_flip_from_the_linked_configuration() {
-  let declaration = declaration();
-  let deploy = table(&declaration, "deploy");
-  let linked = deploy
-    .get("env_links")
-    .and_then(toml::Value::as_array)
-    .expect("testbed.toml links the configuration into each release");
-  let step = deploy_step(&declaration, "tool-env");
-
-  assert!(
-    linked
-      .iter()
-      .filter_map(toml::Value::as_table)
-      .any(|link| { text(link, "link") == "brain.toml" && text(link, "target") == "env/brain.toml" })
-  );
-  assert_eq!(text(step, "phase"), "before-flip");
-  assert_eq!(text(step, "command"), "bin/bmo-brain --config brain.toml tool-env");
 }
 
 // One key of a unit file's section, as systemd reads it.

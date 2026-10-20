@@ -1,22 +1,11 @@
-//! The brain service: each chat agent's memory rows, its brain documents (knowledge, the person book and
-//! room rules) and the recollector runs that write them. Other units reach it over HTTP only.
+//! The brain service (docs/boundary-api.md): memory rows, notes, watches, reminders, fragments and the
+//! libraries they come from, knowledge reads, locks and scopes, stored and served under the caller's opaque
+//! scopes. It never executes and calls no other service; its clock turns moments and conditions into events.
+//! Its harness plugin, the MCP server `bmo-brain mcp`, calls the service through `bmo-brain-client`.
 
 pub mod api;
-pub mod commands;
+pub mod clock;
 pub mod config;
-pub mod editors;
-pub mod failure;
-pub mod health_check;
-pub mod lifecycle;
-pub mod migration;
-pub mod policy;
-pub mod ports;
-pub mod reminders;
-pub mod room_rules;
-pub mod schedules;
-pub mod settings;
-pub mod tool_env;
-pub mod watch_runner;
-pub mod watches;
-
-pub use failure::Failure;
+pub mod mcp;
+pub mod openapi;
+pub mod store;

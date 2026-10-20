@@ -1,27 +1,27 @@
 # brain
 
-The brain service, `bmo-brain`. Each chat agent has one brain: its memory rows (promises, checks, states,
-situation rules, notes and watches), its brain documents (knowledge, the person book and room rules) and
-the fragment index over them. Recollector runs read a room's conversation and write those documents;
-the service decides what to recollect and when, and asks the agency only for the model session that does
-it. The gate reads the service's material over HTTP to choose what a turn is shown; the service itself
-selects nothing.
+The brain service, `bmo-brain`: memory as middleware. It stores memory rows, notes, watches, reminders,
+fragments of reference text and the libraries they come from, and the locks that say who is editing the store,
+each under the caller's opaque scope, and serves them over HTTP. It never executes and calls no other service;
+its clock turns reminders and watches into events a client reads. Its harness plugin, `brain-harness`, is the MCP
+server the same binary starts as `bmo-brain mcp` and the skill that tells a harness how to use it.
+
+`docs/boundary-api.md` states every route, event, tool and code; `docs/openapi.json` is the same contract in
+machine form, generated from the client's types.
 
 ## Layout
 
-| Path | Holds |
+| Folder | Holds |
 |---|---|
-| `src/` | the service's own package: its database migrations, routes, editors, schedules and the ports to other units |
-| `crates/brain-support/` | helpers the crates share: database access, the clock, text measures, policy loading, the editing lock's process start times and whole-published files |
-| `crates/memory-rows/` | the memory, note and watch rows and the operations on them |
-| `crates/fragment-desk/` | the fragment desk over an agent's brain documents |
-| `crates/tool-call/` | the brain's side of the tool host's call protocol, which its tools share |
-| `tools/memory/`, `tools/fragment/` | the tools bound to the brain, each with its `tool.toml`, answering through the brain's routes |
-| `prompts/` | the recollectors' tasks and the two rulebooks only they read, which the `prompts` setting points at |
-| `policy/` | the service's own policy, the Korean words the prompts quote among it |
+| `src/` | the service's own package: its store, routes, clock, MCP server and OpenAPI document |
+| `crates/` | `client/`, the crate `bmo-brain-client`, every body and member as a Rust type and one method for each route |
+| `migrations/` | the database's migrations, built into the binary |
+| `skills/` | `brain-harness/`, the plugin's skill |
+| `docs/` | the boundary document and the OpenAPI document |
 | `tests/` | the service's tests and the checks that span the repository |
 | `deploy/` | the service's user unit, `bmo-brain.service`, which a deployment links from the deploy tree |
-| `testbed.toml` | the testbed's declaration: how it tests, checks, builds and deploys the repository, the tools' placement and their env file among it |
+
+The testbed's declaration, `testbed.toml`, says how the testbed tests, checks, builds and deploys the repository.
 
 ## Build and test
 
@@ -32,23 +32,14 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo fmt --all --check
 ```
 
+The tests make their own databases on the PostgreSQL server `BMO_TEST_POSTGRES` names, the local socket's where
+it names none.
+
 ## Running
 
-The service runs as `bmo-brain --config <file> serve`: it runs its migrations and answers on its listen address.
-Deployed, it is the user unit `deploy/bmo-brain.service` declares, run out of the deploy tree with the release's
-`brain.toml`, the repository's one service, whose health every deployment waits on. The same binary given a run's
-words does one piece of work the brain launched apart and ends; given `tool-env` writes the data root's
-`env/brain.env`, where the brain's tools find its address and token; and given `health` ends 0 only where the
-service answers ready. Its configuration, a TOML file standing under the data root as `env/brain.toml` once
-deployed, is stated key by key in `docs/boundary-api.md`. It reads:
-
-- the address it listens on and the bearer token callers present;
-- its database, which holds only the brain's own tables and its own settings;
-- its brain folder, a git repository of the agents' documents, and its prompts folder, this repository's
-  `prompts/` as it is deployed;
-- the chat agent's key, which names whose brain it serves, and the owner's number and names;
-- the addresses and tokens of the agency, the receiver, the gate and bmo-job;
-- its own command, the words that start its binary, which every run it launches apart as a unit of the user's
-  service manager begins with.
-
-Its policy files under `policy/` are built into the binary.
+- `bmo-brain --config <file> serve` runs the migrations and answers on the listen address. The configuration is
+  a TOML file of three keys: `listen`, `token` and `database`.
+- `bmo-brain --config <file> health` ends 0 only where that service answers ready.
+- `bmo-brain mcp --brain <url>` serves the harness tools over MCP on standard input and output, with the token
+  in `BRAIN_TOKEN`.
+- `bmo-brain openapi` prints the OpenAPI document; `docs/openapi.json` is its output.

@@ -1,36 +1,29 @@
 # Working in this repository
 
-This repository is the brain service, `bmo-brain`: each chat agent's memory rows (promises, checks, states,
-situation rules, notes and watches), its brain documents (knowledge, the person book and room rules), the
-fragment index over them, and the recollector runs that write the documents. It owns its own database tables
-and its brain folder. It asks the agency for recollector model sessions and what they stand on, reads messages
-and rooms from the receiver and item states from bmo-job, and serves raw material to the gate, which does all
-reference selection. Other units reach it over HTTP only. The tools bound to the brain, memory and fragment,
-are this repository's, under `tools/`, each with its `tool.toml`. The word-chain game is not the brain's: it
-is its own tool repository, `bmo-word-chain`.
+This repository is the brain service, `bmo-brain`: memory as middleware. It stores memory rows, notes,
+watches, reminders, fragments and the libraries they come from, and locks, under the caller's opaque scopes,
+serves them over HTTP and publishes its own events. It never executes and calls no other unit. It publishes
+its client, `bmo-brain-client`, and its harness plugin, `brain-harness`: the MCP server its binary starts as
+`bmo-brain mcp` and the skill under `skills/`. It is an upstream: bmo-chat's `docs/conventions.md` holds the
+rules it keeps.
 
 ## Rules
 
 - **`docs/` is canonical.** Read the document covering a change before changing code. A change that would
   make it wrong or incomplete repairs it first, stating what is true now, and the code is then written to
-  match. `docs/boundary-api.md` states every route this service serves, every call it makes on another
-  unit and every status code it answers with.
-- **No `bmo-*` dependency but the base libraries** `bmo-chat`, `bmo-chat-client` and `bmo-ui`. Another
-  unit is reached through a port in this repository, over HTTP; a helper the old shared crates held is
-  copied into a crate here. `tests/repository.rs` fails on any other `bmo-*` dependency and on the old
-  shared crate names.
-- **A base never knows its consumers.** A port, a crate or a route supplies the mechanism and a safe
-  default; no code here names the unit or agent that calls it.
-- **English only** in code, comments, strings, tests and documents, and in commit messages. Messages the
-  service answers with are English sentences; what a machine reads is a status code or a kebab-case code
-  with parameters, and the web unit's language packs render it for people. Korean words the code reads
-  or matches on are data, kept in `policy/*.toml` files and under `tests/fixtures/`, never in `.rs` files.
+  match. `docs/boundary-api.md` states every route, event, tool and code; `docs/openapi.json` is generated
+  from the code (`bmo-brain openapi`) and a test fails where they differ.
+- **It knows nothing of its callers.** No route, field, tool, schema, document or test names a unit, an agent,
+  a room, an owner or anything only one caller uses; a caller's meaning stays in its `scope`, `subjectKey`,
+  `<role>Name` and `labels`, which the brain never reads.
+- **No `bmo-*` dependency but the base libraries** `bmo-chat`, `bmo-chat-client` and `bmo-ui`, and this
+  repository's own crates. `tests/repository.rs` fails on any other.
+- **English only** in code, comments, strings, tests and documents, and in commit messages. What a machine
+  reads is a status code and a kebab-case code; the sentence beside it is English.
 - **No agent names, owner names, host names, home paths or private network addresses** in code, documents
-  or commits. An agent is named by its registration and the service's configuration; tests use neutral
-  names such as `agent-a` and `agent-b`. `tests/repository.rs` fails on these.
-- **Tests live in `tests/`.** A crate's tests are in its own `tests/`; checks that span the repository and
-  the service's own tests are in the root `tests/`. No test module sits in `src/`; a private function a
-  test needs becomes public in its own module.
+  or commits. Tests use neutral names such as `writer-a` and `room:a`. `tests/repository.rs` fails on these.
+- **Tests live in `tests/`.** A crate's tests are in its own `tests/`; checks that span the repository and the
+  service's own tests are in the root `tests/`. No test module sits in `src/`.
 - **No directory named after its parent** (no `x/x`), and **only Cargo manifests at the root**: the root
   `Cargo.toml` is the workspace and also the service's package.
 - **Documents state what is true now**: no change history, no quoted source and no file-and-line pins.
@@ -46,5 +39,5 @@ A change moves through three stages in order:
 3. Verification: the test targets the change touched, then `cargo test --workspace` once, the Cargo suite
    `testbed.toml` declares.
 
-The version is the workspace's, in semver; the testbed's declaration, `testbed.toml`, carries none. It states how
-the testbed tests, checks, builds and deploys the repository, the tools' placement among it.
+The version is the workspace's: until the first release it is `0.1.0-rev.N`, and each change raises only the
+revision. The testbed's declaration, `testbed.toml`, carries none.

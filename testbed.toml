@@ -9,10 +9,6 @@ languages = ["cargo"]
 # The tests make their own scratch databases on the server, so no template is named.
 [test.database]
 
-[tools]
-# The brain's own tools, each checked by the command its tool.toml names.
-dir = "tools"
-
 [check]
 quick = ["layout", "dependencies"]
 base_libraries = ["bmo-chat", "bmo-chat-client", "bmo-ui"]
@@ -32,12 +28,11 @@ id = "fmt"
 command = "cargo fmt --all --check"
 
 [build]
-# The service's binary and the executables of the brain's tools.
-binaries = ["bmo-brain", "memory-tool", "fragment-tool"]
+# The service's binary, which also starts the harness plugin's MCP server.
+binaries = ["bmo-brain"]
 
-# The brain's own deploy tree, and the data root it shares with the services that read its files. The
-# service's configuration stands under the data root as env/brain.toml, and each release links to it as
-# brain.toml (docs/boundary-api.md, 「Configuration」).
+# The brain's own deploy tree, and the data root its configuration stands under: env/brain.toml, which each
+# release links to as brain.toml (docs/boundary-api.md, 「Configuration」).
 [deploy]
 root = "~/.local/share/bmo-brain"
 link = "deploy"
@@ -45,35 +40,6 @@ data_root = "~/.local/share/bmo/data"
 env_links = [{ link = "brain.toml", target = "env/brain.toml" }]
 # The service's user unit, marked bot: the repository's one service, whose health the deployment waits on.
 units = ["deploy/*.service"]
-# Answers 0 once the service the deployed configuration names answers ready (docs/boundary-api.md, 「Health」).
+# Answers 0 once the service the deployed configuration names answers ready (docs/boundary-api.md,
+# 「Configuration」).
 health = "~/.local/share/bmo-brain/deploy/bin/bmo-brain --config ~/.local/share/bmo-brain/deploy/brain.toml health"
-
-# Where the brain's tools find it: the data root's env/brain.env, written from the configuration
-# (docs/boundary-api.md, 「Its tools」).
-[[deploy.step]]
-id = "tool-env"
-phase = "before-flip"
-command = "bin/bmo-brain --config brain.toml tool-env"
-
-# Each tool is placed in its folder's .placed/, the folder the tool host reads: the executable the release's
-# bin/ holds, its manifest and the schemas its entries name. tests/repository.rs holds these steps to every
-# tools/*/tool.toml.
-[[deploy.step]]
-id = "place-memory"
-phase = "before-flip"
-command = '''
-set -eu
-rm -rf tools/memory/.placed
-mkdir -p tools/memory/.placed
-cp bin/memory-tool tools/memory/tool.toml tools/memory/memory_list.json tools/memory/reading.json tools/memory/memory_add.json tools/memory/memory_update.json tools/memory/memory_done.json tools/memory/memory_retire.json tools/memory/memory_revive.json tools/memory/memory_candidate.json tools/memory/note_add.json tools/memory/watch_set.json tools/memory/.placed/
-'''
-
-[[deploy.step]]
-id = "place-fragment"
-phase = "before-flip"
-command = '''
-set -eu
-rm -rf tools/fragment/.placed
-mkdir -p tools/fragment/.placed
-cp bin/fragment-tool tools/fragment/tool.toml tools/fragment/fragment_search.json tools/fragment/fragment_write.json tools/fragment/fragment_remove.json tools/fragment/fragment_merge.json tools/fragment/fragment_split.json tools/fragment/fragment_owed.json tools/fragment/.placed/
-'''

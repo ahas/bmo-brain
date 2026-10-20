@@ -1,28 +1,186 @@
-//! What the service's tests share: the fixed ids a test names the owner, a room and a message by, the
-//! agents' names, a migrated database of the test's own, the other units in memory, and a stub server a
-//! port's client is tested against. A test needing a second one of a kind names its own beside these.
+//! What the service's tests share: a migrated database of the test's own, and the service answering over it on
+//! a port of its own, with a client that reaches it.
+//!
+//! The migrations run once per test binary into a template database, and each test is handed a copy of it,
+//! which the server makes in a fraction of the time a migration takes. A copy is dropped when its test is
+//! done, and the template and copies a binary left behind are dropped by the next binary to make a template.
 
 #![allow(dead_code)]
 
-pub mod agency;
-pub mod calls;
-pub mod editing;
-pub mod gate;
-pub mod job;
-pub mod receiver;
-pub mod scratch;
-pub mod served;
-pub mod sorting;
-pub mod starter;
-pub mod stub;
+use std::str::FromStr;
+use std::sync::atomic::{AtomicU32, Ordering};
 
-/// The owner's user id, which is also the chat id of the owner's private chat with the chat agent.
-pub const OWNER: i64 = 42;
-/// A group room's chat id.
-pub const ROOM: i64 = -100;
-/// A message's id within its room.
-pub const MESSAGE: i64 = 9;
-/// An agent's registration name.
-pub const AGENT: &str = "agent-a";
-/// A second agent's registration name.
-pub const OTHER_AGENT: &str = "agent-b";
+use bmo_brain::api::{Brain, router};
+use bmo_brain::store::{MIGRATOR, Store};
+use bmo_brain_client::BrainClient;
+use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
+use sqlx::{ConnectOptions, Connection, Executor, PgConnection};
+use tokio::task::JoinHandle;
+
+/// The token the served brain takes.
+pub const TOKEN: &str = "the-brain-token";
+
+// What a template's and a copy's names begin with, ahead of the process that made them.
+const TEMPLATE: &str = "brain_rs_tmpl_";
+const COPY: &str = "brain_rs_copy_";
+
+static COPIES: AtomicU32 = AtomicU32::new(0);
+static MADE: tokio::sync::OnceCell<String> = tokio::sync::OnceCell::const_new();
+
+/// The suite's PostgreSQL server, as the run names it, and the machine's own socket where nothing does.
+fn test_address() -> String {
+  std::env::var("BMO_TEST_POSTGRES")
+    .unwrap_or_else(|_| "postgres:///bmo_test?host=/var/run/postgresql".into())
+}
+
+fn options(database: &str) -> PgConnectOptions {
+  PgConnectOptions::from_str(&test_address())
+    .unwrap()
+    .database(database)
+    .disable_statement_logging()
+}
+
+async fn server() -> PgConnection {
+  PgConnection::connect_with(&options("postgres")).await.unwrap()
+}
+
+fn alive(pid: &str) -> bool {
+  std::path::Path::new("/proc").join(pid).exists()
+}
+
+// The template this binary's copies are made from, migrated the first time a test asks. The databases a
+// binary that is gone left behind are dropped first.
+async fn template() -> String {
+  MADE
+    .get_or_init(|| async {
+      let mut admin = server().await;
+      let left: Vec<String> = sqlx::query_scalar(
+        "SELECT datname::text FROM pg_database WHERE datname LIKE $1 OR datname LIKE $2",
+      )
+      .bind(format!("{}%", TEMPLATE.replace('_', "\\_")))
+      .bind(format!("{}%", COPY.replace('_', "\\_")))
+      .fetch_all(&mut admin)
+      .await
+      .unwrap();
+      for old in left {
+        let pid = old
+          .trim_start_matches(TEMPLATE)
+          .trim_start_matches(COPY)
+          .split('_')
+          .next()
+          .unwrap_or_default();
+        if !alive(pid) {
+          let _ = admin.execute(format!("DROP DATABASE IF EXISTS \"{old}\" WITH (FORCE)").as_str()).await;
+        }
+      }
+      let name = format!("{TEMPLATE}{}", std::process::id());
+      admin
+        .execute(
+          format!(
+            "CREATE DATABASE \"{name}\" TEMPLATE template0 ENCODING 'UTF8' LC_COLLATE 'C' LC_CTYPE 'C'"
+          )
+          .as_str(),
+        )
+        .await
+        .unwrap();
+      admin.close().await.unwrap();
+      let mut db = PgConnection::connect_with(&options(&name)).await.unwrap();
+      MIGRATOR.run(&mut db).await.unwrap();
+      db.close().await.unwrap();
+      name
+    })
+    .await
+    .clone()
+}
+
+/// A copy dropped, its connections ended with it. It goes on a thread of its own, since a guard dropped inside
+/// the runtime may not block on it.
+fn drop_copy(database: String) {
+  let _ = std::thread::spawn(move || {
+    let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
+    runtime.block_on(async move {
+      let mut admin = server().await;
+      let _ = admin
+        .execute(format!("DROP DATABASE IF EXISTS \"{database}\" WITH (FORCE)").as_str())
+        .await;
+      let _ = admin.close().await;
+    });
+  })
+  .join();
+}
+
+/// The service over a migrated, empty database of the test's own, answering on a port of its own until the
+/// guard goes.
+pub struct Served {
+  database: String,
+  pub store: Store,
+  pub client: BrainClient,
+  pub base: String,
+  serving: JoinHandle<()>,
+}
+
+impl Served {
+  pub async fn new() -> Served {
+    let template = template().await;
+    let database = format!("{COPY}{}_{}", std::process::id(), COPIES.fetch_add(1, Ordering::SeqCst));
+    let mut admin = server().await;
+    admin
+      .execute(format!("CREATE DATABASE \"{database}\" TEMPLATE \"{template}\"").as_str())
+      .await
+      .unwrap();
+    admin.close().await.unwrap();
+    let pool = PgPoolOptions::new().max_connections(8).connect_with(options(&database)).await.unwrap();
+    let store = Store::over(pool);
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let base = format!("http://{}", listener.local_addr().unwrap());
+    let brain = Brain {
+      store: store.clone(),
+      token: TOKEN.to_owned(),
+    };
+    let serving = tokio::spawn(async move {
+      axum::serve(listener, router(brain)).await.unwrap();
+    });
+    let client = BrainClient::new(&base, TOKEN).unwrap();
+    Served {
+      database,
+      store,
+      client,
+      base,
+      serving,
+    }
+  }
+
+  /// A client presenting another token.
+  pub fn with_token(&self, token: &str) -> BrainClient {
+    BrainClient::new(&self.base, token).unwrap()
+  }
+
+  /// The events published so far, every kind.
+  pub async fn event_kinds(&self) -> Vec<String> {
+    let page = self.client.events(&bmo_brain_client::EventsQuery::default()).await.unwrap();
+    page.items.into_iter().map(|event| event.kind).collect()
+  }
+}
+
+impl Drop for Served {
+  fn drop(&mut self) {
+    self.serving.abort();
+    drop_copy(std::mem::take(&mut self.database));
+  }
+}
+
+/// The failure a call came to: its status and code.
+pub fn refused<T: std::fmt::Debug>(answer: bmo_brain_client::Answer<T>) -> (u16, String) {
+  match answer {
+    Err(bmo_brain_client::ClientFailure::Answered {
+      status,
+      answer: Some(answer),
+    }) => (status, answer.code),
+    other => panic!("a refusal was due, and the call came to {other:?}"),
+  }
+}
+
+/// Labels from pairs.
+pub fn labels(pairs: &[(&str, &str)]) -> bmo_brain_client::Labels {
+  pairs.iter().map(|(key, value)| ((*key).to_owned(), (*value).to_owned())).collect()
+}
