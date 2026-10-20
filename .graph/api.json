@@ -112,8 +112,8 @@
       "service/locks",
       "service/scopes"
     ],
-    "base": "b1ae47ef9ad5b7c30492c70f6d66c1f4c8c3e947",
-    "changed": 1792497707909,
+    "base": "6e5241fc1c3f8ad0c276f436b809c5cbfbdc5c7f",
+    "changed": 1792532507608,
     "boundary": {
       "side": "exposes"
     }
