@@ -1,8 +1,9 @@
 # brain
 
 The brain service, `bmo-brain`: memory as middleware. It stores memory rows, notes, watches, reminders,
-fragments of reference text and the libraries they come from, and the locks that say who is editing the store,
-each under the caller's opaque scope, and serves them over HTTP. It never executes and calls no other service;
+fragments of reference text and the libraries they come from, the locks that say who is editing the store, and
+the caller's own records — a room's rules, a session's loads and a chat session's note — each under the caller's
+opaque scope, and serves them over HTTP. It never executes and calls no other service;
 its clock turns reminders and watches into events a client reads. Its harness plugin, `brain-harness`, is the MCP
 server the same binary starts as `bmo-brain mcp` and the skill that tells a harness how to use it.
 

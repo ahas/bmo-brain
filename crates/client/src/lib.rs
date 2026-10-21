@@ -6,6 +6,7 @@ mod client;
 mod fragments;
 mod holdings;
 mod memories;
+mod records;
 mod watches;
 mod wire;
 
@@ -20,6 +21,10 @@ pub use holdings::{Lock, LocksQuery, NewLock, ScopeChange, ScopeCounts, ScopeHol
 pub use memories::{
   MemoriesQuery, Memory, MemoryChange, MemoryMatch, MemoryState, NewMemory, NewMemoryMatch, NewNote, Note,
   NotesQuery,
+};
+pub use records::{
+  AgentAsk, Done, Load, LoadsKeep, NoteKeep, RoomRule, RoomRules, RoomRulesAsk, RuleSet, RuleText,
+  SessionAsk, SessionLoads, SessionNote,
 };
 /// The HTTP client a `BrainClient` calls through, for a caller that sets its own timeout or proxy.
 pub use reqwest::Client as HttpClient;

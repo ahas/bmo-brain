@@ -352,6 +352,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/room-rules/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** A room's rules, in the order they were set. */
+        post: operations["readRoomRules"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/room-rules/set": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Set or revoke one rule on a message; the room's rules as they now stand. */
+        post: operations["setRoomRule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/scopes/{scope}": {
         parameters: {
             query?: never;
@@ -369,6 +403,108 @@ export interface paths {
         head?: never;
         /** Mark a scope forgotten, so its rows wither, or remembered again. */
         patch: operations["changeScope"];
+        trace?: never;
+    };
+    "/session-summary/clear": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Clear an agent's handoff note. */
+        post: operations["clearSessionNote"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/session-summary/keep": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Keep an agent's handoff note, overwriting the one it had. */
+        post: operations["keepSessionNote"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/session-summary/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** An agent's handoff note, or null where it left none. */
+        post: operations["readSessionNote"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/loads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** The documents a session was handed, by path and version. */
+        post: operations["readSessionLoads"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/loads/forget": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Let a session's loads go. */
+        post: operations["forgetSessionLoads"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/loads/keep": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Keep the documents a session was handed; sessions untouched for a week are let go. */
+        post: operations["keepSessionLoads"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/watches": {
@@ -411,6 +547,14 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @description The agent whose handoff note is read, kept or cleared. */
+        AgentAsk: {
+            agent: string;
+        };
+        /** @description That the call was done. */
+        Done: {
+            ok: boolean;
+        };
         /** @description One fragment out of line with its library. */
         Drift: {
             change: components["schemas"]["DriftChange"];
@@ -628,6 +772,22 @@ export interface components {
         LibrarySyncAsk: {
             libraryName: string;
         };
+        /** @description One document a session was handed, at the version it read. */
+        Load: {
+            path: string;
+            version: string;
+        };
+        /** @description The loads a session keeps, read at `at`. */
+        LoadsKeep: {
+            /**
+             * Format: int64
+             * @description When they were read, in seconds; now where none is given.
+             * @default null
+             */
+            at: number | null;
+            loads: components["schemas"]["Load"][];
+            session: string;
+        };
         /** @description Who is editing the store. */
         Lock: {
             /** Format: int64 */
@@ -796,6 +956,11 @@ export interface components {
             subjectKey: string | null;
             text: string;
         };
+        /** @description A handoff note kept. */
+        NoteKeep: {
+            agent: string;
+            note: string;
+        };
         /** @description One page of a list, oldest first. */
         NotePage: {
             items: components["schemas"]["Note"][];
@@ -828,6 +993,38 @@ export interface components {
             /** @description Whether anything stands past the last item. */
             more: boolean;
         };
+        /** @description One rule a caller grants in a room: its id, the subject it is about and its words. */
+        RoomRule: {
+            id: string;
+            /** Format: int64 */
+            subject: number;
+            text: string;
+        };
+        /** @description A room's rules, in the order they were set. */
+        RoomRules: {
+            rules: components["schemas"]["RoomRule"][];
+        };
+        /** @description The room whose rules are read. */
+        RoomRulesAsk: {
+            /** Format: int64 */
+            chatId: number;
+        };
+        /** @description A rule set or revoked on a message. */
+        RuleSet: {
+            /** Format: int64 */
+            chatId: number;
+            id: string;
+            /** Format: int64 */
+            messageId: number;
+            /** @description The rule's words, or null to revoke it. */
+            rule: components["schemas"]["RuleText"] | null;
+        };
+        /** @description A rule's words, as it is set. */
+        RuleText: {
+            /** Format: int64 */
+            subject: number;
+            text: string;
+        };
         /** @description A scope marked. */
         ScopeChange: {
             state: components["schemas"]["ScopeState"];
@@ -857,6 +1054,18 @@ export interface components {
         };
         /** @description Whether a scope's rows wither. */
         ScopeState: "remembered" | "forgotten";
+        /** @description The session whose loads are read or let go. */
+        SessionAsk: {
+            session: string;
+        };
+        /** @description A session's loads, by path. */
+        SessionLoads: {
+            loads: components["schemas"]["Load"][];
+        };
+        /** @description The handoff note an agent's chat session left, or null. */
+        SessionNote: {
+            note: string | null;
+        };
         /** @description A condition waited on, and fired once it holds. */
         Watch: {
             /** Format: int64 */
@@ -1776,6 +1985,58 @@ export interface operations {
             404: components["responses"]["NotFound"];
         };
     };
+    readRoomRules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RoomRulesAsk"];
+            };
+        };
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoomRules"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    setRoomRule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RuleSet"];
+            };
+        };
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoomRules"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
     readScope: {
         parameters: {
             query?: never;
@@ -1856,6 +2117,162 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    clearSessionNote: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AgentAsk"];
+            };
+        };
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Done"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    keepSessionNote: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NoteKeep"];
+            };
+        };
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Done"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    readSessionNote: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AgentAsk"];
+            };
+        };
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionNote"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    readSessionLoads: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SessionAsk"];
+            };
+        };
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionLoads"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    forgetSessionLoads: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SessionAsk"];
+            };
+        };
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Done"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    keepSessionLoads: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoadsKeep"];
+            };
+        };
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Done"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
         };
     };
     listWatches: {

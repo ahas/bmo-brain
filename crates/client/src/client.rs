@@ -13,6 +13,10 @@ use crate::holdings::{Lock, LocksQuery, NewLock, ScopeChange, ScopeHolding};
 use crate::memories::{
   MemoriesQuery, Memory, MemoryChange, MemoryMatch, NewMemory, NewMemoryMatch, NewNote, Note, NotesQuery,
 };
+use crate::records::{
+  AgentAsk, Done, LoadsKeep, NoteKeep, RoomRules, RoomRulesAsk, RuleSet, SessionAsk, SessionLoads,
+  SessionNote,
+};
 use crate::watches::{NewReminder, NewWatch, Reminder, RemindersQuery, Watch, WatchChange, WatchesQuery};
 use crate::wire::{DryRun, Event, EventsQuery, Health, NameCursor, Page, WireError};
 
@@ -309,5 +313,45 @@ impl BrainClient {
       dry_run: dry_run.then_some(true),
     };
     Self::answered(self.request(Method::DELETE, &["scopes", scope]).query(&query)).await
+  }
+
+  /// `POST /room-rules/read`
+  pub async fn room_rules(&self, ask: &RoomRulesAsk) -> Answer<RoomRules> {
+    Self::answered(self.send(Method::POST, &["room-rules", "read"], ask)).await
+  }
+
+  /// `POST /room-rules/set`
+  pub async fn room_rule_set(&self, set: &RuleSet) -> Answer<RoomRules> {
+    Self::answered(self.send(Method::POST, &["room-rules", "set"], set)).await
+  }
+
+  /// `POST /sessions/loads`
+  pub async fn session_loads(&self, ask: &SessionAsk) -> Answer<SessionLoads> {
+    Self::answered(self.send(Method::POST, &["sessions", "loads"], ask)).await
+  }
+
+  /// `POST /sessions/loads/keep`
+  pub async fn session_loads_keep(&self, keep: &LoadsKeep) -> Answer<Done> {
+    Self::answered(self.send(Method::POST, &["sessions", "loads", "keep"], keep)).await
+  }
+
+  /// `POST /sessions/loads/forget`
+  pub async fn session_loads_forget(&self, ask: &SessionAsk) -> Answer<Done> {
+    Self::answered(self.send(Method::POST, &["sessions", "loads", "forget"], ask)).await
+  }
+
+  /// `POST /session-summary/read`
+  pub async fn session_note(&self, ask: &AgentAsk) -> Answer<SessionNote> {
+    Self::answered(self.send(Method::POST, &["session-summary", "read"], ask)).await
+  }
+
+  /// `POST /session-summary/keep`
+  pub async fn session_note_keep(&self, keep: &NoteKeep) -> Answer<Done> {
+    Self::answered(self.send(Method::POST, &["session-summary", "keep"], keep)).await
+  }
+
+  /// `POST /session-summary/clear`
+  pub async fn session_note_clear(&self, ask: &AgentAsk) -> Answer<Done> {
+    Self::answered(self.send(Method::POST, &["session-summary", "clear"], ask)).await
   }
 }

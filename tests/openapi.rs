@@ -1,5 +1,5 @@
 //! The OpenAPI document: the committed one is what the code generates, and it states exactly the routes and
-//! the tools docs/boundary-api.md lists, with no route that names a caller.
+//! the tools docs/boundary-api.md lists.
 
 use std::collections::BTreeSet;
 
@@ -8,7 +8,7 @@ use bmo_brain::openapi::{openapi, openapi_json};
 const ROOT: &str = env!("CARGO_MANIFEST_DIR");
 
 /// The routes docs/boundary-api.md states, by method and path.
-const ROUTES: [&str; 35] = [
+const ROUTES: [&str; 43] = [
   "get /health",
   "get /events",
   "get /memories",
@@ -18,6 +18,14 @@ const ROUTES: [&str; 35] = [
   "post /memory-matches",
   "get /notes",
   "post /notes",
+  "post /room-rules/read",
+  "post /room-rules/set",
+  "post /sessions/loads",
+  "post /sessions/loads/keep",
+  "post /sessions/loads/forget",
+  "post /session-summary/read",
+  "post /session-summary/keep",
+  "post /session-summary/clear",
   "get /watches",
   "post /watches",
   "get /watches/{watchId}",

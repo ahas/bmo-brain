@@ -101,6 +101,7 @@
     "needs": [
       "api/client",
       "api/events",
+      "api/records",
       "service/storage",
       "memory/rows",
       "memory/notes",
@@ -112,8 +113,8 @@
       "service/locks",
       "service/scopes"
     ],
-    "base": "6e5241fc1c3f8ad0c276f436b809c5cbfbdc5c7f",
-    "changed": 1792532507608,
+    "base": "b490f040b4f3f779b92227b82c3f1946f0e179cc",
+    "changed": 1792550285504,
     "boundary": {
       "side": "exposes"
     }
@@ -142,6 +143,40 @@
     ],
     "base": "b1ae47ef9ad5b7c30492c70f6d66c1f4c8c3e947",
     "changed": 1792497707927,
+    "boundary": {
+      "side": "exposes"
+    }
+  },
+  {
+    "id": "api/records",
+    "title": "Caller records",
+    "what": "A room's rules, a session's loads and a chat session's note: the caller's own records, each keyed as the caller gives it and read back in the shape it asks for.",
+    "files": [
+      "src/store/records.rs",
+      "crates/client/src/records.rs",
+      "docs/boundary-api.md",
+      "migrations/0002_caller_records.sql"
+    ],
+    "symbols": [
+      "RoomRule",
+      "RuleText",
+      "RoomRules",
+      "RoomRulesAsk",
+      "RuleSet",
+      "Load",
+      "SessionLoads",
+      "LoadsKeep",
+      "SessionNote",
+      "NoteKeep",
+      "Done"
+    ],
+    "aliases": [],
+    "needs": [
+      "api/client",
+      "service/storage"
+    ],
+    "base": "b490f040b4f3f779b92227b82c3f1946f0e179cc",
+    "changed": 1792550283252,
     "boundary": {
       "side": "exposes"
     }

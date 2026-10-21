@@ -13,9 +13,11 @@ rules it keeps.
   make it wrong or incomplete repairs it first, stating what is true now, and the code is then written to
   match. `docs/boundary-api.md` states every route, event, tool and code; `docs/openapi.json` is generated
   from the code (`bmo-brain openapi`) and a test fails where they differ.
-- **It knows nothing of its callers.** No route, field, tool, schema, document or test names a unit, an agent,
-  a room, an owner or anything only one caller uses; a caller's meaning stays in its `scope`, `subjectKey`,
-  `<role>Name` and `labels`, which the brain never reads.
+- **It knows nothing of its callers.** A caller's meaning stays in its `scope`, `subjectKey`, `<role>Name` and
+  `labels`, which the brain never reads, and no route, field, tool, schema, document or test names a unit, an
+  agent, an owner or anything only one caller uses. The one named surface is the caller's own records — a room's
+  rules, a session's loads and a chat session's note (`docs/boundary-api.md`, 「A caller's records」), whose keys
+  the brain takes as given and reads no meaning into.
 - **No `bmo-*` dependency but the base libraries** `bmo-chat`, `bmo-chat-client` and `bmo-ui`, and this
   repository's own crates. `tests/repository.rs` fails on any other.
 - **English only** in code, comments, strings, tests and documents, and in commit messages. What a machine

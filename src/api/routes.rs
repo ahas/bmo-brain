@@ -8,11 +8,12 @@ use axum::http::StatusCode;
 use axum::response::Json;
 use axum::routing::{delete, get, post};
 use bmo_brain_client::{
-  DryRun, ErrorCode, Fragment, FragmentHits, FragmentHitsRecorded, FragmentKind, FragmentMerge,
-  FragmentSplit, FragmentSwitch, FragmentWrite, FragmentsQuery, Knowledge, KnowledgeQuery, Library,
-  LibraryPut, LibrarySync, LibrarySyncAsk, Lock, LocksQuery, MemoriesQuery, Memory, MemoryChange,
-  MemoryMatch, NameCursor, NewLock, NewMemory, NewMemoryMatch, NewNote, NewReminder, NewWatch, Note,
-  NotesQuery, Page, Reminder, RemindersQuery, ScopeChange, ScopeHolding, Watch, WatchChange, WatchesQuery,
+  AgentAsk, Done, DryRun, ErrorCode, Fragment, FragmentHits, FragmentHitsRecorded, FragmentKind,
+  FragmentMerge, FragmentSplit, FragmentSwitch, FragmentWrite, FragmentsQuery, Knowledge, KnowledgeQuery,
+  Library, LibraryPut, LibrarySync, LibrarySyncAsk, LoadsKeep, Lock, LocksQuery, MemoriesQuery, Memory,
+  MemoryChange, MemoryMatch, NameCursor, NewLock, NewMemory, NewMemoryMatch, NewNote, NewReminder,
+  NewWatch, Note, NoteKeep, NotesQuery, Page, Reminder, RemindersQuery, RoomRules, RoomRulesAsk, RuleSet,
+  ScopeChange, ScopeHolding, SessionAsk, SessionLoads, SessionNote, Watch, WatchChange, WatchesQuery,
 };
 use tokio::time::Instant;
 
@@ -67,6 +68,56 @@ async fn notes(State(brain): State<Brain>, Query(query): Query<NotesQuery>) -> A
 
 async fn note_add(State(brain): State<Brain>, Body(body): Body<NewNote>) -> Answer<Created<Note>> {
   Ok(created(brain.store.note_add(&body).await?))
+}
+
+async fn room_rules(State(brain): State<Brain>, Body(body): Body<RoomRulesAsk>) -> Answer<Json<RoomRules>> {
+  Ok(Json(RoomRules {
+    rules: brain.store.room_rules(body.chat_id).await?,
+  }))
+}
+
+async fn room_rule_set(State(brain): State<Brain>, Body(body): Body<RuleSet>) -> Answer<Json<RoomRules>> {
+  Ok(Json(RoomRules {
+    rules: brain.store.room_rule_set(&body).await?,
+  }))
+}
+
+async fn session_loads(
+  State(brain): State<Brain>,
+  Body(body): Body<SessionAsk>,
+) -> Answer<Json<SessionLoads>> {
+  Ok(Json(SessionLoads {
+    loads: brain.store.session_loads(&body.session).await?,
+  }))
+}
+
+async fn session_loads_keep(State(brain): State<Brain>, Body(body): Body<LoadsKeep>) -> Answer<Json<Done>> {
+  brain.store.session_loads_keep(&body).await?;
+  Ok(Json(Done { ok: true }))
+}
+
+async fn session_loads_forget(
+  State(brain): State<Brain>,
+  Body(body): Body<SessionAsk>,
+) -> Answer<Json<Done>> {
+  brain.store.session_loads_forget(&body.session).await?;
+  Ok(Json(Done { ok: true }))
+}
+
+async fn session_note(State(brain): State<Brain>, Body(body): Body<AgentAsk>) -> Answer<Json<SessionNote>> {
+  Ok(Json(SessionNote {
+    note: brain.store.session_note(&body.agent).await?,
+  }))
+}
+
+async fn session_note_keep(State(brain): State<Brain>, Body(body): Body<NoteKeep>) -> Answer<Json<Done>> {
+  brain.store.session_note_keep(&body.agent, &body.note).await?;
+  Ok(Json(Done { ok: true }))
+}
+
+async fn session_note_clear(State(brain): State<Brain>, Body(body): Body<AgentAsk>) -> Answer<Json<Done>> {
+  brain.store.session_note_clear(&body.agent).await?;
+  Ok(Json(Done { ok: true }))
 }
 
 async fn watches(
@@ -256,6 +307,14 @@ pub(super) fn routes() -> Router<Brain> {
     .route("/memories/{memoryId}", get(memory).patch(memory_change))
     .route("/memory-matches", post(memory_match_add))
     .route("/notes", get(notes).post(note_add))
+    .route("/room-rules/read", post(room_rules))
+    .route("/room-rules/set", post(room_rule_set))
+    .route("/sessions/loads", post(session_loads))
+    .route("/sessions/loads/keep", post(session_loads_keep))
+    .route("/sessions/loads/forget", post(session_loads_forget))
+    .route("/session-summary/read", post(session_note))
+    .route("/session-summary/keep", post(session_note_keep))
+    .route("/session-summary/clear", post(session_note_clear))
     .route("/watches", get(watches).post(watch_add))
     .route("/watches/{watchId}", get(watch).patch(watch_change))
     .route("/reminders", get(reminders).post(reminder_add))

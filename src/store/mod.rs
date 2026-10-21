@@ -7,6 +7,7 @@ pub mod fragments;
 pub mod libraries;
 pub mod locks;
 pub mod memories;
+pub mod records;
 pub mod scopes;
 pub mod watches;
 

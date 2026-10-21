@@ -9,14 +9,16 @@ code generates. The wire format and the API design rules are the common ones of 
 ## What the brain is
 
 Memory as middleware. The brain stores memory rows, notes, watches, reminders, fragments and the libraries
-they come from, and the locks that say who is editing the store; it serves them through this API and
-publishes its own events. It never executes: it opens no session, runs no model, launches nothing, calls no
-other service and registers no hook. It calls nothing at all.
+they come from, the locks that say who is editing the store, and a caller's own records — a room's rules, a
+session's loaded documents and a chat session's handoff note; it serves them through this API and publishes its
+own events. It never executes: it opens no session, runs no model, launches nothing, calls no other service and
+registers no hook. It calls nothing at all.
 
 - **Every member is held under the caller's opaque scope.** `scope` is a string the caller writes and the
   brain never reads; where a member is about someone or something, `subjectKey` is the caller's opaque key for
   it. `<role>Name` fields (`actorName`, `setterName`, `holderName`) say who made or holds a member, and
   `labels` is the caller's own metadata, a map of strings to strings. The brain gives none of them a meaning.
+  The caller's own records (「A caller's records」) carry the caller's ids instead, keyed as it gives them.
 - **Time is the one thing the brain acts on.** A reminder whose moment comes and a watch whose condition holds
   become events, `reminder.due` and `watch.fired`, which a client reads and acts on. What happens then is the
   client's.
@@ -122,6 +124,46 @@ A match is `id`, `memoryIds`, `actorName`, `spentMs`, `tokenCount` and `createdA
 A note is something to keep for a later reading: `id`, `scope`, `subjectKey` (or null), `text`, `actorName`,
 `createdAt`. `GET /notes` lists them by `scope` and `subjectKey`; `POST /notes` adds one (`scope`, `text`,
 `actorName` required, `subjectKey`), answered 201.
+
+## A caller's records
+
+Three records keep a caller's own keys, and the brain reads no meaning into them: a room's rules, a session's
+loaded documents and a chat session's handoff note. Their routes take the caller's post bodies, and every failure
+is the common error shape: 400 `bad-request` for a blank key, a blank text or one past its ceiling.
+
+### Room rules
+
+A rule is one thing a caller grants in a room: `id`, the caller's key for it (1 to 200 characters, as a fragment's
+key); `subject`, a whole number; and `text`, not blank and at most 8000 characters. A rule is set or revoked on a
+message the caller names (`messageId`), and the caller checks the message's sender itself: the brain reads neither
+the room nor the message.
+
+| Route | Body | Answers |
+|---|---|---|
+| `POST /room-rules/read` | `chatId` | `rules`: each `id`, `subject`, `text`, in the order they were set |
+| `POST /room-rules/set` | `chatId`, `messageId`, `id`, `rule` (`subject`, `text`) or null to revoke | `rules`, as they now stand |
+
+### Session loads
+
+A load is a document a session was already handed in full: its `path`, the `version` read, and `at`, when it was
+read, in seconds. A path kept again takes the version it was read at.
+
+| Route | Body | Answers |
+|---|---|---|
+| `POST /sessions/loads` | `session` | `loads`: each `path`, `version`, by path |
+| `POST /sessions/loads/keep` | `session`, `loads`, `at` (now where none is given) | `ok`; sessions untouched for a week are let go at the same stroke |
+| `POST /sessions/loads/forget` | `session` | `ok` |
+
+### Chat session notes
+
+The handoff note a chat agent's folded session leaves for its next one: one per agent, the next keep overwriting
+it, read until a clear forgets it.
+
+| Route | Body | Answers |
+|---|---|---|
+| `POST /session-summary/read` | `agent` | `note`, a string or null |
+| `POST /session-summary/keep` | `agent`, `note` (not blank, at most 64000 characters) | `ok` |
+| `POST /session-summary/clear` | `agent` | `ok` |
 
 ## Watches
 

@@ -6,11 +6,12 @@
 use std::collections::BTreeMap;
 
 use bmo_brain_client::{
-  DryRun, ErrorCode, Event, EventsQuery, Fragment, FragmentHits, FragmentHitsRecorded, FragmentKind,
-  FragmentMerge, FragmentSplit, FragmentSwitch, FragmentWrite, FragmentsQuery, Health, Knowledge,
-  KnowledgeQuery, Library, LibraryPut, LibrarySync, LibrarySyncAsk, Lock, LocksQuery, MemoriesQuery,
-  Memory, MemoryChange, MemoryMatch, NameCursor, NewLock, NewMemory, NewMemoryMatch, NewNote, NewReminder,
-  NewWatch, Note, NotesQuery, Page, Reminder, RemindersQuery, ScopeChange, ScopeHolding, Watch,
+  AgentAsk, Done, DryRun, ErrorCode, Event, EventsQuery, Fragment, FragmentHits, FragmentHitsRecorded,
+  FragmentKind, FragmentMerge, FragmentSplit, FragmentSwitch, FragmentWrite, FragmentsQuery, Health,
+  Knowledge, KnowledgeQuery, Library, LibraryPut, LibrarySync, LibrarySyncAsk, LoadsKeep, Lock, LocksQuery,
+  MemoriesQuery, Memory, MemoryChange, MemoryMatch, NameCursor, NewLock, NewMemory, NewMemoryMatch,
+  NewNote, NewReminder, NewWatch, Note, NoteKeep, NotesQuery, Page, Reminder, RemindersQuery, RoomRules,
+  RoomRulesAsk, RuleSet, ScopeChange, ScopeHolding, SessionAsk, SessionLoads, SessionNote, Watch,
   WatchChange, WatchesQuery, WireError,
 };
 use schemars::generate::{SchemaGenerator, SchemaSettings};
@@ -23,14 +24,15 @@ use crate::mcp::tools;
 const SCHEMAS: &str = "/components/schemas";
 
 const DESCRIPTION: &str = "Memory as middleware: memory rows, notes, watches, reminders, fragments and the \
-  libraries they come from, knowledge readings and locks, stored and served through this API. The service never \
-  executes: it opens no session, runs no model, calls no other service and registers no hook. A member belongs \
-  to an opaque scope and, where it is about someone or something, to an opaque subjectKey; the caller decides \
-  what they mean. Time is the one thing the service acts on: a reminder whose time comes and a watch whose \
-  condition holds become events (reminder.due, watch.fired) that a client reads and acts on. A person sheet is a \
-  fragment of kind person keyed by its subjectKey. Bodies are JSON with camelCase keys, times are epoch \
-  milliseconds, lists are pages of items and more, and every failure is the error shape with its status. The \
-  harness plugin's tools, each a thin call of one route, are stated under x-tools.";
+  libraries they come from, knowledge readings and locks, stored and served through this API, and the caller's \
+  own records — a room's rules, a session's loads and a chat session's note. The service never executes: it opens \
+  no session, runs no model, calls no other service and registers no hook. A member belongs to an opaque scope \
+  and, where it is about someone or something, to an opaque subjectKey; the caller decides what they mean. Time \
+  is the one thing the service acts on: a reminder whose time comes and a watch whose condition holds become \
+  events (reminder.due, watch.fired) that a client reads and acts on. A person sheet is a fragment of kind person \
+  keyed by its subjectKey. Bodies are JSON with camelCase keys, times are epoch milliseconds, lists are pages of \
+  items and more, and every failure is the error shape with its status. The harness plugin's tools, each a thin \
+  call of one route, are stated under x-tools.";
 
 const ENTRY: &str = "A harness reads what it should remember for a scope with brain_knowledge and \
   brain_memories, writes rows and notes as it learns, and sets reminders and watches whose events its own loop \
@@ -298,6 +300,94 @@ fn routes(g: &mut SchemaGenerator) -> Vec<Route> {
       parameters: vec![],
       body: body::<NewNote>(g),
       answers: vec![(201, json_answer::<Note>(g))],
+      codes: vec![BadRequest],
+    },
+    Route {
+      method: "post",
+      path: "/room-rules/read",
+      id: "readRoomRules",
+      tag: "room-rules",
+      summary: "A room's rules, in the order they were set.",
+      parameters: vec![],
+      body: body::<RoomRulesAsk>(g),
+      answers: vec![(200, json_answer::<RoomRules>(g))],
+      codes: vec![BadRequest],
+    },
+    Route {
+      method: "post",
+      path: "/room-rules/set",
+      id: "setRoomRule",
+      tag: "room-rules",
+      summary: "Set or revoke one rule on a message; the room's rules as they now stand.",
+      parameters: vec![],
+      body: body::<RuleSet>(g),
+      answers: vec![(200, json_answer::<RoomRules>(g))],
+      codes: vec![BadRequest],
+    },
+    Route {
+      method: "post",
+      path: "/sessions/loads",
+      id: "readSessionLoads",
+      tag: "sessions",
+      summary: "The documents a session was handed, by path and version.",
+      parameters: vec![],
+      body: body::<SessionAsk>(g),
+      answers: vec![(200, json_answer::<SessionLoads>(g))],
+      codes: vec![BadRequest],
+    },
+    Route {
+      method: "post",
+      path: "/sessions/loads/keep",
+      id: "keepSessionLoads",
+      tag: "sessions",
+      summary: "Keep the documents a session was handed; sessions untouched for a week are let go.",
+      parameters: vec![],
+      body: body::<LoadsKeep>(g),
+      answers: vec![(200, json_answer::<Done>(g))],
+      codes: vec![BadRequest],
+    },
+    Route {
+      method: "post",
+      path: "/sessions/loads/forget",
+      id: "forgetSessionLoads",
+      tag: "sessions",
+      summary: "Let a session's loads go.",
+      parameters: vec![],
+      body: body::<SessionAsk>(g),
+      answers: vec![(200, json_answer::<Done>(g))],
+      codes: vec![BadRequest],
+    },
+    Route {
+      method: "post",
+      path: "/session-summary/read",
+      id: "readSessionNote",
+      tag: "session-summary",
+      summary: "An agent's handoff note, or null where it left none.",
+      parameters: vec![],
+      body: body::<AgentAsk>(g),
+      answers: vec![(200, json_answer::<SessionNote>(g))],
+      codes: vec![BadRequest],
+    },
+    Route {
+      method: "post",
+      path: "/session-summary/keep",
+      id: "keepSessionNote",
+      tag: "session-summary",
+      summary: "Keep an agent's handoff note, overwriting the one it had.",
+      parameters: vec![],
+      body: body::<NoteKeep>(g),
+      answers: vec![(200, json_answer::<Done>(g))],
+      codes: vec![BadRequest],
+    },
+    Route {
+      method: "post",
+      path: "/session-summary/clear",
+      id: "clearSessionNote",
+      tag: "session-summary",
+      summary: "Clear an agent's handoff note.",
+      parameters: vec![],
+      body: body::<AgentAsk>(g),
+      answers: vec![(200, json_answer::<Done>(g))],
       codes: vec![BadRequest],
     },
     Route {

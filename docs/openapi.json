@@ -73,6 +73,30 @@
       }
     },
     "schemas": {
+      "AgentAsk": {
+        "description": "The agent whose handoff note is read, kept or cleared.",
+        "properties": {
+          "agent": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "agent"
+        ],
+        "type": "object"
+      },
+      "Done": {
+        "description": "That the call was done.",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "type": "object"
+      },
       "Drift": {
         "description": "One fragment out of line with its library.",
         "properties": {
@@ -861,6 +885,51 @@
         ],
         "type": "object"
       },
+      "Load": {
+        "description": "One document a session was handed, at the version it read.",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "version"
+        ],
+        "type": "object"
+      },
+      "LoadsKeep": {
+        "description": "The loads a session keeps, read at `at`.",
+        "properties": {
+          "at": {
+            "default": null,
+            "description": "When they were read, in seconds; now where none is given.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "loads": {
+            "items": {
+              "$ref": "#/components/schemas/Load"
+            },
+            "type": "array"
+          },
+          "session": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "session",
+          "loads",
+          "at"
+        ],
+        "type": "object"
+      },
       "Lock": {
         "description": "Who is editing the store.",
         "properties": {
@@ -1376,6 +1445,22 @@
         ],
         "type": "object"
       },
+      "NoteKeep": {
+        "description": "A handoff note kept.",
+        "properties": {
+          "agent": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "agent",
+          "note"
+        ],
+        "type": "object"
+      },
       "NotePage": {
         "description": "One page of a list, oldest first.",
         "properties": {
@@ -1464,6 +1549,106 @@
         "required": [
           "items",
           "more"
+        ],
+        "type": "object"
+      },
+      "RoomRule": {
+        "description": "One rule a caller grants in a room: its id, the subject it is about and its words.",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "subject": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "subject",
+          "text"
+        ],
+        "type": "object"
+      },
+      "RoomRules": {
+        "description": "A room's rules, in the order they were set.",
+        "properties": {
+          "rules": {
+            "items": {
+              "$ref": "#/components/schemas/RoomRule"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "rules"
+        ],
+        "type": "object"
+      },
+      "RoomRulesAsk": {
+        "description": "The room whose rules are read.",
+        "properties": {
+          "chatId": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "chatId"
+        ],
+        "type": "object"
+      },
+      "RuleSet": {
+        "description": "A rule set or revoked on a message.",
+        "properties": {
+          "chatId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "id": {
+            "type": "string"
+          },
+          "messageId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "rule": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RuleText"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The rule's words, or null to revoke it."
+          }
+        },
+        "required": [
+          "chatId",
+          "messageId",
+          "id",
+          "rule"
+        ],
+        "type": "object"
+      },
+      "RuleText": {
+        "description": "A rule's words, as it is set.",
+        "properties": {
+          "subject": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "subject",
+          "text"
         ],
         "type": "object"
       },
@@ -1557,6 +1742,48 @@
             "type": "string"
           }
         ]
+      },
+      "SessionAsk": {
+        "description": "The session whose loads are read or let go.",
+        "properties": {
+          "session": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "session"
+        ],
+        "type": "object"
+      },
+      "SessionLoads": {
+        "description": "A session's loads, by path.",
+        "properties": {
+          "loads": {
+            "items": {
+              "$ref": "#/components/schemas/Load"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "loads"
+        ],
+        "type": "object"
+      },
+      "SessionNote": {
+        "description": "The handoff note an agent's chat session left, or null.",
+        "properties": {
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "note"
+        ],
+        "type": "object"
       },
       "Watch": {
         "description": "A condition waited on, and fired once it holds.",
@@ -1718,9 +1945,9 @@
     }
   },
   "info": {
-    "description": "Memory as middleware: memory rows, notes, watches, reminders, fragments and the libraries they come from, knowledge readings and locks, stored and served through this API. The service never executes: it opens no session, runs no model, calls no other service and registers no hook. A member belongs to an opaque scope and, where it is about someone or something, to an opaque subjectKey; the caller decides what they mean. Time is the one thing the service acts on: a reminder whose time comes and a watch whose condition holds become events (reminder.due, watch.fired) that a client reads and acts on. A person sheet is a fragment of kind person keyed by its subjectKey. Bodies are JSON with camelCase keys, times are epoch milliseconds, lists are pages of items and more, and every failure is the error shape with its status. The harness plugin's tools, each a thin call of one route, are stated under x-tools.",
+    "description": "Memory as middleware: memory rows, notes, watches, reminders, fragments and the libraries they come from, knowledge readings and locks, stored and served through this API, and the caller's own records — a room's rules, a session's loads and a chat session's note. The service never executes: it opens no session, runs no model, calls no other service and registers no hook. A member belongs to an opaque scope and, where it is about someone or something, to an opaque subjectKey; the caller decides what they mean. Time is the one thing the service acts on: a reminder whose time comes and a watch whose condition holds become events (reminder.due, watch.fired) that a client reads and acts on. A person sheet is a fragment of kind person keyed by its subjectKey. Bodies are JSON with camelCase keys, times are epoch milliseconds, lists are pages of items and more, and every failure is the error shape with its status. The harness plugin's tools, each a thin call of one route, are stated under x-tools.",
     "title": "bmo-brain",
-    "version": "0.1.0-rev.5"
+    "version": "0.1.0-rev.6"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -3446,6 +3673,88 @@
         ]
       }
     },
+    "/room-rules/read": {
+      "post": {
+        "operationId": "readRoomRules",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoomRulesAsk"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoomRules"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "summary": "A room's rules, in the order they were set.",
+        "tags": [
+          "room-rules"
+        ],
+        "x-codes": [
+          "bad-request",
+          "unauthorized"
+        ]
+      }
+    },
+    "/room-rules/set": {
+      "post": {
+        "operationId": "setRoomRule",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RuleSet"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoomRules"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "summary": "Set or revoke one rule on a message; the room's rules as they now stand.",
+        "tags": [
+          "room-rules"
+        ],
+        "x-codes": [
+          "bad-request",
+          "unauthorized"
+        ]
+      }
+    },
     "/scopes/{scope}": {
       "delete": {
         "operationId": "deleteScope",
@@ -3597,6 +3906,252 @@
           "bad-request",
           "unauthorized",
           "not-found"
+        ]
+      }
+    },
+    "/session-summary/clear": {
+      "post": {
+        "operationId": "clearSessionNote",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentAsk"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Done"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "summary": "Clear an agent's handoff note.",
+        "tags": [
+          "session-summary"
+        ],
+        "x-codes": [
+          "bad-request",
+          "unauthorized"
+        ]
+      }
+    },
+    "/session-summary/keep": {
+      "post": {
+        "operationId": "keepSessionNote",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoteKeep"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Done"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "summary": "Keep an agent's handoff note, overwriting the one it had.",
+        "tags": [
+          "session-summary"
+        ],
+        "x-codes": [
+          "bad-request",
+          "unauthorized"
+        ]
+      }
+    },
+    "/session-summary/read": {
+      "post": {
+        "operationId": "readSessionNote",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentAsk"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionNote"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "summary": "An agent's handoff note, or null where it left none.",
+        "tags": [
+          "session-summary"
+        ],
+        "x-codes": [
+          "bad-request",
+          "unauthorized"
+        ]
+      }
+    },
+    "/sessions/loads": {
+      "post": {
+        "operationId": "readSessionLoads",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionAsk"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionLoads"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "summary": "The documents a session was handed, by path and version.",
+        "tags": [
+          "sessions"
+        ],
+        "x-codes": [
+          "bad-request",
+          "unauthorized"
+        ]
+      }
+    },
+    "/sessions/loads/forget": {
+      "post": {
+        "operationId": "forgetSessionLoads",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionAsk"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Done"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "summary": "Let a session's loads go.",
+        "tags": [
+          "sessions"
+        ],
+        "x-codes": [
+          "bad-request",
+          "unauthorized"
+        ]
+      }
+    },
+    "/sessions/loads/keep": {
+      "post": {
+        "operationId": "keepSessionLoads",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoadsKeep"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Done"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "summary": "Keep the documents a session was handed; sessions untouched for a week are let go.",
+        "tags": [
+          "sessions"
+        ],
+        "x-codes": [
+          "bad-request",
+          "unauthorized"
         ]
       }
     },
@@ -3877,6 +4432,15 @@
     },
     {
       "name": "notes"
+    },
+    {
+      "name": "room-rules"
+    },
+    {
+      "name": "sessions"
+    },
+    {
+      "name": "session-summary"
     },
     {
       "name": "watches"
