@@ -266,7 +266,7 @@ fn the_testbed_declaration_is_in_the_testbeds_format_and_carries_no_version() {
   }
   assert_eq!(
     table(&declaration, "test").get("languages").and_then(toml::Value::as_array),
-    Some(&vec![toml::Value::from("cargo")])
+    Some(&vec![toml::Value::from("cargo"), toml::Value::from("bun")])
   );
 }
 

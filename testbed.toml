@@ -4,13 +4,18 @@ testbed = 0
 name = "brain"
 
 [test]
-languages = ["cargo"]
+# The Cargo workspace's crates, and the TypeScript client under package/, a Bun project whose check script is
+# its typecheck and its tests.
+languages = ["cargo", "bun"]
+# A fresh tree gets the client's locked packages through the same frozen install the check step runs.
+setup = ["cd package && bun install --frozen-lockfile"]
 
 # The tests make their own scratch databases on the server, so no template is named.
 [test.database]
 
-# The TypeScript client under package/, a project of its own with its manifest and lockfile; the check step
-# below runs its manifest's check script. The repository's tests stay the Cargo suite's.
+# The TypeScript client under package/, a project of its own with its manifest and lockfile; bun runs its
+# check script in the suite, and the check step below runs the same install and check in the static check.
+# The service's own tests stay the Cargo suite's.
 [projects]
 paths = ["package"]
 
