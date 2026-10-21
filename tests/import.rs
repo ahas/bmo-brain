@@ -39,7 +39,7 @@ fn fixture() -> (tempfile::TempDir, PathBuf, PathBuf) {
     json!({"id": 1, "slug": "m", "type": "followup", "chat_id": 1, "reach": "owner", "condition": "", "action": "do it", "for_user": null, "message_id": null, "todo_id": null, "set_by": null, "set_at": 100, "active": 1, "last_hit_at": 110, "hits": 3, "done_at": null, "done_text": null, "down_reason": null, "down_at": null, "candidate_why": null, "candidate_at": null, "event": "", "event_met_at": null, "moved_at": null, "agent": "bmo"}),
   ];
   let notes = vec![
-    json!({"id": 1, "chat_id": 1, "author": "하스", "text": "a note", "created_at": 200, "agent": "bmo", "shared": 0, "consumed_at": null}),
+    json!({"id": 1, "chat_id": 1, "author": "tester", "text": "a note", "created_at": 200, "agent": "bmo", "shared": 0, "consumed_at": null}),
   ];
   let reminders = vec![
     json!({"id": 1, "chat_id": 1, "user_id": null, "due_at": 300, "reason": "a reminder", "memory_id": null, "every": null, "fired": 1, "created_at": 290, "agent": "bmo"}),
