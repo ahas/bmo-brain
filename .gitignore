@@ -1,2 +1,4 @@
 /target
 /package/node_modules
+.graph/*
+!.graph/settings.toml

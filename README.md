@@ -20,7 +20,7 @@ fixtures or commit messages. `docs/PERSONAL-DATA.md` states the rule and the che
 
 | Folder | Holds |
 |---|---|
-| `.graph/` | the code dependency graph: its settings and its nodes, one feature to a node |
+| `.graph/` | the code dependency graph: its settings and its nodes, one feature to a node. The area files are generated in the checkout and untracked, so a fresh checkout builds them again, while `settings.toml` is the repository's configuration and stays tracked |
 | `src/` | the service's own package: its store, routes, clock, MCP server and OpenAPI document |
 | `crates/` | `client/`, the crate `bmo-brain-client`, every body and member as a Rust type and one method for each route |
 | `package/` | the TypeScript package `bmo-brain-client`, generated from `docs/openapi.json`: every body as a type and a typed call for each route |
