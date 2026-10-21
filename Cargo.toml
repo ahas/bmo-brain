@@ -81,3 +81,13 @@ regex.workspace = true
 # The service's unit file, read in its INI shape by the repository's checks.
 rust-ini.workspace = true
 tokio = { workspace = true, features = ["io-util", "process"] }
+
+# Build output kept small: line tables alone for a backtrace, split out, and no incremental cache.
+[profile.dev]
+debug = "line-tables-only"
+split-debuginfo = "unpacked"
+incremental = false
+
+[profile.release]
+debug = false
+strip = "debuginfo"
