@@ -8,6 +8,7 @@ pub mod api;
 pub mod clock;
 pub mod command;
 pub mod config;
+pub mod import;
 pub mod mcp;
 pub mod openapi;
 pub mod store;

@@ -80,6 +80,8 @@ reqwest = { workspace = true, features = ["stream"] }
 regex.workspace = true
 # The service's unit file, read in its INI shape by the repository's checks.
 rust-ini.workspace = true
+# A temporary folder the import's tests write their export and tree into.
+tempfile = "3.20.0"
 tokio = { workspace = true, features = ["io-util", "process"] }
 
 # Build output kept small: line tables alone for a backtrace, split out, and no incremental cache.

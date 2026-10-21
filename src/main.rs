@@ -52,6 +52,21 @@ enum Verb {
   Openapi,
   /// Prints the nouns `bmo` dispatches to this command, one a line.
   Nouns,
+  /// Moves the old archive's exported rows and the brain tree into this store (TODO #1923).
+  Import {
+    /// The export directory the item's export hand wrote.
+    #[arg(long, value_name = "dir")]
+    export: PathBuf,
+    /// The brain repository the fragments are read from.
+    #[arg(long, value_name = "dir")]
+    brain: PathBuf,
+    /// The PostgreSQL database written.
+    #[arg(long, value_name = "url")]
+    database: String,
+    /// Reads, checks and counts everything, and writes nothing.
+    #[arg(long)]
+    dry_run: bool,
+  },
   /// The memory rows.
   Memory {
     #[command(subcommand)]
@@ -208,6 +223,38 @@ async fn main() -> ExitCode {
       NOUNS.iter().for_each(|noun| println!("{noun}"));
       Ok(())
     }
+    Verb::Import {
+      export,
+      brain,
+      database,
+      dry_run,
+    } => match bmo_brain::import::run(&database, &export, &brain, dry_run).await {
+      Ok(report) => {
+        for moved in &report.tables {
+          println!(
+            "{} -> {}: {} exported, {} written ({})",
+            moved.source, moved.target, moved.exported, moved.written, moved.note
+          );
+        }
+        println!(
+          "{} at snapshot {} read {}: {} rows sampled, {} failures",
+          if report.dry_run { "dry run" } else { "import" },
+          report.snapshot,
+          report.read_at,
+          report.sample.checked,
+          report.sample.failures.len()
+        );
+        for failure in &report.sample.failures {
+          eprintln!("  {failure}");
+        }
+        if report.sample.failures.is_empty() {
+          Ok(())
+        } else {
+          Err("the count-and-sample compare failed".to_owned())
+        }
+      }
+      Err(why) => Err(why),
+    },
     Verb::Memory { word } => {
       noun(config.as_ref(), |client| async move { command::memory::run(&client, word).await }).await
     }

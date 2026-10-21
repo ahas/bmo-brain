@@ -155,6 +155,20 @@ impl Served {
     BrainClient::new(&self.base, token).unwrap()
   }
 
+  /// The database's address, as a caller handed one opens it.
+  pub fn address(&self) -> String {
+    let address = test_address();
+    let (base, query) = address
+      .split_once('?')
+      .map_or((address.as_str(), None), |(base, query)| (base, Some(query)));
+    let base = base.rsplit_once('/').map(|(head, _)| head).unwrap_or(base);
+
+    match query {
+      Some(query) => format!("{base}/{}?{query}", self.database),
+      None => format!("{base}/{}", self.database),
+    }
+  }
+
   /// The events published so far, every kind.
   pub async fn event_kinds(&self) -> Vec<String> {
     let page = self.client.events(&bmo_brain_client::EventsQuery::default()).await.unwrap();
