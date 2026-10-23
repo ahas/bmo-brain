@@ -14,6 +14,10 @@ it as you read, in the turn itself. Nothing writes it for you.
 
 ## As you read a message
 
+- **Every message you read counts,** the one that woke you and every archived message a turn carries: the
+  messages that arrived while you were away, handed to you after a handover or when you return to a room.
+  Read those as you read a live message and write what matters from them the same way. Nothing else writes
+  it for you: no digest and no person-book writer runs behind you.
 - **Keep what may matter later as an episode** (`brain_memory_write`, type `episode`): what was said, who
   said it (a subject of type `person` by their id) and the room (type `room` by its id), with an importance
   from 1 to 10: small talk 1 or 2; a decision, a promise, a correction, news 6 or more. Not every line is an
