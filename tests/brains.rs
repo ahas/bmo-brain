@@ -169,6 +169,50 @@ async fn a_subject_is_found_by_its_type_and_key_and_a_layer_by_its_name() {
 }
 
 #[tokio::test]
+async fn the_layer_page_walks_the_list_in_position_order_past_the_layer_last_seen() {
+  let served = Served::new().await;
+  let client = &served.client;
+  let brain = brain_of(client, "agent-a").await;
+  let mut ids = vec![];
+  for (name, position) in [("lore", 2), ("persona", 0), ("tone", 1)] {
+    let layer = client
+      .layer_add(
+        brain,
+        &NewLayer {
+          name: name.to_owned(),
+          description: String::new(),
+          position: Some(position),
+        },
+      )
+      .await
+      .unwrap();
+    ids.push(layer.id);
+  }
+  let mut walked = vec![];
+  let mut after = None;
+  loop {
+    let page = client
+      .layers(
+        brain,
+        &LayersQuery {
+          after,
+          limit: Some(1),
+        },
+      )
+      .await
+      .unwrap();
+    assert_eq!(page.items.len(), 1);
+    walked.push(page.items[0].name.clone());
+    after = Some(page.items[0].id);
+    if !page.more {
+      break;
+    }
+  }
+  assert_eq!(walked, ["persona", "tone", "lore"]);
+  assert!(ids[0] < ids[1], "the first layer added has the lowest id and the last position");
+}
+
+#[tokio::test]
 async fn a_memory_is_versioned_never_edited_and_its_key_moves_with_the_live_version() {
   let served = Served::new().await;
   let client = &served.client;

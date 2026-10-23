@@ -360,8 +360,14 @@ impl Store {
       "SELECT id, brain_id, name, description, position, created_at FROM layers WHERE brain_id = ",
     );
     sql.push_bind(brain_id);
+    // The page walks the order the list stands in, position then id, from past the layer last seen.
     if let Some(after) = query.after {
-      sql.push(" AND id > ").push_bind(after);
+      sql
+        .push(" AND (position, id) > (SELECT position, id FROM layers WHERE brain_id = ")
+        .push_bind(brain_id)
+        .push(" AND id = ")
+        .push_bind(after)
+        .push(")");
     }
     sql.push(" ORDER BY position, id LIMIT ").push_bind(limit + 1);
     let rows: Vec<LayerRow> = sql.build_query_as().fetch_all(&mut *conn).await?;
