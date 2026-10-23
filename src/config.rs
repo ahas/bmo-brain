@@ -17,6 +17,10 @@ pub struct Config {
   /// The numbers the brain reads by (docs/design.md); each has a default.
   #[serde(default)]
   pub rules: Rules,
+  /// The data root whose env file the brain's tool reads the service's address from; none where the brain
+  /// ships no tool env.
+  #[serde(default)]
+  pub data_root: Option<PathBuf>,
 }
 
 /// How long the health command waits on one answer.

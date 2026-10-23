@@ -1,0 +1,100 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "type",
+    "text",
+    "source"
+  ],
+  "properties": {
+    "type": {
+      "type": "string",
+      "description": "fact, rumor, situation, name, tip, promise, check, followup, state, reflection, or your own word."
+    },
+    "text": {
+      "type": "string",
+      "description": "One short sentence."
+    },
+    "subjects": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "type",
+          "key"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "What it is: person, room, document, ..."
+          },
+          "key": {
+            "type": "string",
+            "description": "Its key as you know it: a person's id, a room's id."
+          }
+        }
+      }
+    },
+    "importance": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 1,
+      "maximum": 10
+    },
+    "source": {
+      "type": "string",
+      "enum": [
+        "own",
+        "owner",
+        "told",
+        "inferred"
+      ],
+      "description": "own: the person about themselves; owner: the owner's word; told: someone about someone else; inferred: your conclusion."
+    },
+    "confirms": {
+      "type": "array",
+      "items": {
+        "type": "integer"
+      },
+      "description": "Ids of live memories this merely repeats."
+    },
+    "strengthens": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "description": "The id of the live memory this says more fully."
+    },
+    "replaces": {
+      "type": "array",
+      "items": {
+        "type": "integer"
+      },
+      "description": "Ids of live memories this contradicts."
+    },
+    "grounds": {
+      "type": "array",
+      "items": {
+        "type": "integer"
+      },
+      "description": "Ids of the episodes this rests on."
+    },
+    "key": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Your own identifier, for a memory you may rewrite later."
+    },
+    "room": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "The room's id to link as a subject; this turn's room where none is given; empty to link no room."
+    }
+  }
+}

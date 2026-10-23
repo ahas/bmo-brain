@@ -52,6 +52,12 @@ enum Verb {
   Openapi,
   /// Prints the nouns `bmo` dispatches to this command, one a line.
   Nouns,
+  /// Writes the env file the brain's tool reads the service's address and token from, under the data root.
+  ToolEnv {
+    /// The data root; the configuration's where none is given.
+    #[arg(long, value_name = "dir")]
+    data_root: Option<PathBuf>,
+  },
   /// Moves the old archive's exported rows and the brain tree into this store (TODO #1923).
   Import {
     /// The export directory the item's export hand wrote.
@@ -238,6 +244,16 @@ async fn main() -> ExitCode {
       NOUNS.iter().for_each(|noun| println!("{noun}"));
       Ok(())
     }
+    Verb::ToolEnv { data_root } => match configured(config.as_ref()) {
+      Ok(config) => match data_root.or_else(|| config.data_root.clone()) {
+        Some(root) => bmo_brain::tool_env::write_env(&config, &root).map(|written| match written {
+          bmo_brain::tool_env::Written::Written(path) => println!("written {}", path.display()),
+          bmo_brain::tool_env::Written::Unchanged(path) => println!("unchanged {}", path.display()),
+        }),
+        None => Err("--data-root names no data root, and the configuration names none".to_owned()),
+      },
+      Err(why) => Err(why),
+    },
     Verb::Import {
       export,
       brain,

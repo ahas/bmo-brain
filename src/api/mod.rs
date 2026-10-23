@@ -140,6 +140,13 @@ async fn authorised(State(brain): State<Brain>, request: Request, next: Next) ->
   next.run(request).await
 }
 
+/// The discipline a chat agent's system prompt carries (docs/design.md, 「Writing」).
+pub const DISCIPLINE: &str = include_str!("../../skills/brain-harness/every-turn.md");
+
+async fn discipline() -> Response {
+  ([(header::CONTENT_TYPE, "text/plain; charset=utf-8")], DISCIPLINE).into_response()
+}
+
 async fn no_route() -> ApiError {
   ApiError::new(ErrorCode::NoRoute, "No route answers at this method and path.")
 }
@@ -159,6 +166,7 @@ pub fn router(brain: Brain) -> Router {
   Router::new()
     .route("/health", axum::routing::get(health))
     .route("/events", axum::routing::get(events::events))
+    .route("/discipline", axum::routing::get(discipline))
     .merge(routes::routes())
     .merge(brains::routes())
     .fallback(no_route)

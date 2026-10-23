@@ -14,3 +14,4 @@ pub mod mcp;
 pub mod moving;
 pub mod openapi;
 pub mod store;
+pub mod tool_env;

@@ -3270,7 +3270,7 @@
   "info": {
     "description": "An agent's long-term memory as a service. The service keeps many brains, each an account's and one agent's: subjects (what a memory is about, found by type and key), layers (the table of contents) and memories, one row a version, superseded and invalidated but never deleted. A turn asks recall for a block under a token budget; a persona is rendered as the same bytes until a piece changes; a brain moves in and out as a brain file. The rows held under a caller's opaque scope (memory rows, notes, watches, reminders, fragments, libraries, locks and the caller's own records) keep answering until their readers move to the brains. Bodies are JSON with camelCase keys, times are epoch milliseconds, lists are pages of items and more, and every failure is the error shape with its status. The harness plugin's tools, each a thin call of one route, are stated under x-tools.",
     "title": "bmo-brain",
-    "version": "0.1.0-rev.8"
+    "version": "0.1.0-rev.9"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -5172,6 +5172,33 @@
           "bad-request",
           "unauthorized",
           "not-found"
+        ]
+      }
+    },
+    "/discipline": {
+      "get": {
+        "operationId": "readDiscipline",
+        "responses": {
+          "200": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "summary": "The discipline a chat agent's system prompt carries: how it reads and writes its brain every turn.",
+        "tags": [
+          "writing"
+        ],
+        "x-codes": [
+          "unauthorized"
         ]
       }
     },
@@ -7643,6 +7670,9 @@
   ],
   "tags": [
     {
+      "name": "writing"
+    },
+    {
       "name": "brains"
     },
     {
@@ -7656,9 +7686,6 @@
     },
     {
       "name": "recall"
-    },
-    {
-      "name": "writing"
     },
     {
       "name": "persona"

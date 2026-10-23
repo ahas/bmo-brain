@@ -19,6 +19,10 @@ setup = ["cd package && bun install --frozen-lockfile"]
 [projects]
 paths = ["package"]
 
+# The brain's own tool, checked by the command its tool.toml names.
+[tools]
+dir = "tools"
+
 [check]
 quick = ["layout", "dependencies"]
 base_libraries = ["bmo-chat", "bmo-chat-client", "bmo-ui"]
@@ -44,8 +48,8 @@ command = "bun install --frozen-lockfile && bun run check"
 dir = "package"
 
 [build]
-# The service's binary, which also starts the harness plugin's MCP server.
-binaries = ["bmo-brain"]
+# The service's binary, which also starts the harness plugin's MCP server, and the tool host's tool.
+binaries = ["bmo-brain", "brain-tool"]
 
 # The brain's own deploy tree, and the data root its configuration stands under: env/brain.toml, which each
 # release links to as brain.toml (docs/boundary-api.md, 「Configuration」).
@@ -59,3 +63,21 @@ units = ["deploy/*.service"]
 # Answers 0 once the service the deployed configuration names answers ready (docs/boundary-api.md,
 # 「Configuration」).
 health = "~/.local/share/bmo-brain/deploy/bin/bmo-brain --config ~/.local/share/bmo-brain/deploy/brain.toml health"
+
+# Where the brain's tool finds it: the data root's env/brain.env, written from the configuration.
+[[deploy.step]]
+id = "tool-env"
+phase = "before-flip"
+command = "bin/bmo-brain --config brain.toml tool-env"
+
+# The tool placed in its folder's .placed/, the folder the tool host reads: the executable the release's bin/
+# holds, its manifest and the schemas beside it.
+[[deploy.step]]
+id = "place-brain-tool"
+phase = "before-flip"
+command = '''
+set -eu
+rm -rf tools/brain/.placed
+mkdir -p tools/brain/.placed
+cp bin/brain-tool tools/brain/tool.toml tools/brain/*.json tools/brain/.placed/
+'''

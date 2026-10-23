@@ -32,6 +32,7 @@ fixtures or commit messages. `docs/PERSONAL-DATA.md` states the rule and the che
 | `docs/` | the design, the boundary document, the OpenAPI document and the personal-data rule |
 | `tests/` | the service's tests and the checks that span the repository |
 | `deploy/` | the service's user unit, `bmo-brain.service`, which a deployment links from the deploy tree |
+| `tools/` | the brain's tool for the tool host, `brain/`, with its manifest, its entries' schemas and the crate of its executable |
 
 The testbed's declaration, `testbed.toml`, says how the testbed tests, checks, builds and deploys the repository.
 

@@ -197,7 +197,7 @@ dependencies = [
 
 [[package]]
 name = "bmo-brain"
-version = "0.1.0-rev.8"
+version = "0.1.0-rev.9"
 dependencies = [
  "axum",
  "bmo-brain-client",
@@ -222,12 +222,26 @@ dependencies = [
 
 [[package]]
 name = "bmo-brain-client"
-version = "0.1.0-rev.8"
+version = "0.1.0-rev.9"
 dependencies = [
  "reqwest",
  "schemars",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "brain-tool"
+version = "0.1.0-rev.9"
+dependencies = [
+ "axum",
+ "bmo-brain",
+ "bmo-brain-client",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "tokio",
+ "toml",
 ]
 
 [[package]]

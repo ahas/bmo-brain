@@ -35,6 +35,7 @@ server, `bmo-brain mcp`, takes no configuration file (「The harness plugin」).
 | listen address | `listen` | where the service answers |
 | token | `token` | the bearer token every caller presents |
 | database | `database` | the address of the brain's own PostgreSQL database, which holds its tables and nothing else |
+| data root | `data_root` | the data root whose `env/brain.env` the brain's tool reads the service's address and token from; the `tool-env` verb writes it |
 | rules | `[rules]` | the numbers the brain reads by (`docs/design.md`), each with a default: `budget_tokens`, `weight_relevance`, `weight_importance`, `weight_recency`, `subject_bonus`, `subject_cap`, `decay`, `hit_times_kept`, `same_session_ms`, `strength_gain`, `previous_value_days`, `consolidation_threshold` |
 
 Deployed, the file stands under the data root as `env/brain.toml`, and each release links to it as
@@ -490,6 +491,30 @@ command whose leading words match a declared noun to it, the noun's words includ
 - **`brain hold`** takes `--holder` and `--reason` required, and `--ttl-ms` for how long it stands; with
   none it stands until it is let go. **`brain wait`** waits `--wait-ms` (ten minutes where none is given)
   for no lock to stand, and narrows with `--after` and `--limit`.
+
+## Its tool
+
+The tool host serves the brain's tool, `tools/brain/`, to a chat agent's session: `tool.toml` declares its
+entries in the `bmo` namespace, each for a session holding the `room.chat` capability, and the executable
+`brain-tool` answers one call handed on standard input with one tool result on standard output, as the tool
+host's call protocol states.
+
+- **It finds the brain** by `BRAIN_ADDRESS` and `BRAIN_TOKEN` in its own environment, else in `env/brain.env`
+  under the data root the record's `BMO_DATA_DIR` names, which `bmo-brain --config <file> tool-env` writes
+  from the configuration before a deployment flips.
+- **It finds the agent's brain** by the turn's agent, `BMO_TURN_AGENT` in the record's variables, else the
+  record's holder: the one brain registered for that agent key. The turn's room, `BMO_TURN_CHAT`, is the room
+  a write links where the call names none.
+- **Its entries,** each one call: `memory_episode` (`POST /brains/{brainId}/memories`, type `episode`),
+  `memory_similar` (`POST …/similar`), `memory_learn` (`POST …/learnings`), `memory_move`
+  (`PATCH …/memories/{memoryId}`), `memory_list` (`GET …/memories`), `memory_unconsolidated`
+  (`GET …/unconsolidated`), `memory_consolidated` (`POST …/consolidated`) and `brain_fold`
+  (`POST …/folds`, the session key the record's `BMO_RUN_NAME`). It writes as `agent-session`.
+- **A deployment places it** in `tools/brain/.placed/` inside the release: the executable, the manifest and
+  the schemas; the tool host's registry takes that folder as the service's own tool.
+
+`GET /discipline` answers `text/plain`: the discipline a chat agent's system prompt carries, how it reads and
+writes its brain every turn, the same text the skill ships as `every-turn.md`.
 
 ## The harness plugin
 

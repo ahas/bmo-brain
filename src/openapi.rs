@@ -209,6 +209,18 @@ fn brain_routes(g: &mut SchemaGenerator) -> Vec<Route> {
   vec![
     Route {
       method: "get",
+      path: "/discipline",
+      id: "readDiscipline",
+      tag: "writing",
+      summary: "The discipline a chat agent's system prompt carries: how it reads and writes its brain every turn.",
+      parameters: vec![],
+      body: None,
+      raw_body: None,
+      answers: vec![(200, Some(json!({ "text/plain": { "schema": { "type": "string" } } })))],
+      codes: vec![],
+    },
+    Route {
+      method: "get",
       path: "/brains",
       id: "listBrains",
       tag: "brains",

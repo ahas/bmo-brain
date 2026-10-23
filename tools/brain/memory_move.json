@@ -1,0 +1,28 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "memory_id",
+    "status"
+  ],
+  "properties": {
+    "memory_id": {
+      "type": "integer"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "done",
+        "invalidated"
+      ]
+    },
+    "at": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "description": "When it stopped holding, epoch milliseconds; now where none is given."
+    }
+  }
+}
