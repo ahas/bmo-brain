@@ -9,8 +9,8 @@ use bmo_brain_client::{
   Brain, BrainsQuery, Confirmations, ErrorCode, Event, EventsQuery, ExportQuery, Fold, Folded, Fragment,
   FragmentKind, FragmentSwitch, FragmentsQuery, Health, Hits, Injected, Layer, LayerChange, LayersQuery,
   MemoriesQuery, Memory, MemoryMerge, MemoryMove, MemoryVersion, NameCursor, NewBrain, NewLayer, NewMemory,
-  NewSubject, Page, Recall, RecallAsk, Recorded, ScopedMemoriesQuery, ScopedMemory, ScopedMemoryChange,
-  Subject, SubjectChange, SubjectsQuery, TypeCount, WireError,
+  NewSubject, Page, PersonaQuery, Recall, RecallAsk, Recorded, ScopedMemoriesQuery, ScopedMemory,
+  ScopedMemoryChange, Subject, SubjectChange, SubjectsQuery, TypeCount, WireError,
 };
 use bmo_brain_client::{Consolidated, Learned, Learning, SimilarAsk, UnconsolidatedQuery};
 use schemars::generate::{SchemaGenerator, SchemaSettings};
@@ -558,8 +558,12 @@ fn brain_routes(g: &mut SchemaGenerator) -> Vec<Route> {
       path: "/brains/{brainId}/persona",
       id: "renderPersona",
       tag: "persona",
-      summary: "The persona rendered as text, the same bytes until a piece changes.",
-      parameters: brain(g),
+      summary: "The persona rendered as text, the same bytes until a piece changes; the layers named alone where any are.",
+      parameters: {
+        let mut parameters = brain(g);
+        parameters.extend(query::<PersonaQuery>(g));
+        parameters
+      },
       body: None,
       raw_body: None,
       answers: vec![(200, Some(json!({ "text/plain": { "schema": { "type": "string" } } })))],

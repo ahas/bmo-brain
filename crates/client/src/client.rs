@@ -7,8 +7,8 @@ use serde::de::DeserializeOwned;
 use crate::brains::{
   Brain, BrainsQuery, Confirmations, Consolidated, ExportQuery, Fold, Folded, Hits, Injected, Layer,
   LayerChange, LayersQuery, Learned, Learning, MemoriesQuery, Memory, MemoryMerge, MemoryMove,
-  MemoryVersion, NewBrain, NewLayer, NewMemory, NewSubject, Recall, RecallAsk, Recorded, SimilarAsk,
-  Subject, SubjectChange, SubjectsQuery, TypeCount, UnconsolidatedQuery,
+  MemoryVersion, NewBrain, NewLayer, NewMemory, NewSubject, PersonaQuery, Recall, RecallAsk, Recorded,
+  SimilarAsk, Subject, SubjectChange, SubjectsQuery, TypeCount, UnconsolidatedQuery,
 };
 use crate::fragments::{Fragment, FragmentKind, FragmentSwitch, FragmentsQuery};
 use crate::memories::{ScopedMemoriesQuery, ScopedMemory, ScopedMemoryChange};
@@ -312,8 +312,8 @@ impl BrainClient {
   }
 
   /// `GET /brains/{brainId}/persona`
-  pub async fn persona(&self, brain_id: i64) -> Answer<String> {
-    Self::words(self.request(Method::GET, &["brains", &brain_id.to_string(), "persona"])).await
+  pub async fn persona(&self, brain_id: i64, query: &PersonaQuery) -> Answer<String> {
+    Self::words(self.get(&["brains", &brain_id.to_string(), "persona"], query)).await
   }
 
   /// `GET /brains/{brainId}/export`

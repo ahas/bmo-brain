@@ -7,8 +7,8 @@ use std::pin::Pin;
 
 use bmo_brain_client::{
   BrainClient, BrainsQuery, ClientFailure, Confirmations, Fold, Hits, LayersQuery, MemoriesQuery,
-  MemoryMerge, MemoryMove, MemoryVersion, NewBrain, NewLayer, NewMemory, NewSubject, RecallAsk,
-  SubjectsQuery,
+  MemoryMerge, MemoryMove, MemoryVersion, NewBrain, NewLayer, NewMemory, NewSubject, PersonaQuery,
+  RecallAsk, SubjectsQuery,
 };
 use bmo_brain_client::{Consolidated, Learning, SimilarAsk, UnconsolidatedQuery};
 use schemars::generate::SchemaGenerator;
@@ -340,7 +340,10 @@ pub fn tools() -> Vec<BrainTool> {
       "The persona rendered as text.",
       "GET /brains/{brainId}/persona",
       |client, BrainId { brain_id }| async move {
-        client.persona(brain_id).await.map(|text| PersonaText { text })
+        client
+          .persona(brain_id, &PersonaQuery::default())
+          .await
+          .map(|text| PersonaText { text })
       },
     ),
   ]

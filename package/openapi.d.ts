@@ -289,7 +289,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The persona rendered as text, the same bytes until a piece changes. */
+        /** The persona rendered as text, the same bytes until a piece changes; the layers named alone where any are. */
         get: operations["renderPersona"];
         put?: never;
         post?: never;
@@ -1940,7 +1940,10 @@ export interface operations {
     };
     renderPersona: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Comma-separated layer names; every persona piece where none is given. */
+                layers?: string | null;
+            };
             header?: never;
             path: {
                 brainId: number;

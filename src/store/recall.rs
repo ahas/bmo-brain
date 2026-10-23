@@ -305,19 +305,43 @@ impl Store {
   }
 
   /// The persona rendered: the active persona pieces in their layers' order and their own, joined by a blank
-  /// line, the same bytes until a piece changes.
-  pub async fn persona(&self, brain_id: i64) -> Held<String> {
+  /// line, the same bytes until a piece changes; the pieces of the layers named alone where any are.
+  pub async fn persona(&self, brain_id: i64, layers: &[String]) -> Held<String> {
     let mut conn = self.connection().await?;
     brain_of(&mut conn, brain_id).await?;
-    let pieces: Vec<String> = sqlx::query_scalar(
-      "SELECT m.text FROM memories m LEFT JOIN layers l ON l.id = m.layer_id \
-       WHERE m.brain_id = $1 AND m.type = 'persona' AND m.status = $2 \
-       ORDER BY l.position NULLS LAST, m.layer_id NULLS LAST, m.position, m.id",
-    )
-    .bind(brain_id)
-    .bind(MemoryStatus::Active.name())
-    .fetch_all(&mut *conn)
-    .await?;
+    let pieces: Vec<String> = if layers.is_empty() {
+      sqlx::query_scalar(
+        "SELECT m.text FROM memories m LEFT JOIN layers l ON l.id = m.layer_id \
+         WHERE m.brain_id = $1 AND m.type = 'persona' AND m.status = $2 \
+         ORDER BY l.position NULLS LAST, m.layer_id NULLS LAST, m.position, m.id",
+      )
+      .bind(brain_id)
+      .bind(MemoryStatus::Active.name())
+      .fetch_all(&mut *conn)
+      .await?
+    } else {
+      let standing: Vec<String> =
+        sqlx::query_scalar("SELECT name FROM layers WHERE brain_id = $1 AND name = ANY($2)")
+          .bind(brain_id)
+          .bind(layers)
+          .fetch_all(&mut *conn)
+          .await?;
+      for name in layers {
+        if !standing.contains(name) {
+          return Err(Fault::NotFound(format!("Brain {brain_id} has no layer {name:?}.")));
+        }
+      }
+      sqlx::query_scalar(
+        "SELECT m.text FROM memories m JOIN layers l ON l.id = m.layer_id \
+         WHERE m.brain_id = $1 AND m.type = 'persona' AND m.status = $2 AND l.name = ANY($3) \
+         ORDER BY l.position, m.layer_id, m.position, m.id",
+      )
+      .bind(brain_id)
+      .bind(MemoryStatus::Active.name())
+      .bind(layers)
+      .fetch_all(&mut *conn)
+      .await?
+    };
     Ok(pieces.iter().map(|piece| piece.trim_end()).collect::<Vec<_>>().join("\n\n"))
   }
 }

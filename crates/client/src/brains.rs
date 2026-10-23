@@ -509,6 +509,15 @@ pub struct ExportQuery {
   pub layers: Option<String>,
 }
 
+/// Which layers a persona rendering takes.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct PersonaQuery {
+  /// Comma-separated layer names; every persona piece where none is given.
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub layers: Option<String>,
+}
+
 /// What an injection came to.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]

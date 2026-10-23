@@ -10,8 +10,8 @@ use axum::routing::{get, post};
 use bmo_brain_client::{
   Brain as BrainMember, BrainsQuery, Confirmations, Consolidated, ExportQuery, Fold, Folded, Hits,
   Injected, Layer, LayerChange, LayersQuery, Learned, Learning, MemoriesQuery, Memory, MemoryMerge,
-  MemoryMove, MemoryVersion, NewBrain, NewLayer, NewMemory, NewSubject, Page, Recall, RecallAsk, Recorded,
-  SimilarAsk, Subject, SubjectChange, SubjectsQuery, TypeCount, UnconsolidatedQuery,
+  MemoryMove, MemoryVersion, NewBrain, NewLayer, NewMemory, NewSubject, Page, PersonaQuery, Recall,
+  RecallAsk, Recorded, SimilarAsk, Subject, SubjectChange, SubjectsQuery, TypeCount, UnconsolidatedQuery,
 };
 
 use super::{Answer, Body, Brain, Key, Query};
@@ -225,9 +225,24 @@ async fn consolidated(
   Ok(Json(Recorded { recorded_count }))
 }
 
-async fn persona(State(brain): State<Brain>, Key(id): Key<i64>) -> Answer<Response> {
-  let text = brain.store.persona(id).await?;
+async fn persona(
+  State(brain): State<Brain>,
+  Key(id): Key<i64>,
+  Query(query): Query<PersonaQuery>,
+) -> Answer<Response> {
+  let text = brain.store.persona(id, &layer_names(query.layers.as_deref())).await?;
   Ok(([(header::CONTENT_TYPE, "text/plain; charset=utf-8")], text).into_response())
+}
+
+/// The layer names a comma-separated query names, trimmed, the empty ones left out.
+fn layer_names(query: Option<&str>) -> Vec<String> {
+  query
+    .unwrap_or_default()
+    .split(',')
+    .map(str::trim)
+    .filter(|name| !name.is_empty())
+    .map(str::to_owned)
+    .collect()
 }
 
 async fn export(
@@ -235,16 +250,7 @@ async fn export(
   Key(id): Key<i64>,
   Query(query): Query<ExportQuery>,
 ) -> Answer<Response> {
-  let layers: Vec<String> = query
-    .layers
-    .as_deref()
-    .unwrap_or_default()
-    .split(',')
-    .map(str::trim)
-    .filter(|name| !name.is_empty())
-    .map(str::to_owned)
-    .collect();
-  let bytes = brain.store.export(id, &layers).await?;
+  let bytes = brain.store.export(id, &layer_names(query.layers.as_deref())).await?;
   Ok(([(header::CONTENT_TYPE, "application/vnd.sqlite3")], bytes).into_response())
 }
 

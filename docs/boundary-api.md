@@ -206,7 +206,9 @@ The skill ships the discipline a chat agent's system prompt carries, `skills/bra
 ### Persona
 
 `GET /persona` answers `text/plain`: the active `persona` memories in their layers' order and their own
-position, joined by a blank line, with nothing that changes between calls.
+position, joined by a blank line, with nothing that changes between calls. `layers` (comma-separated layer
+names) narrows the rendering to those layers' pieces in the same order, so a caller that builds a prompt
+takes the base layer alone; a named layer that does not stand is 404.
 
 ### Brain files
 

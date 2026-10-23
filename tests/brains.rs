@@ -7,7 +7,7 @@ mod support;
 use bmo_brain_client::{
   BrainClient, BrainsQuery, Confirmations, ExportQuery, Fold, Hits, LayersQuery, MemoriesQuery,
   MemoryMerge, MemoryMove, MemoryStatus, MemoryVersion, NewBrain, NewLayer, NewMemory, NewSubject,
-  RecallAsk, RecallPart, SubjectKey, SubjectsQuery,
+  PersonaQuery, RecallAsk, RecallPart, SubjectKey, SubjectsQuery,
 };
 use support::{Served, labels, refused};
 
@@ -588,9 +588,9 @@ async fn the_persona_renders_in_layer_order_and_the_same_bytes_twice() {
     )
     .await
     .unwrap();
-  let text = client.persona(brain).await.unwrap();
+  let text = client.persona(brain, &PersonaQuery::default()).await.unwrap();
   assert_eq!(text, "An assistant.\n\nNamed after a game console.\n\nSpeaks plainly.");
-  assert_eq!(client.persona(brain).await.unwrap(), text);
+  assert_eq!(client.persona(brain, &PersonaQuery::default()).await.unwrap(), text);
   client
     .memory_version(
       brain,
@@ -604,9 +604,27 @@ async fn the_persona_renders_in_layer_order_and_the_same_bytes_twice() {
     .await
     .unwrap();
   assert_eq!(
-    client.persona(brain).await.unwrap(),
+    client.persona(brain, &PersonaQuery::default()).await.unwrap(),
     "A helper.\n\nNamed after a game console.\n\nSpeaks plainly."
   );
+  let base_only = PersonaQuery {
+    layers: Some("base".to_owned()),
+  };
+  assert_eq!(
+    client.persona(brain, &base_only).await.unwrap(),
+    "A helper.\n\nNamed after a game console."
+  );
+  let both = PersonaQuery {
+    layers: Some(" tone, base ".to_owned()),
+  };
+  assert_eq!(
+    client.persona(brain, &both).await.unwrap(),
+    "A helper.\n\nNamed after a game console.\n\nSpeaks plainly."
+  );
+  let missing = PersonaQuery {
+    layers: Some("base,voice".to_owned()),
+  };
+  assert_eq!(refused(client.persona(brain, &missing).await), (404, "not-found".to_owned()));
 }
 
 #[tokio::test]
