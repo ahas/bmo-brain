@@ -550,4 +550,9 @@ impl BrainClient {
   pub async fn consolidated(&self, brain_id: i64, body: &Consolidated) -> Answer<Recorded> {
     Self::answered(self.send(Method::POST, &["brains", &brain_id.to_string(), "consolidated"], body)).await
   }
+
+  /// `GET /discipline`
+  pub async fn discipline(&self) -> Answer<String> {
+    Self::words(self.request(Method::GET, &["discipline"])).await
+  }
 }
