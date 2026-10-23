@@ -9,9 +9,9 @@ use axum::response::{IntoResponse, Json, Response};
 use axum::routing::{get, post};
 use bmo_brain_client::{
   Brain as BrainMember, BrainsQuery, Confirmations, Consolidated, ExportQuery, Fold, Folded, Hits,
-  Injected, Layer, LayerChange, LayersQuery, Learned, Learning, MemoriesQuery, Memory, MemoryMove,
-  MemoryVersion, NewBrain, NewLayer, NewMemory, NewSubject, Page, Recall, RecallAsk, Recorded, SimilarAsk,
-  Subject, SubjectChange, SubjectsQuery, TypeCount, UnconsolidatedQuery,
+  Injected, Layer, LayerChange, LayersQuery, Learned, Learning, MemoriesQuery, Memory, MemoryMerge,
+  MemoryMove, MemoryVersion, NewBrain, NewLayer, NewMemory, NewSubject, Page, Recall, RecallAsk, Recorded,
+  SimilarAsk, Subject, SubjectChange, SubjectsQuery, TypeCount, UnconsolidatedQuery,
 };
 
 use super::{Answer, Body, Brain, Key, Query};
@@ -128,6 +128,14 @@ async fn memory_version(
   Body(body): Body<MemoryVersion>,
 ) -> Answer<Created<Memory>> {
   Ok(created(brain.store.memory_version(id, memory, &body).await?))
+}
+
+async fn memory_merge(
+  State(brain): State<Brain>,
+  Key(id): Key<i64>,
+  Body(body): Body<MemoryMerge>,
+) -> Answer<Created<Memory>> {
+  Ok(created(brain.store.memory_merge(id, &body).await?))
 }
 
 async fn memory_move(
@@ -256,6 +264,7 @@ pub fn routes() -> Router<Brain> {
     .route("/brains/{brainId}/memories", get(memories).post(memory_add))
     .route("/brains/{brainId}/memories/{memoryId}", get(memory).patch(memory_move))
     .route("/brains/{brainId}/memories/{memoryId}/versions", post(memory_version))
+    .route("/brains/{brainId}/merges", post(memory_merge))
     .route("/brains/{brainId}/lineages/{lineageId}", get(lineage))
     .route("/brains/{brainId}/hits", post(hits))
     .route("/brains/{brainId}/confirmations", post(confirmations))

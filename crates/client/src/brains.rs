@@ -310,6 +310,37 @@ pub struct MemoryVersion {
   pub labels: Option<Labels>,
 }
 
+/// One row written over several live rows about the same thing: the new row starts a lineage, and each
+/// merged row is superseded by it. Where no subjects are given, the new row is about the union of theirs;
+/// where no importance is given, the highest of theirs.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct MemoryMerge {
+  /// The live rows merged, two or more.
+  pub memory_ids: Vec<i64>,
+  #[serde(rename = "type")]
+  pub kind: String,
+  pub text: String,
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub key: Option<String>,
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub layer_id: Option<i64>,
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub position: Option<i64>,
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub subject_ids: Option<Vec<i64>>,
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub subjects: Option<Vec<SubjectKey>>,
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub importance: Option<i64>,
+  /// When the merged row began to hold, and the merged ones stopped; now where none is given.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub valid_from: Option<i64>,
+  pub actor_name: String,
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub labels: Option<Labels>,
+}
+
 /// A move of a memory's status by a caller's word.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]

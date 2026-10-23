@@ -16,7 +16,7 @@ use tokio::process::{Child, ChildStdin, ChildStdout, Command};
 const PATIENCE: Duration = Duration::from_secs(30);
 
 /// The tools the plugin offers.
-const TOOLS: [&str; 21] = [
+const TOOLS: [&str; 22] = [
   "brain_brains",
   "brain_brain_add",
   "brain_subjects",
@@ -26,6 +26,7 @@ const TOOLS: [&str; 21] = [
   "brain_memories_list",
   "brain_memory_write",
   "brain_memory_read",
+  "brain_memory_merge",
   "brain_memory_version",
   "brain_memory_move",
   "brain_hits",

@@ -265,6 +265,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/brains/{brainId}/merges": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Write one memory over several live ones, superseding each of them. */
+        post: operations["mergeMemories"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/brains/{brainId}/persona": {
         parameters: {
             query?: never;
@@ -816,6 +833,35 @@ export interface components {
             validFrom: number;
             /** Format: int64 */
             validTo: number | null;
+        };
+        /**
+         * @description One row written over several live rows about the same thing: the new row starts a lineage, and each
+         *     merged row is superseded by it. Where no subjects are given, the new row is about the union of theirs;
+         *     where no importance is given, the highest of theirs.
+         */
+        MemoryMerge: {
+            actorName: string;
+            /** Format: int64 */
+            importance?: number | null;
+            key?: string | null;
+            labels?: {
+                [key: string]: string;
+            } | null;
+            /** Format: int64 */
+            layerId?: number | null;
+            /** @description The live rows merged, two or more. */
+            memoryIds: number[];
+            /** Format: int64 */
+            position?: number | null;
+            subjectIds?: number[] | null;
+            subjects?: components["schemas"]["SubjectKey"][] | null;
+            text: string;
+            type: string;
+            /**
+             * Format: int64
+             * @description When the merged row began to hold, and the merged ones stopped; now where none is given.
+             */
+            validFrom?: number | null;
         };
         /** @description A move of a memory's status by a caller's word. */
         MemoryMove: {
@@ -1844,6 +1890,36 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["MemoryVersion"];
+            };
+        };
+        responses: {
+            /** @description Created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Memory"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    mergeMemories: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                brainId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MemoryMerge"];
             };
         };
         responses: {

@@ -7,7 +7,8 @@ use std::pin::Pin;
 
 use bmo_brain_client::{
   BrainClient, BrainsQuery, ClientFailure, Confirmations, Fold, Hits, LayersQuery, MemoriesQuery,
-  MemoryMove, MemoryVersion, NewBrain, NewLayer, NewMemory, NewSubject, RecallAsk, SubjectsQuery,
+  MemoryMerge, MemoryMove, MemoryVersion, NewBrain, NewLayer, NewMemory, NewSubject, RecallAsk,
+  SubjectsQuery,
 };
 use bmo_brain_client::{Consolidated, Learning, SimilarAsk, UnconsolidatedQuery};
 use schemars::generate::SchemaGenerator;
@@ -145,6 +146,15 @@ struct VersionOf {
   version: MemoryVersion,
 }
 
+/// A brain and the merge written in it.
+#[derive(Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+struct MergeOf {
+  brain_id: i64,
+  #[serde(flatten)]
+  merge: MemoryMerge,
+}
+
 /// A memory of a brain and the move it makes.
 #[derive(Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -234,6 +244,12 @@ pub fn tools() -> Vec<BrainTool> {
          brain_id,
          memory_id,
        }| async move { client.memory(brain_id, memory_id).await },
+    ),
+    tool(
+      "brain_memory_merge",
+      "Write one memory over several live ones about the same thing, superseding each of them.",
+      "POST /brains/{brainId}/merges",
+      |client, MergeOf { brain_id, merge }| async move { client.memory_merge(brain_id, &merge).await },
     ),
     tool(
       "brain_memory_version",

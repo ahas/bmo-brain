@@ -10,9 +10,9 @@ mod wire;
 
 pub use brains::{
   Brain, BrainsQuery, Confirmations, Consolidated, ExportQuery, Fold, Folded, Hits, Injected, Layer,
-  LayerChange, LayersQuery, Learned, Learning, MemoriesQuery, Memory, MemoryMove, MemoryStatus,
-  MemoryVersion, NewBrain, NewLayer, NewMemory, NewSubject, Recall, RecallAsk, RecallChoice, RecallPart,
-  Recorded, Rules, Subject, SubjectChange, SubjectKey, SubjectRef, SubjectsQuery, TypeCount,
+  LayerChange, LayersQuery, Learned, Learning, MemoriesQuery, Memory, MemoryMerge, MemoryMove,
+  MemoryStatus, MemoryVersion, NewBrain, NewLayer, NewMemory, NewSubject, Recall, RecallAsk, RecallChoice,
+  RecallPart, Recorded, Rules, Subject, SubjectChange, SubjectKey, SubjectRef, SubjectsQuery, TypeCount,
 };
 pub use brains::{SimilarAsk, Source, UnconsolidatedQuery};
 pub use client::{Answer, BrainClient, ClientFailure};

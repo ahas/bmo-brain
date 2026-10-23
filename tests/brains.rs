@@ -5,9 +5,9 @@
 mod support;
 
 use bmo_brain_client::{
-  BrainClient, BrainsQuery, Confirmations, ExportQuery, Fold, Hits, LayersQuery, MemoriesQuery, MemoryMove,
-  MemoryStatus, MemoryVersion, NewBrain, NewLayer, NewMemory, NewSubject, RecallAsk, RecallPart,
-  SubjectKey, SubjectsQuery,
+  BrainClient, BrainsQuery, Confirmations, ExportQuery, Fold, Hits, LayersQuery, MemoriesQuery,
+  MemoryMerge, MemoryMove, MemoryStatus, MemoryVersion, NewBrain, NewLayer, NewMemory, NewSubject,
+  RecallAsk, RecallPart, SubjectKey, SubjectsQuery,
 };
 use support::{Served, labels, refused};
 
@@ -741,4 +741,97 @@ async fn a_brain_file_is_exported_and_injected_without_overwriting() {
     refused(client.inject(target, b"not a file".to_vec()).await),
     (400, "bad-request".to_owned())
   );
+}
+
+#[tokio::test]
+async fn a_merge_writes_one_row_over_several_and_supersedes_each() {
+  let served = Served::new().await;
+  let client = &served.client;
+  let brain = brain_of(client, "agent-a").await;
+  let one = client
+    .memory_add(
+      brain,
+      &NewMemory {
+        subjects: vec![subject("person", "1")],
+        importance: Some(4),
+        ..memory("sheet", "Likes the north.")
+      },
+    )
+    .await
+    .unwrap();
+  let two = client
+    .memory_add(
+      brain,
+      &NewMemory {
+        subjects: vec![subject("person", "1"), subject("room", "7")],
+        importance: Some(7),
+        ..memory("sheet", "Lives in the north.")
+      },
+    )
+    .await
+    .unwrap();
+  client
+    .hits_record(
+      brain,
+      &Hits {
+        memory_ids: vec![two.id],
+        actor_name: "reader-a".to_owned(),
+        session_key: Some("s1".to_owned()),
+        at: None,
+      },
+    )
+    .await
+    .unwrap();
+  let merged = client
+    .memory_merge(
+      brain,
+      &MemoryMerge {
+        memory_ids: vec![one.id, two.id],
+        kind: "sheet".to_owned(),
+        text: "Lives in the north and likes it.".to_owned(),
+        key: Some("north".to_owned()),
+        actor_name: "writer-b".to_owned(),
+        ..MemoryMerge::default()
+      },
+    )
+    .await
+    .unwrap();
+  assert_eq!(merged.lineage_id, merged.id);
+  assert_eq!(merged.status, MemoryStatus::Active);
+  assert_eq!(merged.importance, 7);
+  assert_eq!(merged.hits, 1);
+  assert_eq!(merged.subjects.len(), 2);
+  assert_eq!(merged.key.as_deref(), Some("north"));
+  for id in [one.id, two.id] {
+    let old = client.memory(brain, id).await.unwrap();
+    assert_eq!(old.status, MemoryStatus::Superseded);
+    assert_eq!(old.superseded_by, Some(merged.id));
+    assert_eq!(old.valid_to, Some(merged.valid_from));
+  }
+  let again = client
+    .memory_merge(
+      brain,
+      &MemoryMerge {
+        memory_ids: vec![one.id, merged.id],
+        kind: "sheet".to_owned(),
+        text: "Again".to_owned(),
+        actor_name: "writer-b".to_owned(),
+        ..MemoryMerge::default()
+      },
+    )
+    .await;
+  assert_eq!(refused(again), (409, "conflict".to_owned()));
+  let few = client
+    .memory_merge(
+      brain,
+      &MemoryMerge {
+        memory_ids: vec![merged.id],
+        kind: "sheet".to_owned(),
+        text: "Alone".to_owned(),
+        actor_name: "writer-b".to_owned(),
+        ..MemoryMerge::default()
+      },
+    )
+    .await;
+  assert_eq!(refused(few), (400, "bad-request".to_owned()));
 }

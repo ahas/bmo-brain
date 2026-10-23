@@ -4,8 +4,8 @@
 use std::collections::BTreeMap;
 
 use bmo_brain_client::{
-  Confirmations, Hits, Labels, MemoriesQuery, Memory, MemoryMove, MemoryStatus, MemoryVersion, NewMemory,
-  Page, SubjectKey, SubjectRef, TypeCount,
+  Confirmations, Hits, Labels, MemoriesQuery, Memory, MemoryMerge, MemoryMove, MemoryStatus, MemoryVersion,
+  NewMemory, Page, SubjectKey, SubjectRef, TypeCount,
 };
 use sqlx::types::Json;
 use sqlx::{FromRow, PgConnection, Postgres, QueryBuilder};
@@ -414,6 +414,145 @@ impl Store {
     link_subjects(&mut *tx, new_id, &subject_ids).await?;
     let superseded = self.member_of(&mut *tx, brain_id, id).await?;
     publish(&mut *tx, "memory.moved", Some(&event_scope(brain_id)), &superseded).await?;
+    let memory = self.member_of(&mut *tx, brain_id, new_id).await?;
+    publish(&mut *tx, "memory.written", Some(&event_scope(brain_id)), &memory).await?;
+    Ok(memory)
+  }
+
+  /// One row written over several, each merged row superseded by it.
+  pub async fn memory_merge(&self, brain_id: i64, body: &MemoryMerge) -> Held<Memory> {
+    let mut tx = self.begin().await?;
+    let memory = self.merge_in(&mut tx, brain_id, body, now()).await?;
+    self.commit(tx).await?;
+    Ok(memory)
+  }
+
+  /// A merge within a transaction: the new row starts a lineage and keeps the most the merged rows had
+  /// earned; each merged row becomes superseded, pointing at it.
+  pub(crate) async fn merge_in(
+    &self,
+    tx: &mut PgConnection,
+    brain_id: i64,
+    body: &MemoryMerge,
+    at: i64,
+  ) -> Held<Memory> {
+    given("type", &body.kind)?;
+    text("text", &body.text, TEXT_MOST)?;
+    given("actorName", &body.actor_name)?;
+    if let Some(key) = &body.key {
+      super::key("key", key)?;
+    }
+    let mut ids = body.memory_ids.clone();
+    ids.sort_unstable();
+    ids.dedup();
+    if ids.len() < 2 {
+      return Err(Fault::BadRequest("memoryIds names fewer than two memories.".to_owned()));
+    }
+    brain_of(&mut *tx, brain_id).await?;
+    if let Some(layer) = body.layer_id {
+      layer_of(&mut *tx, brain_id, layer).await?;
+    }
+    let mut merged = Vec::with_capacity(ids.len());
+    for id in &ids {
+      let row = self.row_of(&mut *tx, brain_id, *id, true).await?;
+      let status = row.status()?;
+      if !status.is_live() {
+        return Err(Fault::Conflict(format!("Memory {id} is {}; a merge takes live rows.", status.name())));
+      }
+      merged.push(row);
+    }
+    if let Some(key) = &body.key {
+      let holder: Option<i64> = sqlx::query_scalar(
+        "SELECT id FROM memories WHERE brain_id = $1 AND key = $2 AND status IN ('active', 'pending')",
+      )
+      .bind(brain_id)
+      .bind(key)
+      .fetch_optional(&mut *tx)
+      .await?;
+      if let Some(id) = holder
+        && !ids.contains(&id)
+      {
+        return Err(Fault::Conflict(format!(
+          "Memory {id} holds the key {key:?}; name it among the merged or write a version of it."
+        )));
+      }
+    }
+    let importance = match body.importance {
+      Some(_) => importance(body.importance)?,
+      None => merged.iter().map(|row| row.importance).max().unwrap_or(5),
+    };
+    let subject_ids: Vec<i64> = match (&body.subject_ids, &body.subjects) {
+      (None, None) => {
+        sqlx::query_scalar(
+          "SELECT DISTINCT subject_id FROM memory_subjects WHERE memory_id = ANY($1) ORDER BY subject_id",
+        )
+        .bind(&ids)
+        .fetch_all(&mut *tx)
+        .await?
+      }
+      (given_ids, keys) => {
+        resolve_subjects(
+          &mut *tx,
+          brain_id,
+          given_ids.as_deref().unwrap_or(&[]),
+          keys.as_deref().unwrap_or(&[]),
+          at,
+        )
+        .await?
+      }
+    };
+    let position = match body.position {
+      Some(position) => position,
+      None => next_position(&mut *tx, brain_id, body.layer_id).await?,
+    };
+    let valid_from = body.valid_from.unwrap_or(at);
+    let most_hit = merged.iter().max_by_key(|row| row.hits);
+    let hits = most_hit.map_or(0, |row| row.hits);
+    let hit_times = most_hit.map(|row| row.hit_times.clone()).unwrap_or_default();
+    let last_hit_at = merged.iter().filter_map(|row| row.last_hit_at).max();
+    let last_confirmed_at = merged.iter().filter_map(|row| row.last_confirmed_at).min();
+    let strength = merged.iter().map(|row| row.strength).fold(1.0_f64, f64::max);
+    let labels = body.labels.clone().unwrap_or_default();
+    let new_id: i64 = sqlx::query_scalar(
+      "INSERT INTO memories (brain_id, key, type, text, layer_id, position, status, lineage_id, valid_from, \
+       importance, hits, hit_times, last_hit_at, last_confirmed_at, strength, actor_name, labels, created_at) \
+       VALUES ($1, $2, $3, $4, $5, $6, 'active', 0, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) RETURNING id",
+    )
+    .bind(brain_id)
+    .bind(&body.key)
+    .bind(&body.kind)
+    .bind(&body.text)
+    .bind(body.layer_id)
+    .bind(position)
+    .bind(valid_from)
+    .bind(importance)
+    .bind(hits)
+    .bind(&hit_times)
+    .bind(last_hit_at)
+    .bind(last_confirmed_at)
+    .bind(strength)
+    .bind(&body.actor_name)
+    .bind(Json(&labels))
+    .bind(at)
+    .fetch_one(&mut *tx)
+    .await?;
+    sqlx::query("UPDATE memories SET lineage_id = id WHERE id = $1")
+      .bind(new_id)
+      .execute(&mut *tx)
+      .await?;
+    sqlx::query(
+      "UPDATE memories SET status = 'superseded', valid_to = $2, superseded_by = $3 WHERE id = ANY($1)",
+    )
+    .bind(&ids)
+    .bind(valid_from)
+    .bind(new_id)
+    .execute(&mut *tx)
+    .await?;
+    link_subjects(&mut *tx, new_id, &subject_ids).await?;
+    for id in &ids {
+      let superseded = self.member_of(&mut *tx, brain_id, *id).await?;
+      publish(&mut *tx, "memory.moved", Some(&event_scope(brain_id)), &superseded).await?;
+    }
     let memory = self.member_of(&mut *tx, brain_id, new_id).await?;
     publish(&mut *tx, "memory.written", Some(&event_scope(brain_id)), &memory).await?;
     Ok(memory)

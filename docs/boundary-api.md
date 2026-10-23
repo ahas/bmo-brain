@@ -155,6 +155,7 @@ caller's word may make:
 | `GET /memories/{memoryId}` | reads one | 200; 404 |
 | `PATCH /memories/{memoryId}` | moves its status: `status`, `actorName`, `at` (when it stopped holding, now where none) | 200; 404; 409 for a move the table does not allow |
 | `POST /memories/{memoryId}/versions` | writes a new version over a live one: `actorName` required; `text`, `type`, `layerId`, `position`, `subjectIds` or `subjects` (replacing the subjects whole), `importance`, `validFrom`, `labels`, each taken from the old version where not given | 201, the new version; the old is `superseded` with `validTo` the new one's `validFrom`; 409 over a row that is not live |
+| `POST /merges` | writes one row over several: `memoryIds` (two or more live rows), `type`, `text`, `actorName` required; `key`, `layerId`, `position`, `subjectIds` or `subjects` (the union of the merged rows' subjects where none is given), `importance` (the highest merged where none), `validFrom` (now where none), `labels`; each merged row becomes `superseded` pointing at the new one | 201, the new row; 400; 404; 409 for a row that is not live |
 | `GET /lineages/{lineageId}` | every version of a lineage, oldest first | 200, a list; 404 |
 | `POST /hits` | records a hand-out: `memoryIds`, `actorName`, `sessionKey` (which marks the rows for that session), `at` | 201, `recordedCount` |
 | `POST /confirmations` | records confirmations: `memoryIds`, `actorName`, `at`; each row's storage strength rises by the gap since its last confirmation, nothing within the same session | 201, `recordedCount` |
@@ -344,6 +345,7 @@ reads what a turn should know with `brain_recall`, writes what it learns with `b
 | `brain_memories_list` | `GET /brains/{brainId}/memories` |
 | `brain_memory_write` | `POST /brains/{brainId}/memories` |
 | `brain_memory_read` | `GET /brains/{brainId}/memories/{memoryId}` |
+| `brain_memory_merge` | `POST /brains/{brainId}/merges` |
 | `brain_memory_version` | `POST /brains/{brainId}/memories/{memoryId}/versions` |
 | `brain_memory_move` | `PATCH /brains/{brainId}/memories/{memoryId}` |
 | `brain_hits` | `POST /brains/{brainId}/hits` |

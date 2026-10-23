@@ -8,9 +8,9 @@ use std::collections::BTreeMap;
 use bmo_brain_client::{
   Brain, BrainsQuery, Confirmations, ErrorCode, Event, EventsQuery, ExportQuery, Fold, Folded, Fragment,
   FragmentKind, FragmentSwitch, FragmentsQuery, Health, Hits, Injected, Layer, LayerChange, LayersQuery,
-  MemoriesQuery, Memory, MemoryMove, MemoryVersion, NameCursor, NewBrain, NewLayer, NewMemory, NewSubject,
-  Page, Recall, RecallAsk, Recorded, ScopedMemoriesQuery, ScopedMemory, ScopedMemoryChange, Subject,
-  SubjectChange, SubjectsQuery, TypeCount, WireError,
+  MemoriesQuery, Memory, MemoryMerge, MemoryMove, MemoryVersion, NameCursor, NewBrain, NewLayer, NewMemory,
+  NewSubject, Page, Recall, RecallAsk, Recorded, ScopedMemoriesQuery, ScopedMemory, ScopedMemoryChange,
+  Subject, SubjectChange, SubjectsQuery, TypeCount, WireError,
 };
 use bmo_brain_client::{Consolidated, Learned, Learning, SimilarAsk, UnconsolidatedQuery};
 use schemars::generate::{SchemaGenerator, SchemaSettings};
@@ -413,6 +413,18 @@ fn brain_routes(g: &mut SchemaGenerator) -> Vec<Route> {
       summary: "Write a new version of a memory, superseding the one named.",
       parameters: under(g, "memoryId"),
       body: body::<MemoryVersion>(g),
+      raw_body: None,
+      answers: vec![(201, json_answer::<Memory>(g))],
+      codes: vec![BadRequest, NotFound, Conflict],
+    },
+    Route {
+      method: "post",
+      path: "/brains/{brainId}/merges",
+      id: "mergeMemories",
+      tag: "brain-memories",
+      summary: "Write one memory over several live ones, superseding each of them.",
+      parameters: brain(g),
+      body: body::<MemoryMerge>(g),
       raw_body: None,
       answers: vec![(201, json_answer::<Memory>(g))],
       codes: vec![BadRequest, NotFound, Conflict],

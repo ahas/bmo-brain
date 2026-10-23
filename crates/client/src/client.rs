@@ -6,9 +6,9 @@ use serde::de::DeserializeOwned;
 
 use crate::brains::{
   Brain, BrainsQuery, Confirmations, Consolidated, ExportQuery, Fold, Folded, Hits, Injected, Layer,
-  LayerChange, LayersQuery, Learned, Learning, MemoriesQuery, Memory, MemoryMove, MemoryVersion, NewBrain,
-  NewLayer, NewMemory, NewSubject, Recall, RecallAsk, Recorded, SimilarAsk, Subject, SubjectChange,
-  SubjectsQuery, TypeCount, UnconsolidatedQuery,
+  LayerChange, LayersQuery, Learned, Learning, MemoriesQuery, Memory, MemoryMerge, MemoryMove,
+  MemoryVersion, NewBrain, NewLayer, NewMemory, NewSubject, Recall, RecallAsk, Recorded, SimilarAsk,
+  Subject, SubjectChange, SubjectsQuery, TypeCount, UnconsolidatedQuery,
 };
 use crate::fragments::{Fragment, FragmentKind, FragmentSwitch, FragmentsQuery};
 use crate::memories::{ScopedMemoriesQuery, ScopedMemory, ScopedMemoryChange};
@@ -265,6 +265,12 @@ impl BrainClient {
     body: &MemoryVersion,
   ) -> Answer<Memory> {
     let path = ["brains", &brain_id.to_string(), "memories", &memory_id.to_string(), "versions"];
+    Self::answered(self.send(Method::POST, &path, body)).await
+  }
+
+  /// `POST /brains/{brainId}/merges`
+  pub async fn memory_merge(&self, brain_id: i64, body: &MemoryMerge) -> Answer<Memory> {
+    let path = ["brains", &brain_id.to_string(), "merges"];
     Self::answered(self.send(Method::POST, &path, body)).await
   }
 

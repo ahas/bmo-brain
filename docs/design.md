@@ -124,6 +124,12 @@ each, so a meaning does not split into two spellings.
   `status` becomes `superseded` and its `validTo` the new row's `validFrom`. The new row carries the lineage
   id. A reading hands out the newest row of a lineage that is `active`, and says for a row whose predecessor
   was superseded in the last thirty days what the previous value was and until when.
+- **A merge is one new row written over several.** Rows about the same thing, each a lineage of its own,
+  are folded into one: the new row starts a lineage, and every merged row becomes `superseded` with its
+  `supersededBy` naming the new row and its `validTo` the new row's `validFrom`. The new row takes the most
+  hits, the earliest confirmation and the highest strength among them, so a reading does not forget what
+  the pieces had earned. Nothing is deleted: each merged row stays in its own lineage, pointing at the row
+  that stands for it now.
 - **A fact that stopped holding is invalidated:** `status` `invalidated`, `validTo` the moment it stopped.
   Nothing points at a replacement. A promise kept or an errand finished is `done`, with `validTo` the moment
   it was done and the text it ended on as a new version where the writer gives one.

@@ -902,6 +902,98 @@
         ],
         "type": "object"
       },
+      "MemoryMerge": {
+        "description": "One row written over several live rows about the same thing: the new row starts a lineage, and each\nmerged row is superseded by it. Where no subjects are given, the new row is about the union of theirs;\nwhere no importance is given, the highest of theirs.",
+        "properties": {
+          "actorName": {
+            "type": "string"
+          },
+          "importance": {
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "key": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "labels": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "layerId": {
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "memoryIds": {
+            "description": "The live rows merged, two or more.",
+            "items": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "position": {
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "subjectIds": {
+            "items": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "subjects": {
+            "items": {
+              "$ref": "#/components/schemas/SubjectKey"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "text": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "validFrom": {
+            "description": "When the merged row began to hold, and the merged ones stopped; now where none is given.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "memoryIds",
+          "type",
+          "text",
+          "actorName"
+        ],
+        "type": "object"
+      },
       "MemoryMove": {
         "description": "A move of a memory's status by a caller's word.",
         "properties": {
@@ -1879,7 +1971,7 @@
   "info": {
     "description": "An agent's long-term memory as a service. The service keeps many brains, each an account's and one agent's: subjects (what a memory is about, found by type and key), layers (the table of contents) and memories, one row a version, superseded and invalidated but never deleted. A turn asks recall for a block under a token budget; a persona is rendered as the same bytes until a piece changes; a brain moves in and out as a brain file. The memory rows and fragments held under a caller's opaque scope stand for the console's screens until those read brains. Bodies are JSON with camelCase keys, times are epoch milliseconds, lists are pages of items and more, and every failure is the error shape with its status. The harness plugin's tools, each a thin call of one route, are stated under x-tools.",
     "title": "bmo-brain",
-    "version": "0.1.0-rev.13"
+    "version": "0.1.0-rev.14"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -3213,6 +3305,66 @@
           }
         },
         "summary": "Write a new version of a memory, superseding the one named.",
+        "tags": [
+          "brain-memories"
+        ],
+        "x-codes": [
+          "bad-request",
+          "unauthorized",
+          "not-found",
+          "conflict"
+        ]
+      }
+    },
+    "/brains/{brainId}/merges": {
+      "post": {
+        "operationId": "mergeMemories",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "brainId",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemoryMerge"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Memory"
+                }
+              }
+            },
+            "description": "Created."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        },
+        "summary": "Write one memory over several live ones, superseding each of them.",
         "tags": [
           "brain-memories"
         ],
@@ -4965,6 +5117,111 @@
         "$ref": "#/components/schemas/Memory"
       },
       "route": "GET /brains/{brainId}/memories/{memoryId}"
+    },
+    {
+      "description": "Write one memory over several live ones about the same thing, superseding each of them.",
+      "input": {
+        "description": "A brain and the merge written in it.",
+        "properties": {
+          "actorName": {
+            "type": "string"
+          },
+          "brainId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "importance": {
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "key": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "labels": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "layerId": {
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "memoryIds": {
+            "description": "The live rows merged, two or more.",
+            "items": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "position": {
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "subjectIds": {
+            "items": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "subjects": {
+            "items": {
+              "$ref": "#/components/schemas/SubjectKey"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "text": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "validFrom": {
+            "description": "When the merged row began to hold, and the merged ones stopped; now where none is given.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "brainId",
+          "memoryIds",
+          "type",
+          "text",
+          "actorName"
+        ],
+        "type": "object"
+      },
+      "name": "brain_memory_merge",
+      "output": {
+        "$ref": "#/components/schemas/Memory"
+      },
+      "route": "POST /brains/{brainId}/merges"
     },
     {
       "description": "Write a new version of a memory, superseding the one named.",
