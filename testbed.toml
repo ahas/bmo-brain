@@ -81,3 +81,13 @@ rm -rf tools/brain/.placed
 mkdir -p tools/brain/.placed
 cp bin/brain-tool tools/brain/tool.toml tools/brain/*.json tools/brain/.placed/
 '''
+
+# The placed tool registered with the tool host under this service's name, so every release carries its
+# tool without a hand on the registry; the host's command stands in its own deploy tree.
+[[deploy.step]]
+id = "register-brain-tool"
+phase = "after-health"
+command = '''
+set -eu
+"$HOME/.local/share/bmo-pocket/deploy/bin/bmo-pocket" put --service brain --placed --allow room.chat tools/brain/.placed
+'''

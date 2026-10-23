@@ -1,6 +1,6 @@
 {
   "name": "bmo-brain-client",
-  "version": "0.1.0-rev.11",
+  "version": "0.1.0-rev.12",
   "description": "The brain service's client, generated from its OpenAPI document: every body as a type and a typed call for every route.",
   "license": "MIT",
   "private": true,

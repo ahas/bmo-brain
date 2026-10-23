@@ -512,7 +512,8 @@ host's call protocol states.
   (`GET …/unconsolidated`), `memory_consolidated` (`POST …/consolidated`) and `brain_fold`
   (`POST …/folds`, the session key the record's `BMO_RUN_NAME`). It writes as `agent-session`.
 - **A deployment places it** in `tools/brain/.placed/` inside the release: the executable, the manifest and
-  the schemas; the tool host's registry takes that folder as the service's own tool.
+  the schemas; and once the release stays up, registers that folder with the tool host as the service's own
+  tool, so no hand touches the registry.
 
 `GET /discipline` answers `text/plain`: the discipline a chat agent's system prompt carries, how it reads and
 writes its brain every turn, the same text the skill ships as `every-turn.md`.
