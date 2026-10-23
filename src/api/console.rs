@@ -155,8 +155,8 @@ impl Bundle {
     }))
   }
 
-  /// The manifest naming this bundle.
-  pub fn manifest(&self) -> ConsoleManifest {
+  /// The manifest naming this bundle, and the other services its screen calls as the settings name them.
+  pub fn manifest(&self, calls: &[String]) -> ConsoleManifest {
     ConsoleManifest {
       name: NAME.to_owned(),
       title: format!("{NAME}.title.screen"),
@@ -172,6 +172,7 @@ impl Bundle {
       events: true,
       websocket: false,
       push_kinds: vec![],
+      calls: calls.to_vec(),
     }
   }
 
@@ -183,22 +184,28 @@ impl Bundle {
   }
 }
 
-/// The console the brain serves a bundle to: the token it calls with, and the bundle where one was built.
+/// The console the brain serves a bundle to: the token it calls with, the bundle where one was built, and the
+/// other services the screen calls through the console.
 #[derive(Debug, Clone)]
 pub struct Console {
   pub token: String,
   pub bundle: Option<Bundle>,
+  pub calls: Vec<String>,
 }
 
 impl Console {
   /// The console over its token, its bundle read from the folder; a bundle that does not read is told on the
   /// error stream and left out, so the service stands without a screen.
-  pub fn over(token: String, folder: &Path) -> Self {
+  pub fn over(token: String, folder: &Path, calls: Vec<String>) -> Self {
     let bundle = Bundle::read(folder).unwrap_or_else(|why| {
       eprintln!("bmo-brain: the console bundle in {} could not be read: {why}", folder.display());
       None
     });
-    Self { token, bundle }
+    Self {
+      token,
+      bundle,
+      calls,
+    }
   }
 }
 
@@ -228,7 +235,8 @@ fn bytes(body: Vec<u8>, headers: &[(header::HeaderName, &'static str)]) -> Respo
 
 /// `GET /console-manifest`
 pub(super) async fn manifest(State(brain): State<Brain>) -> Answer<Json<ConsoleManifest>> {
-  Ok(Json(bundle_of(&brain)?.manifest()))
+  let calls = brain.console.as_ref().map(|console| console.calls.as_slice()).unwrap_or_default();
+  Ok(Json(bundle_of(&brain)?.manifest(calls)))
 }
 
 /// `GET /console-bundle/words`

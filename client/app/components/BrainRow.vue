@@ -24,12 +24,16 @@
 
       <div class="flex flex-col gap-4 p-4">
         <div v-if="!editing">
-          <p class="text-base whitespace-pre-wrap select-text">{{ memory.text }}</p>
+          <BrainText :text="memory.text" text-class="text-base whitespace-pre-wrap select-text" />
         </div>
         <div v-else class="flex flex-col gap-3">
           <UFormField :label="t('brain.field.text')" :help="memory.type === 'episode' ? t('brain.hint.episode') : undefined">
             <UTextarea v-model="draft.text" :rows="4" autoresize class="w-full" :disabled="memory.type === 'episode'" />
           </UFormField>
+          <UFormField v-if="draftWords.english.value !== null" :label="t('brain.label.translated_english')" :help="t('brain.hint.translated_english')">
+            <UTextarea v-model="draftWords.english.value" :rows="3" autoresize class="w-full" />
+          </UFormField>
+          <p v-if="draftWords.fault.value !== null" class="text-sm text-warning">{{ t(faultKey(draftWords.fault.value)) }}</p>
           <div class="grid grid-cols-2 gap-3">
             <UFormField :label="t('brain.field.type')">
               <UInput v-model="draft.type" class="w-full" />
@@ -50,7 +54,7 @@
           <p v-if="memory.type === 'persona'" class="text-xs text-warning">{{ t("brain.hint.persona_cache") }}</p>
           <div class="flex justify-end gap-2">
             <UButton color="neutral" variant="ghost" :label="t('common.action.cancel')" @click="editing = false" />
-            <UButton :label="t('common.action.save')" :loading="busy" @click="saveEdit" />
+            <UButton :label="t('common.action.save')" :loading="busy || draftWords.busy.value" @click="saveEdit" />
           </div>
         </div>
 
@@ -133,15 +137,23 @@
           <UFormField :label="t('brain.field.reason')" :help="t('brain.hint.reason')">
             <UTextarea v-model="reason" :rows="2" autoresize class="w-full" />
           </UFormField>
+          <UFormField v-if="reasonWords.english.value !== null" :label="t('brain.label.translated_english')" :help="t('brain.hint.translated_english')">
+            <UTextarea v-model="reasonWords.english.value" :rows="2" autoresize class="w-full" />
+          </UFormField>
+          <p v-if="reasonWords.fault.value !== null" class="text-sm text-warning">{{ t(faultKey(reasonWords.fault.value)) }}</p>
           <UFormField v-if="moveTo === 'done'" :label="t('brain.field.ended_on')" :help="t('brain.hint.ended_on')">
             <UTextarea v-model="endedOn" :rows="2" autoresize class="w-full" />
           </UFormField>
+          <UFormField v-if="moveTo === 'done' && endedWords.english.value !== null" :label="t('brain.label.translated_english')" :help="t('brain.hint.translated_english')">
+            <UTextarea v-model="endedWords.english.value" :rows="2" autoresize class="w-full" />
+          </UFormField>
+          <p v-if="endedWords.fault.value !== null" class="text-sm text-warning">{{ t(faultKey(endedWords.fault.value)) }}</p>
         </div>
       </template>
       <template #footer>
         <div class="flex w-full justify-end gap-2">
           <UButton color="neutral" variant="ghost" :label="t('common.action.cancel')" @click="moving = false" />
-          <UButton :color="moveTo === 'done' ? 'primary' : 'error'" :label="moveTo === 'done' ? t('brain.action.done') : t('brain.action.invalidate')" :loading="busy" @click="move(moveTo)" />
+          <UButton :color="moveTo === 'done' ? 'primary' : 'error'" :label="moveTo === 'done' ? t('brain.action.done') : t('brain.action.invalidate')" :loading="busy || endedWords.busy.value || reasonWords.busy.value" @click="move(moveTo)" />
         </div>
       </template>
     </UModal>
@@ -151,8 +163,9 @@
 <script setup lang="ts">
 import { useIsland } from "bmo-ui/app/domain/island";
 import BrainStatus from "./BrainStatus.vue";
+import BrainText from "./BrainText.vue";
 import * as api from "../domain/brain-api";
-import { holdsHangul } from "../domain/brain-words";
+import { faultKey, useEnglishWords } from "../domain/brain-reading";
 
 import type { Layer, Memory, MemoryStatus } from "../domain/brain-api";
 
@@ -190,6 +203,11 @@ const endedOn = ref("");
 const NO_LAYER = "none";
 
 const draft = reactive({ text: "", type: "", importance: 5, layer: NO_LAYER as string, position: 0, labels: "" });
+
+// Words typed in the console's language are read into English and confirmed before a row holds them.
+const draftWords = useEnglishWords(() => draft.text);
+const endedWords = useEnglishWords(() => endedOn.value);
+const reasonWords = useEnglishWords(() => reason.value);
 
 async function read(): Promise<void> {
   failure.value = "";
@@ -286,10 +304,10 @@ async function saveEdit(): Promise<void> {
 
   if (found === null) return;
 
-  if (holdsHangul(draft.text)) {
-    island.say({ tone: "warning", title: t("brain.error.english_only") });
-    return;
-  }
+  // The text only where it changed: an unchanged text is the row's own English and is not asked for again.
+  const text = draft.text === found.text ? null : await draftWords.ready();
+
+  if (draft.text !== found.text && text === null) return;
 
   if (found.type === "persona" && !(await island.ask({ title: t("brain.hint.persona_cache"), confirm: t("common.action.save"), tone: "warning" }))) return;
 
@@ -297,7 +315,7 @@ async function saveEdit(): Promise<void> {
 
   try {
     const written = await api.writeVersion(props.brainId, found.id, {
-      text: draft.text === found.text ? null : draft.text,
+      text,
       type: draft.type === found.type ? null : draft.type,
       importance: draft.importance === found.importance ? null : draft.importance,
       layerId: draft.layer === NO_LAYER ? null : Number(draft.layer),
@@ -313,9 +331,12 @@ async function saveEdit(): Promise<void> {
       // Another writer moved the row first: the words being written stay, and the row is read again.
       island.say({ tone: "warning", title: t("brain.error.conflict") });
       const kept = { ...draft };
+      const english = draftWords.english.value;
 
       await read();
       Object.assign(draft, kept);
+      await nextTick();
+      draftWords.english.value = english;
     } else {
       island.fail(error, t("brain.error.save"));
     }
@@ -336,17 +357,17 @@ async function move(status: MemoryStatus): Promise<void> {
 
   if (found === null) return;
 
-  const words = status === "done" && endedOn.value.trim() !== "" ? endedOn.value.trim() : null;
+  // The words it ended on and the reason, each English as typed or confirmed in English; both are read at once.
+  const ending = status === "done" && endedOn.value.trim() !== "";
+  const giving = reason.value.trim() !== "";
+  const [words, why] = await Promise.all([ending ? endedWords.ready() : null, giving ? reasonWords.ready() : null]);
 
-  if (words !== null && holdsHangul(words)) {
-    island.say({ tone: "warning", title: t("brain.error.english_only") });
-    return;
-  }
+  if ((ending && words === null) || (giving && why === null)) return;
 
   busy.value = true;
 
   try {
-    const moved = await api.moveMemory(props.brainId, found.id, status, reason.value.trim() || null, words);
+    const moved = await api.moveMemory(props.brainId, found.id, status, why, words);
 
     moving.value = false;
     emit("changed");

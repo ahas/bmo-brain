@@ -34,7 +34,7 @@ plugin」).
 |---|---|---|
 | listen address | `listen` | where the service answers |
 | token | `token` | the service's bearer token, which reaches every route |
-| console | `[console]` | the console bundle (「The console bundle」), where the brain serves one: `token`, the console's bearer token, which reaches what the screen uses; `bundle`, the folder the build of `client/` wrote the module, its stylesheet and its words into, the release's `console` where none is given |
+| console | `[console]` | the console bundle (「The console bundle」), where the brain serves one: `token`, the console's bearer token, which reaches what the screen uses; `bundle`, the folder the build of `client/` wrote the module, its stylesheet and its words into, the release's `console` where none is given; `calls`, the other services the screen calls through the console, each by the service name its own manifest gives it, which the manifest names under `calls`, none where none is given |
 | database | `database` | the address of the brain's own PostgreSQL database, which holds its tables and nothing else |
 | data root | `data_root` | the data root whose `env/brain.env` the brain's tool reads the service's address and token from; the `tool-env` verb writes it |
 | rules | `[rules]` | the numbers the brain reads by (`docs/design.md`), each with a default: `budget_tokens`, `weight_relevance`, `weight_importance`, `weight_recency`, `subject_bonus`, `subject_cap`, `core_fact_cap` (the most facts of one speaker's sheet the core of a recall carries, 8), `decay`, `hit_times_kept`, `same_session_ms`, `strength_gain`, `previous_value_days`, `consolidation_threshold` |
@@ -264,8 +264,10 @@ stylesheet and its words, and guards every route the screen uses.
 
 - **The manifest** is the contract's shape: the bundle `brain`, its menu title the key `brain.title.screen`,
   its icon, its screens under `/brain`, the service `brain`, the paths of its module, its stylesheet and its
-  words, the API prefix `/`, the role `administrator`, no owner key, the event stream read and no socket, and
-  no event raised as a notice.
+  words, the API prefix `/`, the role `administrator`, no owner key, the event stream read and no socket, no
+  event raised as a notice, and under `calls` the services the configuration's `[console] calls` names. The
+  brain names no service itself: which service the screen translates through is the console's setting, and the
+  deployment names that service here so the console relays the screen's calls to it.
 - **The module and the stylesheet** are the files the build of `client/` writes into the bundle folder the
   configuration names, read when the service starts. Each is answered at `/console-bundle/` and a name
   carrying the first sixteen hexadecimal digits of the SHA-256 of its bytes, so its path changes whenever

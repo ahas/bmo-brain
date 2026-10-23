@@ -115,7 +115,7 @@ async fn serve(config: &Config) -> Result<(), String> {
   let clock = clock::stand(store.clone());
   let console = config.console.as_ref().map(|console| {
     let folder = console.bundle.clone().or_else(bundle_beside_binary).unwrap_or_default();
-    Console::over(console.token.clone(), &folder)
+    Console::over(console.token.clone(), &folder, console.calls.clone())
   });
   let brain = Brain {
     store,

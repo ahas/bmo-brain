@@ -19,16 +19,22 @@
       "open": "열기",
       "open_live": "살아 있는 버전 열기",
       "previous": "앞 버전",
+      "reading": "번역해 읽기",
       "restore": "다시 살리기",
+      "show_original": "원문 보기",
+      "show_translation": "번역 보기",
       "similar": "비슷한 기억 찾기",
       "teach": "가르치기",
       "up": "위로"
     },
     "error": {
       "conflict": "읽은 뒤에 다른 쓰는 이가 이 기억을 바꿨습니다. 새 버전을 보여 드리고, 쓰던 글은 남겨 둡니다.",
-      "english_only": "기억은 영어로 저장됩니다. 번역기가 이 화면에 닿지 않아 영어로 쓴 글만 저장할 수 있습니다.",
+      "english_only": "기억은 영어로만 저장됩니다. 영어가 아닌 글이 남아 있어 저장하지 않았습니다.",
+      "no_translator": "번역기가 이 화면에 닿지 않아 영어로 쓴 글만 저장할 수 있습니다.",
       "read": "브레인을 읽지 못했습니다.",
-      "save": "저장하지 못했습니다."
+      "save": "저장하지 못했습니다.",
+      "translate_read": "번역하지 못해 영어 원문을 보여 드립니다.",
+      "translate_write": "영어로 번역하지 못해 저장하지 않았습니다. 잠시 뒤 다시 하거나 영어로 써 주세요."
     },
     "field": {
       "consolidated": "정리",
@@ -56,14 +62,15 @@
     },
     "hint": {
       "ended_on": "적으면 이 글이 새 버전이 되고, 그 버전이 끝남으로 옮겨집니다.",
-      "english": "영어로 씁니다.",
+      "english": "영어로 저장됩니다. 한국어로 쓰면 영어로 번역해 보여 드리고, 확인한 뒤에 저장합니다.",
       "episode": "에피소드의 본문은 있었던 일 그대로라서 고칠 수 없습니다.",
       "label": "key 또는 key=value",
       "labels": "한 줄에 하나씩 key=value",
       "persona_cache": "페르소나 조각이 바뀌면 렌더링의 바이트가 바뀌어, 이 페르소나를 쓰는 프롬프트의 캐시가 한 번 새로 시작됩니다.",
       "position": "비우면 레이어의 맨 끝",
       "reason": "이유는 이 행에 남습니다.",
-      "subjects": "유형:키, 쉼표로 여럿"
+      "subjects": "유형:키, 쉼표로 여럿",
+      "translated_english": "한국어에서 번역된 영어입니다. 고칠 수 있고, 이 영어가 저장됩니다."
     },
     "index": {
       "layers": "레이어",
@@ -87,17 +94,22 @@
       "merged_in": "합쳐 들어온 행",
       "more_count": "외 {n}개",
       "order": "정렬",
+      "original": "영어 원문",
       "pieces": "조각",
       "reading": "읽는 방식",
       "rendering": "렌더링",
       "reserved": "예약",
       "retrieval": "인출 강도",
       "search": "낱말",
+      "sheet": "시트",
       "similar_count": "비슷한 기억 {n}개",
       "status": "상태",
       "strength": "저장 강도",
       "superseded_by": "대체한 버전 #{id}",
       "toolbar": "브레인 도구",
+      "translated": "번역됨",
+      "translated_english": "번역된 영어",
+      "translated_in_part": "일부만 번역됨",
       "type": "유형",
       "unfiled": "레이어 없음",
       "use": "인출 {hits}회 · 저장 강도 {strength} · 인출 강도 {retrieval} · 중요도 {importance}",
@@ -123,7 +135,8 @@
       "no_memory_open": "기억을 고르면 여기에 섭니다.",
       "nothing": "없습니다.",
       "superseded_band": "이 버전은 대체되었습니다.",
-      "timeline_empty": "기억을 고르면 그 계보가 여기에 섭니다."
+      "timeline_empty": "기억을 고르면 그 계보가 여기에 섭니다.",
+      "translating": "번역하는 중"
     },
     "status_choice": {
       "active": "활성",

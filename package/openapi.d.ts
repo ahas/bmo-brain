@@ -676,6 +676,11 @@ export interface components {
             apiPrefix: string;
             /** @description The path the module is answered at. */
             bundle: string;
+            /**
+             * @description The other services the screen calls through the console, each by the service name its own manifest gives it.
+             * @default []
+             */
+            calls: string[];
             /** @description Whether the screen reads the event stream through the console. */
             events: boolean;
             /** @description The icon drawn beside that name. */

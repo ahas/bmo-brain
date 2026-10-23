@@ -20,13 +20,13 @@
         <p v-if="current.description" class="text-sm text-muted">{{ current.description }}</p>
       </div>
 
-      <pre v-if="reading === 'rendering' && hasPersona" class="p-4 font-mono text-sm whitespace-pre-wrap select-text">{{ rendering }}</pre>
+      <BrainText v-if="reading === 'rendering' && hasPersona" :text="rendering" tag="pre" text-class="font-mono text-sm whitespace-pre-wrap select-text" class="p-4" />
 
       <template v-else>
         <ol class="flex flex-col">
           <li v-for="(piece, index) in pieces" :key="piece.id" class="flex items-start gap-2 border-b border-default px-4 py-3">
             <span class="w-8 shrink-0 text-xs text-muted tabular-nums">{{ piece.position }}</span>
-            <button type="button" class="min-w-0 flex-1 text-start text-sm whitespace-pre-wrap hover:text-primary" @click="emit('open', piece.id)">{{ piece.text }}</button>
+            <button type="button" class="min-w-0 flex-1 text-start text-sm whitespace-pre-wrap hover:text-primary" @click="emit('open', piece.id)">{{ reader.shown(piece.text) }}</button>
             <span class="shrink-0 text-xs text-muted">{{ piece.type }}</span>
             <div class="flex shrink-0 flex-col">
               <UButton size="xs" color="neutral" variant="ghost" icon="i-material-symbols-keyboard-arrow-up" :aria-label="t('brain.action.up')" :disabled="index === 0 || busy" @click="swap(index, index - 1)" />
@@ -42,7 +42,9 @@
 
 <script setup lang="ts">
 import { useIsland } from "bmo-ui/app/domain/island";
+import BrainText from "./BrainText.vue";
 import * as api from "../domain/brain-api";
+import { useReading } from "../domain/brain-reading";
 
 import type { Layer, Memory } from "../domain/brain-api";
 
@@ -52,6 +54,7 @@ const emit = defineEmits<{ layer: [id: number]; open: [id: number]; changed: [] 
 
 const { t } = useI18n();
 const island = useIsland(t);
+const reader = useReading();
 
 const pieces = ref<Memory[]>([]);
 const rendering = ref("");
@@ -81,6 +84,8 @@ async function read(): Promise<void> {
 }
 
 watch(() => [props.brainId, current.value?.id, props.changes], () => void read(), { immediate: true });
+
+watch(() => [pieces.value, reader.language.value] as const, ([shown]) => reader.want(shown.map((piece) => piece.text)), { immediate: true });
 
 // Two pieces trade places: each is written again at the other's position, as a new version.
 async function swap(from: number, to: number): Promise<void> {

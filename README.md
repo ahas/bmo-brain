@@ -27,6 +27,7 @@ fixtures or commit messages. `docs/PERSONAL-DATA.md` states the rule and the che
 | `src/` | the service's own package: its store (the brains, their subjects, layers, memories, recall and brain files, and the rows held under scopes), routes, clock, MCP server, OpenAPI document, the data move and the old archive's import |
 | `crates/` | `client/`, the crate `bmo-brain-client`, every body and member as a Rust type and one method for each route |
 | `package/` | the TypeScript package `bmo-brain-client`, generated from `docs/openapi.json`: every body as a type and a typed call for each route |
+| `client/` | the brain's screen, a Nuxt layer on bmo-ui built into the console bundle the brain serves: its pages, components, words, build and tests |
 | `migrations/` | the database's migrations, built into the binary |
 | `skills/` | `brain-harness/`, the plugin's skill |
 | `docs/` | the design, the boundary document, the OpenAPI document and the personal-data rule |

@@ -35,6 +35,10 @@ pub struct ConsoleConfig {
   /// The folder the build of `client/` wrote the bundle into; the release's `console` where none is given.
   #[serde(default)]
   pub bundle: Option<PathBuf>,
+  /// The other services the screen calls through the console, each by the service name its own manifest gives
+  /// it; none where none is given.
+  #[serde(default)]
+  pub calls: Vec<String>,
 }
 
 /// How long the health command waits on one answer.

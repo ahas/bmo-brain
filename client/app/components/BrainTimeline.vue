@@ -56,9 +56,11 @@
           <span>· {{ chosenVersion.actorName }}</span>
           <UButton size="xs" color="neutral" variant="ghost" class="ms-auto" :label="t('brain.action.open')" @click="emit('open', chosenVersion.id)" />
         </div>
-        <p class="text-sm whitespace-pre-wrap select-text">
-          <span v-for="(piece, index) in change" :key="index" :class="{ 'bg-success/20': piece.change === 'added', 'bg-error/20 line-through': piece.change === 'removed' }">{{ piece.text }}</span>
-        </p>
+        <BrainText :text="chosenVersion.text" text-class="text-sm whitespace-pre-wrap select-text">
+          <p class="text-sm whitespace-pre-wrap select-text">
+            <span v-for="(piece, index) in change" :key="index" :class="{ 'bg-success/20': piece.change === 'added', 'bg-error/20 line-through': piece.change === 'removed' }">{{ piece.text }}</span>
+          </p>
+        </BrainText>
       </div>
     </template>
   </div>
@@ -67,6 +69,7 @@
 <script setup lang="ts">
 import { useIsland } from "bmo-ui/app/domain/island";
 import BrainStatus from "./BrainStatus.vue";
+import BrainText from "./BrainText.vue";
 import * as api from "../domain/brain-api";
 import { wordChange } from "../domain/brain-words";
 

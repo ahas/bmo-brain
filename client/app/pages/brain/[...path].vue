@@ -108,10 +108,23 @@
               @click="go({ subject: null })"
             />
           </div>
-          <div class="ms-auto">
+          <div v-if="reader.offered" class="ms-auto">
+            <UButton
+              icon="i-material-symbols-translate"
+              :label="narrow ? undefined : t('brain.action.reading')"
+              :aria-label="t('brain.action.reading')"
+              :aria-pressed="translating"
+              color="neutral"
+              :variant="translating ? 'soft' : 'ghost'"
+              @click="reader.choose(translating ? ENGLISH : reader.home)"
+            />
+          </div>
+          <div :class="{ 'ms-auto': !reader.offered }">
             <UButton icon="i-material-symbols-school-outline" :label="narrow ? undefined : t('brain.action.teach')" color="neutral" variant="ghost" :aria-label="t('brain.action.teach')" :disabled="place.brainId === null" @click="teachOpen = true" />
           </div>
         </ToolBar>
+
+        <p v-if="translating && reader.failed.value" role="status" class="border-b border-default px-3 py-1.5 text-sm text-warning">{{ t("brain.error.translate_read") }}</p>
 
         <div v-if="narrow" class="relative flex min-h-0 flex-1 flex-col">
           <div class="flex min-h-0 flex-1 flex-col" :inert="place.memory !== null">
@@ -181,6 +194,7 @@ import BrainTeach from "../../components/BrainTeach.vue";
 import BrainTimeline from "../../components/BrainTimeline.vue";
 import * as api from "../../domain/brain-api";
 import { EVERY_TYPE, EVERY_TYPE_BUT_EPISODES, ORDERS, STATUS_CHOICES, filterOf, orderOf, pathOf, placeOf, queryOf } from "../../domain/brain-place";
+import { ENGLISH, useReading } from "../../domain/brain-reading";
 import { useBrainStream } from "../../domain/brain-stream";
 
 import type { Brain, Layer, Memory, Subject, Tally, TypeCount } from "../../domain/brain-api";
@@ -204,6 +218,9 @@ const router = useRouter();
 const { t } = useI18n();
 const island = useIsland(t);
 const narrow = useNarrow();
+// The reading language (docs/design.md, 「The screen」): the console's own where a translator is named.
+const reader = useReading();
+const translating = computed(() => reader.language.value !== ENGLISH);
 
 const brainList = ref<Brain[] | null>(null);
 const layerList = ref<Layer[]>([]);
@@ -532,6 +549,9 @@ const viewProps = computed(() => {
         subjectNames: subjectNames.value,
         openId: place.value.memory,
         narrow: narrow.value,
+        brainId,
+        subjectId: place.value.subject,
+        changes: changes.value,
         onOpen: openMemory,
         onMore: readMore
       };

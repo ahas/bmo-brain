@@ -232,6 +232,9 @@ pub struct ConsoleManifest {
   pub websocket: bool,
   /// The event kinds a console may raise as a notice to a reader not on the screen.
   pub push_kinds: Vec<String>,
+  /// The other services the screen calls through the console, each by the service name its own manifest gives it.
+  #[serde(default)]
+  pub calls: Vec<String>,
 }
 
 /// The console bundle's words: each locale's tree under the locale's code.

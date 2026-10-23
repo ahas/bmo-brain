@@ -642,6 +642,7 @@ async fn the_manifest_names_the_built_module_stylesheet_and_words_and_each_is_an
   let read = read_by_contract(&body);
   assert_eq!(read["role"], "administrator", "{read}");
   assert_eq!(read["apiPrefix"], "/");
+  assert_eq!(read["calls"], serde_json::json!([]));
   assert_eq!(served.client.console_manifest().await.unwrap(), manifest);
 
   let (status, body) = relayed(&served, get.clone(), &manifest.words, None).await;
@@ -655,6 +656,22 @@ async fn the_manifest_names_the_built_module_stylesheet_and_words_and_each_is_an
   let (status, body) =
     relayed(&served, get, "/console-bundle/module.0000000000000000.js", Some("administrator")).await;
   assert_eq!((status, code(&body)), (404, "not-found".to_owned()));
+}
+
+#[tokio::test]
+async fn the_manifest_names_the_services_the_settings_say_the_screen_calls() {
+  let folder = std::env::temp_dir().join(format!("brain-console-calls-{}", std::process::id()));
+  std::fs::create_dir_all(&folder).unwrap();
+  std::fs::write(folder.join("module.js"), "export default { routes: [] };\n").unwrap();
+  std::fs::write(folder.join("words.json"), r#"{"ko":{"brain":{"title":{"screen":"x"}}}}"#).unwrap();
+  let served = Served::with_bundle_calling(&folder, &["words-out"]).await;
+  std::fs::remove_dir_all(&folder).unwrap();
+
+  let (status, body) = relayed(&served, reqwest::Method::GET, "/console-manifest", None).await;
+  assert_eq!(status, 200, "{body}");
+  let manifest: bmo_brain_client::ConsoleManifest = serde_json::from_str(&body).unwrap();
+  assert_eq!(manifest.calls, vec!["words-out".to_owned()]);
+  assert_eq!(read_by_contract(&body)["calls"], serde_json::json!(["words-out"]));
 }
 
 /// The manifest read through bmo-ui's own reading of the contract, by the client's script under `bun`.

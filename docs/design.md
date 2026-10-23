@@ -364,8 +364,25 @@ console bundle contract and served by the brain itself (`docs/boundary-api.md`, 
 - **Teaching.** A person teaches through the write judgement: the screen shows the live memories most like
   the words to teach, at most ten, the person judges them as a duplicate, a strengthening, a contradiction or
   new, and one learning with the source `owner` applies it. A piece placed at a position in a layer, a
-  persona's, a lore's or a knowledge piece, is written as a memory into that layer. The brain's memories are
-  English, so the screen saves only English words while no translator reaches it, and says so.
+  persona's, a lore's or a knowledge piece, is written as a memory into that layer.
+- **The reading language.** The brain's memories and its persona are English, and the person at the screen may
+  read another language. A toggle in the toolbar chooses the reading language: the console's own locale by
+  default, or English. In a language other than English, a memory's text wherever it stands (the list, the row
+  view, the timeline, the book and the memories offered while teaching), a subject's sheet and a persona layer's
+  rendering are shown translated through the translator the console names, page by page as they are shown; each
+  translated text in the row view, the timeline, the sheet and the rendering says so and opens its English
+  original with one tap, and the toggle turns every text back to English at once. The English stands while a
+  translation is on its way, so a translation never holds the English view back, and where one fails the English
+  stays with one sentence saying so. Where the console names no translator, the toggle does not stand and the
+  screen reads English.
+- **A subject's sheet** stands folded over the memories narrowed to that subject, as the brain renders it from
+  the facts about it (「A person is a subject」), and not at all where the subject has no fact.
+- **Writing in another language.** The brain's rows stay English: no word of another script reaches a row. Words
+  typed in the console's own language to teach, to edit a text, or as a move's reason or the words a row ended on
+  are translated into English through the same translator before they are saved, and the screen shows the
+  English to confirm, with a label saying it was translated; the English, which the person may still change, is
+  what is saved. Where the translation fails or no translator is named, the screen says so in one sentence and
+  saves nothing until the words are English.
 - **The layer index** reads the persona and the lore like a book: the layers in position order, each layer's
   pieces in theirs, moved up and down as new versions. A persona layer shows its rendering, the very bytes
   the brain hands a system prompt, placeholders left as they stand, and a change to a persona piece says

@@ -135,6 +135,11 @@ export function persona(brainId: number, layer: string): Promise<string> {
   return $fetch<string>(under(brainId, "/persona"), { query: { layers: layer }, responseType: "text" });
 }
 
+// A subject's sheet as the brain renders it from the facts about it; empty where it holds none.
+export function sheet(brainId: number, subjectId: number): Promise<string> {
+  return $fetch<string>(under(brainId, `/subjects/${subjectId}/sheet`), { responseType: "text" });
+}
+
 export function exportAddress(brainId: number, layer: string): string {
   return `${under(brainId, "/export")}?layers=${encodeURIComponent(layer)}`;
 }

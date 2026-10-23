@@ -124,15 +124,20 @@ pub struct Served {
 
 impl Served {
   pub async fn new() -> Served {
-    Self::serving(None).await
+    Self::serving(None, vec![]).await
   }
 
   /// The service serving the console bundle built into this folder, where it holds one.
   pub async fn with_bundle(folder: &std::path::Path) -> Served {
-    Self::serving(Some(folder)).await
+    Self::serving(Some(folder), vec![]).await
   }
 
-  async fn serving(bundle: Option<&std::path::Path>) -> Served {
+  /// The service serving the console bundle built into this folder, its screen calling the services named.
+  pub async fn with_bundle_calling(folder: &std::path::Path, calls: &[&str]) -> Served {
+    Self::serving(Some(folder), calls.iter().map(|call| (*call).to_owned()).collect()).await
+  }
+
+  async fn serving(bundle: Option<&std::path::Path>, calls: Vec<String>) -> Served {
     let template = template().await;
     let database = format!("{COPY}{}_{}", std::process::id(), COPIES.fetch_add(1, Ordering::SeqCst));
     let mut admin = server().await;
@@ -146,10 +151,11 @@ impl Served {
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let base = format!("http://{}", listener.local_addr().unwrap());
     let console = match bundle {
-      Some(folder) => Console::over(CONSOLE_TOKEN.to_owned(), folder),
+      Some(folder) => Console::over(CONSOLE_TOKEN.to_owned(), folder, calls),
       None => Console {
         token: CONSOLE_TOKEN.to_owned(),
         bundle: None,
+        calls,
       },
     };
     let brain = Brain {

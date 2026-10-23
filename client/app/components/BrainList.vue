@@ -8,6 +8,7 @@
     </ContentSkeleton>
 
     <div v-else class="min-h-0 flex-1 overflow-y-auto">
+      <BrainSheet v-if="subjectId !== null" :brain-id="brainId" :subject-id="subjectId" :changes="changes" />
       <p v-if="failure" class="p-4 text-sm text-error">{{ failure }}</p>
       <p v-else-if="memories.length === 0" class="p-6 text-center text-sm text-muted">{{ t("brain.status.nothing") }}</p>
 
@@ -30,7 +31,7 @@
           >
             <div v-if="!narrow" class="grid grid-cols-[5.5rem_minmax(0,1fr)_6rem_5.5rem_2.5rem_6rem] items-center gap-3 text-sm">
               <span class="truncate text-muted">{{ memory.type }}</span>
-              <span class="truncate">{{ memory.text }}</span>
+              <span class="truncate" :title="reader.of(memory.text) === undefined ? undefined : memory.text">{{ reader.shown(memory.text) }}</span>
               <span class="truncate text-muted">{{ layerName(memory.layerId) }}</span>
               <BrainStatus :status="memory.status" />
               <span class="text-end tabular-nums">{{ memory.importance }}</span>
@@ -42,7 +43,7 @@
                 <BrainStatus :status="memory.status" />
                 <span class="ms-auto tabular-nums">{{ day(memory.validFrom) }}</span>
               </div>
-              <p class="line-clamp-3 text-sm">{{ memory.text }}</p>
+              <p class="line-clamp-3 text-sm">{{ reader.shown(memory.text) }}</p>
               <div v-if="memory.subjects.length > 0" class="truncate text-xs text-muted">
                 {{ memory.subjects.map((subject) => subjectNames.get(subject.id) ?? subject.key).join(" · ") }}
               </div>
@@ -59,7 +60,9 @@
 </template>
 
 <script setup lang="ts">
+import BrainSheet from "./BrainSheet.vue";
 import BrainStatus from "./BrainStatus.vue";
+import { useReading } from "../domain/brain-reading";
 
 import type { Layer, Memory } from "../domain/brain-api";
 
@@ -72,11 +75,22 @@ const props = defineProps<{
   subjectNames: Map<number, string>;
   openId: number | null;
   narrow: boolean;
+  brainId: number;
+  subjectId: number | null;
+  changes: number;
 }>();
 
 const emit = defineEmits<{ open: [id: number]; more: [] }>();
 
 const { t } = useI18n();
+const reader = useReading();
+
+// Each page's texts are asked for in the reading language as the page comes; the English stands meanwhile.
+watch(
+  () => [props.memories, reader.language.value] as const,
+  ([memories]) => reader.want((memories ?? []).map((memory) => memory.text)),
+  { immediate: true }
+);
 
 function layerName(id: number | null | undefined): string {
   if (id === null || id === undefined) return "";
