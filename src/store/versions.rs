@@ -513,6 +513,12 @@ impl Store {
     let last_confirmed_at = merged.iter().filter_map(|row| row.last_confirmed_at).min();
     let strength = merged.iter().map(|row| row.strength).fold(1.0_f64, f64::max);
     let labels = body.labels.clone().unwrap_or_default();
+    // The merged rows leave the live set first, so a key one of them held is free for the new row.
+    sqlx::query("UPDATE memories SET status = 'superseded', valid_to = $2 WHERE id = ANY($1)")
+      .bind(&ids)
+      .bind(valid_from)
+      .execute(&mut *tx)
+      .await?;
     let new_id: i64 = sqlx::query_scalar(
       "INSERT INTO memories (brain_id, key, type, text, layer_id, position, status, lineage_id, valid_from, \
        importance, hits, hit_times, last_hit_at, last_confirmed_at, strength, actor_name, labels, created_at) \
@@ -540,14 +546,11 @@ impl Store {
       .bind(new_id)
       .execute(&mut *tx)
       .await?;
-    sqlx::query(
-      "UPDATE memories SET status = 'superseded', valid_to = $2, superseded_by = $3 WHERE id = ANY($1)",
-    )
-    .bind(&ids)
-    .bind(valid_from)
-    .bind(new_id)
-    .execute(&mut *tx)
-    .await?;
+    sqlx::query("UPDATE memories SET superseded_by = $2 WHERE id = ANY($1)")
+      .bind(&ids)
+      .bind(new_id)
+      .execute(&mut *tx)
+      .await?;
     link_subjects(&mut *tx, new_id, &subject_ids).await?;
     for id in &ids {
       let superseded = self.member_of(&mut *tx, brain_id, *id).await?;

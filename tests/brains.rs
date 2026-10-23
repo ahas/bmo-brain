@@ -808,11 +808,37 @@ async fn a_merge_writes_one_row_over_several_and_supersedes_each() {
     assert_eq!(old.superseded_by, Some(merged.id));
     assert_eq!(old.valid_to, Some(merged.valid_from));
   }
+  let third = client
+    .memory_add(
+      brain,
+      &NewMemory {
+        subjects: vec![subject("person", "1")],
+        ..memory("sheet", "Also north.")
+      },
+    )
+    .await
+    .unwrap();
+  let under_held_key = client
+    .memory_merge(
+      brain,
+      &MemoryMerge {
+        memory_ids: vec![merged.id, third.id],
+        kind: "sheet".to_owned(),
+        text: "Lives in the north, likes it, and says so.".to_owned(),
+        key: Some("north".to_owned()),
+        actor_name: "writer-b".to_owned(),
+        ..MemoryMerge::default()
+      },
+    )
+    .await
+    .unwrap();
+  assert_eq!(under_held_key.key.as_deref(), Some("north"));
+  assert_eq!(client.memory(brain, merged.id).await.unwrap().superseded_by, Some(under_held_key.id));
   let again = client
     .memory_merge(
       brain,
       &MemoryMerge {
-        memory_ids: vec![one.id, merged.id],
+        memory_ids: vec![one.id, under_held_key.id],
         kind: "sheet".to_owned(),
         text: "Again".to_owned(),
         actor_name: "writer-b".to_owned(),

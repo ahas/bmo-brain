@@ -1971,7 +1971,7 @@
   "info": {
     "description": "An agent's long-term memory as a service. The service keeps many brains, each an account's and one agent's: subjects (what a memory is about, found by type and key), layers (the table of contents) and memories, one row a version, superseded and invalidated but never deleted. A turn asks recall for a block under a token budget; a persona is rendered as the same bytes until a piece changes; a brain moves in and out as a brain file. The memory rows and fragments held under a caller's opaque scope stand for the console's screens until those read brains. Bodies are JSON with camelCase keys, times are epoch milliseconds, lists are pages of items and more, and every failure is the error shape with its status. The harness plugin's tools, each a thin call of one route, are stated under x-tools.",
     "title": "bmo-brain",
-    "version": "0.1.0-rev.14"
+    "version": "0.1.0-rev.15"
   },
   "openapi": "3.1.0",
   "paths": {
