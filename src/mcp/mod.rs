@@ -19,12 +19,11 @@ use serde_json::{Map, Value};
 pub use tools::{Answered, BrainTool, ToolFailure, tools};
 
 /// What the server tells a harness of itself when it starts.
-const INSTRUCTIONS: &str = "Keeps what a harness remembers, under scopes the harness names. Read what to \
-  know for a scope with brain_knowledge and brain_memories; write what is learned with brain_memory_add and \
-  brain_note_add, and fragments of reference text with brain_fragment_put; set brain_reminder_add and \
-  brain_watch_add for what should come back at a time or once a condition holds, and read their events on the \
-  service's GET /events. Take brain_lock before editing the store at length and brain_unlock after. A failure \
-  comes back as a tool error carrying the route's status, code and sentence.";
+const INSTRUCTIONS: &str = "Keeps an agent's long-term memory as brains, one an account's and one \
+  agent's. Find or make the brain with brain_brains and brain_brain_add, read what a turn should know with \
+  brain_recall, judge what is learned with brain_similar and apply it with brain_learn, write with \
+  brain_memory_write and brain_memory_version, and close a memory with brain_memory_move. A failure comes back \
+  as a tool error carrying the route's status, code and sentence.";
 
 /// The server over the brain the client reaches.
 pub struct BrainServer {

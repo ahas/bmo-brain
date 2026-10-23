@@ -6,10 +6,8 @@ use std::future::Future;
 use std::pin::Pin;
 
 use bmo_brain_client::{
-  BrainClient, BrainsQuery, ClientFailure, Confirmations, Fold, FragmentWrite, FragmentsQuery, Hits,
-  KnowledgeQuery, LayersQuery, MemoriesQuery, MemoryMove, MemoryVersion, NewBrain, NewLayer, NewLock,
-  NewMemory, NewNote, NewReminder, NewScopedMemory, NewSubject, NewWatch, NotesQuery, RecallAsk,
-  RemindersQuery, ScopedMemoriesQuery, ScopedMemoryChange, SubjectsQuery, WatchChange, WatchesQuery,
+  BrainClient, BrainsQuery, ClientFailure, Confirmations, Fold, Hits, LayersQuery, MemoriesQuery,
+  MemoryMove, MemoryVersion, NewBrain, NewLayer, NewMemory, NewSubject, RecallAsk, SubjectsQuery,
 };
 use bmo_brain_client::{Consolidated, Learning, SimilarAsk, UnconsolidatedQuery};
 use schemars::generate::SchemaGenerator;
@@ -113,51 +111,6 @@ where
   }
 }
 
-/// What a route that answers no content answers through a tool: an empty object.
-#[derive(Serialize, JsonSchema)]
-#[schemars(inline)]
-struct Nothing {}
-
-/// One memory row, by its id.
-#[derive(Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-struct MemoryId {
-  memory_id: i64,
-}
-
-/// A row and the change to it.
-#[derive(Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-struct MemoryUpdate {
-  memory_id: i64,
-  #[serde(flatten)]
-  change: ScopedMemoryChange,
-}
-
-/// A watch and the move it makes.
-#[derive(Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-struct WatchUpdate {
-  watch_id: i64,
-  #[serde(flatten)]
-  change: WatchChange,
-}
-
-/// One reminder, by its id.
-#[derive(Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-struct ReminderId {
-  reminder_id: i64,
-}
-
-/// A fragment's key and the fragment written whole.
-#[derive(Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-struct FragmentPut {
-  fragment_key: String,
-  body: FragmentWrite,
-}
-
 /// One brain, by its id.
 #[derive(Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -209,14 +162,7 @@ struct PersonaText {
   text: String,
 }
 
-/// One lock, by its id.
-#[derive(Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-struct LockId {
-  lock_id: i64,
-}
-
-/// The tools, in the order the plugin lists them: the brains' first, then the scope routes'.
+/// The tools, in the order the plugin lists them.
 pub fn tools() -> Vec<BrainTool> {
   vec![
     tool(
@@ -380,111 +326,6 @@ pub fn tools() -> Vec<BrainTool> {
       |client, BrainId { brain_id }| async move {
         client.persona(brain_id).await.map(|text| PersonaText { text })
       },
-    ),
-    tool(
-      "brain_memories",
-      "Memory rows by scope, scope prefix, subject, kind, state, label; standing rows, rows due.",
-      "GET /memories",
-      |client, query: ScopedMemoriesQuery| async move { client.scoped_memories(&query).await },
-    ),
-    tool(
-      "brain_memory_add",
-      "Add a memory row.",
-      "POST /memories",
-      |client, body: NewScopedMemory| async move { client.scoped_memory_add(&body).await },
-    ),
-    tool(
-      "brain_memory",
-      "One memory row and the watches on it.",
-      "GET /memories/{memoryId}",
-      |client, MemoryId { memory_id }| async move { client.scoped_memory(memory_id).await },
-    ),
-    tool(
-      "brain_memory_update",
-      "Change a row: its words, or its state (done, retired, candidate, off, standing again).",
-      "PATCH /memories/{memoryId}",
-      |client, MemoryUpdate { memory_id, change }| async move {
-        client.scoped_memory_update(memory_id, &change).await
-      },
-    ),
-    tool(
-      "brain_notes",
-      "Notes by scope and subject.",
-      "GET /notes",
-      |client, query: NotesQuery| async move { client.notes(&query).await },
-    ),
-    tool("brain_note_add", "Add a note.", "POST /notes", |client, body: NewNote| async move {
-      client.note_add(&body).await
-    }),
-    tool(
-      "brain_watches",
-      "Watches by scope, setter, holder or state.",
-      "GET /watches",
-      |client, query: WatchesQuery| async move { client.watches(&query).await },
-    ),
-    tool(
-      "brain_watch_add",
-      "Set a watch.",
-      "POST /watches",
-      |client, body: NewWatch| async move { client.watch_add(&body).await },
-    ),
-    tool(
-      "brain_watch_update",
-      "Move a watch: fired (an external condition held), claimed by a holder (409 when held), ended, cancelled.",
-      "PATCH /watches/{watchId}",
-      |client, WatchUpdate { watch_id, change }| async move { client.watch_update(watch_id, &change).await },
-    ),
-    tool(
-      "brain_reminders",
-      "Reminders by scope, due before a time.",
-      "GET /reminders",
-      |client, query: RemindersQuery| async move { client.reminders(&query).await },
-    ),
-    tool(
-      "brain_reminder_add",
-      "Set a reminder; reminder.due is published at its time.",
-      "POST /reminders",
-      |client, body: NewReminder| async move { client.reminder_add(&body).await },
-    ),
-    tool(
-      "brain_reminder_cancel",
-      "Cancel a reminder.",
-      "DELETE /reminders/{reminderId}",
-      |client, ReminderId { reminder_id }| async move {
-        client.reminder_cancel(reminder_id).await.map(|()| Nothing {})
-      },
-    ),
-    tool(
-      "brain_fragments",
-      "Fragments by kind, scope, subject, library, words, state; kind=person reads person sheets.",
-      "GET /fragments",
-      |client, query: FragmentsQuery| async move { client.fragments(&query).await },
-    ),
-    tool(
-      "brain_fragment_put",
-      "Write a fragment.",
-      "PUT /fragments/{fragmentKey}",
-      |client, FragmentPut { fragment_key, body }| async move {
-        client.fragment_put(&fragment_key, &body).await
-      },
-    ),
-    tool(
-      "brain_knowledge",
-      "Knowledge for a set of scopes: fragments by slugs and kinds, and the standing rows.",
-      "GET /knowledge",
-      |client, query: KnowledgeQuery| async move { client.knowledge(&query).await },
-    ),
-    tool(
-      "brain_lock",
-      "Lock the store for editing; 409 while another holds it.",
-      "POST /locks",
-      |client, body: NewLock| async move { client.lock(&body).await },
-    ),
-    tool(
-      "brain_unlock",
-      "Let a lock go.",
-      "DELETE /locks/{lockId}",
-      |client, LockId { lock_id }| async move { client.unlock(lock_id).await.map(|()| Nothing {}) },
     ),
   ]
 }

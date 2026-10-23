@@ -1,9 +1,8 @@
-//! Memory rows, the matches a reading records on them, and notes.
+//! Memory rows, held under a caller's scope for the console's screens.
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::watches::Watch;
 use crate::wire::{Labels, Object, nullable};
 
 /// Where a row stands.
@@ -18,7 +17,7 @@ pub enum ScopedMemoryState {
   Retired,
   /// It waits for someone's approval.
   Candidate,
-  /// It is set aside, or withered.
+  /// It is set aside.
   Off,
 }
 
@@ -76,8 +75,6 @@ pub struct ScopedMemory {
   pub last_matched_at: Option<i64>,
   pub created_at: i64,
   pub changed_at: i64,
-  /// Every watch whose condition names the row.
-  pub watches: Vec<Watch>,
 }
 
 /// Which rows to list.
@@ -111,24 +108,6 @@ pub struct ScopedMemoriesQuery {
   pub limit: Option<i64>,
 }
 
-/// A row to add.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct NewScopedMemory {
-  pub scope: String,
-  #[serde(default, skip_serializing_if = "Option::is_none")]
-  pub subject_key: Option<String>,
-  pub kind: String,
-  pub text: String,
-  pub conditions: Vec<Object>,
-  pub labels: Labels,
-  #[serde(default, skip_serializing_if = "Option::is_none")]
-  pub due_at: Option<i64>,
-  /// `standing` where none is given.
-  #[serde(default, skip_serializing_if = "Option::is_none")]
-  pub state: Option<ScopedMemoryState>,
-}
-
 /// A change to a row: only the fields given change.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -143,64 +122,4 @@ pub struct ScopedMemoryChange {
   /// The moment it is due; null clears it.
   #[serde(default, deserialize_with = "nullable", skip_serializing_if = "Option::is_none")]
   pub due_at: Option<Option<i64>>,
-}
-
-/// That a reading matched rows, and what it spent.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct NewScopedMemoryMatch {
-  pub memory_ids: Vec<i64>,
-  pub actor_name: String,
-  pub spent_ms: i64,
-  pub token_count: i64,
-}
-
-/// A reading's match, as recorded.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct ScopedMemoryMatch {
-  pub id: i64,
-  pub memory_ids: Vec<i64>,
-  pub actor_name: String,
-  pub spent_ms: i64,
-  pub token_count: i64,
-  pub created_at: i64,
-}
-
-/// Something kept for a later reading.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct Note {
-  pub id: i64,
-  pub scope: String,
-  pub subject_key: Option<String>,
-  pub text: String,
-  pub actor_name: String,
-  pub created_at: i64,
-}
-
-/// Which notes to list.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct NotesQuery {
-  #[serde(skip_serializing_if = "Option::is_none")]
-  pub scope: Option<String>,
-  #[serde(skip_serializing_if = "Option::is_none")]
-  pub subject_key: Option<String>,
-  /// The last id seen.
-  #[serde(skip_serializing_if = "Option::is_none")]
-  pub after: Option<i64>,
-  #[serde(skip_serializing_if = "Option::is_none")]
-  pub limit: Option<i64>,
-}
-
-/// A note to add.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct NewNote {
-  pub scope: String,
-  #[serde(default, skip_serializing_if = "Option::is_none")]
-  pub subject_key: Option<String>,
-  pub text: String,
-  pub actor_name: String,
 }

@@ -1,27 +1,17 @@
-//! `bmo fragment` (docs/boundary-api.md, 「The command」): the fragment table and the libraries it is
-//! synced from, asked of 「Fragments」's and 「Libraries」's routes.
+//! `bmo fragment` (docs/boundary-api.md, 「The command」): the fragment table, asked of 「Fragments」's routes.
 
-use bmo_brain_client::{
-  BrainClient, Fragment, FragmentState, FragmentSwitch, FragmentWrite, FragmentsQuery, LibrarySync,
-  LibrarySyncAsk,
-};
+use bmo_brain_client::{BrainClient, Fragment, FragmentState, FragmentSwitch, FragmentsQuery};
 use clap::{Args, Subcommand};
 
-use super::{labels, labels_text, text_of};
+use super::labels_text;
 
 /// The forms `bmo fragment` takes.
 #[derive(Subcommand)]
 pub enum Word {
   /// Lists the fragments the filters name.
   List(List),
-  /// Writes one fragment whole and prints it.
-  Write(Write),
-  /// Removes one fragment.
-  Remove(Remove),
   /// Switches one fragment's state or the scopes it is off for, and prints it.
   Switch(Switch),
-  /// Brings a library's fragments in line with its documents.
-  Sync(Sync),
 }
 
 /// Which fragments to list.
@@ -36,7 +26,7 @@ pub struct List {
   /// The caller's key for what they are about.
   #[arg(long)]
   subject: Option<String>,
-  /// The library they were synced from.
+  /// The caller's name for the set they came in.
   #[arg(long)]
   library: Option<String>,
   /// Whether they are offered.
@@ -59,47 +49,6 @@ pub struct List {
   limit: Option<i64>,
 }
 
-/// A fragment written whole.
-#[derive(Args)]
-pub struct Write {
-  /// The fragment's key.
-  key: String,
-  /// The kind it names.
-  #[arg(long)]
-  kind: String,
-  /// Its text; `-` reads it from standard input.
-  #[arg(long, allow_hyphen_values = true)]
-  text: String,
-  /// The scope it is held under; every scope where none is given.
-  #[arg(long)]
-  scope: Option<String>,
-  /// The caller's key for what it is about.
-  #[arg(long)]
-  subject: Option<String>,
-  /// What it is.
-  #[arg(long)]
-  title: Option<String>,
-  /// Where the caller keeps it.
-  #[arg(long)]
-  path: Option<String>,
-  /// The library it belongs to.
-  #[arg(long)]
-  library: Option<String>,
-  /// Whether it is offered.
-  #[arg(long, value_name = "state")]
-  state: Option<String>,
-  /// A label as key=value, one flag each.
-  #[arg(long, value_name = "key=value")]
-  label: Vec<String>,
-}
-
-/// A fragment to remove.
-#[derive(Args)]
-pub struct Remove {
-  /// The fragment's key.
-  key: String,
-}
-
 /// A fragment switched.
 #[derive(Args)]
 pub struct Switch {
@@ -111,16 +60,6 @@ pub struct Switch {
   /// A scope it is switched off for, replacing the scopes it was off for; one flag each.
   #[arg(long = "off-for")]
   off_for: Vec<String>,
-}
-
-/// A library whose fragments to bring in line.
-#[derive(Args)]
-pub struct Sync {
-  /// The library's name.
-  library: String,
-  /// Only says what would change, and changes nothing.
-  #[arg(long)]
-  dry_run: bool,
 }
 
 fn state_of(name: &str) -> Result<FragmentState, String> {
@@ -152,10 +91,7 @@ pub fn line(fragment: &Fragment) -> String {
 pub async fn run(client: &BrainClient, word: Word) -> Result<Vec<String>, String> {
   match word {
     Word::List(asked) => list(client, asked).await,
-    Word::Write(asked) => write(client, asked).await,
-    Word::Remove(asked) => remove(client, asked).await,
     Word::Switch(asked) => switched(client, asked).await,
-    Word::Sync(asked) => synced(client, asked).await,
   }
 }
 
@@ -185,40 +121,6 @@ async fn list(client: &BrainClient, asked: List) -> Result<Vec<String>, String> 
   Ok(page.items.iter().map(line).collect())
 }
 
-async fn write(client: &BrainClient, asked: Write) -> Result<Vec<String>, String> {
-  let refused = |why: String| format!("fragment: {why}");
-  let labels = labels(&asked.label).map_err(refused)?;
-  let state = asked.state.as_deref().map(state_of).transpose().map_err(refused)?;
-  let text = text_of(&asked.text).map_err(refused)?;
-
-  let written = client
-    .fragment_put(
-      &asked.key,
-      &FragmentWrite {
-        kind: asked.kind,
-        text,
-        scope: asked.scope,
-        subject_key: asked.subject,
-        title: asked.title,
-        path: asked.path,
-        library_name: asked.library,
-        state,
-        switched_off: None,
-        labels: (!labels.is_empty()).then_some(labels),
-      },
-    )
-    .await
-    .map_err(|why| refused(why.to_string()))?;
-
-  Ok(vec![line(&written)])
-}
-
-async fn remove(client: &BrainClient, asked: Remove) -> Result<Vec<String>, String> {
-  client.fragment_remove(&asked.key).await.map_err(|why| format!("fragment: {why}"))?;
-
-  Ok(vec![format!("fragment: {} removed.", asked.key)])
-}
-
 async fn switched(client: &BrainClient, asked: Switch) -> Result<Vec<String>, String> {
   let refused = |why: String| format!("fragment: {why}");
   if asked.state.is_none() && asked.off_for.is_empty() {
@@ -238,36 +140,4 @@ async fn switched(client: &BrainClient, asked: Switch) -> Result<Vec<String>, St
     .map_err(|why| refused(why.to_string()))?;
 
   Ok(vec![line(&switched)])
-}
-
-async fn synced(client: &BrainClient, asked: Sync) -> Result<Vec<String>, String> {
-  let sync: LibrarySync = client
-    .library_sync(
-      &LibrarySyncAsk {
-        library_name: asked.library.clone(),
-      },
-      asked.dry_run,
-    )
-    .await
-    .map_err(|why| format!("fragment: {why}"))?;
-
-  let ending = if sync.applied { "applied" } else { "not applied" };
-  if sync.drift.is_empty() {
-    return Ok(vec![format!("fragment: {}: in line with its documents.", sync.library_name)]);
-  }
-
-  let mut lines = vec![format!("fragment: {}: {} changes, {ending}.", sync.library_name, sync.drift.len())];
-  for drift in &sync.drift {
-    lines.push(format!(
-      "fragment: {} {}",
-      drift.key,
-      match drift.change {
-        bmo_brain_client::DriftChange::Added => "added",
-        bmo_brain_client::DriftChange::Changed => "changed",
-        bmo_brain_client::DriftChange::Removed => "removed",
-        bmo_brain_client::DriftChange::Claimed => "claimed",
-      }
-    ));
-  }
-  Ok(lines)
 }

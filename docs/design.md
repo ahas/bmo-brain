@@ -275,34 +275,17 @@ Reminders, waits on events and watches are not the brain's: a wait is a tool run
 runs the thing waited for, holds it, and wakes the agent with the memory it was told to carry. The brain
 keeps the memory; the wait keeps itself.
 
-## What the brain stops holding
+## What the brain holds besides brains
 
-These members are retired once their readers have moved, each to the place
-that owns it: fragments and libraries (now memories of the reference types, in layers), notes (now
-`episode` rows), watches and reminders (now the wait tool outside the brain), session loads and session
-notes (the agency's session records) and the room-rules routes (now `rule` memories). Until a reader has
-moved,
-the old route keeps answering as its document states; a reader moves by a change of its own.
+Two members of the shape the brains replace stand, for the console alone: the memory rows held under a
+caller's opaque scope and the fragments of reference text. The console's memory and document screens read
+them, list them, move a row's state and switch a fragment; nothing adds one, and they go once those screens
+read brains (「The screen」).
 
-## The data move
-
-The store moves into this shape once, whole, with nothing lost; this table goes once the move is done:
-
-| Today | Becomes |
-|---|---|
-| a memory row's `scope` | the brain, by the agent the scope names, and the room's subject where the scope names a room |
-| a memory row's `kind` (`promise`, `check`, `followup`, `situation`, `state`) | the same word as `type` |
-| `standing` | `active`; `done` → `done` with `validTo`; `retired` and `off` → `invalidated`; `candidate` → `pending` |
-| `conditions` and `labels` | `labels`, kept whole, with the condition's words folded into the text where the row is a `situation` |
-| a fragment of kind `person` | a `sheet` row linked to the person's subject, and to the room's where the key names one |
-| a fragment of kind `library-knowledge` | a `knowledge` row in the layer named for its library |
-| a fragment of kind `room-rule` | a `rule` row linked to the room's subject |
-| a fragment's `hitCount`, `lastHitAt` | `hits`, `lastHitAt` |
-| a note | an `episode` row |
-| the brain's markdown tree under the data root: its people, knowledge, room and agent documents | memories of the matching types, each document once; a document already held as a fragment moves as that fragment |
-| a reminder or a watch | left where it stands until the wait tool outside the brain takes it over |
-| a room rule record | a `rule` row |
-| session loads and session notes | left for the agency's session records |
+Nothing else stands outside a brain. An episode is an `episode` row; a reference piece is a memory of a
+reference type in a layer; a room's rule is a `rule` memory; a wait or a reminder is the wait tool's, outside
+the brain (「What the brain acts on by itself」); a session's loaded documents and its handoff note are the
+agency's session records.
 
 ## The screen
 
@@ -333,9 +316,10 @@ The screen's design is shown to the owner before it is built.
 2. The writing: the material of the write judgement, the one call that applies it, the consolidation
    reads and marks, and the due signal in recall.
 3. The readers move: the reference selection onto recall, the room rules and sheets onto the subject routes,
-   the session records onto the agency's own; then the old routes and tables go. Once the reference
+   the session records onto the agency's own; then the old routes and tables go, all but the memory rows and
+   fragments the console reads (「What the brain holds besides brains」). Once the reference
    selection reads this structure, its training data is rebuilt on it and its decision model retrained, at
    the owner's word only, as that unit's own item.
 4. The persona and lore of each agent injected from their content repositories' exports, and the agency's
    prompt composition onto the persona rendering.
-5. The screen.
+5. The screen, and with it the memory rows and fragments go.

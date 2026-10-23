@@ -15,13 +15,11 @@ changes; a brain moves in and out as a brain file. The brain never executes and 
 
 - **A brain is keyed by `accountKey` and `agentKey`,** strings the caller gives and the brain never reads.
   Every subject, layer and memory belongs to one brain and is reached under its id.
-- **The rows held under a caller's opaque scope** — memory rows, notes, watches, reminders, fragments and
-  their libraries, locks and the caller's own records — keep answering their routes below until their
-  readers have moved to the brains. There `scope` is a string the caller writes, `subjectKey` its key for
-  who or what a member is about, `<role>Name` fields say who made or holds a member, and `labels` is the
-  caller's metadata; the brain gives none of them a meaning.
-- **Time is the one thing the brain acts on by itself:** a reminder whose moment comes and a watch whose
-  condition holds become events, and the brain's own clock prunes its event window.
+- **The memory rows and fragments held under a caller's opaque scope** stand for the console's screens
+  alone, until those screens read brains (「Memory rows」, 「Fragments」). There `scope` is a string the caller
+  wrote, `subjectKey` its key for who or what a member is about, and `labels` is the caller's metadata; the
+  brain gives none of them a meaning.
+- **Its clock is the one thing the brain acts on by itself:** it prunes the event window.
 
 ## Configuration
 
@@ -50,14 +48,12 @@ answers ready and 1 otherwise, saying why on its error stream.
 - **Auth.** Every route, `GET /health` among them, needs `Authorization: Bearer <token>`; a missing or wrong
   token is answered 401 `unauthorized`.
 - **Pages.** A list answers `{"items": [...], "more": boolean}`, oldest first by the member's `id`, and is
-  paged by `after` (the last `id` seen) and `limit` (50 where none is given, at most 500). The libraries and
-  the fragment kinds are ordered by name instead, and `after` is the last name seen.
-- **Times** are epoch milliseconds. **Ids** are signed 64-bit integers the brain assigns. A fragment and a
-  library are also keyed by a name the caller gives (`key`, `libraryName`): 1 to 200 characters, none of
-  them `/`, a control character or whitespace, and neither `.` nor `..`.
-- **Strings.** `scope` is 1 to 200 characters; `text` of a row, a note or a reminder is not blank and at
-  most 64000 characters; a fragment's text at most a million. Anything outside is answered 400
-  `bad-request`.
+  paged by `after` (the last `id` seen) and `limit` (50 where none is given, at most 500). The fragment kinds
+  are ordered by name instead, and `after` is the last name seen.
+- **Times** are epoch milliseconds. **Ids** are signed 64-bit integers the brain assigns. A fragment is also
+  keyed by the name the caller gave it, `key`.
+- **Strings.** `scope` is 1 to 200 characters; `text` of a row is not blank and at most 64000 characters.
+  Anything outside is answered 400 `bad-request`.
 
 ## Health
 
@@ -72,8 +68,8 @@ reads by. The service is ready where its database answers.
 events as a page instead.
 
 - **Narrowing:** `kinds`, a comma-separated list of kinds; `scope`, the events of members held under one
-  scope, a brain's being `brain:<id>` (an event of a member with no scope, such as a library or a lock, is
-  never narrowed in).
+  scope, a brain's being `brain:<id>` (an event of a member with no scope, such as a fragment shared by
+  every scope, is never narrowed in).
 - **Resuming:** `Last-Event-ID` or `after`. The brain keeps seven days of events; a resume from before the
   oldest it keeps is answered 410 `gone`, and the reader reads the collections again.
 - **Keeping the stream open:** a comment line every fifteen seconds.
@@ -88,19 +84,8 @@ events as a page instead.
 | `layer.changed` | a layer is added or changed | the layer |
 | `memory.written` | a version of a memory is written, first or superseding | the memory |
 | `memory.moved` | a memory's status moves | the memory |
-| `memory.created` | a row is added | the row |
-| `memory.changed` | a row's words, state, labels or due moment change, or a scope's withering moves it | the row |
-| `note.created` | a note is added | the note |
-| `watch.changed` | a watch is set, claimed, ended or cancelled | the watch |
-| `watch.fired` | a watch's condition holds, or a client fires it | the watch |
-| `reminder.created` | a reminder is set | the reminder |
-| `reminder.due` | a reminder's moment comes | the reminder |
-| `reminder.deleted` | a reminder is cancelled | `{"id"}` |
-| `fragment.changed` | a fragment is written, merged into, split out, switched or synced | the fragment |
-| `fragment.deleted` | a fragment is removed, merged away or synced away | `{"key"}` |
-| `library.changed` | a library is put | the library |
-| `lock.changed` | a lock is taken, let go or runs out | the lock |
-| `scope.changed` | a scope is marked forgotten or remembered, or let go | the scope's holding |
+| `memory.changed` | a memory row's words, state, labels or due moment change | the row |
+| `fragment.changed` | a fragment is switched | the fragment |
 
 ## Brains
 
@@ -234,12 +219,14 @@ The file is a SQLite database of the tables `brain_file` (`shape`, `exported_at`
 
 ## Memory rows
 
-The rows below are held under a caller's scope; a brain's memories are 「Brains」.
+The rows below are held under a caller's scope; a brain's memories are 「Brains」. These rows and the
+fragments stand only for the console's screens until those screens read brains (`docs/design.md`, 「What the
+brain holds besides brains」): a row is listed and changed, and none is added.
 
 A memory row is one thing to remember: `id`, `scope`, `subjectKey` (or null), `kind`, `text`, `state`,
-`conditions`, `labels`, `dueAt` (or null), `matchCount`, `lastMatchedAt` (or null), `createdAt`,
-`changedAt`, and `watches`, every watch whose condition names the row. `kind` is the caller's word for what
-the row is; the brain reads none. `conditions` is a list of the caller's objects, kept as given.
+`conditions`, `labels`, `dueAt` (or null), `matchCount`, `lastMatchedAt` (or null), `createdAt` and
+`changedAt`. `kind` is the caller's word for what the row is; the brain reads none. `conditions` is a list of
+the caller's objects, kept as given.
 
 The states, and the moves a `PATCH` may make; moving to the state a row is in already changes nothing.
 
@@ -249,206 +236,42 @@ The states, and the moves a `PATCH` may make; moving to the state a row is in al
 | `done` | what it asked is finished | `standing`, `retired` |
 | `retired` | it is no longer of use | `standing` |
 | `candidate` | it waits for someone's approval | `standing`, `retired` |
-| `off` | it is set aside, or withered | `standing`, `retired` |
+| `off` | it is set aside | `standing`, `retired` |
 
 | Route | Does | Answers |
 |---|---|---|
 | `GET /memories` | lists rows by `scope`, `scopePrefix`, `subjectKey`, `kind`, `state`, `label` (`key` for a label that is set, `key=value` for its value), `dueBefore` (a `dueAt` at or before it) and `q` (words the text holds, any case) | 200, a page |
-| `POST /memories` | adds a row: `scope`, `kind`, `text`, `conditions`, `labels` required; `subjectKey`, `dueAt`, and `state` (`standing` where none is given) | 201, the row |
-| `GET /memories/{memoryId}` | reads a row | 200, the row; 404 `not-found` |
-| `PATCH /memories/{memoryId}` | changes `text`, `state`, `labels` (replacing them whole) or `dueAt` (null clears it) | 200, the row; 404; 409 `conflict` for a move the table does not allow |
-| `POST /memory-matches` | records that a reading matched rows: `memoryIds`, `actorName`, `spentMs`, `tokenCount` | 201, the match; each row's `matchCount` grows by one and `lastMatchedAt` is set; a row that does not stand is 400 |
-
-A match is `id`, `memoryIds`, `actorName`, `spentMs`, `tokenCount` and `createdAt`.
-
-## Notes
-
-A note is something to keep for a later reading: `id`, `scope`, `subjectKey` (or null), `text`, `actorName`,
-`createdAt`. `GET /notes` lists them by `scope` and `subjectKey`; `POST /notes` adds one (`scope`, `text`,
-`actorName` required, `subjectKey`), answered 201.
-
-## A caller's records
-
-Three records keep a caller's own keys, and the brain reads no meaning into them: a room's rules, a
-session's loaded documents and a chat session's handoff note. Their routes take the caller's post bodies,
-and every failure is the common error shape: 400 `bad-request` for a blank key, a blank text or one past its
-ceiling.
-
-### Room rules
-
-A rule is one thing a caller grants in a room: `id`, the caller's key for it (1 to 200 characters, as a
-fragment's key); `subject`, a whole number; and `text`, not blank and at most 8000 characters. A rule is set
-or revoked on a message the caller names (`messageId`), and the caller checks the message's sender itself:
-the brain reads neither the room nor the message.
-
-| Route | Body | Answers |
-|---|---|---|
-| `POST /room-rules/read` | `chatId` | `rules`: each `id`, `subject`, `text`, in the order they were set |
-| `POST /room-rules/set` | `chatId`, `messageId`, `id`, `rule` (`subject`, `text`) or null to revoke | `rules`, as they now stand |
-
-### Session loads
-
-A load is a document a session was already handed in full: its `path`, the `version` read, and `at`, when it
-was read, in seconds. A path kept again takes the version it was read at.
-
-| Route | Body | Answers |
-|---|---|---|
-| `POST /sessions/loads` | `session` | `loads`: each `path`, `version`, by path |
-| `POST /sessions/loads/keep` | `session`, `loads`, `at` (now where none is given) | `ok`; sessions untouched for a week are let go at the same stroke |
-| `POST /sessions/loads/forget` | `session` | `ok` |
-
-### Chat session notes
-
-The handoff note a chat agent's folded session leaves for its next one: one per agent, the next keep
-overwriting it, read until a clear forgets it.
-
-| Route | Body | Answers |
-|---|---|---|
-| `POST /session-summary/read` | `agent` | `note`, a string or null |
-| `POST /session-summary/keep` | `agent`, `note` (not blank, at most 64000 characters) | `ok` |
-| `POST /session-summary/clear` | `agent` | `ok` |
-
-## Watches
-
-A watch waits on a condition and fires once it holds: `id`, `scope`, `condition`, `state`, `setterName`,
-`holderName` (or null), `labels`, `firedAt` (or null), `createdAt`, `changedAt`. The condition is an object
-whose `kind` says what it waits on; any other field it carries is kept as given.
-
-| `condition.kind` | Its fields | Fires |
-|---|---|---|
-| `at` | `at`, a moment | once the moment has come |
-| `memory` | `memoryId`, a row's id; `state`, one of the row states | once that row is in that state, at once where it is already |
-| `external` | `key`, the caller's string | when a client moves it to `fired` |
-
-| State | Means | May move to |
-|---|---|---|
-| `armed` | waiting on its condition | `fired`, `cancelled` |
-| `fired` | its condition held | `claimed`, `ended`, `cancelled` |
-| `claimed` | a holder is acting on it | `ended`, `cancelled` |
-| `ended` | acted on | none |
-| `cancelled` | given up | none |
-
-| Route | Does | Answers |
-|---|---|---|
-| `GET /watches` | lists by `scope`, `setterName`, `holderName`, `state` | 200, a page |
-| `POST /watches` | sets one: `scope`, `condition`, `setterName`, `labels` | 201, the watch, `armed` (or `fired` where its condition already holds); 400 for a condition of no known kind, missing its fields, or naming no row |
-| `GET /watches/{watchId}` | reads one | 200; 404 |
-| `PATCH /watches/{watchId}` | moves it: `state`, and `holderName` to claim it | 200; 404; 400 for a claim with no holder; 409 for a move the table does not allow, or a claim while another holder holds it |
-
-A claim by the holder that holds it already changes nothing. The brain fires an `at` watch on its clock,
-which looks every second, and a `memory` watch as the row it names moves.
-
-## Reminders
-
-A reminder is a moment to be told of: `id`, `scope`, `dueAt`, `text`, `labels`, `setterName`, `createdAt`,
-`firedAt` (or null). The brain publishes `reminder.due` once its moment comes, one that came while the
-service was down included, and sets `firedAt`; a reminder fires once, and a caller that wants it again sets
-another.
-
-| Route | Does | Answers |
-|---|---|---|
-| `GET /reminders` | lists by `scope`, `dueBefore` and `fired` (true or false) | 200, a page |
-| `POST /reminders` | sets one: `scope`, `dueAt`, `text`, `setterName`, `labels` | 201, the reminder |
-| `DELETE /reminders/{reminderId}` | cancels it | 204; 404 |
+| `PATCH /memories/{memoryId}` | changes `text`, `state`, `labels` (replacing them whole) or `dueAt` (null clears it) | 200, the row; 404 `not-found`; 409 `conflict` for a move the table does not allow |
 
 ## Fragments
 
 A fragment is one piece of reference text: `id`, `key`, `kind`, `scope` (or null for one shared by every
 scope), `subjectKey` (or null), `title` (or null), `path` (or null, where the caller keeps it), `text`,
-`version` (the SHA-256 of the text, in hex), `libraryName` (or null), `state` (`active` or `off`),
-`switchedOff` (the scopes it is switched off for), `labels`, `hitCount`, `lastHitAt` (or null), `createdAt`
-and `changedAt`. The key is the caller's and names it in every route.
+`version` (the SHA-256 of the text, in hex), `libraryName` (or null, the caller's name for the set it came
+in), `state` (`active` or `off`), `switchedOff` (the scopes it is switched off for), `labels`, `hitCount`,
+`lastHitAt` (or null), `createdAt` and `changedAt`. The key is the caller's and names it in every route.
+Like the memory rows, the fragments stand only for the console's screens: a fragment is listed and
+switched, and none is written.
 
 | Route | Does | Answers |
 |---|---|---|
 | `GET /fragments` | lists by `kind`, `scope`, `subjectKey`, `libraryName`, `state`, `q` (words its title or text holds, any case), `ids` (comma-separated ids) and `keys` (comma-separated keys) | 200, a page |
-| `PUT /fragments/{fragmentKey}` | writes one whole: `kind`, `text` required; `scope`, `subjectKey`, `title`, `path`, `libraryName`, `state`, `switchedOff`, `labels`; `state` and `switchedOff` left out keep what the fragment had (`active` and none for a new one) | 201 where it is new, 200 where it replaced one |
 | `PATCH /fragments/{fragmentKey}` | sets `switchedOff` (whole) and `state` | 200; 404 |
-| `DELETE /fragments/{fragmentKey}` | removes it | 204; 404 |
-| `POST /fragment-merges` | folds the fragments `keys` into the one `into`: its text the body's `text`, or the texts in the order named joined by a blank line; `title` where given; every other named fragment removed | 201, the fragment kept; 400 for no fragment to fold or one that does not stand |
-| `POST /fragment-splits` | cuts the fragment `key` into `pieces`, each `key` and `text` and any field a write takes, the rest taken from the fragment cut; the fragment cut is removed unless a piece keeps its key | 201, a page of the pieces; 400 for fewer than two pieces or a fragment that does not stand |
-| `POST /fragment-hits` | records that a reading attached fragments: `keys`, `actorName`, `scope` | 201, `recordedCount`; each fragment's `hitCount` grows by one and `lastHitAt` is set; a key that names none is passed over |
-| `GET /fragment-kinds` | the kinds: every kind a fragment or a library names, each `name` and `description` (empty where none was given) and `fragmentCount` | 200, a page by name |
-
-## Libraries
-
-A library is a named set of documents a caller keeps elsewhere and hands in whole: `name`, `documents`,
-`kinds` and `changedAt`. A document is `key`, `kind`, `scope` (or null), `subjectKey` (or null), `title` (or
-null), `path` (or null), `text` and `version`, the SHA-256 of its text in hex; `kinds` gives the words a
-reader calls each kind by, each `name` and `description`. The library is the caller's; its fragments are the
-brain's copy of it, made by a sync.
-
-| Route | Does | Answers |
-|---|---|---|
-| `GET /libraries` | lists them, with their documents | 200, a page by name |
-| `GET /libraries/{libraryName}` | reads one | 200; 404 |
-| `PUT /libraries/{libraryName}` | puts one whole: `documents` (each without `version`, which the brain reckons), `kinds` | 201 where new, 200 where it replaced one; 400 for two documents of one key |
-| `POST /library-syncs` | brings the fragments of `libraryName` in line with its documents; with `dryRun=true` only says what would change | 200, the sync; 404 for no such library |
-
-A sync is `libraryName`, `drift` and `applied`. Each drift entry is `key` and `change`: `added` (a document
-with no fragment), `changed` (a fragment whose text, version or place differs from its document), `removed`
-(a fragment of the library whose document is gone) or `claimed` (a fragment of the document's key that
-belongs to no library or to another, which the sync takes over). Applied, a fragment keeps its state,
-switches and counts; everything else comes from its document.
-
-## Knowledge
-
-`GET /knowledge` answers what a reader should know for a set of scopes: `scopes` (comma-separated,
-required), and to narrow it `slugs` (comma-separated fragment keys), `kinds` (comma-separated) and
-`subjectKey`. It answers `scopes`, the scopes asked; `fragments`, the active fragments held under one of
-them or shared, switched off for none of them, in the order `slugs` names them or else by id; and
-`memories`, the standing rows held under one of them, by id. `subjectKey` narrows both.
-
-## Locks
-
-A lock says who is editing the store. It holds nothing back: a writer that wants the store to itself takes a
-lock first and lets it go after, and every writer that keeps to that waits on the others. A lock is `id`,
-`holderName`, `reason`, `createdAt` and `expiresAt` (or null for one that stands until it is let go).
-
-| Route | Does | Answers |
-|---|---|---|
-| `GET /locks` | the locks that stand; with `waitMs` (at most ten minutes) it answers once none stands or the wait runs out | 200, a page |
-| `POST /locks` | takes the lock: `holderName`, `reason`, `ttlMs` | 201, the lock; 409 while another holder holds one; the holder holding it already has it renewed, answered 200 |
-| `DELETE /locks/{lockId}` | lets it go | 204; 404 |
-
-A lock past its `expiresAt` is let go on the brain's clock, with `lock.changed`.
-
-## Scopes
-
-What the brain holds under a scope a caller gave it is the scope's holding: `scope`, `counts` (each of
-`memories`, `memoryMatches`, `notes`, `watches`, `reminders`, `fragments`, `fragmentHits` with its count)
-and `state` (`remembered` or `forgotten`).
-
-| Route | Does | Answers |
-|---|---|---|
-| `GET /scopes/{scope}` | reads the holding | 200; 404 where nothing is held under it |
-| `PATCH /scopes/{scope}` | `state`: `forgotten`, so its rows wither, or `remembered` again | 200; 404 |
-| `DELETE /scopes/{scope}` | lets go of everything held under it; with `dryRun=true` only answers what would go | 200, the holding as it stood; 404 |
-
-**Withering.** While a scope is forgotten, the brain's clock moves each of its standing rows that no reading
-has matched for thirty days, counted from its last match or else its creation, to `off`, with
-`memory.changed`. Remembered again, nothing withers; a withered row stays `off` until a client moves it.
+| `GET /fragment-kinds` | the kinds: every kind a fragment names or the store holds a description of, each `name`, `description` (empty where none is held) and `fragmentCount` | 200, a page by name |
 
 ## The command
-
-`bmo-brain move --database <url> --account <key> --default-agent <key> [--dry-run]` moves the rows held
-under scopes into brains, subjects, layers and memories once, as `docs/design.md` 「The data move」 states: a
-brain per agent a scope names, under the account given; the fragments held under no scope and the room rules
-into the default agent's brain; a dry run counts and writes nothing; a store holding a brain already is
-refused.
 
 `bmo-brain` is the service and its command in one binary. The platform's `bmo` asks it `nouns` and hands a
 command whose leading words match a declared noun to it, the noun's words included.
 
-- **`bmo-brain nouns`** prints the nouns it carries, one a line: `memory`, `note`, `fragment`, `watch set`,
-  `watch list`, `reminder list`, `brain hold` and `brain wait`. No noun carries a mark: every command asks
-  the service's routes over HTTP, so it runs wherever the service is reachable.
+- **`bmo-brain nouns`** prints the nouns it carries, one a line: `memory` and `fragment`. No noun carries a
+  mark: every command asks the service's routes over HTTP, so it runs wherever the service is reachable.
 - **The service asked** is the one the configuration names: the file `--config` gives, else the one
   `BMO_BRAIN_CONFIG` names, else the `brain.toml` a deployment links in the directory above the binary's.
   The command reads the configuration's `listen` (an unspecified host asked at the loopback one) and
   `token`, and calls the routes through the brain's client.
 - **Moments** are given as epoch milliseconds or an RFC 3339 time, and printed as RFC 3339 in UTC to the
-  millisecond. **Labels** are given as `key=value`, one `--label` each. **A condition** is a JSON object.
+  millisecond. **Labels** are given as `key=value`, one `--label` each.
 - **`--via <road>`**, which `bmo` hands on after the noun, is taken and passed over: the brain reads no
   turn.
 - **Output** begins each member on a line, prefixed with the noun, and prints its text as it stands.
@@ -457,40 +280,21 @@ command whose leading words match a declared noun to it, the noun's words includ
 
 | Noun | Form | Route |
 |---|---|---|
-| `memory` | `add --scope <scope> --kind <kind> --text <text>` | `POST /memories` |
-| | `update <id>` | `PATCH /memories/{memoryId}` |
+| `memory` | `update <id>` | `PATCH /memories/{memoryId}` |
 | | `done <id> [--text <text>]` | `PATCH /memories/{memoryId}` |
 | | `retire <id>`, `revive <id>`, `candidate <id>` | `PATCH /memories/{memoryId}` |
 | | `list` | `GET /memories` |
-| `note` | `--scope <scope> --actor <name> [--text <text>]` | `POST /notes` |
-| `fragment` | `list`, `write <key>`, `remove <key>`, `switch <key>`, `sync <library>` | the fragment and library routes above |
-| `watch set` | `--scope <scope> --setter <name>` and one condition | `POST /watches` |
-| `watch list` | | `GET /watches` |
-| `reminder list` | `[--scope <scope>]`, or `--cancel <id>` | `GET /reminders`, `DELETE /reminders/{reminderId}` |
-| `brain hold` | `--holder <name> --reason <text> [--ttl-ms <n>]` | `POST /locks` |
-| `brain wait` | `[--wait-ms <n>]` | `GET /locks` with `waitMs` |
+| `fragment` | `list` | `GET /fragments` |
+| | `switch <key>` | `PATCH /fragments/{fragmentKey}` |
 
-- **`memory add`** takes `--scope`, `--kind` (also as `--type`) and `--text` required, then `--subject`,
-  `--condition` (one flag each, an object kept as given), `--label`, `--due` and `--state`; `--text -` reads
-  standard input. **`memory update`** takes at least one of `--text`, `--state`, `--label` (replacing the
-  labels whole), `--due` or `--no-due`. **`memory done`** moves a row to `done`, with the text it ends on
-  where `--text` gives one. **`memory list`** narrows by `--scope`, `--scope-prefix`, `--subject`, `--kind`,
-  `--state`, `--label` (`key` or `key=value`), `--due-before`, `--q`, `--after` and `--limit`.
-- **`note`** takes `--scope` and `--actor` required, then `--subject` and `--text`; with no `--text` it
-  reads standard input.
+- **`memory update`** takes at least one of `--text`, `--state`, `--label` (replacing the labels whole),
+  `--due` or `--no-due`; `--text -` reads standard input. **`memory done`** moves a row to `done`, with the
+  text it ends on where `--text` gives one. **`memory list`** narrows by `--scope`, `--scope-prefix`,
+  `--subject`, `--kind`, `--state`, `--label` (`key` or `key=value`), `--due-before`, `--q`, `--after` and
+  `--limit`.
 - **`fragment list`** narrows by `--kind`, `--scope`, `--subject`, `--library`, `--state`, `--q`, `--ids`,
-  `--keys`, `--after` and `--limit`. **`fragment write <key>`** takes `--kind` and `--text` required, then
-  `--scope`, `--subject`, `--title`, `--path`, `--library`, `--state` and `--label`. **`fragment switch
-  <key>`** takes `--state` or `--off-for` (one flag each, replacing the scopes it was off for). **`fragment
-  sync <library>`** takes `--dry-run`.
-- **`watch set`** takes exactly one condition: `--at` a moment, `--memory` a row with the `--state` it waits
-  for, or `--external` a key. **`watch list`** narrows by `--scope`, `--setter`, `--holder`, `--state`,
-  `--after` and `--limit`.
-- **`reminder list`** narrows by `--scope`, `--due-before`, `--fired` or `--waiting`, `--after` and
-  `--limit`; `--cancel <id>` cancels the reminder it names instead of listing.
-- **`brain hold`** takes `--holder` and `--reason` required, and `--ttl-ms` for how long it stands; with
-  none it stands until it is let go. **`brain wait`** waits `--wait-ms` (ten minutes where none is given)
-  for no lock to stand, and narrows with `--after` and `--limit`.
+  `--keys`, `--after` and `--limit`. **`fragment switch <key>`** takes `--state` or `--off-for` (one flag
+  each, replacing the scopes it was off for).
 
 ## Its tool
 
@@ -527,8 +331,7 @@ call of one route through the brain's client, `bmo-brain-client`, a tool of a br
 (and `memoryId`) beside the route's own fields; a failure comes back as a tool error carrying the route's
 status, code and sentence. A harness finds or makes its brain with `brain_brains` and `brain_brain_add`,
 reads what a turn should know with `brain_recall`, writes what it learns with `brain_memory_write` and
-`brain_memory_version`, and keeps the scope routes' tools for rows its callers still hold under scopes. The
-server sends no notifications.
+`brain_memory_version`. The server sends no notifications.
 
 | Tool | Route |
 |---|---|
@@ -553,23 +356,6 @@ server sends no notifications.
 | `brain_unconsolidated` | `GET /brains/{brainId}/unconsolidated` |
 | `brain_consolidated` | `POST /brains/{brainId}/consolidated` |
 | `brain_persona` | `GET /brains/{brainId}/persona` |
-| `brain_memories` | `GET /memories` |
-| `brain_memory_add` | `POST /memories` |
-| `brain_memory` | `GET /memories/{memoryId}` |
-| `brain_memory_update` | `PATCH /memories/{memoryId}` |
-| `brain_notes` | `GET /notes` |
-| `brain_note_add` | `POST /notes` |
-| `brain_watches` | `GET /watches` |
-| `brain_watch_add` | `POST /watches` |
-| `brain_watch_update` | `PATCH /watches/{watchId}` |
-| `brain_reminders` | `GET /reminders` |
-| `brain_reminder_add` | `POST /reminders` |
-| `brain_reminder_cancel` | `DELETE /reminders/{reminderId}` |
-| `brain_fragments` | `GET /fragments` |
-| `brain_fragment_put` | `PUT /fragments/{fragmentKey}` |
-| `brain_knowledge` | `GET /knowledge` |
-| `brain_lock` | `POST /locks` |
-| `brain_unlock` | `DELETE /locks/{lockId}` |
 
 ## The client
 
@@ -599,6 +385,6 @@ Every failure is the common error shape, `code` and `error`.
 | 401 | `unauthorized` | the token is missing or wrong |
 | 404 | `no-route` | no route answers this method and path |
 | 404 | `not-found` | nothing stands at the key the path names |
-| 409 | `conflict` | the member's state does not allow the change, or another holder holds the lock |
+| 409 | `conflict` | the member's state does not allow the change |
 | 410 | `gone` | an event stream resumed from before the oldest event kept |
 | 500 | `failed` | the service failed; the sentence is the failure |

@@ -1,5 +1,5 @@
 //! The harness plugin: `bmo-brain mcp --brain <url>` starts an MCP server on standard input and output that
-//! lists exactly the plugin's thirty-eight tools, and each call reaches the served brain through its client. The
+//! lists exactly the plugin's twenty-one tools, and each call reaches the served brain through its client. The
 //! command runs as its own process, spoken to over its pipes, and is taken down before each test ends.
 
 mod support;
@@ -16,7 +16,7 @@ use tokio::process::{Child, ChildStdin, ChildStdout, Command};
 const PATIENCE: Duration = Duration::from_secs(30);
 
 /// The tools the plugin offers.
-const TOOLS: [&str; 38] = [
+const TOOLS: [&str; 21] = [
   "brain_brains",
   "brain_brain_add",
   "brain_subjects",
@@ -38,23 +38,6 @@ const TOOLS: [&str; 38] = [
   "brain_unconsolidated",
   "brain_consolidated",
   "brain_persona",
-  "brain_memories",
-  "brain_memory_add",
-  "brain_memory",
-  "brain_memory_update",
-  "brain_notes",
-  "brain_note_add",
-  "brain_watches",
-  "brain_watch_add",
-  "brain_watch_update",
-  "brain_reminders",
-  "brain_reminder_add",
-  "brain_reminder_cancel",
-  "brain_fragments",
-  "brain_fragment_put",
-  "brain_knowledge",
-  "brain_lock",
-  "brain_unlock",
 ];
 
 struct Server {
@@ -152,24 +135,34 @@ async fn the_server_lists_exactly_the_plugins_tools() {
 async fn a_call_reaches_the_brain_and_a_refusal_comes_back_as_a_tool_error() {
   let served = Served::new().await;
   let mut server = Server::start(&served.base, TOKEN).await;
-  let added = server
+  let made = server
+    .call("brain_brain_add", json!({ "accountKey": "account-a", "agentKey": "agent-a" }))
+    .await;
+  assert_eq!(made["isError"], json!(false), "{made}");
+  let brain = made["structuredContent"]["id"].as_i64().unwrap();
+  let written = server
     .call(
-      "brain_memory_add",
-      json!({ "scope": "room:a", "kind": "promise", "text": "Call back", "conditions": [], "labels": {} }),
+      "brain_memory_write",
+      json!({ "brainId": brain, "type": "fact", "text": "Tea at four", "actorName": "writer-a" }),
     )
     .await;
-  assert_eq!(added["isError"], json!(false), "{added}");
-  let id = added["structuredContent"]["id"].as_i64().unwrap();
-  let updated = server.call("brain_memory_update", json!({ "memoryId": id, "state": "done" })).await;
-  assert_eq!(updated["structuredContent"]["state"], "done");
-  let listed = server.call("brain_memories", json!({ "scope": "room:a" })).await;
+  assert_eq!(written["isError"], json!(false), "{written}");
+  let id = written["structuredContent"]["id"].as_i64().unwrap();
+  let moved = server
+    .call(
+      "brain_memory_move",
+      json!({ "brainId": brain, "memoryId": id, "status": "done", "actorName": "writer-a" }),
+    )
+    .await;
+  assert_eq!(moved["structuredContent"]["status"], "done");
+  let listed = server.call("brain_memories_list", json!({ "brainId": brain })).await;
   assert_eq!(listed["structuredContent"]["items"][0]["id"], json!(id));
 
-  let missing = server.call("brain_memory", json!({ "memoryId": id + 9 })).await;
+  let missing = server.call("brain_memory_read", json!({ "brainId": brain, "memoryId": id + 9 })).await;
   assert_eq!(missing["isError"], json!(true));
   let said: Value = serde_json::from_str(missing["content"][0]["text"].as_str().unwrap()).unwrap();
   assert_eq!((said["status"].as_u64(), said["code"].as_str()), (Some(404), Some("not-found")));
-  let cancelled = server.call("brain_reminder_cancel", json!({ "reminderId": 1 })).await;
-  assert_eq!(cancelled["isError"], json!(true));
+  let unread = server.call("brain_memory_read", json!({ "brainId": "one" })).await;
+  assert_eq!(unread["isError"], json!(true));
   server.stop().await;
 }

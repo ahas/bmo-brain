@@ -2,27 +2,14 @@
 //! each noun's words, and the route its words call.
 
 pub mod fragment;
-pub mod lock;
 pub mod memory;
-pub mod note;
-pub mod reminder;
-pub mod watch;
 
 use std::io::Read as _;
 
-use bmo_brain_client::{Labels, Object};
+use bmo_brain_client::Labels;
 
 /// The nouns `bmo` dispatches to this command, each printed one a line as it asks.
-pub const NOUNS: &[&str] = &[
-  "memory",
-  "note",
-  "fragment",
-  "watch set",
-  "watch list",
-  "reminder list",
-  "brain hold",
-  "brain wait",
-];
+pub const NOUNS: &[&str] = &["memory", "fragment"];
 
 /// A moment as the command reads one: an epoch millisecond count, or an RFC 3339 time.
 pub fn moment(text: &str) -> Result<i64, String> {
@@ -60,15 +47,6 @@ pub fn labels(words: &[String]) -> Result<Labels, String> {
 /// The labels as one line writes them.
 pub fn labels_text(labels: &Labels) -> String {
   labels.iter().map(|(key, value)| format!("{key}={value}")).collect::<Vec<_>>().join(",")
-}
-
-/// The JSON object a word gives, such as a watch's condition.
-pub fn object(text: &str) -> Result<Object, String> {
-  match serde_json::from_str::<serde_json::Value>(text) {
-    Ok(serde_json::Value::Object(object)) => Ok(object),
-    Ok(_) => Err(format!("'{text}' is no JSON object")),
-    Err(why) => Err(format!("'{text}' is no JSON: {why}")),
-  }
 }
 
 /// The text a flag gives, or standard input where the flag is `-`.

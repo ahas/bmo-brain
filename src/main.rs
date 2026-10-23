@@ -58,62 +58,15 @@ enum Verb {
     #[arg(long, value_name = "dir")]
     data_root: Option<PathBuf>,
   },
-  /// Moves the old archive's exported rows and the brain tree into this store (TODO #1923).
-  Import {
-    /// The export directory the item's export hand wrote.
-    #[arg(long, value_name = "dir")]
-    export: PathBuf,
-    /// The brain repository the fragments are read from.
-    #[arg(long, value_name = "dir")]
-    brain: PathBuf,
-    /// The PostgreSQL database written.
-    #[arg(long, value_name = "url")]
-    database: String,
-    /// Reads, checks and counts everything, and writes nothing.
-    #[arg(long)]
-    dry_run: bool,
-  },
-  /// Moves the rows held under scopes into brains, subjects, layers and memories, once (docs/design.md).
-  Move {
-    /// The PostgreSQL database moved.
-    #[arg(long, value_name = "url")]
-    database: String,
-    /// The account every brain is made under.
-    #[arg(long, value_name = "key")]
-    account: String,
-    /// The agent whose brain takes the fragments held under no scope and the room rules.
-    #[arg(long, value_name = "key")]
-    default_agent: String,
-    /// Reads, counts and writes nothing.
-    #[arg(long)]
-    dry_run: bool,
-  },
   /// The memory rows.
   Memory {
     #[command(subcommand)]
     word: command::memory::Word,
   },
-  /// A note kept for a later reading.
-  Note(command::note::Asked),
-  /// The fragment table and the libraries it is synced from.
+  /// The fragment table.
   Fragment {
     #[command(subcommand)]
     word: command::fragment::Word,
-  },
-  /// The watches.
-  Watch {
-    #[command(subcommand)]
-    word: command::watch::Word,
-  },
-  /// The reminders.
-  Reminder {
-    #[command(subcommand)]
-    word: command::reminder::Word,
-  },
-  /// The locks that say who is editing the store.
-  Brain {
-    #[command(subcommand)]
-    word: command::lock::Word,
   },
 }
 
@@ -254,67 +207,11 @@ async fn main() -> ExitCode {
       },
       Err(why) => Err(why),
     },
-    Verb::Import {
-      export,
-      brain,
-      database,
-      dry_run,
-    } => match bmo_brain::import::run(&database, &export, &brain, dry_run).await {
-      Ok(report) => {
-        for moved in &report.tables {
-          println!(
-            "{} -> {}: {} exported, {} written ({})",
-            moved.source, moved.target, moved.exported, moved.written, moved.note
-          );
-        }
-        println!(
-          "{} at snapshot {} read {}: {} rows sampled, {} failures",
-          if report.dry_run { "dry run" } else { "import" },
-          report.snapshot,
-          report.read_at,
-          report.sample.checked,
-          report.sample.failures.len()
-        );
-        for failure in &report.sample.failures {
-          eprintln!("  {failure}");
-        }
-        if report.sample.failures.is_empty() {
-          Ok(())
-        } else {
-          Err("the count-and-sample compare failed".to_owned())
-        }
-      }
-      Err(why) => Err(why),
-    },
-    Verb::Move {
-      database,
-      account,
-      default_agent,
-      dry_run,
-    } => match bmo_brain::moving::run(&database, &account, &default_agent, dry_run).await {
-      Ok(moved) => {
-        println!("{moved}");
-        Ok(())
-      }
-      Err(why) => Err(why),
-    },
     Verb::Memory { word } => {
       noun(config.as_ref(), |client| async move { command::memory::run(&client, word).await }).await
     }
-    Verb::Note(asked) => {
-      noun(config.as_ref(), |client| async move { command::note::run(&client, asked).await }).await
-    }
     Verb::Fragment { word } => {
       noun(config.as_ref(), |client| async move { command::fragment::run(&client, word).await }).await
-    }
-    Verb::Watch { word } => {
-      noun(config.as_ref(), |client| async move { command::watch::run(&client, word).await }).await
-    }
-    Verb::Reminder { word } => {
-      noun(config.as_ref(), |client| async move { command::reminder::run(&client, word).await }).await
-    }
-    Verb::Brain { word } => {
-      noun(config.as_ref(), |client| async move { command::lock::run(&client, word).await }).await
     }
   };
   match ended {

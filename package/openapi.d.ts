@@ -420,23 +420,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/fragment-hits": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Record the fragments a reading attached. */
-        post: operations["createFragmentHits"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/fragment-kinds": {
         parameters: {
             query?: never;
@@ -454,40 +437,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/fragment-merges": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Merge fragments into one. */
-        post: operations["createFragmentMerge"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/fragment-splits": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Split a fragment into pieces. */
-        post: operations["createFragmentSplit"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/fragments": {
         parameters: {
             query?: never;
@@ -495,7 +444,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Fragments by kind, scope, subject, library, words, state, ids or keys; kind=person reads person sheets. */
+        /** Fragments by kind, scope, subject, library, words, state, ids or keys. */
         get: operations["listFragments"];
         put?: never;
         post?: never;
@@ -513,11 +462,9 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Write a fragment whole. */
-        put: operations["putFragment"];
+        put?: never;
         post?: never;
-        /** Remove a fragment. */
-        delete: operations["deleteFragment"];
+        delete?: never;
         options?: never;
         head?: never;
         /** Switch a fragment off or on for scopes, or set its state. */
@@ -541,110 +488,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/knowledge": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Knowledge for a set of scopes: fragments by slugs and kinds, and the standing rows. */
-        get: operations["readKnowledge"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/libraries": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** The libraries by name, each with its documents and their SHA-256 versions. */
-        get: operations["listLibraries"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/libraries/{libraryName}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** One library and its documents. */
-        get: operations["readLibrary"];
-        /** A library put whole, replacing what it said before. */
-        put: operations["putLibrary"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/library-syncs": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Bring the fragments in line with their library's documents; dryRun reports the drift. */
-        post: operations["createLibrarySync"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/locks": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Who holds the store for editing; waitMs answers once it is free. */
-        get: operations["listLocks"];
-        put?: never;
-        /** Lock the store for editing; 409 while another holds it, renewed for the holder holding it. */
-        post: operations["createLock"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/locks/{lockId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /** Let a lock go. */
-        delete: operations["deleteLock"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/memories": {
         parameters: {
             query?: never;
@@ -652,11 +495,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Memory rows by scope, scope prefix, subject, kind, state, label; standing rows, rows due. */
+        /** Memory rows by scope, scope prefix, subject, kind, state, label, due moment and words. */
         get: operations["listMemories"];
         put?: never;
-        /** Add a memory row. */
-        post: operations["createMemory"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -670,8 +512,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** One memory row and the watches on it. */
-        get: operations["readMemory"];
+        get?: never;
         put?: never;
         post?: never;
         delete?: never;
@@ -681,275 +522,10 @@ export interface paths {
         patch: operations["changeMemory"];
         trace?: never;
     };
-    "/memory-matches": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Record which rows a reading matched and what it spent. */
-        post: operations["createMemoryMatch"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/notes": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Notes by scope and subject. */
-        get: operations["listNotes"];
-        put?: never;
-        /** Add a note. */
-        post: operations["createNote"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/reminders": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Reminders by scope, due before a time, fired or waiting. */
-        get: operations["listReminders"];
-        put?: never;
-        /** Set a reminder; reminder.due is published at its time. */
-        post: operations["createReminder"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/reminders/{reminderId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /** Cancel a reminder. */
-        delete: operations["deleteReminder"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/room-rules/read": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** A room's rules, in the order they were set. */
-        post: operations["readRoomRules"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/room-rules/set": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Set or revoke one rule on a message; the room's rules as they now stand. */
-        post: operations["setRoomRule"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/scopes/{scope}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** What the service holds under a scope, counted by resource. */
-        get: operations["readScope"];
-        put?: never;
-        post?: never;
-        /** Let go of everything held under a scope; dryRun=true answers what would go. */
-        delete: operations["deleteScope"];
-        options?: never;
-        head?: never;
-        /** Mark a scope forgotten, so its rows wither, or remembered again. */
-        patch: operations["changeScope"];
-        trace?: never;
-    };
-    "/session-summary/clear": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Clear an agent's handoff note. */
-        post: operations["clearSessionNote"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/session-summary/keep": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Keep an agent's handoff note, overwriting the one it had. */
-        post: operations["keepSessionNote"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/session-summary/read": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** An agent's handoff note, or null where it left none. */
-        post: operations["readSessionNote"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/sessions/loads": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** The documents a session was handed, by path and version. */
-        post: operations["readSessionLoads"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/sessions/loads/forget": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Let a session's loads go. */
-        post: operations["forgetSessionLoads"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/sessions/loads/keep": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Keep the documents a session was handed; sessions untouched for a week are let go. */
-        post: operations["keepSessionLoads"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/watches": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Watches by scope, setter, holder or state. */
-        get: operations["listWatches"];
-        put?: never;
-        /** Set a watch. */
-        post: operations["createWatch"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/watches/{watchId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** One watch. */
-        get: operations["readWatch"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /** Move a watch: fired (an external condition held), claimed by a holder (409 when held), ended, cancelled. */
-        patch: operations["changeWatch"];
-        trace?: never;
-    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        /** @description The agent whose handoff note is read, kept or cleared. */
-        AgentAsk: {
-            agent: string;
-        };
         /** @description One agent's long-term memory, keyed by the account that owns it and the agent it belongs to. */
         Brain: {
             /** @description The account's opaque key, as the caller gives it. */
@@ -979,17 +555,6 @@ export interface components {
         Consolidated: {
             episodeIds: number[];
         };
-        /** @description That the call was done. */
-        Done: {
-            ok: boolean;
-        };
-        /** @description One fragment out of line with its library. */
-        Drift: {
-            change: components["schemas"]["DriftChange"];
-            key: string;
-        };
-        /** @description How a fragment differs from its library. */
-        DriftChange: "added" | "changed" | "removed" | "claimed";
         /** @description One event: its number, its kind, when it happened and the member it is about. */
         Event: {
             /** Format: int64 */
@@ -1039,7 +604,7 @@ export interface components {
             };
             /** Format: int64 */
             lastHitAt: number | null;
-            /** @description The library it was synced from. */
+            /** @description The caller's name for the set it came in. */
             libraryName: string | null;
             /** @description Where the caller keeps it. */
             path: string | null;
@@ -1054,20 +619,9 @@ export interface components {
             /** @description The SHA-256 of the text, in hex. */
             version: string;
         };
-        /** @description That a reading attached fragments. */
-        FragmentHits: {
-            actorName: string;
-            keys: string[];
-            scope?: string | null;
-        };
-        /** @description How many of the hits were recorded. */
-        FragmentHitsRecorded: {
-            /** Format: int64 */
-            recordedCount: number;
-        };
         /** @description A kind of fragment and the words a reader calls it by. */
         FragmentKind: {
-            /** @description Empty where none was given. */
+            /** @description Empty where the store holds none. */
             description: string;
             /** Format: int64 */
             fragmentCount: number;
@@ -1079,38 +633,11 @@ export interface components {
             /** @description Whether anything stands past the last item. */
             more: boolean;
         };
-        /** @description Fragments folded into one. */
-        FragmentMerge: {
-            /** @description The fragment kept: one of `keys`, or a new key. */
-            into: string;
-            /** @description The fragments folded, in the order their texts join. */
-            keys: string[];
-            /** @description The kept fragment's text; the texts joined by a blank line where none is given. */
-            text?: string | null;
-            title?: string | null;
-        };
         /** @description One page of a list, oldest first. */
         FragmentPage: {
             items: components["schemas"]["Fragment"][];
             /** @description Whether anything stands past the last item. */
             more: boolean;
-        };
-        /** @description One piece a fragment is cut into; every field left out is the fragment's that is cut. */
-        FragmentPiece: {
-            key: string;
-            kind?: string | null;
-            labels?: {
-                [key: string]: string;
-            } | null;
-            path?: string | null;
-            subjectKey?: string | null;
-            text: string;
-            title?: string | null;
-        };
-        /** @description A fragment cut into pieces. */
-        FragmentSplit: {
-            key: string;
-            pieces: components["schemas"]["FragmentPiece"][];
         };
         /**
          * @description Whether a fragment is offered.
@@ -1122,22 +649,6 @@ export interface components {
             state?: components["schemas"]["FragmentState"] | null;
             /** @description The scopes it is switched off for, replaced whole. */
             switchedOff?: string[] | null;
-        };
-        /** @description A fragment written whole. `state` and `switchedOff`, where not given, keep what the fragment had. */
-        FragmentWrite: {
-            kind: string;
-            labels?: {
-                [key: string]: string;
-            } | null;
-            libraryName?: string | null;
-            path?: string | null;
-            /** @description Null or left out for a fragment shared by every scope. */
-            scope?: string | null;
-            state?: components["schemas"]["FragmentState"] | null;
-            subjectKey?: string | null;
-            switchedOff?: string[] | null;
-            text: string;
-            title?: string | null;
         };
         /** @description Whether the service can answer. */
         Health: {
@@ -1167,19 +678,6 @@ export interface components {
             memoriesSuperseded: number;
             /** Format: int64 */
             subjectsAdded: number;
-        };
-        /** @description A kind's words, as a library gives them. */
-        KindWords: {
-            description: string;
-            name: string;
-        };
-        /** @description What a reader should know for a set of scopes. */
-        Knowledge: {
-            /** @description The active fragments held under one of the scopes or shared, switched off for none of them. */
-            fragments: components["schemas"]["Fragment"][];
-            /** @description The standing rows held under one of the scopes. */
-            memories: components["schemas"]["ScopedMemory"][];
-            scopes: string[];
         };
         /** @description A heading in a brain's table of contents. */
         Layer: {
@@ -1256,95 +754,6 @@ export interface components {
             subjects: components["schemas"]["SubjectKey"][];
             text: string;
             type: string;
-        };
-        /** @description A named set of documents the caller keeps elsewhere, handed in whole. */
-        Library: {
-            /** Format: int64 */
-            changedAt: number;
-            documents: components["schemas"]["LibraryDocument"][];
-            kinds: components["schemas"]["KindWords"][];
-            name: string;
-        };
-        /** @description One document of a library. */
-        LibraryDocument: {
-            /** @description The key of the fragment a sync makes of it. */
-            key: string;
-            kind: string;
-            path: string | null;
-            scope: string | null;
-            subjectKey: string | null;
-            text: string;
-            title: string | null;
-            /** @description The SHA-256 of the text, in hex. */
-            version: string;
-        };
-        /** @description One document as a library is put; the brain reckons its version. */
-        LibraryDocumentPut: {
-            key: string;
-            kind: string;
-            path?: string | null;
-            scope?: string | null;
-            subjectKey?: string | null;
-            text: string;
-            title?: string | null;
-        };
-        /** @description One page of a list, oldest first. */
-        LibraryPage: {
-            items: components["schemas"]["Library"][];
-            /** @description Whether anything stands past the last item. */
-            more: boolean;
-        };
-        /** @description A library put whole. */
-        LibraryPut: {
-            documents: components["schemas"]["LibraryDocumentPut"][];
-            /** @default [] */
-            kinds: components["schemas"]["KindWords"][];
-        };
-        /** @description What a sync found, and whether it was applied. */
-        LibrarySync: {
-            applied: boolean;
-            drift: components["schemas"]["Drift"][];
-            libraryName: string;
-        };
-        /** @description The library whose fragments to bring in line. */
-        LibrarySyncAsk: {
-            libraryName: string;
-        };
-        /** @description One document a session was handed, at the version it read. */
-        Load: {
-            path: string;
-            version: string;
-        };
-        /** @description The loads a session keeps, read at `at`. */
-        LoadsKeep: {
-            /**
-             * Format: int64
-             * @description When they were read, in seconds; now where none is given.
-             * @default null
-             */
-            at: number | null;
-            loads: components["schemas"]["Load"][];
-            session: string;
-        };
-        /** @description Who is editing the store. */
-        Lock: {
-            /** Format: int64 */
-            createdAt: number;
-            /**
-             * Format: int64
-             * @description When it runs out, or null for one that stands until it is let go.
-             */
-            expiresAt: number | null;
-            holderName: string;
-            /** Format: int64 */
-            id: number;
-            reason: string;
-        };
-        /** @description One page of a list, oldest first. */
-        LockPage: {
-            items: components["schemas"]["Lock"][];
-            /** @description Whether anything stands past the last item. */
-            more: boolean;
         };
         /** @description One memory in one version. */
         Memory: {
@@ -1467,16 +876,6 @@ export interface components {
              */
             position?: number | null;
         };
-        /** @description A lock to take. */
-        NewLock: {
-            holderName: string;
-            reason: string;
-            /**
-             * Format: int64
-             * @description How long it stands; it stands until let go where none is given.
-             */
-            ttlMs?: number | null;
-        };
         /** @description A memory to write as a first version. */
         NewMemory: {
             actorName: string;
@@ -1514,93 +913,12 @@ export interface components {
              */
             validFrom?: number | null;
         };
-        /** @description A note to add. */
-        NewNote: {
-            actorName: string;
-            scope: string;
-            subjectKey?: string | null;
-            text: string;
-        };
-        /** @description A reminder to set. */
-        NewReminder: {
-            /** Format: int64 */
-            dueAt: number;
-            labels: {
-                [key: string]: string;
-            };
-            scope: string;
-            setterName: string;
-            text: string;
-        };
-        /** @description A row to add. */
-        NewScopedMemory: {
-            conditions: {
-                [key: string]: unknown;
-            }[];
-            /** Format: int64 */
-            dueAt?: number | null;
-            kind: string;
-            labels: {
-                [key: string]: string;
-            };
-            scope: string;
-            /** @description `standing` where none is given. */
-            state?: components["schemas"]["ScopedMemoryState"] | null;
-            subjectKey?: string | null;
-            text: string;
-        };
-        /** @description That a reading matched rows, and what it spent. */
-        NewScopedMemoryMatch: {
-            actorName: string;
-            memoryIds: number[];
-            /** Format: int64 */
-            spentMs: number;
-            /** Format: int64 */
-            tokenCount: number;
-        };
         /** @description A subject to add. */
         NewSubject: {
             /** @default  */
             description: string;
             key: string;
             type: string;
-        };
-        /** @description A watch to set. */
-        NewWatch: {
-            /**
-             * @description `{"kind": "at", "at": <moment>}`, `{"kind": "memory", "memoryId": <row>, "state": <row state>}` or
-             *     `{"kind": "external", "key": <string>}`.
-             */
-            condition: {
-                [key: string]: unknown;
-            };
-            labels: {
-                [key: string]: string;
-            };
-            scope: string;
-            setterName: string;
-        };
-        /** @description Something kept for a later reading. */
-        Note: {
-            actorName: string;
-            /** Format: int64 */
-            createdAt: number;
-            /** Format: int64 */
-            id: number;
-            scope: string;
-            subjectKey: string | null;
-            text: string;
-        };
-        /** @description A handoff note kept. */
-        NoteKeep: {
-            agent: string;
-            note: string;
-        };
-        /** @description One page of a list, oldest first. */
-        NotePage: {
-            items: components["schemas"]["Note"][];
-            /** @description Whether anything stands past the last item. */
-            more: boolean;
         };
         /** @description The rendered persona, as a tool answers it. */
         PersonaText: {
@@ -1667,64 +985,6 @@ export interface components {
         Recorded: {
             /** Format: int64 */
             recordedCount: number;
-        };
-        /** @description A moment to be told of. */
-        Reminder: {
-            /** Format: int64 */
-            createdAt: number;
-            /** Format: int64 */
-            dueAt: number;
-            /**
-             * Format: int64
-             * @description When `reminder.due` was published, or null while it waits.
-             */
-            firedAt: number | null;
-            /** Format: int64 */
-            id: number;
-            labels: {
-                [key: string]: string;
-            };
-            scope: string;
-            setterName: string;
-            text: string;
-        };
-        /** @description One page of a list, oldest first. */
-        ReminderPage: {
-            items: components["schemas"]["Reminder"][];
-            /** @description Whether anything stands past the last item. */
-            more: boolean;
-        };
-        /** @description One rule a caller grants in a room: its id, the subject it is about and its words. */
-        RoomRule: {
-            id: string;
-            /** Format: int64 */
-            subject: number;
-            text: string;
-        };
-        /** @description A room's rules, in the order they were set. */
-        RoomRules: {
-            rules: components["schemas"]["RoomRule"][];
-        };
-        /** @description The room whose rules are read. */
-        RoomRulesAsk: {
-            /** Format: int64 */
-            chatId: number;
-        };
-        /** @description A rule set or revoked on a message. */
-        RuleSet: {
-            /** Format: int64 */
-            chatId: number;
-            id: string;
-            /** Format: int64 */
-            messageId: number;
-            /** @description The rule's words, or null to revoke it. */
-            rule: components["schemas"]["RuleText"] | null;
-        };
-        /** @description A rule's words, as it is set. */
-        RuleText: {
-            /** Format: int64 */
-            subject: number;
-            text: string;
         };
         /** @description The rules, key by key as the configuration writes them. */
         Rules: {
@@ -1801,35 +1061,6 @@ export interface components {
              */
             weight_relevance: number;
         };
-        /** @description A scope marked. */
-        ScopeChange: {
-            state: components["schemas"]["ScopeState"];
-        };
-        /** @description How many members of each resource stand under a scope. */
-        ScopeCounts: {
-            /** Format: int64 */
-            fragmentHits: number;
-            /** Format: int64 */
-            fragments: number;
-            /** Format: int64 */
-            memories: number;
-            /** Format: int64 */
-            memoryMatches: number;
-            /** Format: int64 */
-            notes: number;
-            /** Format: int64 */
-            reminders: number;
-            /** Format: int64 */
-            watches: number;
-        };
-        /** @description What the brain holds under one scope. */
-        ScopeHolding: {
-            counts: components["schemas"]["ScopeCounts"];
-            scope: string;
-            state: components["schemas"]["ScopeState"];
-        };
-        /** @description Whether a scope's rows wither. */
-        ScopeState: "remembered" | "forgotten";
         /** @description One thing to remember. */
         ScopedMemory: {
             /** Format: int64 */
@@ -1860,8 +1091,6 @@ export interface components {
             state: components["schemas"]["ScopedMemoryState"];
             subjectKey: string | null;
             text: string;
-            /** @description Every watch whose condition names the row. */
-            watches: components["schemas"]["Watch"][];
         };
         /** @description A change to a row: only the fields given change. */
         ScopedMemoryChange: {
@@ -1877,19 +1106,6 @@ export interface components {
             state?: components["schemas"]["ScopedMemoryState"] | null;
             text?: string | null;
         };
-        /** @description A reading's match, as recorded. */
-        ScopedMemoryMatch: {
-            actorName: string;
-            /** Format: int64 */
-            createdAt: number;
-            /** Format: int64 */
-            id: number;
-            memoryIds: number[];
-            /** Format: int64 */
-            spentMs: number;
-            /** Format: int64 */
-            tokenCount: number;
-        };
         /** @description One page of a list, oldest first. */
         ScopedMemoryPage: {
             items: components["schemas"]["ScopedMemory"][];
@@ -1898,18 +1114,6 @@ export interface components {
         };
         /** @description Where a row stands. */
         ScopedMemoryState: "standing" | "done" | "retired" | "candidate" | "off";
-        /** @description The session whose loads are read or let go. */
-        SessionAsk: {
-            session: string;
-        };
-        /** @description A session's loads, by path. */
-        SessionLoads: {
-            loads: components["schemas"]["Load"][];
-        };
-        /** @description The handoff note an agent's chat session left, or null. */
-        SessionNote: {
-            note: string | null;
-        };
         /** @description A candidate memory, whose likes the write judgement reads. */
         SimilarAsk: {
             /**
@@ -1967,45 +1171,6 @@ export interface components {
             reserved: boolean;
             type: string;
         };
-        /** @description A condition waited on, and fired once it holds. */
-        Watch: {
-            /** Format: int64 */
-            changedAt: number;
-            /**
-             * @description `kind` is `at` (with `at`, a moment), `memory` (with `memoryId` and the row `state` it waits for) or
-             *     `external` (with `key`, fired by a client); any other field is kept as given.
-             */
-            condition: {
-                [key: string]: unknown;
-            };
-            /** Format: int64 */
-            createdAt: number;
-            /** Format: int64 */
-            firedAt: number | null;
-            holderName: string | null;
-            /** Format: int64 */
-            id: number;
-            labels: {
-                [key: string]: string;
-            };
-            scope: string;
-            setterName: string;
-            state: components["schemas"]["WatchState"];
-        };
-        /** @description A watch moved on. */
-        WatchChange: {
-            /** @description The holder claiming it; required with `claimed`. */
-            holderName?: string | null;
-            state: components["schemas"]["WatchState"];
-        };
-        /** @description One page of a list, oldest first. */
-        WatchPage: {
-            items: components["schemas"]["Watch"][];
-            /** @description Whether anything stands past the last item. */
-            more: boolean;
-        };
-        /** @description Where a watch stands. */
-        WatchState: "armed" | "fired" | "claimed" | "ended" | "cancelled";
         /** @description Every failure: its code and an English sentence saying what went wrong. */
         WireError: {
             /** @description The code, kebab-case. */
@@ -2024,7 +1189,7 @@ export interface components {
                 "application/json": components["schemas"]["WireError"];
             };
         };
-        /** @description `conflict`: the member's state does not allow the change, or another holder holds the lock */
+        /** @description `conflict`: the member's state does not allow the change */
         Conflict: {
             headers: {
                 [name: string]: unknown;
@@ -3015,32 +2180,6 @@ export interface operations {
             410: components["responses"]["Gone"];
         };
     };
-    createFragmentHits: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["FragmentHits"];
-            };
-        };
-        responses: {
-            /** @description Created. */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["FragmentHitsRecorded"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-        };
-    };
     listFragmentKinds: {
         parameters: {
             query?: {
@@ -3062,58 +2201,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FragmentKindPage"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-        };
-    };
-    createFragmentMerge: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["FragmentMerge"];
-            };
-        };
-        responses: {
-            /** @description Created. */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Fragment"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-        };
-    };
-    createFragmentSplit: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["FragmentSplit"];
-            };
-        };
-        responses: {
-            /** @description Created. */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["FragmentPage"];
                 };
             };
             400: components["responses"]["BadRequest"];
@@ -3155,65 +2242,6 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
-        };
-    };
-    putFragment: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                fragmentKey: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["FragmentWrite"];
-            };
-        };
-        responses: {
-            /** @description Answered. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Fragment"];
-                };
-            };
-            /** @description Created. */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Fragment"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-        };
-    };
-    deleteFragment: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                fragmentKey: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Done; no content. */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            401: components["responses"]["Unauthorized"];
-            404: components["responses"]["NotFound"];
         };
     };
     changeFragment: {
@@ -3266,241 +2294,6 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
         };
     };
-    readKnowledge: {
-        parameters: {
-            query: {
-                /** @description Comma-separated fragment kinds. */
-                kinds?: string | null;
-                /** @description Comma-separated scopes. */
-                scopes: string;
-                /** @description Comma-separated fragment keys. */
-                slugs?: string | null;
-                subjectKey?: string | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Answered. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Knowledge"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-        };
-    };
-    listLibraries: {
-        parameters: {
-            query?: {
-                /** @description The last name seen; the page begins after it. */
-                after?: string | null;
-                /** @description How many items at most: 50 where none is given, at most 500. */
-                limit?: number | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Answered. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LibraryPage"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-        };
-    };
-    readLibrary: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                libraryName: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Answered. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Library"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            404: components["responses"]["NotFound"];
-        };
-    };
-    putLibrary: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                libraryName: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["LibraryPut"];
-            };
-        };
-        responses: {
-            /** @description Answered. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Library"];
-                };
-            };
-            /** @description Created. */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Library"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-        };
-    };
-    createLibrarySync: {
-        parameters: {
-            query?: {
-                /** @description True answers what would happen and changes nothing. */
-                dryRun?: boolean | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["LibrarySyncAsk"];
-            };
-        };
-        responses: {
-            /** @description Answered. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LibrarySync"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            404: components["responses"]["NotFound"];
-        };
-    };
-    listLocks: {
-        parameters: {
-            query?: {
-                /** @description The last id seen. */
-                after?: number | null;
-                limit?: number | null;
-                /** @description Answer once no lock stands, or once this many milliseconds have passed (at most ten minutes). */
-                waitMs?: number | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Answered. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LockPage"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-        };
-    };
-    createLock: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["NewLock"];
-            };
-        };
-        responses: {
-            /** @description Answered. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Lock"];
-                };
-            };
-            /** @description Created. */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Lock"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            409: components["responses"]["Conflict"];
-        };
-    };
-    deleteLock: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                lockId: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Done; no content. */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            404: components["responses"]["NotFound"];
-        };
-    };
     listMemories: {
         parameters: {
             query?: {
@@ -3539,57 +2332,6 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
         };
     };
-    createMemory: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["NewScopedMemory"];
-            };
-        };
-        responses: {
-            /** @description Created. */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ScopedMemory"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-        };
-    };
-    readMemory: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                memoryId: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Answered. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ScopedMemory"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            404: components["responses"]["NotFound"];
-        };
-    };
     changeMemory: {
         parameters: {
             query?: never;
@@ -3612,567 +2354,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ScopedMemory"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-        };
-    };
-    createMemoryMatch: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["NewScopedMemoryMatch"];
-            };
-        };
-        responses: {
-            /** @description Created. */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ScopedMemoryMatch"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-        };
-    };
-    listNotes: {
-        parameters: {
-            query?: {
-                /** @description The last id seen. */
-                after?: number | null;
-                limit?: number | null;
-                scope?: string | null;
-                subjectKey?: string | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Answered. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["NotePage"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-        };
-    };
-    createNote: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["NewNote"];
-            };
-        };
-        responses: {
-            /** @description Created. */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Note"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-        };
-    };
-    listReminders: {
-        parameters: {
-            query?: {
-                /** @description The last id seen. */
-                after?: number | null;
-                /** @description Reminders due at or before this moment. */
-                dueBefore?: number | null;
-                /** @description True for the ones fired, false for the ones still waiting. */
-                fired?: boolean | null;
-                limit?: number | null;
-                scope?: string | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Answered. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ReminderPage"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-        };
-    };
-    createReminder: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["NewReminder"];
-            };
-        };
-        responses: {
-            /** @description Created. */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Reminder"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-        };
-    };
-    deleteReminder: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                reminderId: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Done; no content. */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            404: components["responses"]["NotFound"];
-        };
-    };
-    readRoomRules: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RoomRulesAsk"];
-            };
-        };
-        responses: {
-            /** @description Answered. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RoomRules"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-        };
-    };
-    setRoomRule: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RuleSet"];
-            };
-        };
-        responses: {
-            /** @description Answered. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RoomRules"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-        };
-    };
-    readScope: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                scope: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Answered. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ScopeHolding"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            404: components["responses"]["NotFound"];
-        };
-    };
-    deleteScope: {
-        parameters: {
-            query?: {
-                /** @description True answers what would happen and changes nothing. */
-                dryRun?: boolean | null;
-            };
-            header?: never;
-            path: {
-                scope: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Answered. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ScopeHolding"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            404: components["responses"]["NotFound"];
-        };
-    };
-    changeScope: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                scope: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ScopeChange"];
-            };
-        };
-        responses: {
-            /** @description Answered. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ScopeHolding"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            404: components["responses"]["NotFound"];
-        };
-    };
-    clearSessionNote: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["AgentAsk"];
-            };
-        };
-        responses: {
-            /** @description Answered. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Done"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-        };
-    };
-    keepSessionNote: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["NoteKeep"];
-            };
-        };
-        responses: {
-            /** @description Answered. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Done"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-        };
-    };
-    readSessionNote: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["AgentAsk"];
-            };
-        };
-        responses: {
-            /** @description Answered. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SessionNote"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-        };
-    };
-    readSessionLoads: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SessionAsk"];
-            };
-        };
-        responses: {
-            /** @description Answered. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SessionLoads"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-        };
-    };
-    forgetSessionLoads: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SessionAsk"];
-            };
-        };
-        responses: {
-            /** @description Answered. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Done"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-        };
-    };
-    keepSessionLoads: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["LoadsKeep"];
-            };
-        };
-        responses: {
-            /** @description Answered. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Done"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-        };
-    };
-    listWatches: {
-        parameters: {
-            query?: {
-                /** @description The last id seen. */
-                after?: number | null;
-                holderName?: string | null;
-                limit?: number | null;
-                scope?: string | null;
-                setterName?: string | null;
-                state?: components["schemas"]["WatchState"] | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Answered. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["WatchPage"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-        };
-    };
-    createWatch: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["NewWatch"];
-            };
-        };
-        responses: {
-            /** @description Created. */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Watch"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-        };
-    };
-    readWatch: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                watchId: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Answered. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Watch"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            404: components["responses"]["NotFound"];
-        };
-    };
-    changeWatch: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                watchId: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["WatchChange"];
-            };
-        };
-        responses: {
-            /** @description Answered. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Watch"];
                 };
             };
             400: components["responses"]["BadRequest"];

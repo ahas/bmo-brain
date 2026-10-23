@@ -5,19 +5,18 @@ mod support;
 
 use std::time::Duration;
 
-use bmo_brain::clock::slow;
+use bmo_brain::clock::pass;
 use bmo_brain::store::events::WINDOW_MS;
 use bmo_brain::store::now;
-use bmo_brain_client::{EventsQuery, NewNote};
+use bmo_brain_client::{EventsQuery, NewBrain};
 use futures_util::StreamExt;
 use support::{Served, TOKEN, refused};
 
-fn note(scope: &str) -> NewNote {
-  NewNote {
-    scope: scope.into(),
-    subject_key: None,
-    text: "Something to keep".into(),
-    actor_name: "writer-a".into(),
+fn brain(agent: &str) -> NewBrain {
+  NewBrain {
+    account_key: "account-a".into(),
+    agent_key: agent.into(),
+    name: None,
   }
 }
 
@@ -25,8 +24,8 @@ fn note(scope: &str) -> NewNote {
 async fn the_page_reads_events_past_a_cursor_narrowed_by_kind_and_scope() {
   let served = Served::new().await;
   let client = &served.client;
-  let first = client.note_add(&note("room:a")).await.unwrap();
-  client.note_add(&note("room:b")).await.unwrap();
+  let first = client.brain_add(&brain("agent-a")).await.unwrap();
+  let second = client.brain_add(&brain("agent-b")).await.unwrap();
 
   let all = client.events(&EventsQuery::default()).await.unwrap();
   assert_eq!(all.items.len(), 2);
@@ -41,7 +40,7 @@ async fn the_page_reads_events_past_a_cursor_narrowed_by_kind_and_scope() {
   assert_eq!(past.items, all.items[1..]);
   let of_scope = client
     .events(&EventsQuery {
-      scope: Some("room:b".into()),
+      scope: Some(format!("brain:{}", second.id)),
       ..Default::default()
     })
     .await
@@ -49,7 +48,7 @@ async fn the_page_reads_events_past_a_cursor_narrowed_by_kind_and_scope() {
   assert_eq!(of_scope.items, all.items[1..]);
   let of_kind = client
     .events(&EventsQuery {
-      kinds: Some("memory.created".into()),
+      kinds: Some("memory.changed".into()),
       ..Default::default()
     })
     .await
@@ -60,8 +59,8 @@ async fn the_page_reads_events_past_a_cursor_narrowed_by_kind_and_scope() {
 #[tokio::test]
 async fn a_resume_from_before_the_window_is_gone() {
   let served = Served::new().await;
-  served.client.note_add(&note("room:a")).await.unwrap();
-  slow(&served.store, now() + WINDOW_MS + 1_000).await.unwrap();
+  served.client.brain_add(&brain("agent-a")).await.unwrap();
+  pass(&served.store, now() + WINDOW_MS + 1_000).await.unwrap();
   assert_eq!(
     refused(
       served
@@ -79,7 +78,7 @@ async fn a_resume_from_before_the_window_is_gone() {
 #[tokio::test]
 async fn the_stream_hands_over_each_event_with_its_kind_and_number() {
   let served = Served::new().await;
-  let first = served.client.note_add(&note("room:a")).await.unwrap();
+  let first = served.client.brain_add(&brain("agent-a")).await.unwrap();
   let answer = reqwest::Client::new()
     .get(format!("{}/events?after=0", served.base))
     .bearer_auth(TOKEN)
@@ -97,7 +96,7 @@ async fn the_stream_hands_over_each_event_with_its_kind_and_number() {
       .unwrap();
     read.push_str(&String::from_utf8_lossy(&chunk));
   }
-  assert!(read.contains("event: note.created\n"), "{read}");
+  assert!(read.contains("event: brain.created\n"), "{read}");
   let id = read.lines().find_map(|line| line.strip_prefix("id: ")).unwrap();
   let data: serde_json::Value =
     serde_json::from_str(read.lines().find_map(|line| line.strip_prefix("data: ")).unwrap()).unwrap();
@@ -113,7 +112,23 @@ async fn every_route_takes_the_token_and_a_route_no_one_serves_is_no_route() {
   assert!(health.ready);
   assert_eq!(health.version, env!("CARGO_PKG_VERSION"));
   let http = reqwest::Client::new();
-  for (method, path) in [(reqwest::Method::GET, "/nowhere"), (reqwest::Method::POST, "/fragments")] {
+  for (method, path) in [
+    (reqwest::Method::GET, "/nowhere"),
+    (reqwest::Method::POST, "/fragments"),
+    (reqwest::Method::POST, "/memories"),
+    (reqwest::Method::GET, "/memories/1"),
+    (reqwest::Method::PUT, "/fragments/tea"),
+    (reqwest::Method::GET, "/notes"),
+    (reqwest::Method::GET, "/watches"),
+    (reqwest::Method::GET, "/reminders"),
+    (reqwest::Method::GET, "/libraries"),
+    (reqwest::Method::GET, "/knowledge"),
+    (reqwest::Method::GET, "/locks"),
+    (reqwest::Method::GET, "/scopes/room:a"),
+    (reqwest::Method::POST, "/room-rules/read"),
+    (reqwest::Method::POST, "/sessions/loads"),
+    (reqwest::Method::POST, "/session-summary/read"),
+  ] {
     let answer = http
       .request(method, format!("{}{path}", served.base))
       .bearer_auth(TOKEN)
@@ -125,10 +140,10 @@ async fn every_route_takes_the_token_and_a_route_no_one_serves_is_no_route() {
     assert_eq!(body["code"], "no-route");
   }
   let unread = http
-    .post(format!("{}/notes", served.base))
+    .patch(format!("{}/memories/1", served.base))
     .bearer_auth(TOKEN)
     .header("content-type", "application/json")
-    .body("{\"scope\": 1}")
+    .body("{\"state\": 1}")
     .send()
     .await
     .unwrap();

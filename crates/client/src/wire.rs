@@ -75,7 +75,7 @@ impl ErrorCode {
       Self::Unauthorized => "the token is missing or wrong",
       Self::NoRoute => "no route answers this method and path",
       Self::NotFound => "nothing stands at the key the path names",
-      Self::Conflict => "the member's state does not allow the change, or another holder holds the lock",
+      Self::Conflict => "the member's state does not allow the change",
       Self::Gone => "the stream was resumed from before the oldest event kept",
       Self::Failed => "the service failed",
     }
@@ -152,15 +152,6 @@ pub struct EventsQuery {
   /// Only the events of members held under this scope.
   #[serde(skip_serializing_if = "Option::is_none")]
   pub scope: Option<String>,
-}
-
-/// A request previewed rather than carried out.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct DryRun {
-  /// True answers what would happen and changes nothing.
-  #[serde(skip_serializing_if = "Option::is_none")]
-  pub dry_run: Option<bool>,
 }
 
 /// A field a merge patch may set, clear with null or leave out: absent is `None`, null `Some(None)`.

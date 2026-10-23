@@ -5,10 +5,7 @@
 mod brains;
 mod client;
 mod fragments;
-mod holdings;
 mod memories;
-mod records;
-mod watches;
 mod wire;
 
 pub use brains::{
@@ -19,27 +16,10 @@ pub use brains::{
 };
 pub use brains::{SimilarAsk, Source, UnconsolidatedQuery};
 pub use client::{Answer, BrainClient, ClientFailure};
-pub use fragments::{
-  Drift, DriftChange, Fragment, FragmentHits, FragmentHitsRecorded, FragmentKind, FragmentMerge,
-  FragmentPiece, FragmentSplit, FragmentState, FragmentSwitch, FragmentWrite, FragmentsQuery, KindWords,
-  Knowledge, KnowledgeQuery, Library, LibraryDocument, LibraryDocumentPut, LibraryPut, LibrarySync,
-  LibrarySyncAsk,
-};
-pub use holdings::{Lock, LocksQuery, NewLock, ScopeChange, ScopeCounts, ScopeHolding, ScopeState};
-pub use memories::{
-  NewNote, NewScopedMemory, NewScopedMemoryMatch, Note, NotesQuery, ScopedMemoriesQuery, ScopedMemory,
-  ScopedMemoryChange, ScopedMemoryMatch, ScopedMemoryState,
-};
-pub use records::{
-  AgentAsk, Done, Load, LoadsKeep, NoteKeep, RoomRule, RoomRules, RoomRulesAsk, RuleSet, RuleText,
-  SessionAsk, SessionLoads, SessionNote,
-};
+pub use fragments::{Fragment, FragmentKind, FragmentState, FragmentSwitch, FragmentsQuery};
+pub use memories::{ScopedMemoriesQuery, ScopedMemory, ScopedMemoryChange, ScopedMemoryState};
 /// The HTTP client a `BrainClient` calls through, for a caller that sets its own timeout or proxy.
 pub use reqwest::Client as HttpClient;
-pub use watches::{
-  NewReminder, NewWatch, Reminder, RemindersQuery, Watch, WatchChange, WatchState, WatchesQuery,
-};
 pub use wire::{
-  Cursor, DryRun, ErrorCode, Event, EventsQuery, Health, Labels, NameCursor, Object, Page, WireError,
-  nullable,
+  Cursor, ErrorCode, Event, EventsQuery, Health, Labels, NameCursor, Object, Page, WireError, nullable,
 };

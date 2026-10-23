@@ -1,53 +1,39 @@
-//! Memory rows, their matches and notes, through the served routes (docs/boundary-api.md, 「Memory rows」 and
-//! 「Notes」).
+//! Memory rows, listed and changed through the served routes (docs/boundary-api.md, 「Memory rows」). No route
+//! adds a row, so each test puts its rows in the table.
 
 mod support;
 
 use bmo_brain_client::{
-  NewNote, NewScopedMemory, NewScopedMemoryMatch, NotesQuery, Object, ScopedMemoriesQuery,
-  ScopedMemoryChange, ScopedMemoryState,
+  Object, Page, ScopedMemoriesQuery, ScopedMemory, ScopedMemoryChange, ScopedMemoryState,
 };
 use serde_json::json;
-use support::{Served, labels, refused};
-
-fn row(scope: &str, kind: &str, text: &str) -> NewScopedMemory {
-  NewScopedMemory {
-    scope: scope.to_owned(),
-    subject_key: None,
-    kind: kind.to_owned(),
-    text: text.to_owned(),
-    conditions: vec![],
-    labels: labels(&[]),
-    due_at: None,
-    state: None,
-  }
-}
+use support::{Row, Served, labels, refused, row};
 
 #[tokio::test]
-async fn a_row_is_added_read_and_listed_by_its_fields() {
+async fn rows_are_listed_by_their_fields() {
   let served = Served::new().await;
   let client = &served.client;
   let condition: Object = json!({ "when": "asked" }).as_object().unwrap().clone();
-  let first = client
-    .scoped_memory_add(&NewScopedMemory {
+  let first = served
+    .put_row(Row {
       subject_key: Some("person-1".to_owned()),
       conditions: vec![condition.clone()],
       labels: labels(&[("source", "talk")]),
       due_at: Some(5_000),
       ..row("room:a", "promise", "Bring the Report back")
     })
-    .await
-    .unwrap();
-  client.scoped_memory_add(&row("room:b", "check", "Look at the door")).await.unwrap();
-  client.scoped_memory_add(&row("agent:a", "state", "Halfway")).await.unwrap();
+    .await;
+  served.put_row(row("room:b", "check", "Look at the door")).await;
+  served.put_row(row("agent:a", "state", "Halfway")).await;
 
-  assert_eq!(first.state, ScopedMemoryState::Standing);
-  assert_eq!(first.conditions, vec![condition]);
-  assert_eq!(client.scoped_memory(first.id).await.unwrap(), first);
+  let all = client.scoped_memories(&ScopedMemoriesQuery::default()).await.unwrap();
+  let read = &all.items[0];
+  assert_eq!((read.id, read.state), (first, ScopedMemoryState::Standing));
+  assert_eq!(read.conditions, vec![condition]);
+  assert_eq!((read.match_count, read.last_matched_at), (0, None));
 
-  let texts = |page: bmo_brain_client::Page<bmo_brain_client::ScopedMemory>| {
-    page.items.into_iter().map(|memory| memory.text).collect::<Vec<_>>()
-  };
+  let texts =
+    |page: Page<ScopedMemory>| page.items.into_iter().map(|memory| memory.text).collect::<Vec<_>>();
   let asked =
     |query: ScopedMemoriesQuery| async move { texts(client.scoped_memories(&query).await.unwrap()) };
   assert_eq!(
@@ -83,6 +69,15 @@ async fn a_row_is_added_read_and_listed_by_its_fields() {
     })
     .await,
     ["Look at the door"]
+  );
+  assert_eq!(
+    asked(ScopedMemoriesQuery {
+      state: Some(ScopedMemoryState::Standing),
+      ..Default::default()
+    })
+    .await
+    .len(),
+    3
   );
   assert_eq!(
     asked(ScopedMemoriesQuery {
@@ -164,59 +159,40 @@ async fn a_row_is_added_read_and_listed_by_its_fields() {
     ),
     (400, "bad-request".into())
   );
-  assert_eq!(refused(client.scoped_memory(first.id + 100).await), (404, "not-found".into()));
-}
-
-#[tokio::test]
-async fn a_row_refuses_a_blank_text_and_a_scope_too_long() {
-  let served = Served::new().await;
-  assert_eq!(refused(served.client.scoped_memory_add(&row("room:a", "promise", "  ")).await).0, 400);
-  assert_eq!(
-    refused(served.client.scoped_memory_add(&row(&"s".repeat(201), "promise", "Words")).await).0,
-    400
-  );
 }
 
 #[tokio::test]
 async fn a_change_moves_a_row_only_as_its_states_allow() {
   let served = Served::new().await;
   let client = &served.client;
-  let added = client
-    .scoped_memory_add(&NewScopedMemory {
+  let id = served
+    .put_row(Row {
       due_at: Some(10),
       ..row("room:a", "promise", "Call back")
     })
-    .await
-    .unwrap();
+    .await;
   let state = |state| ScopedMemoryChange {
     state: Some(state),
     ..Default::default()
   };
 
-  let done = client.scoped_memory_update(added.id, &state(ScopedMemoryState::Done)).await.unwrap();
+  let done = client.scoped_memory_update(id, &state(ScopedMemoryState::Done)).await.unwrap();
   assert_eq!(done.state, ScopedMemoryState::Done);
   assert_eq!(done.due_at, Some(10));
   assert_eq!(
-    client
-      .scoped_memory_update(added.id, &state(ScopedMemoryState::Done))
-      .await
-      .unwrap()
-      .state,
+    client.scoped_memory_update(id, &state(ScopedMemoryState::Done)).await.unwrap().state,
     ScopedMemoryState::Done
   );
   assert_eq!(
-    refused(client.scoped_memory_update(added.id, &state(ScopedMemoryState::Candidate)).await),
+    refused(client.scoped_memory_update(id, &state(ScopedMemoryState::Candidate)).await),
     (409, "conflict".into())
   );
 
-  let again = client
-    .scoped_memory_update(added.id, &state(ScopedMemoryState::Standing))
-    .await
-    .unwrap();
+  let again = client.scoped_memory_update(id, &state(ScopedMemoryState::Standing)).await.unwrap();
   assert_eq!(again.state, ScopedMemoryState::Standing);
   let changed = client
     .scoped_memory_update(
-      added.id,
+      id,
       &ScopedMemoryChange {
         text: Some("Call back at noon".into()),
         labels: Some(labels(&[("by", "hand")])),
@@ -229,72 +205,18 @@ async fn a_change_moves_a_row_only_as_its_states_allow() {
   assert_eq!(changed.text, "Call back at noon");
   assert_eq!(changed.labels, labels(&[("by", "hand")]));
   assert_eq!(changed.due_at, None);
+  assert!(changed.changed_at > 1);
+  let blank = ScopedMemoryChange {
+    text: Some("  ".into()),
+    ..Default::default()
+  };
+  assert_eq!(refused(client.scoped_memory_update(id, &blank).await).0, 400);
   assert_eq!(
-    refused(client.scoped_memory_update(added.id + 9, &state(ScopedMemoryState::Off)).await).0,
+    refused(client.scoped_memory_update(id + 9, &state(ScopedMemoryState::Off)).await).0,
     404
   );
   assert_eq!(
     served.event_kinds().await,
-    ["memory.created", "memory.changed", "memory.changed", "memory.changed", "memory.changed"]
+    ["memory.changed", "memory.changed", "memory.changed", "memory.changed"]
   );
-}
-
-#[tokio::test]
-async fn a_match_counts_each_row_it_names_and_refuses_a_row_that_does_not_stand() {
-  let served = Served::new().await;
-  let client = &served.client;
-  let one = client.scoped_memory_add(&row("room:a", "rule", "Answer briefly")).await.unwrap();
-  let two = client.scoped_memory_add(&row("room:a", "rule", "Answer in kind")).await.unwrap();
-  let matched = NewScopedMemoryMatch {
-    memory_ids: vec![one.id, two.id, one.id],
-    actor_name: "reader-a".into(),
-    spent_ms: 12,
-    token_count: 30,
-  };
-
-  let recorded = client.scoped_memory_match_add(&matched).await.unwrap();
-  assert_eq!(recorded.memory_ids, matched.memory_ids);
-  let read = client.scoped_memory(one.id).await.unwrap();
-  assert_eq!((read.match_count, read.last_matched_at), (1, Some(recorded.created_at)));
-
-  let missing = NewScopedMemoryMatch {
-    memory_ids: vec![two.id + 50],
-    ..matched
-  };
-  assert_eq!(refused(client.scoped_memory_match_add(&missing).await).0, 400);
-  assert_eq!(client.scoped_memory(two.id).await.unwrap().match_count, 1);
-}
-
-#[tokio::test]
-async fn notes_are_added_and_listed_by_scope_and_subject() {
-  let served = Served::new().await;
-  let client = &served.client;
-  let note = |scope: &str, subject: Option<&str>, text: &str| NewNote {
-    scope: scope.into(),
-    subject_key: subject.map(Into::into),
-    text: text.into(),
-    actor_name: "writer-a".into(),
-  };
-  let first = client.note_add(&note("room:a", Some("person-1"), "Likes tea")).await.unwrap();
-  client.note_add(&note("room:a", None, "Meets on Fridays")).await.unwrap();
-  client.note_add(&note("room:b", None, "Quiet room")).await.unwrap();
-
-  let of_room = client
-    .notes(&NotesQuery {
-      scope: Some("room:a".into()),
-      ..Default::default()
-    })
-    .await
-    .unwrap();
-  assert_eq!(of_room.items.len(), 2);
-  assert_eq!(of_room.items[0], first);
-  let of_person = client
-    .notes(&NotesQuery {
-      subject_key: Some("person-1".into()),
-      ..Default::default()
-    })
-    .await
-    .unwrap();
-  assert_eq!(of_person.items, vec![first]);
-  assert_eq!(refused(client.note_add(&note("room:a", None, "")).await).0, 400);
 }

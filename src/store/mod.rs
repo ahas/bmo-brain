@@ -7,15 +7,10 @@ pub mod events;
 pub mod files;
 pub mod fragments;
 pub mod learning;
-pub mod libraries;
-pub mod locks;
 pub mod memories;
 pub mod recall;
-pub mod records;
 pub mod rules;
-pub mod scopes;
 pub mod versions;
-pub mod watches;
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -196,7 +191,7 @@ pub(crate) fn scope(field: &str, value: &str) -> Held<()> {
   }
 }
 
-/// A key a caller names a fragment or a library by: 1 to 200 characters, none of them `/`, a control character
+/// A key a caller names a member by: 1 to 200 characters, none of them `/`, a control character
 /// or whitespace, and neither `.` nor `..`.
 pub(crate) fn key(field: &str, value: &str) -> Held<()> {
   let length = value.chars().count();
@@ -226,14 +221,8 @@ pub(crate) fn text(field: &str, value: &str, most: usize) -> Held<()> {
   Ok(())
 }
 
-/// A name given for who made or holds a member: not blank, at most 200 characters.
-pub(crate) fn name(field: &str, value: &str) -> Held<()> {
-  text(field, value, 200)
-}
-
-/// The most characters a row's, a note's or a reminder's text holds, and a fragment's.
+/// The most characters a row's text holds.
 pub const TEXT_MOST: usize = 64_000;
-pub const FRAGMENT_MOST: usize = 1_000_000;
 
 /// A comma-separated list as its items, blanks left out.
 pub(crate) fn listed(value: Option<&str>) -> Vec<String> {
@@ -244,12 +233,6 @@ pub(crate) fn listed(value: Option<&str>) -> Vec<String> {
     .filter(|item| !item.is_empty())
     .map(str::to_owned)
     .collect()
-}
-
-/// A text's version: its SHA-256, in hex.
-pub fn version(text: &str) -> String {
-  use sha2::Digest;
-  hex::encode(sha2::Sha256::digest(text.as_bytes()))
 }
 
 /// A pattern matching a text holding these words, any case, with LIKE's own marks taken literally.
