@@ -64,6 +64,7 @@
           <UButton v-if="isLive" size="sm" color="neutral" variant="outline" icon="i-material-symbols-task-alt" :label="t('brain.action.done')" @click="askMove('done')" />
           <UButton v-if="isLive" size="sm" color="error" variant="outline" icon="i-material-symbols-block" :label="t('brain.action.invalidate')" @click="askMove('invalidated')" />
           <UButton v-if="restorable" size="sm" color="neutral" variant="outline" icon="i-material-symbols-undo" :label="t('brain.action.restore')" :loading="busy" @click="restore" />
+          <UButton v-if="isLive && memory.type === 'rule'" size="sm" :color="always ? 'primary' : 'neutral'" :variant="always ? 'soft' : 'outline'" :icon="always ? 'i-material-symbols-keep' : 'i-material-symbols-keep-outline'" :label="always ? t('brain.action.always_off') : t('brain.action.always_on')" :aria-pressed="always" :loading="busy" @click="toggleAlways" />
         </div>
 
         <dl class="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-2 text-sm [&>dt]:text-muted">
@@ -72,6 +73,10 @@
             <BrainStatus :status="memory.status" />
             <span class="text-muted tabular-nums">{{ stamp(memory.validFrom) }} – {{ memory.validTo === null || memory.validTo === undefined ? "" : stamp(memory.validTo) }}</span>
           </dd>
+          <template v-if="memory.type === 'rule'">
+            <dt>{{ t("brain.field.always") }}</dt>
+            <dd>{{ always ? t("brain.label.always_on") : t("brain.label.always_off") }}</dd>
+          </template>
           <template v-if="memory.reason">
             <dt>{{ t("brain.field.reason") }}</dt>
             <dd>{{ memory.reason }}</dd>
@@ -251,7 +256,10 @@ const restorable = computed(
 const topics = computed(() => memory.value?.subjects.filter((subject) => subject.type !== "episode") ?? []);
 const grounds = computed(() => memory.value?.subjects.filter((subject) => subject.type === "episode") ?? []);
 const source = computed(() => memory.value?.labels.source ?? null);
-const labelPairs = computed(() => Object.entries(memory.value?.labels ?? {}).filter(([name]) => name !== "source"));
+const labelPairs = computed(() =>
+  Object.entries(memory.value?.labels ?? {}).filter(([name]) => name !== "source" && !(memory.value?.type === "rule" && name === api.ALWAYS_LABEL))
+);
+const always = computed(() => memory.value !== null && api.labelledAlways(memory.value.labels));
 
 const layerItems = computed(() => [
   { value: NO_LAYER, label: t("brain.label.unfiled") },
@@ -395,6 +403,33 @@ async function restore(): Promise<void> {
     emit("open", restored.id);
   } catch (error) {
     island.fail(error, t("brain.error.save"));
+  } finally {
+    busy.value = false;
+  }
+}
+
+// A rule's `always` turned on or off: a new version with the label added or taken out and nothing else changed.
+async function toggleAlways(): Promise<void> {
+  const found = memory.value;
+
+  if (found === null) return;
+
+  busy.value = true;
+
+  try {
+    const written = await api.writeVersion(props.brainId, found.id, {
+      labels: api.withAlways(found.labels, !api.labelledAlways(found.labels))
+    });
+
+    emit("changed");
+    emit("open", written.id);
+  } catch (error) {
+    if (api.isConflict(error)) {
+      island.say({ tone: "warning", title: t("brain.error.conflict") });
+      await read();
+    } else {
+      island.fail(error, t("brain.error.save"));
+    }
   } finally {
     busy.value = false;
   }

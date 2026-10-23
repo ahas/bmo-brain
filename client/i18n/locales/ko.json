@@ -3,6 +3,8 @@
     "title": { "screen": "브레인" },
     "action": {
       "all_versions": "모든 버전",
+      "always_off": "매 턴에서 빼기",
+      "always_on": "매 턴 세우기",
       "approve": "승인",
       "confirm": "맞음",
       "describe": "설명 고치기",
@@ -37,6 +39,7 @@
       "translate_write": "영어로 번역하지 못해 저장하지 않았습니다. 잠시 뒤 다시 하거나 영어로 써 주세요."
     },
     "field": {
+      "always": "매 턴",
       "consolidated": "정리",
       "description": "설명",
       "ended_on": "끝난 말",
@@ -84,6 +87,8 @@
       "unrelated": "관계없음"
     },
     "label": {
+      "always_off": "말이 닿을 때만 읽음",
+      "always_on": "이 방의 모든 턴에 섬",
       "as_table": "표로 보기",
       "brain": "브레인",
       "count": "수",

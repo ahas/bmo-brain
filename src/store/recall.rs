@@ -4,9 +4,11 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use bmo_brain_client::{
-  Fold, Memory, MemoryStatus, Recall, RecallAsk, RecallChoice, RecallPart, SubjectKey,
+  ALWAYS_LABEL, ALWAYS_VALUE, Fold, Labels, Memory, MemoryStatus, Recall, RecallAsk, RecallChoice,
+  RecallPart, SubjectKey,
 };
 use sqlx::PgConnection;
+use sqlx::types::Json;
 
 use super::brains::{brain_of, given};
 use super::rules::tokens;
@@ -82,18 +84,33 @@ impl Store {
     }
     let named: Vec<i64> = room.into_iter().chain(speakers.iter().copied()).collect();
 
-    // The core: the room's situation rules and rules, and the head of each speaker's sheet, at most the cap of
-    // their facts; the rest are candidates of the searched part like any other row.
+    // The core: the room's situation rules, its `always` rules at most to their cap in a sheet's order, and the
+    // head of each speaker's sheet, at most the cap of their facts; the rest are candidates of the searched part
+    // like any other row.
     let mut core: Vec<MemoryRow> = Vec::new();
     if let Some(room) = room {
       core.extend(
         sqlx::query_as::<_, MemoryRow>(&format!(
           "SELECT {MEMORY_COLUMNS} FROM memories WHERE brain_id = $1 AND status = 'active' \
-           AND type IN ('situation', 'rule') AND id IN (SELECT memory_id FROM memory_subjects WHERE subject_id = $2) \
+           AND type = 'situation' AND id IN (SELECT memory_id FROM memory_subjects WHERE subject_id = $2) \
            ORDER BY importance DESC, id"
         ))
         .bind(brain_id)
         .bind(room)
+        .fetch_all(&mut *tx)
+        .await?,
+      );
+      core.extend(
+        sqlx::query_as::<_, MemoryRow>(&format!(
+          "SELECT {MEMORY_COLUMNS} FROM memories WHERE brain_id = $1 AND status = 'active' \
+           AND type = 'rule' AND labels @> $3 \
+           AND id IN (SELECT memory_id FROM memory_subjects WHERE subject_id = $2) \
+           ORDER BY importance DESC, valid_from DESC, last_confirmed_at DESC NULLS LAST, id DESC LIMIT $4"
+        ))
+        .bind(brain_id)
+        .bind(room)
+        .bind(Json(Labels::from([(ALWAYS_LABEL.to_owned(), ALWAYS_VALUE.to_owned())])))
+        .bind(self.rules.core_rule_cap.max(0))
         .fetch_all(&mut *tx)
         .await?,
       );

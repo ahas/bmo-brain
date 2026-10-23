@@ -797,6 +797,7 @@
               "type": "string"
             },
             "default": {},
+            "description": "The writer's labels; `always=true` on a `rule` puts it in the core of every recall of its room.",
             "type": "object"
           },
           "layerId": {
@@ -1044,6 +1045,7 @@
             "additionalProperties": {
               "type": "string"
             },
+            "description": "The writer's labels; `always=true` on a `rule` puts it in the core of every recall of its room.",
             "type": [
               "object",
               "null"
@@ -1218,6 +1220,7 @@
             "additionalProperties": {
               "type": "string"
             },
+            "description": "The writer's labels; `always=true` on a `rule` puts it in the core of every recall of its room.",
             "type": [
               "object",
               "null"
@@ -1356,6 +1359,7 @@
               "type": "string"
             },
             "default": {},
+            "description": "The writer's labels; `always=true` on a `rule` puts it in the core of every recall of its room.",
             "type": "object"
           },
           "layerId": {
@@ -1674,6 +1678,12 @@
             "format": "int64",
             "type": "integer"
           },
+          "core_rule_cap": {
+            "default": 6,
+            "description": "The most of a room's `always` rules the core of a block carries; the rest reach a turn only through the\nsearched part.",
+            "format": "int64",
+            "type": "integer"
+          },
           "decay": {
             "default": 0.5,
             "description": "The exponent the time since each hit is raised to, negated, in the retrieval strength.",
@@ -1743,6 +1753,7 @@
           "subject_bonus",
           "subject_cap",
           "core_fact_cap",
+          "core_rule_cap",
           "decay",
           "hit_times_kept",
           "same_session_ms",
@@ -2202,7 +2213,7 @@
   "info": {
     "description": "An agent's long-term memory as a service. The service keeps many brains, each an account's and one agent's: subjects (what a memory is about, found by type and key), layers (the table of contents) and memories, one row a version, superseded and invalidated but never deleted. A turn asks recall for a block under a token budget; a persona is rendered as the same bytes until a piece changes; a brain moves in and out as a brain file. The memory rows and fragments held under a caller's opaque scope stand for the console's screens until those read brains. Bodies are JSON with camelCase keys, times are epoch milliseconds, lists are pages of items and more, and every failure is the error shape with its status. The harness plugin's tools, each a thin call of one route, are stated under x-tools.",
     "title": "bmo-brain",
-    "version": "0.1.0-rev.21"
+    "version": "0.1.0-rev.22"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -6075,6 +6086,7 @@
               "type": "string"
             },
             "default": {},
+            "description": "The writer's labels; `always=true` on a `rule` puts it in the core of every recall of its room.",
             "type": "object"
           },
           "layerId": {
@@ -6206,6 +6218,7 @@
             "additionalProperties": {
               "type": "string"
             },
+            "description": "The writer's labels; `always=true` on a `rule` puts it in the core of every recall of its room.",
             "type": [
               "object",
               "null"
@@ -6305,6 +6318,7 @@
             "additionalProperties": {
               "type": "string"
             },
+            "description": "The writer's labels; `always=true` on a `rule` puts it in the core of every recall of its room.",
             "type": [
               "object",
               "null"
@@ -6698,6 +6712,7 @@
               "type": "string"
             },
             "default": {},
+            "description": "The writer's labels; `always=true` on a `rule` puts it in the core of every recall of its room.",
             "type": "object"
           },
           "layerId": {

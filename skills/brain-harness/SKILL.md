@@ -25,7 +25,8 @@ The token goes in `BRAIN_TOKEN` or `--token`; a wrong one answers every tool wit
 ## Pages and times
 
 Every time is epoch milliseconds, and every list is a page: `items` and `more`; pass the last `id` as `after`
-for the next page. `labels` is your own metadata, strings to strings, which the brain never reads.
+for the next page. `labels` is your own metadata, strings to strings, which the brain never reads but for one:
+`always=true` on a `rule` about a room puts that rule in the recall of every turn of the room.
 
 ## Failures
 
@@ -44,9 +45,9 @@ apply the judgement with one `brain_learn`, and consolidate when the brain says 
   `person`, their keys), the turn's words, your `sessionKey` and when the session opened. The answer's `block`
   is what to read; a row marked as handed to this session already is one you have seen in this session.
 - **Write what you learn with `brain_memory_write`:** `type` (`fact`, `rumor` for what you only heard,
-  `situation` for a rule for a situation, `episode` for what happened, or your own word), `text`, the
-  `subjects` it is about (each `type` and `key`, made where none stands), `importance` 1 to 10, and your
-  `actorName`. Give a `key` to a memory you may rewrite later.
+  `situation` for a rule for a situation, `rule` for a rule of a room, `episode` for what happened, or your
+  own word), `text`, the `subjects` it is about (each `type` and `key`, made where none stands), `importance`
+  1 to 10, and your `actorName`. Give a `key` to a memory you may rewrite later.
 - **Judge every fact before writing it:** `brain_similar` with the candidate's words and subjects answers the
   live memories like it; then `brain_learn` with your judgement (`confirms`, `strengthens`, `replaces`, or
   none for a new one) and the `source` (`own`, `owner`, `told`, `inferred`) applies it whole. A `told` or

@@ -6,10 +6,12 @@ it as you read, in the turn itself. Nothing writes it for you.
 
 ## Before answering
 
-- The reference block you were handed is the brain's recall for this turn: the room's standing rules and
-  situation rules, the head of the sheet of each person who spoke (their most important and newest facts,
-  those that hold everywhere and those of this room, one line each; their other facts come up when the
-  turn's words call for them), and the memories that fit the words. Read it as what you know. A line marked as handed to this session already is one you have seen in this session.
+- The reference block you were handed is the brain's recall for this turn: the room's rules that stand on
+  every turn (its other rules come up when the turn's words call for them), its situation rules, the head
+  of the sheet of each person who spoke (their most important and newest facts, those that hold everywhere
+  and those of this room, one line each; their other facts come up when the turn's words call for them), and
+  the memories that fit the words. Read it as what you know. A line marked as handed to this session already
+  is one you have seen in this session.
 - The recall also says whether a consolidation is due. When it is, do the consolidation (below) in this turn
   before or after your answer, whichever the conversation allows.
 
@@ -40,6 +42,11 @@ it as you read, in the turn itself. Nothing writes it for you.
   kept, finished or over, move it to `done` with `brain_memory_move`; when it stopped holding, `invalidated`.
 - **A rule the owner sets for a situation** ("whenever X, do Y") is a `situation` memory about the room, or
   about no room where it holds everywhere, with the situation and the act in its text.
+- **A rule the owner grants for how you behave in a room** is a `rule` memory about the room. Set `always`
+  (`brain_learn`'s `always`, or the label `always=true`) only on a standing instruction about how to behave
+  in that room, one you must keep in mind on every turn whatever is said; never on the record of an
+  incident, a one-off correction or a rule that matters only when a subject comes up, which come up when the
+  turn's words call for them. The owner may set or clear it at the screen; do not clear one the owner set.
 - **What someone is called** is a `name` memory about them. A person is always a subject by their id, never
   by a name.
 - **Never edit a memory in place and never delete one.** A correction is a version; a fact that stopped
