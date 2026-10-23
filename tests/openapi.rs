@@ -8,7 +8,7 @@ use bmo_brain::openapi::{openapi, openapi_json};
 const ROOT: &str = env!("CARGO_MANIFEST_DIR");
 
 /// The routes docs/boundary-api.md states, by method and path.
-const ROUTES: [&str; 39] = [
+const ROUTES: [&str; 44] = [
   "get /health",
   "get /events",
   "get /discipline",
@@ -29,11 +29,13 @@ const ROUTES: [&str; 39] = [
   "get /brains/{brainId}/memories/{memoryId}",
   "patch /brains/{brainId}/memories/{memoryId}",
   "post /brains/{brainId}/memories/{memoryId}/versions",
+  "post /brains/{brainId}/memories/{memoryId}/restorations",
   "post /brains/{brainId}/merges",
   "get /brains/{brainId}/lineages/{lineageId}",
   "post /brains/{brainId}/hits",
   "post /brains/{brainId}/confirmations",
   "get /brains/{brainId}/types",
+  "get /brains/{brainId}/tallies",
   "post /brains/{brainId}/recall",
   "post /brains/{brainId}/folds",
   "post /brains/{brainId}/learnings",
@@ -48,6 +50,9 @@ const ROUTES: [&str; 39] = [
   "get /fragments",
   "patch /fragments/{fragmentKey}",
   "get /fragment-kinds",
+  "get /console-manifest",
+  "get /console-bundle/words",
+  "get /console-bundle/{file}",
 ];
 
 /// The harness plugin's tools.

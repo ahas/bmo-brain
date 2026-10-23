@@ -31,7 +31,8 @@ server, `bmo-brain mcp`, takes no configuration file (「The harness plugin」).
 | Setting | Key | What it is |
 |---|---|---|
 | listen address | `listen` | where the service answers |
-| token | `token` | the bearer token every caller presents |
+| token | `token` | the service's bearer token, which reaches every route |
+| console | `[console]` | the console bundle (「The console bundle」), where the brain serves one: `token`, the console's bearer token, which reaches what the screen uses; `bundle`, the folder the build of `client/` wrote the module, its stylesheet and its words into, the release's `console` where none is given |
 | database | `database` | the address of the brain's own PostgreSQL database, which holds its tables and nothing else |
 | data root | `data_root` | the data root whose `env/brain.env` the brain's tool reads the service's address and token from; the `tool-env` verb writes it |
 | rules | `[rules]` | the numbers the brain reads by (`docs/design.md`), each with a default: `budget_tokens`, `weight_relevance`, `weight_importance`, `weight_recency`, `subject_bonus`, `subject_cap`, `decay`, `hit_times_kept`, `same_session_ms`, `strength_gain`, `previous_value_days`, `consolidation_threshold` |
@@ -45,11 +46,14 @@ answers ready and 1 otherwise, saying why on its error stream.
 
 ## Common rules
 
-- **Auth.** Every route, `GET /health` among them, needs `Authorization: Bearer <token>`; a missing or wrong
-  token is answered 401 `unauthorized`.
-- **Pages.** A list answers `{"items": [...], "more": boolean}`, oldest first by the member's `id`, and is
-  paged by `after` (the last `id` seen) and `limit` (50 where none is given, at most 500). The fragment kinds
-  are ordered by name instead, and `after` is the last name seen.
+- **Auth.** Every route, `GET /health` among them, needs `Authorization: Bearer <token>`, the service's
+  token or the console's; a missing or wrong token is answered 401 `unauthorized`. The service's token
+  reaches every route; the console's reaches only what the screen uses (「The console bundle」), and any other
+  route is answered 403 `forbidden` to it.
+- **Pages.** A list answers `{"items": [...], "more": boolean}`, oldest first by the member's `id` where its
+  route names no other order, and is paged by `after`, the last `id` seen, the page continuing past that
+  member in the order the list stands in, and `limit` (50 where none is given, at most 500). The fragment
+  kinds are ordered by name instead, and `after` is the last name seen.
 - **Times** are epoch milliseconds. **Ids** are signed 64-bit integers the brain assigns. A fragment is also
   keyed by the name the caller gave it, `key`.
 - **Strings.** `scope` is 1 to 200 characters; `text` of a row is not blank and at most 64000 characters.
@@ -106,12 +110,13 @@ stand.
 ### Subjects
 
 A subject is something a memory can be about: `id`, `brainId`, `type` (the caller's word for what it is),
-`key` (the caller's identifier, unique within the brain and type), `description` and `createdAt`. A subject
-is found by its type and key alone; a name is a memory of type `name` linked to it.
+`key` (the caller's identifier, unique within the brain and type), `description`, `name` and `createdAt`. A
+subject is found by its type and key alone; a name is a memory of type `name` linked to it, and `name` is
+the text of its newest `active` one, or null where it has none.
 
 | Route | Does | Answers |
 |---|---|---|
-| `GET /subjects` | lists by `type`, `key` and `q` (words the description holds) | 200, a page |
+| `GET /subjects` | lists by `type`, `key`, `q` (words the description holds) and `ids` (comma-separated ids) | 200, a page |
 | `POST /subjects` | `type`, `key`, `description`: makes the subject, or finds the one standing and sets its description where one is given | 201 where new, 200 where it stood |
 | `GET /subjects/{subjectId}` | reads one | 200; 404 |
 | `PATCH /subjects/{subjectId}` | sets `description` | 200; 404 |
@@ -135,7 +140,8 @@ the live rows of a brain; 1 to 200 characters with no control character and no w
 injected), `type`, `text`, `layerId` (or null), `position`, `subjects` (each `id`, `type`,
 `key`), `status`, `lineageId`, `supersededBy` (or null), `validFrom`, `validTo` (or null), `importance` (1
 to 10), `hits`, `lastHitAt`, `lastConfirmedAt`, `strength` (the storage strength), `retrievalStrength`
-(computed from the hits as the reading answers), `consolidatedAt`, `actorName`, `labels` and `createdAt`.
+(computed from the hits as the reading answers), `consolidatedAt`, `actorName`, `reason` (why its status was
+moved, as the mover said, or null), `labels` and `createdAt`.
 
 `type` is the writer's word; the reserved ones are `episode`, `fact`, `rumor`, `situation`, `rule`, `name`,
 `sheet`, `persona`, `lore` and `knowledge` (`docs/design.md`, 「Types」). The statuses and the moves a
@@ -151,16 +157,22 @@ caller's word may make:
 
 | Route | Does | Answers |
 |---|---|---|
-| `GET /memories` | lists by `type`, `status`, `layerId`, `subjectId`, `key`, `lineageId`, `label` (`key` or `key=value`) and `q` (words the text holds) | 200, a page |
+| `GET /memories` | lists by `type` and `status` (each one value or several, comma-separated), `excludeTypes` (comma-separated), `layerId`, `unfiled` (true for the rows in no layer), `subjectId`, `key`, `lineageId`, `ids` (comma-separated), `supersededBy` (comma-separated: the rows superseded by these), `label` (`key` or `key=value`) and `q` (words the text holds), in the order `order` names | 200, a page |
 | `POST /memories` | writes a first version: `type`, `text`, `actorName` required; `key`, `layerId`, `position`, `subjectIds`, `subjects` (each `type` and `key`, made where none stands), `importance` (5 where none), `validFrom` (now where none), `status` (`active` where none, or `pending`), `labels` | 201, the memory; 409 `conflict` where a live row holds the key |
 | `GET /memories/{memoryId}` | reads one | 200; 404 |
-| `PATCH /memories/{memoryId}` | moves its status: `status`, `actorName`, `at` (when it stopped holding, now where none) | 200; 404; 409 for a move the table does not allow |
+| `PATCH /memories/{memoryId}` | moves its status: `status`, `actorName`, `at` (when it stopped holding, now where none), `reason` (kept on the row moved), `text` (for a move to `done`: the words it ended on, written as a new version that is then moved, in one transaction) | 200, the row moved; 400 for `text` on another move; 404; 409 for a move the table does not allow |
+| `POST /memories/{memoryId}/restorations` | restores a closed lineage: the row named is the newest of a `done` or `invalidated` lineage; `actorName` required and `text` (the closed row's where none); a new `active` version is written in the lineage, and the closed row stays as it was | 201, the new version; 404; 409 where the row is not the newest of its lineage, is not `done` or `invalidated`, or a live row holds its key |
 | `POST /memories/{memoryId}/versions` | writes a new version over a live one: `actorName` required; `text`, `type`, `layerId`, `position`, `subjectIds` or `subjects` (replacing the subjects whole), `importance`, `validFrom`, `labels`, each taken from the old version where not given | 201, the new version; the old is `superseded` with `validTo` the new one's `validFrom`; 409 over a row that is not live |
 | `POST /merges` | writes one row over several: `memoryIds` (two or more live rows), `type`, `text`, `actorName` required; `key`, `layerId`, `position`, `subjectIds` or `subjects` (the union of the merged rows' subjects where none is given), `importance` (the highest merged where none), `validFrom` (now where none), `labels`; each merged row becomes `superseded` pointing at the new one | 201, the new row; 400; 404; 409 for a row that is not live |
 | `GET /lineages/{lineageId}` | every version of a lineage, oldest first | 200, a list; 404 |
 | `POST /hits` | records a hand-out: `memoryIds`, `actorName`, `sessionKey` (which marks the rows for that session), `at` | 201, `recordedCount` |
 | `POST /confirmations` | records confirmations: `memoryIds`, `actorName`, `at`; each row's storage strength rises by the gap since its last confirmation, nothing within the same session | 201, `recordedCount` |
 | `GET /types` | the types in use, each `type`, `count` and `reserved`, the reserved ones first | 200, a list |
+| `GET /tallies` | the memories `GET /memories` would list under the same filters (paging and order aside), grouped `by` `status`, `type`, `layer` or `subject`: each group's `group` (the status, the type, or the layer's or subject's id in decimal; null for the rows in no layer or about no subject), `count`, `importance`, `strength` and `retrievalStrength` (each the group's mean, the retrieval strength as of the reading) and `latestValidFrom`, the largest groups first; a row about several subjects counts in each | 200, a list |
+
+`order` is a field the list is ordered by, `id` (where none is given), `position` (by layer position, then
+`id`), `validFrom`, `importance` or `hits`, each ascending, or descending with a leading `-`; ties go by
+`id` in the same direction.
 
 A version keeps the hits, the strength and the confirmation moment of the version it supersedes; a new
 memory starts at strength 1 with no hits.
@@ -220,6 +232,40 @@ takes the base layer alone; a named layer that does not stand is 404.
 
 The file is a SQLite database of the tables `brain_file` (`shape`, `exported_at`, `name`), `subjects`,
 `layers`, `memories` and `memory_subjects`, its ids local to the file; this brain writes and reads shape 1.
+
+## The console bundle
+
+The brain's screen (`docs/design.md`, 「The screen」) is a console bundle by bmo-ui's console bundle contract
+(bmo-ui's `docs/console-bundles.md`), built from `client/`. The brain answers its manifest, its module, its
+stylesheet and its words, and guards every route the screen uses.
+
+| Route | Answers |
+|---|---|
+| `GET /console-manifest` | 200, the manifest |
+| `GET /console-bundle/words` | 200, the bundle's words |
+| `GET /console-bundle/{file}` | 200, the module or the stylesheet the manifest names |
+
+- **The manifest** is the contract's shape: the bundle `brain`, its menu title the key `brain.title.screen`,
+  its icon, its screens under `/brain`, the service `brain`, the paths of its module, its stylesheet and its
+  words, the API prefix `/`, the role `administrator`, no owner key, the event stream read and no socket, and
+  no event raised as a notice.
+- **The module and the stylesheet** are the files the build of `client/` writes into the bundle folder the
+  configuration names, read when the service starts. Each is answered at `/console-bundle/` and a name
+  carrying the first sixteen hexadecimal digits of the SHA-256 of its bytes, so its path changes whenever
+  its bytes do and may be kept by whoever loaded it. A name the manifest does not name is `not-found`.
+- **The words** are each locale's words of the bundle under the locale's code, every key under `brain`, as
+  the build writes them beside the module.
+- **Where the folder holds no module or no words,** the manifest, the module, the stylesheet and the words
+  are all `not-found`, so a console leaves the brain out.
+- **The guard.** A call with the console's token is the console relaying for a reader, and it reaches the
+  manifest and the words with no role, and the module, the stylesheet and every route the screen uses where
+  its `Owner-Role` header is `administrator`; one whose header is missing or names another role is refused
+  403 `forbidden`, as is any other route. The OpenAPI document states each route's reach under `x-console`:
+  `open`, `screen` or `closed`.
+- **The routes the screen uses:** `GET /brains` and `GET /brains/{brainId}`; under a brain, the reads of
+  subjects, layers, memories, lineages, types and tallies, the persona and the export; the writes of
+  subjects, layers, memories, versions, moves, restorations, confirmations and learnings, and the similar
+  ask; and `GET /events`.
 
 ## Memory rows
 
@@ -388,6 +434,7 @@ Every failure is the common error shape, `code` and `error`.
 |---|---|---|
 | 400 | `bad-request` | the body, the query or a key is not the shape the route takes; the sentence names what is wrong |
 | 401 | `unauthorized` | the token is missing or wrong |
+| 403 | `forbidden` | the console's token on a route the screen does not use, or without the role the screen needs |
 | 404 | `no-route` | no route answers this method and path |
 | 404 | `not-found` | nothing stands at the key the path names |
 | 409 | `conflict` | the member's state does not allow the change |

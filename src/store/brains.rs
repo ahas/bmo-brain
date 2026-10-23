@@ -6,7 +6,7 @@ use bmo_brain_client::{
 };
 use sqlx::{FromRow, PgConnection, Postgres, QueryBuilder};
 
-use super::{Fault, Held, Store, holding, limit, now, page, publish, text};
+use super::{Fault, Held, Store, holding, limit, listed, now, page, publish, text};
 
 /// The longest a brain's name, a subject's or a layer's description is.
 const DESCRIPTION_MOST: usize = 2_000;
@@ -45,8 +45,15 @@ pub(crate) struct SubjectRow {
   pub kind: String,
   pub key: String,
   pub description: String,
+  pub name: Option<String>,
   pub created_at: i64,
 }
+
+/// A subject's columns as a read answers them, its name the text of its newest active `name` memory.
+pub(crate) const SUBJECT_COLUMNS: &str = "id, brain_id, type, key, description, \
+  (SELECT m.text FROM memories m JOIN memory_subjects ms ON ms.memory_id = m.id \
+   WHERE ms.subject_id = subjects.id AND m.type = 'name' AND m.status = 'active' \
+   ORDER BY m.valid_from DESC, m.id DESC LIMIT 1) AS name, created_at";
 
 impl From<SubjectRow> for Subject {
   fn from(row: SubjectRow) -> Self {
@@ -56,6 +63,7 @@ impl From<SubjectRow> for Subject {
       kind: row.kind,
       key: row.key,
       description: row.description,
+      name: row.name,
       created_at: row.created_at,
     }
   }
@@ -143,10 +151,9 @@ pub(crate) async fn subject_found_or_made(
 ) -> Held<(bool, Subject)> {
   given("type", &named.kind)?;
   given("key", &named.key)?;
-  let standing: Option<SubjectRow> = sqlx::query_as(
-    "SELECT id, brain_id, type, key, description, created_at FROM subjects \
-     WHERE brain_id = $1 AND type = $2 AND key = $3",
-  )
+  let standing: Option<SubjectRow> = sqlx::query_as(&format!(
+    "SELECT {SUBJECT_COLUMNS} FROM subjects WHERE brain_id = $1 AND type = $2 AND key = $3"
+  ))
   .bind(brain_id)
   .bind(&named.kind)
   .bind(&named.key)
@@ -155,10 +162,10 @@ pub(crate) async fn subject_found_or_made(
   if let Some(row) = standing {
     return Ok((false, row.into()));
   }
-  let row: SubjectRow = sqlx::query_as(
+  let row: SubjectRow = sqlx::query_as(&format!(
     "INSERT INTO subjects (brain_id, type, key, description, created_at) VALUES ($1, $2, $3, '', $4) \
-     RETURNING id, brain_id, type, key, description, created_at",
-  )
+       RETURNING {SUBJECT_COLUMNS}"
+  ))
   .bind(brain_id)
   .bind(&named.kind)
   .bind(&named.key)
@@ -175,10 +182,9 @@ pub(crate) async fn subjects_of(conn: &mut PgConnection, brain_id: i64, ids: &[i
   if ids.is_empty() {
     return Ok(vec![]);
   }
-  let rows: Vec<SubjectRow> = sqlx::query_as(
-    "SELECT id, brain_id, type, key, description, created_at FROM subjects \
-     WHERE brain_id = $1 AND id = ANY($2) ORDER BY id",
-  )
+  let rows: Vec<SubjectRow> = sqlx::query_as(&format!(
+    "SELECT {SUBJECT_COLUMNS} FROM subjects WHERE brain_id = $1 AND id = ANY($2) ORDER BY id"
+  ))
   .bind(brain_id)
   .bind(ids)
   .fetch_all(&mut *conn)
@@ -270,9 +276,18 @@ impl Store {
     let limit = limit(query.limit)?;
     let mut conn = self.connection().await?;
     brain_of(&mut conn, brain_id).await?;
-    let mut sql = QueryBuilder::<Postgres>::new(
-      "SELECT id, brain_id, type, key, description, created_at FROM subjects WHERE brain_id = ",
-    );
+    let ids: Option<Vec<i64>> = query
+      .ids
+      .as_deref()
+      .map(|value| {
+        listed(Some(value))
+          .iter()
+          .map(|id| id.parse().map_err(|_| Fault::BadRequest(format!("ids names {id:?}, which is no id."))))
+          .collect::<Held<Vec<i64>>>()
+      })
+      .transpose()?;
+    let mut sql =
+      QueryBuilder::<Postgres>::new(format!("SELECT {SUBJECT_COLUMNS} FROM subjects WHERE brain_id = "));
     sql.push_bind(brain_id);
     if let Some(kind) = &query.kind {
       sql.push(" AND type = ").push_bind(kind.clone());
@@ -282,6 +297,9 @@ impl Store {
     }
     if let Some(words) = &query.q {
       sql.push(" AND description ILIKE ").push_bind(holding(words));
+    }
+    if let Some(ids) = ids {
+      sql.push(" AND id = ANY(").push_bind(ids).push(")");
     }
     if let Some(after) = query.after {
       sql.push(" AND id > ").push_bind(after);
@@ -334,10 +352,9 @@ impl Store {
   ) -> Held<Subject> {
     description(&body.description)?;
     let mut tx = self.begin().await?;
-    let row: Option<SubjectRow> = sqlx::query_as(
-      "UPDATE subjects SET description = $3 WHERE brain_id = $1 AND id = $2 \
-       RETURNING id, brain_id, type, key, description, created_at",
-    )
+    let row: Option<SubjectRow> = sqlx::query_as(&format!(
+      "UPDATE subjects SET description = $3 WHERE brain_id = $1 AND id = $2 RETURNING {SUBJECT_COLUMNS}"
+    ))
     .bind(brain_id)
     .bind(subject_id)
     .bind(&body.description)

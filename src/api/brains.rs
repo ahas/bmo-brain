@@ -11,7 +11,8 @@ use bmo_brain_client::{
   Brain as BrainMember, BrainsQuery, Confirmations, Consolidated, ExportQuery, Fold, Folded, Hits,
   Injected, Layer, LayerChange, LayersQuery, Learned, Learning, MemoriesQuery, Memory, MemoryMerge,
   MemoryMove, MemoryVersion, NewBrain, NewLayer, NewMemory, NewSubject, Page, PersonaQuery, Recall,
-  RecallAsk, Recorded, SimilarAsk, Subject, SubjectChange, SubjectsQuery, TypeCount, UnconsolidatedQuery,
+  RecallAsk, Recorded, Restoration, SimilarAsk, Subject, SubjectChange, SubjectsQuery, TalliesQuery, Tally,
+  TypeCount, UnconsolidatedQuery,
 };
 
 use super::{Answer, Body, Brain, Key, Query};
@@ -146,6 +147,14 @@ async fn memory_move(
   Ok(Json(brain.store.memory_move(id, memory, &body).await?))
 }
 
+async fn memory_restore(
+  State(brain): State<Brain>,
+  Key((id, memory)): Key<(i64, i64)>,
+  Body(body): Body<Restoration>,
+) -> Answer<Created<Memory>> {
+  Ok(created(brain.store.memory_restore(id, memory, &body).await?))
+}
+
 async fn lineage(
   State(brain): State<Brain>,
   Key((id, lineage)): Key<(i64, i64)>,
@@ -173,6 +182,14 @@ async fn confirmations(
 
 async fn types(State(brain): State<Brain>, Key(id): Key<i64>) -> Answer<Json<Vec<TypeCount>>> {
   Ok(Json(brain.store.types(id).await?))
+}
+
+async fn tallies(
+  State(brain): State<Brain>,
+  Key(id): Key<i64>,
+  Query(query): Query<TalliesQuery>,
+) -> Answer<Json<Vec<Tally>>> {
+  Ok(Json(brain.store.tallies(id, &query).await?))
 }
 
 async fn recall(
@@ -270,11 +287,13 @@ pub fn routes() -> Router<Brain> {
     .route("/brains/{brainId}/memories", get(memories).post(memory_add))
     .route("/brains/{brainId}/memories/{memoryId}", get(memory).patch(memory_move))
     .route("/brains/{brainId}/memories/{memoryId}/versions", post(memory_version))
+    .route("/brains/{brainId}/memories/{memoryId}/restorations", post(memory_restore))
     .route("/brains/{brainId}/merges", post(memory_merge))
     .route("/brains/{brainId}/lineages/{lineageId}", get(lineage))
     .route("/brains/{brainId}/hits", post(hits))
     .route("/brains/{brainId}/confirmations", post(confirmations))
     .route("/brains/{brainId}/types", get(types))
+    .route("/brains/{brainId}/tallies", get(tallies))
     .route("/brains/{brainId}/recall", post(recall))
     .route("/brains/{brainId}/folds", post(fold))
     .route("/brains/{brainId}/learnings", post(learn))

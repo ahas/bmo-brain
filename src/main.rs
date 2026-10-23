@@ -7,6 +7,7 @@
 use std::path::PathBuf;
 use std::process::ExitCode;
 
+use bmo_brain::api::console::{Console, bundle_beside_binary};
 use bmo_brain::api::{Brain, router};
 use bmo_brain::clock;
 use bmo_brain::command::{self, NOUNS};
@@ -94,9 +95,14 @@ async fn serve(config: &Config) -> Result<(), String> {
     .map_err(|why| format!("{}: {why}", config.listen))?;
   println!("bmo-brain: answering on {}", config.listen);
   let clock = clock::stand(store.clone());
+  let console = config.console.as_ref().map(|console| {
+    let folder = console.bundle.clone().or_else(bundle_beside_binary).unwrap_or_default();
+    Console::over(console.token.clone(), &folder)
+  });
   let brain = Brain {
     store,
     token: config.token.clone(),
+    console,
   };
   let served = axum::serve(listener, router(brain))
     .with_graceful_shutdown(stopped())

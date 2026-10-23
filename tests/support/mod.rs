@@ -10,6 +10,7 @@
 use std::str::FromStr;
 use std::sync::atomic::{AtomicU32, Ordering};
 
+use bmo_brain::api::console::Console;
 use bmo_brain::api::{Brain, router};
 use bmo_brain::store::{MIGRATOR, Store};
 use bmo_brain_client::BrainClient;
@@ -19,6 +20,8 @@ use tokio::task::JoinHandle;
 
 /// The token the served brain takes.
 pub const TOKEN: &str = "the-brain-token";
+/// The console's token the served brain takes.
+pub const CONSOLE_TOKEN: &str = "the-console-token";
 
 // What a template's and a copy's names begin with, ahead of the process that made them.
 const TEMPLATE: &str = "brain_rs_tmpl_";
@@ -121,6 +124,15 @@ pub struct Served {
 
 impl Served {
   pub async fn new() -> Served {
+    Self::serving(None).await
+  }
+
+  /// The service serving the console bundle built into this folder, where it holds one.
+  pub async fn with_bundle(folder: &std::path::Path) -> Served {
+    Self::serving(Some(folder)).await
+  }
+
+  async fn serving(bundle: Option<&std::path::Path>) -> Served {
     let template = template().await;
     let database = format!("{COPY}{}_{}", std::process::id(), COPIES.fetch_add(1, Ordering::SeqCst));
     let mut admin = server().await;
@@ -133,9 +145,17 @@ impl Served {
     let store = Store::over(pool);
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let base = format!("http://{}", listener.local_addr().unwrap());
+    let console = match bundle {
+      Some(folder) => Console::over(CONSOLE_TOKEN.to_owned(), folder),
+      None => Console {
+        token: CONSOLE_TOKEN.to_owned(),
+        bundle: None,
+      },
+    };
     let brain = Brain {
       store: store.clone(),
       token: TOKEN.to_owned(),
+      console: Some(console),
     };
     let serving = tokio::spawn(async move {
       axum::serve(listener, router(brain)).await.unwrap();

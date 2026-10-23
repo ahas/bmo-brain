@@ -21,6 +21,20 @@ pub struct Config {
   /// ships no tool env.
   #[serde(default)]
   pub data_root: Option<PathBuf>,
+  /// The console the brain serves its bundle to; none where it serves none.
+  #[serde(default)]
+  pub console: Option<ConsoleConfig>,
+}
+
+/// The console bundle's settings (docs/boundary-api.md, 「The console bundle」).
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ConsoleConfig {
+  /// The console's bearer token, which reaches what the screen uses.
+  pub token: String,
+  /// The folder the build of `client/` wrote the bundle into; the release's `console` where none is given.
+  #[serde(default)]
+  pub bundle: Option<PathBuf>,
 }
 
 /// How long the health command waits on one answer.

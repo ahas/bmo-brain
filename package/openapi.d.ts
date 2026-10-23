@@ -219,7 +219,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** A brain's memories, by type, status, layer, subject, key, lineage, label and words. */
+        /** A brain's memories, by type, status, layer, subject, key, lineage, ids, supersession, label and words, in the order named. */
         get: operations["listBrainMemories"];
         put?: never;
         /** Write a memory as a first version. */
@@ -246,6 +246,23 @@ export interface paths {
         head?: never;
         /** Move a memory's status: approved, done or invalidated. */
         patch: operations["moveMemory"];
+        trace?: never;
+    };
+    "/brains/{brainId}/memories/{memoryId}/restorations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Restore a done or invalidated lineage: a new active version after its newest, closed one. */
+        post: operations["restoreMemory"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/brains/{brainId}/memories/{memoryId}/versions": {
@@ -369,6 +386,23 @@ export interface paths {
         patch: operations["changeSubject"];
         trace?: never;
     };
+    "/brains/{brainId}/tallies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The memories the list's filters name, counted by status, type, layer or subject, with their means. */
+        get: operations["listTallies"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/brains/{brainId}/types": {
         parameters: {
             query?: never;
@@ -395,6 +429,57 @@ export interface paths {
         };
         /** The episodes not yet consolidated, most important first. */
         get: operations["listUnconsolidated"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/console-bundle/words": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The console bundle's words, each locale's tree under the locale's code. */
+        get: operations["readConsoleWords"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/console-bundle/{file}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The console bundle's module or stylesheet, at the name the manifest gives it. */
+        get: operations["readConsoleFile"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/console-manifest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The console bundle's manifest. */
+        get: operations["readConsoleManifest"];
         put?: never;
         post?: never;
         delete?: never;
@@ -567,6 +652,37 @@ export interface components {
             /** Format: int64 */
             at?: number | null;
             memoryIds: number[];
+        };
+        /** @description The console bundle's manifest, in the shape bmo-ui's `console-manifest` module states. */
+        ConsoleManifest: {
+            /** @description The path every call the screen makes stands under. */
+            apiPrefix: string;
+            /** @description The path the module is answered at. */
+            bundle: string;
+            /** @description Whether the screen reads the event stream through the console. */
+            events: boolean;
+            /** @description The icon drawn beside that name. */
+            icon: string;
+            /** @description The bundle's name, in kebab-case: its words' namespace. */
+            name: string;
+            /** @description Whether every call the screen makes needs the reader's owner key. */
+            ownerKey: boolean;
+            /** @description The event kinds a console may raise as a notice to a reader not on the screen. */
+            pushKinds: string[];
+            /** @description The least role a reader holds to open the screen. */
+            role: components["schemas"]["Role"];
+            /** @description The path the bundle's screens stand under. */
+            screenPath: string;
+            /** @description The service's name, which a console relays it under. */
+            serviceName: string;
+            /** @description The path the stylesheet is answered at, where the bundle has one. */
+            stylesheet?: string | null;
+            /** @description The key, in the bundle's words, of the name a console's menu gives the screen. */
+            title: string;
+            /** @description Whether the screen opens a WebSocket through the console. */
+            websocket: boolean;
+            /** @description The path the words are answered at. */
+            words: string;
         };
         /** @description Episodes a consolidation read. */
         Consolidated: {
@@ -813,6 +929,11 @@ export interface components {
              */
             position: number;
             /**
+             * @description Why its status was moved, as the mover said; null where nothing was said.
+             * @default null
+             */
+            reason: string | null;
+            /**
              * Format: double
              * @description The retrieval strength, computed from the hits as the reading answers.
              */
@@ -871,7 +992,11 @@ export interface components {
              * @description When it stopped holding, for `done` and `invalidated`; now where none is given.
              */
             at?: number | null;
+            /** @description Why it moves, kept on the row moved. */
+            reason?: string | null;
             status: components["schemas"]["MemoryStatus"];
+            /** @description For a move to `done`: the words it ended on, written as a new version that is then moved. */
+            text?: string | null;
         };
         /** @description One page of a list, oldest first. */
         MemoryPage: {
@@ -1032,6 +1157,18 @@ export interface components {
             /** Format: int64 */
             recordedCount: number;
         };
+        /** @description A closed lineage restored: a new active version written after its newest, closed one. */
+        Restoration: {
+            actorName: string;
+            /** @description The closed row's text where none is given. */
+            text?: string | null;
+        };
+        /**
+         * @description A role a reader holds, as bmo-ui's console bundle contract names it: an administrator holds every role a
+         *     member holds.
+         * @enum {string}
+         */
+        Role: "administrator" | "member";
         /** @description The rules, key by key as the configuration writes them. */
         Rules: {
             /**
@@ -1184,6 +1321,11 @@ export interface components {
             id: number;
             /** @description The caller's identifier for it, unique within its brain and type. */
             key: string;
+            /**
+             * @description The text of its newest active `name` memory, or null where it has none.
+             * @default null
+             */
+            name: string | null;
             /** @description The caller's word for what it is: a person, a room, a document, a process. */
             type: string;
         };
@@ -1209,6 +1351,41 @@ export interface components {
             key: string;
             type: string;
         };
+        /** @description One group of a tally. */
+        Tally: {
+            /** Format: int64 */
+            count: number;
+            /**
+             * @description The status, the type, or the layer's or subject's id in decimal; null for the rows in no layer or about
+             *     no subject.
+             */
+            group: string | null;
+            /**
+             * Format: double
+             * @description The group's mean importance.
+             */
+            importance: number;
+            /**
+             * Format: int64
+             * @description The latest `validFrom` among the group's rows.
+             */
+            latestValidFrom: number;
+            /**
+             * Format: double
+             * @description The group's mean retrieval strength, as of the reading.
+             */
+            retrievalStrength: number;
+            /**
+             * Format: double
+             * @description The group's mean storage strength.
+             */
+            strength: number;
+        };
+        /**
+         * @description What memories are grouped by in a tally.
+         * @enum {string}
+         */
+        TallyBy: "status" | "type" | "layer" | "subject";
         /** @description A type in use in a brain, and how many rows carry it. */
         TypeCount: {
             /** Format: int64 */
@@ -1246,6 +1423,15 @@ export interface components {
         };
         /** @description `failed`: the service failed */
         Failed: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["WireError"];
+            };
+        };
+        /** @description `forbidden`: the console's token on a route the screen does not use, or without the role it needs */
+        Forbidden: {
             headers: {
                 [name: string]: unknown;
             };
@@ -1322,6 +1508,7 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
         };
     };
     createBrain: {
@@ -1348,6 +1535,7 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             409: components["responses"]["Conflict"];
         };
     };
@@ -1373,6 +1561,7 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
         };
     };
@@ -1398,6 +1587,7 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
         };
     };
@@ -1427,6 +1617,7 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
         };
     };
@@ -1456,6 +1647,7 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
         };
     };
@@ -1484,6 +1676,7 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
         };
     };
@@ -1513,6 +1706,7 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
         };
     };
@@ -1542,6 +1736,7 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
         };
     };
@@ -1571,6 +1766,7 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
         };
     };
@@ -1599,6 +1795,7 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
         };
     };
@@ -1637,6 +1834,7 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
         };
     };
@@ -1663,6 +1861,7 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
         };
     };
@@ -1693,6 +1892,7 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
         };
     };
@@ -1722,6 +1922,7 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
         };
@@ -1749,6 +1950,7 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
         };
     };
@@ -1756,17 +1958,32 @@ export interface operations {
         parameters: {
             query?: {
                 after?: number | null;
+                /** @description Types left out, comma-separated. */
+                excludeTypes?: string | null;
+                /** @description The rows these ids name, comma-separated. */
+                ids?: string | null;
                 key?: string | null;
                 /** @description `key` for rows whose label is set, `key=value` for rows whose label has that value. */
                 label?: string | null;
                 layerId?: number | null;
                 limit?: number | null;
                 lineageId?: number | null;
+                /**
+                 * @description The field the list is ordered by: `id`, `position`, `validFrom`, `importance` or `hits`, descending
+                 *     with a leading `-`; `id` where none is given.
+                 */
+                order?: string | null;
                 /** @description Words the text holds, in any case. */
                 q?: string | null;
-                status?: components["schemas"]["MemoryStatus"] | null;
+                /** @description One status, or several, comma-separated. */
+                status?: string | null;
                 subjectId?: number | null;
+                /** @description The rows superseded by these, comma-separated ids. */
+                supersededBy?: string | null;
+                /** @description One type, or several, comma-separated. */
                 type?: string | null;
+                /** @description True for the rows in no layer. */
+                unfiled?: boolean | null;
             };
             header?: never;
             path: {
@@ -1787,6 +2004,7 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
         };
     };
@@ -1816,6 +2034,7 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
         };
@@ -1843,6 +2062,7 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
         };
     };
@@ -1873,6 +2093,39 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    restoreMemory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                brainId: number;
+                memoryId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Restoration"];
+            };
+        };
+        responses: {
+            /** @description Created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Memory"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
         };
@@ -1904,6 +2157,7 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
         };
@@ -1934,6 +2188,7 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
         };
@@ -1963,6 +2218,7 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
         };
     };
@@ -1992,6 +2248,7 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
         };
     };
@@ -2021,6 +2278,7 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
         };
     };
@@ -2028,6 +2286,8 @@ export interface operations {
         parameters: {
             query?: {
                 after?: number | null;
+                /** @description The subjects these ids name, comma-separated. */
+                ids?: string | null;
                 key?: string | null;
                 limit?: number | null;
                 /** @description Words the description holds, in any case. */
@@ -2053,6 +2313,7 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
         };
     };
@@ -2091,6 +2352,7 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
         };
     };
@@ -2117,6 +2379,7 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
         };
     };
@@ -2147,6 +2410,55 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listTallies: {
+        parameters: {
+            query: {
+                by: components["schemas"]["TallyBy"];
+                /** @description Types left out, comma-separated. */
+                excludeTypes?: string | null;
+                /** @description The rows these ids name, comma-separated. */
+                ids?: string | null;
+                key?: string | null;
+                /** @description `key` for rows whose label is set, `key=value` for rows whose label has that value. */
+                label?: string | null;
+                layerId?: number | null;
+                lineageId?: number | null;
+                /** @description Words the text holds, in any case. */
+                q?: string | null;
+                /** @description One status, or several, comma-separated. */
+                status?: string | null;
+                subjectId?: number | null;
+                /** @description The rows superseded by these, comma-separated ids. */
+                supersededBy?: string | null;
+                /** @description One type, or several, comma-separated. */
+                type?: string | null;
+                /** @description True for the rows in no layer. */
+                unfiled?: boolean | null;
+            };
+            header?: never;
+            path: {
+                brainId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Tally"][];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
         };
     };
@@ -2172,6 +2484,7 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
         };
     };
@@ -2200,6 +2513,81 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    readConsoleWords: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    readConsoleFile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                file: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/css": string;
+                    "text/javascript": string;
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    readConsoleManifest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConsoleManifest"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
         };
     };
@@ -2222,6 +2610,7 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
         };
     };
     listEvents: {
@@ -2256,6 +2645,7 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             410: components["responses"]["Gone"];
         };
     };
@@ -2284,6 +2674,7 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
         };
     };
     listFragments: {
@@ -2321,6 +2712,7 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
         };
     };
     changeFragment: {
@@ -2349,6 +2741,7 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
         };
     };
@@ -2371,6 +2764,7 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
         };
     };
     listMemories: {
@@ -2409,6 +2803,7 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
         };
     };
     changeMemory: {
@@ -2437,6 +2832,7 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
         };

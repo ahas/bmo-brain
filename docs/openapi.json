@@ -31,6 +31,16 @@
         },
         "description": "`failed`: the service failed"
       },
+      "Forbidden": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/WireError"
+            }
+          }
+        },
+        "description": "`forbidden`: the console's token on a route the screen does not use, or without the role it needs"
+      },
       "Gone": {
         "content": {
           "application/json": {
@@ -149,6 +159,89 @@
         "required": [
           "memoryIds",
           "actorName"
+        ],
+        "type": "object"
+      },
+      "ConsoleManifest": {
+        "description": "The console bundle's manifest, in the shape bmo-ui's `console-manifest` module states.",
+        "properties": {
+          "apiPrefix": {
+            "description": "The path every call the screen makes stands under.",
+            "type": "string"
+          },
+          "bundle": {
+            "description": "The path the module is answered at.",
+            "type": "string"
+          },
+          "events": {
+            "description": "Whether the screen reads the event stream through the console.",
+            "type": "boolean"
+          },
+          "icon": {
+            "description": "The icon drawn beside that name.",
+            "type": "string"
+          },
+          "name": {
+            "description": "The bundle's name, in kebab-case: its words' namespace.",
+            "type": "string"
+          },
+          "ownerKey": {
+            "description": "Whether every call the screen makes needs the reader's owner key.",
+            "type": "boolean"
+          },
+          "pushKinds": {
+            "description": "The event kinds a console may raise as a notice to a reader not on the screen.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "role": {
+            "$ref": "#/components/schemas/Role",
+            "description": "The least role a reader holds to open the screen."
+          },
+          "screenPath": {
+            "description": "The path the bundle's screens stand under.",
+            "type": "string"
+          },
+          "serviceName": {
+            "description": "The service's name, which a console relays it under.",
+            "type": "string"
+          },
+          "stylesheet": {
+            "description": "The path the stylesheet is answered at, where the bundle has one.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "title": {
+            "description": "The key, in the bundle's words, of the name a console's menu gives the screen.",
+            "type": "string"
+          },
+          "websocket": {
+            "description": "Whether the screen opens a WebSocket through the console.",
+            "type": "boolean"
+          },
+          "words": {
+            "description": "The path the words are answered at.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "title",
+          "icon",
+          "screenPath",
+          "serviceName",
+          "bundle",
+          "words",
+          "apiPrefix",
+          "role",
+          "ownerKey",
+          "events",
+          "websocket",
+          "pushKinds"
         ],
         "type": "object"
       },
@@ -830,6 +923,14 @@
             "format": "int64",
             "type": "integer"
           },
+          "reason": {
+            "default": null,
+            "description": "Why its status was moved, as the mover said; null where nothing was said.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "retrievalStrength": {
             "description": "The retrieval strength, computed from the hits as the reading answers.",
             "format": "double",
@@ -897,6 +998,7 @@
           "retrievalStrength",
           "consolidatedAt",
           "actorName",
+          "reason",
           "labels",
           "createdAt"
         ],
@@ -1008,8 +1110,22 @@
               "null"
             ]
           },
+          "reason": {
+            "description": "Why it moves, kept on the row moved.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "status": {
             "$ref": "#/components/schemas/MemoryStatus"
+          },
+          "text": {
+            "description": "For a move to `done`: the words it ended on, written as a new version that is then moved.",
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "required": [
@@ -1492,6 +1608,33 @@
         ],
         "type": "object"
       },
+      "Restoration": {
+        "description": "A closed lineage restored: a new active version written after its newest, closed one.",
+        "properties": {
+          "actorName": {
+            "type": "string"
+          },
+          "text": {
+            "description": "The closed row's text where none is given.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "actorName"
+        ],
+        "type": "object"
+      },
+      "Role": {
+        "description": "A role a reader holds, as bmo-ui's console bundle contract names it: an administrator holds every role a\nmember holds.",
+        "enum": [
+          "administrator",
+          "member"
+        ],
+        "type": "string"
+      },
       "Rules": {
         "additionalProperties": false,
         "description": "The rules, key by key as the configuration writes them.",
@@ -1835,6 +1978,14 @@
             "description": "The caller's identifier for it, unique within its brain and type.",
             "type": "string"
           },
+          "name": {
+            "default": null,
+            "description": "The text of its newest active `name` memory, or null where it has none.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "type": {
             "description": "The caller's word for what it is: a person, a room, a document, a process.",
             "type": "string"
@@ -1846,6 +1997,7 @@
           "type",
           "key",
           "description",
+          "name",
           "createdAt"
         ],
         "type": "object"
@@ -1919,6 +2071,61 @@
         ],
         "type": "object"
       },
+      "Tally": {
+        "description": "One group of a tally.",
+        "properties": {
+          "count": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "group": {
+            "description": "The status, the type, or the layer's or subject's id in decimal; null for the rows in no layer or about\nno subject.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "importance": {
+            "description": "The group's mean importance.",
+            "format": "double",
+            "type": "number"
+          },
+          "latestValidFrom": {
+            "description": "The latest `validFrom` among the group's rows.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "retrievalStrength": {
+            "description": "The group's mean retrieval strength, as of the reading.",
+            "format": "double",
+            "type": "number"
+          },
+          "strength": {
+            "description": "The group's mean storage strength.",
+            "format": "double",
+            "type": "number"
+          }
+        },
+        "required": [
+          "group",
+          "count",
+          "importance",
+          "strength",
+          "retrievalStrength",
+          "latestValidFrom"
+        ],
+        "type": "object"
+      },
+      "TallyBy": {
+        "description": "What memories are grouped by in a tally.",
+        "enum": [
+          "status",
+          "type",
+          "layer",
+          "subject"
+        ],
+        "type": "string"
+      },
       "TypeCount": {
         "description": "A type in use in a brain, and how many rows carry it.",
         "properties": {
@@ -1962,7 +2169,7 @@
     },
     "securitySchemes": {
       "bearer": {
-        "description": "The brain's token, from the caller's own configuration.",
+        "description": "The brain's token, or the console's, from the caller's own configuration.",
         "scheme": "bearer",
         "type": "http"
       }
@@ -1971,7 +2178,7 @@
   "info": {
     "description": "An agent's long-term memory as a service. The service keeps many brains, each an account's and one agent's: subjects (what a memory is about, found by type and key), layers (the table of contents) and memories, one row a version, superseded and invalidated but never deleted. A turn asks recall for a block under a token budget; a persona is rendered as the same bytes until a piece changes; a brain moves in and out as a brain file. The memory rows and fragments held under a caller's opaque scope stand for the console's screens until those read brains. Bodies are JSON with camelCase keys, times are epoch milliseconds, lists are pages of items and more, and every failure is the error shape with its status. The harness plugin's tools, each a thin call of one route, are stated under x-tools.",
     "title": "bmo-brain",
-    "version": "0.1.0-rev.17"
+    "version": "0.1.0-rev.18"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -2042,6 +2249,9 @@
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
           }
         },
         "summary": "The brains, by account and agent.",
@@ -2050,8 +2260,10 @@
         ],
         "x-codes": [
           "bad-request",
-          "unauthorized"
-        ]
+          "unauthorized",
+          "forbidden"
+        ],
+        "x-console": "screen"
       },
       "post": {
         "operationId": "createBrain",
@@ -2082,6 +2294,9 @@
           "401": {
             "$ref": "#/components/responses/Unauthorized"
           },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
           "409": {
             "$ref": "#/components/responses/Conflict"
           }
@@ -2093,8 +2308,10 @@
         "x-codes": [
           "bad-request",
           "unauthorized",
+          "forbidden",
           "conflict"
-        ]
+        ],
+        "x-console": "closed"
       }
     },
     "/brains/{brainId}": {
@@ -2128,6 +2345,9 @@
           "401": {
             "$ref": "#/components/responses/Unauthorized"
           },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
@@ -2139,8 +2359,10 @@
         "x-codes": [
           "bad-request",
           "unauthorized",
+          "forbidden",
           "not-found"
-        ]
+        ],
+        "x-console": "closed"
       },
       "get": {
         "operationId": "readBrain",
@@ -2172,6 +2394,9 @@
           "401": {
             "$ref": "#/components/responses/Unauthorized"
           },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
@@ -2183,8 +2408,10 @@
         "x-codes": [
           "bad-request",
           "unauthorized",
+          "forbidden",
           "not-found"
-        ]
+        ],
+        "x-console": "screen"
       }
     },
     "/brains/{brainId}/confirmations": {
@@ -2228,6 +2455,9 @@
           "401": {
             "$ref": "#/components/responses/Unauthorized"
           },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
@@ -2239,8 +2469,10 @@
         "x-codes": [
           "bad-request",
           "unauthorized",
+          "forbidden",
           "not-found"
-        ]
+        ],
+        "x-console": "screen"
       }
     },
     "/brains/{brainId}/consolidated": {
@@ -2284,6 +2516,9 @@
           "401": {
             "$ref": "#/components/responses/Unauthorized"
           },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
@@ -2295,8 +2530,10 @@
         "x-codes": [
           "bad-request",
           "unauthorized",
+          "forbidden",
           "not-found"
-        ]
+        ],
+        "x-console": "closed"
       }
     },
     "/brains/{brainId}/export": {
@@ -2344,6 +2581,9 @@
           "401": {
             "$ref": "#/components/responses/Unauthorized"
           },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
@@ -2355,8 +2595,10 @@
         "x-codes": [
           "bad-request",
           "unauthorized",
+          "forbidden",
           "not-found"
-        ]
+        ],
+        "x-console": "screen"
       }
     },
     "/brains/{brainId}/folds": {
@@ -2400,6 +2642,9 @@
           "401": {
             "$ref": "#/components/responses/Unauthorized"
           },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
@@ -2411,8 +2656,10 @@
         "x-codes": [
           "bad-request",
           "unauthorized",
+          "forbidden",
           "not-found"
-        ]
+        ],
+        "x-console": "closed"
       }
     },
     "/brains/{brainId}/hits": {
@@ -2456,6 +2703,9 @@
           "401": {
             "$ref": "#/components/responses/Unauthorized"
           },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
@@ -2467,8 +2717,10 @@
         "x-codes": [
           "bad-request",
           "unauthorized",
+          "forbidden",
           "not-found"
-        ]
+        ],
+        "x-console": "closed"
       }
     },
     "/brains/{brainId}/injections": {
@@ -2513,6 +2765,9 @@
           "401": {
             "$ref": "#/components/responses/Unauthorized"
           },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
@@ -2524,8 +2779,10 @@
         "x-codes": [
           "bad-request",
           "unauthorized",
+          "forbidden",
           "not-found"
-        ]
+        ],
+        "x-console": "closed"
       }
     },
     "/brains/{brainId}/layers": {
@@ -2583,6 +2840,9 @@
           "401": {
             "$ref": "#/components/responses/Unauthorized"
           },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
@@ -2594,8 +2854,10 @@
         "x-codes": [
           "bad-request",
           "unauthorized",
+          "forbidden",
           "not-found"
-        ]
+        ],
+        "x-console": "screen"
       },
       "post": {
         "operationId": "createLayer",
@@ -2647,6 +2909,9 @@
           "401": {
             "$ref": "#/components/responses/Unauthorized"
           },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
@@ -2658,8 +2923,10 @@
         "x-codes": [
           "bad-request",
           "unauthorized",
+          "forbidden",
           "not-found"
-        ]
+        ],
+        "x-console": "screen"
       }
     },
     "/brains/{brainId}/layers/{layerId}": {
@@ -2702,6 +2969,9 @@
           "401": {
             "$ref": "#/components/responses/Unauthorized"
           },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
@@ -2713,8 +2983,10 @@
         "x-codes": [
           "bad-request",
           "unauthorized",
+          "forbidden",
           "not-found"
-        ]
+        ],
+        "x-console": "screen"
       },
       "patch": {
         "operationId": "changeLayer",
@@ -2765,6 +3037,9 @@
           "401": {
             "$ref": "#/components/responses/Unauthorized"
           },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
@@ -2776,8 +3051,10 @@
         "x-codes": [
           "bad-request",
           "unauthorized",
+          "forbidden",
           "not-found"
-        ]
+        ],
+        "x-console": "screen"
       }
     },
     "/brains/{brainId}/learnings": {
@@ -2821,6 +3098,9 @@
           "401": {
             "$ref": "#/components/responses/Unauthorized"
           },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
           "404": {
             "$ref": "#/components/responses/NotFound"
           },
@@ -2835,9 +3115,11 @@
         "x-codes": [
           "bad-request",
           "unauthorized",
+          "forbidden",
           "not-found",
           "conflict"
-        ]
+        ],
+        "x-console": "screen"
       }
     },
     "/brains/{brainId}/lineages/{lineageId}": {
@@ -2883,6 +3165,9 @@
           "401": {
             "$ref": "#/components/responses/Unauthorized"
           },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
@@ -2894,8 +3179,10 @@
         "x-codes": [
           "bad-request",
           "unauthorized",
+          "forbidden",
           "not-found"
-        ]
+        ],
+        "x-console": "screen"
       }
     },
     "/brains/{brainId}/memories": {
@@ -2919,6 +3206,32 @@
               "format": "int64",
               "type": [
                 "integer",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "Types left out, comma-separated.",
+            "in": "query",
+            "name": "excludeTypes",
+            "required": false,
+            "schema": {
+              "description": "Types left out, comma-separated.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "The rows these ids name, comma-separated.",
+            "in": "query",
+            "name": "ids",
+            "required": false,
+            "schema": {
+              "description": "The rows these ids name, comma-separated.",
+              "type": [
+                "string",
                 "null"
               ]
             }
@@ -2984,6 +3297,19 @@
             }
           },
           {
+            "description": "The field the list is ordered by: `id`, `position`, `validFrom`, `importance` or `hits`, descending\nwith a leading `-`; `id` where none is given.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "description": "The field the list is ordered by: `id`, `position`, `validFrom`, `importance` or `hits`, descending\nwith a leading `-`; `id` where none is given.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
             "description": "Words the text holds, in any case.",
             "in": "query",
             "name": "q",
@@ -2997,17 +3323,15 @@
             }
           },
           {
+            "description": "One status, or several, comma-separated.",
             "in": "query",
             "name": "status",
             "required": false,
             "schema": {
-              "anyOf": [
-                {
-                  "$ref": "#/components/schemas/MemoryStatus"
-                },
-                {
-                  "type": "null"
-                }
+              "description": "One status, or several, comma-separated.",
+              "type": [
+                "string",
+                "null"
               ]
             }
           },
@@ -3024,12 +3348,40 @@
             }
           },
           {
+            "description": "The rows superseded by these, comma-separated ids.",
+            "in": "query",
+            "name": "supersededBy",
+            "required": false,
+            "schema": {
+              "description": "The rows superseded by these, comma-separated ids.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "One type, or several, comma-separated.",
             "in": "query",
             "name": "type",
             "required": false,
             "schema": {
+              "description": "One type, or several, comma-separated.",
               "type": [
                 "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "True for the rows in no layer.",
+            "in": "query",
+            "name": "unfiled",
+            "required": false,
+            "schema": {
+              "description": "True for the rows in no layer.",
+              "type": [
+                "boolean",
                 "null"
               ]
             }
@@ -3052,19 +3404,24 @@
           "401": {
             "$ref": "#/components/responses/Unauthorized"
           },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
         },
-        "summary": "A brain's memories, by type, status, layer, subject, key, lineage, label and words.",
+        "summary": "A brain's memories, by type, status, layer, subject, key, lineage, ids, supersession, label and words, in the order named.",
         "tags": [
           "brain-memories"
         ],
         "x-codes": [
           "bad-request",
           "unauthorized",
+          "forbidden",
           "not-found"
-        ]
+        ],
+        "x-console": "screen"
       },
       "post": {
         "operationId": "writeMemory",
@@ -3106,6 +3463,9 @@
           "401": {
             "$ref": "#/components/responses/Unauthorized"
           },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
           "404": {
             "$ref": "#/components/responses/NotFound"
           },
@@ -3120,9 +3480,11 @@
         "x-codes": [
           "bad-request",
           "unauthorized",
+          "forbidden",
           "not-found",
           "conflict"
-        ]
+        ],
+        "x-console": "screen"
       }
     },
     "/brains/{brainId}/memories/{memoryId}": {
@@ -3165,6 +3527,9 @@
           "401": {
             "$ref": "#/components/responses/Unauthorized"
           },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
@@ -3176,8 +3541,10 @@
         "x-codes": [
           "bad-request",
           "unauthorized",
+          "forbidden",
           "not-found"
-        ]
+        ],
+        "x-console": "screen"
       },
       "patch": {
         "operationId": "moveMemory",
@@ -3228,6 +3595,9 @@
           "401": {
             "$ref": "#/components/responses/Unauthorized"
           },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
           "404": {
             "$ref": "#/components/responses/NotFound"
           },
@@ -3242,9 +3612,85 @@
         "x-codes": [
           "bad-request",
           "unauthorized",
+          "forbidden",
           "not-found",
           "conflict"
-        ]
+        ],
+        "x-console": "screen"
+      }
+    },
+    "/brains/{brainId}/memories/{memoryId}/restorations": {
+      "post": {
+        "operationId": "restoreMemory",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "brainId",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "memoryId",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Restoration"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Memory"
+                }
+              }
+            },
+            "description": "Created."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        },
+        "summary": "Restore a done or invalidated lineage: a new active version after its newest, closed one.",
+        "tags": [
+          "brain-memories"
+        ],
+        "x-codes": [
+          "bad-request",
+          "unauthorized",
+          "forbidden",
+          "not-found",
+          "conflict"
+        ],
+        "x-console": "screen"
       }
     },
     "/brains/{brainId}/memories/{memoryId}/versions": {
@@ -3297,6 +3743,9 @@
           "401": {
             "$ref": "#/components/responses/Unauthorized"
           },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
           "404": {
             "$ref": "#/components/responses/NotFound"
           },
@@ -3311,9 +3760,11 @@
         "x-codes": [
           "bad-request",
           "unauthorized",
+          "forbidden",
           "not-found",
           "conflict"
-        ]
+        ],
+        "x-console": "screen"
       }
     },
     "/brains/{brainId}/merges": {
@@ -3357,6 +3808,9 @@
           "401": {
             "$ref": "#/components/responses/Unauthorized"
           },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
           "404": {
             "$ref": "#/components/responses/NotFound"
           },
@@ -3371,9 +3825,11 @@
         "x-codes": [
           "bad-request",
           "unauthorized",
+          "forbidden",
           "not-found",
           "conflict"
-        ]
+        ],
+        "x-console": "closed"
       }
     },
     "/brains/{brainId}/persona": {
@@ -3420,6 +3876,9 @@
           "401": {
             "$ref": "#/components/responses/Unauthorized"
           },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
@@ -3431,8 +3890,10 @@
         "x-codes": [
           "bad-request",
           "unauthorized",
+          "forbidden",
           "not-found"
-        ]
+        ],
+        "x-console": "screen"
       }
     },
     "/brains/{brainId}/recall": {
@@ -3476,6 +3937,9 @@
           "401": {
             "$ref": "#/components/responses/Unauthorized"
           },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
@@ -3487,8 +3951,10 @@
         "x-codes": [
           "bad-request",
           "unauthorized",
+          "forbidden",
           "not-found"
-        ]
+        ],
+        "x-console": "closed"
       }
     },
     "/brains/{brainId}/similar": {
@@ -3535,6 +4001,9 @@
           "401": {
             "$ref": "#/components/responses/Unauthorized"
           },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
@@ -3546,8 +4015,10 @@
         "x-codes": [
           "bad-request",
           "unauthorized",
+          "forbidden",
           "not-found"
-        ]
+        ],
+        "x-console": "screen"
       }
     },
     "/brains/{brainId}/subjects": {
@@ -3571,6 +4042,19 @@
               "format": "int64",
               "type": [
                 "integer",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "The subjects these ids name, comma-separated.",
+            "in": "query",
+            "name": "ids",
+            "required": false,
+            "schema": {
+              "description": "The subjects these ids name, comma-separated.",
+              "type": [
+                "string",
                 "null"
               ]
             }
@@ -3640,6 +4124,9 @@
           "401": {
             "$ref": "#/components/responses/Unauthorized"
           },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
@@ -3651,8 +4138,10 @@
         "x-codes": [
           "bad-request",
           "unauthorized",
+          "forbidden",
           "not-found"
-        ]
+        ],
+        "x-console": "screen"
       },
       "post": {
         "operationId": "createSubject",
@@ -3704,6 +4193,9 @@
           "401": {
             "$ref": "#/components/responses/Unauthorized"
           },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
@@ -3715,8 +4207,10 @@
         "x-codes": [
           "bad-request",
           "unauthorized",
+          "forbidden",
           "not-found"
-        ]
+        ],
+        "x-console": "screen"
       }
     },
     "/brains/{brainId}/subjects/{subjectId}": {
@@ -3759,6 +4253,9 @@
           "401": {
             "$ref": "#/components/responses/Unauthorized"
           },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
@@ -3770,8 +4267,10 @@
         "x-codes": [
           "bad-request",
           "unauthorized",
+          "forbidden",
           "not-found"
-        ]
+        ],
+        "x-console": "screen"
       },
       "patch": {
         "operationId": "changeSubject",
@@ -3822,6 +4321,9 @@
           "401": {
             "$ref": "#/components/responses/Unauthorized"
           },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
@@ -3833,8 +4335,223 @@
         "x-codes": [
           "bad-request",
           "unauthorized",
+          "forbidden",
           "not-found"
-        ]
+        ],
+        "x-console": "screen"
+      }
+    },
+    "/brains/{brainId}/tallies": {
+      "get": {
+        "operationId": "listTallies",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "brainId",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "by",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/TallyBy"
+            }
+          },
+          {
+            "description": "Types left out, comma-separated.",
+            "in": "query",
+            "name": "excludeTypes",
+            "required": false,
+            "schema": {
+              "description": "Types left out, comma-separated.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "The rows these ids name, comma-separated.",
+            "in": "query",
+            "name": "ids",
+            "required": false,
+            "schema": {
+              "description": "The rows these ids name, comma-separated.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "key",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "`key` for rows whose label is set, `key=value` for rows whose label has that value.",
+            "in": "query",
+            "name": "label",
+            "required": false,
+            "schema": {
+              "description": "`key` for rows whose label is set, `key=value` for rows whose label has that value.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "layerId",
+            "required": false,
+            "schema": {
+              "format": "int64",
+              "type": [
+                "integer",
+                "null"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "lineageId",
+            "required": false,
+            "schema": {
+              "format": "int64",
+              "type": [
+                "integer",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "Words the text holds, in any case.",
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "description": "Words the text holds, in any case.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "One status, or several, comma-separated.",
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "description": "One status, or several, comma-separated.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "subjectId",
+            "required": false,
+            "schema": {
+              "format": "int64",
+              "type": [
+                "integer",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "The rows superseded by these, comma-separated ids.",
+            "in": "query",
+            "name": "supersededBy",
+            "required": false,
+            "schema": {
+              "description": "The rows superseded by these, comma-separated ids.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "One type, or several, comma-separated.",
+            "in": "query",
+            "name": "type",
+            "required": false,
+            "schema": {
+              "description": "One type, or several, comma-separated.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "True for the rows in no layer.",
+            "in": "query",
+            "name": "unfiled",
+            "required": false,
+            "schema": {
+              "description": "True for the rows in no layer.",
+              "type": [
+                "boolean",
+                "null"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Tally"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "summary": "The memories the list's filters name, counted by status, type, layer or subject, with their means.",
+        "tags": [
+          "brain-memories"
+        ],
+        "x-codes": [
+          "bad-request",
+          "unauthorized",
+          "forbidden",
+          "not-found"
+        ],
+        "x-console": "screen"
       }
     },
     "/brains/{brainId}/types": {
@@ -3871,6 +4588,9 @@
           "401": {
             "$ref": "#/components/responses/Unauthorized"
           },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
@@ -3882,8 +4602,10 @@
         "x-codes": [
           "bad-request",
           "unauthorized",
+          "forbidden",
           "not-found"
-        ]
+        ],
+        "x-console": "screen"
       }
     },
     "/brains/{brainId}/unconsolidated": {
@@ -3934,6 +4656,9 @@
           "401": {
             "$ref": "#/components/responses/Unauthorized"
           },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
@@ -3945,8 +4670,134 @@
         "x-codes": [
           "bad-request",
           "unauthorized",
+          "forbidden",
           "not-found"
-        ]
+        ],
+        "x-console": "closed"
+      }
+    },
+    "/console-bundle/words": {
+      "get": {
+        "operationId": "readConsoleWords",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "summary": "The console bundle's words, each locale's tree under the locale's code.",
+        "tags": [
+          "console"
+        ],
+        "x-codes": [
+          "unauthorized",
+          "forbidden",
+          "not-found"
+        ],
+        "x-console": "open"
+      }
+    },
+    "/console-bundle/{file}": {
+      "get": {
+        "operationId": "readConsoleFile",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "file",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/css": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "text/javascript": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "summary": "The console bundle's module or stylesheet, at the name the manifest gives it.",
+        "tags": [
+          "console"
+        ],
+        "x-codes": [
+          "unauthorized",
+          "forbidden",
+          "not-found"
+        ],
+        "x-console": "screen"
+      }
+    },
+    "/console-manifest": {
+      "get": {
+        "operationId": "readConsoleManifest",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsoleManifest"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "summary": "The console bundle's manifest.",
+        "tags": [
+          "console"
+        ],
+        "x-codes": [
+          "unauthorized",
+          "forbidden",
+          "not-found"
+        ],
+        "x-console": "open"
       }
     },
     "/discipline": {
@@ -3965,6 +4816,9 @@
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
           }
         },
         "summary": "The discipline a chat agent's system prompt carries: how it reads and writes its brain every turn.",
@@ -3972,8 +4826,10 @@
           "writing"
         ],
         "x-codes": [
-          "unauthorized"
-        ]
+          "unauthorized",
+          "forbidden"
+        ],
+        "x-console": "closed"
       }
     },
     "/events": {
@@ -4066,6 +4922,9 @@
           "401": {
             "$ref": "#/components/responses/Unauthorized"
           },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
           "410": {
             "$ref": "#/components/responses/Gone"
           }
@@ -4077,8 +4936,10 @@
         "x-codes": [
           "bad-request",
           "unauthorized",
+          "forbidden",
           "gone"
-        ]
+        ],
+        "x-console": "screen"
       }
     },
     "/fragment-kinds": {
@@ -4129,6 +4990,9 @@
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
           }
         },
         "summary": "The kinds of fragment, by name.",
@@ -4137,8 +5001,10 @@
         ],
         "x-codes": [
           "bad-request",
-          "unauthorized"
-        ]
+          "unauthorized",
+          "forbidden"
+        ],
+        "x-console": "closed"
       }
     },
     "/fragments": {
@@ -4286,6 +5152,9 @@
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
           }
         },
         "summary": "Fragments by kind, scope, subject, library, words, state, ids or keys.",
@@ -4294,8 +5163,10 @@
         ],
         "x-codes": [
           "bad-request",
-          "unauthorized"
-        ]
+          "unauthorized",
+          "forbidden"
+        ],
+        "x-console": "closed"
       }
     },
     "/fragments/{fragmentKey}": {
@@ -4338,6 +5209,9 @@
           "401": {
             "$ref": "#/components/responses/Unauthorized"
           },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
@@ -4349,8 +5223,10 @@
         "x-codes": [
           "bad-request",
           "unauthorized",
+          "forbidden",
           "not-found"
-        ]
+        ],
+        "x-console": "closed"
       }
     },
     "/health": {
@@ -4369,6 +5245,9 @@
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
           }
         },
         "summary": "Readiness and version.",
@@ -4376,8 +5255,10 @@
           "health"
         ],
         "x-codes": [
-          "unauthorized"
-        ]
+          "unauthorized",
+          "forbidden"
+        ],
+        "x-console": "closed"
       }
     },
     "/memories": {
@@ -4528,6 +5409,9 @@
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
           }
         },
         "summary": "Memory rows by scope, scope prefix, subject, kind, state, label, due moment and words.",
@@ -4536,8 +5420,10 @@
         ],
         "x-codes": [
           "bad-request",
-          "unauthorized"
-        ]
+          "unauthorized",
+          "forbidden"
+        ],
+        "x-console": "closed"
       }
     },
     "/memories/{memoryId}": {
@@ -4581,6 +5467,9 @@
           "401": {
             "$ref": "#/components/responses/Unauthorized"
           },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
           "404": {
             "$ref": "#/components/responses/NotFound"
           },
@@ -4595,9 +5484,11 @@
         "x-codes": [
           "bad-request",
           "unauthorized",
+          "forbidden",
           "not-found",
           "conflict"
-        ]
+        ],
+        "x-console": "closed"
       }
     }
   },
@@ -4642,6 +5533,9 @@
     },
     {
       "name": "events"
+    },
+    {
+      "name": "console"
     },
     {
       "name": "memories"
@@ -4760,6 +5654,13 @@
           "brainId": {
             "format": "int64",
             "type": "integer"
+          },
+          "ids": {
+            "description": "The subjects these ids name, comma-separated.",
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "key": {
             "type": [
@@ -4922,6 +5823,20 @@
             "format": "int64",
             "type": "integer"
           },
+          "excludeTypes": {
+            "description": "Types left out, comma-separated.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ids": {
+            "description": "The rows these ids name, comma-separated.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "key": {
             "type": [
               "string",
@@ -4956,6 +5871,13 @@
               "null"
             ]
           },
+          "order": {
+            "description": "The field the list is ordered by: `id`, `position`, `validFrom`, `importance` or `hits`, descending\nwith a leading `-`; `id` where none is given.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "q": {
             "description": "Words the text holds, in any case.",
             "type": [
@@ -4964,13 +5886,10 @@
             ]
           },
           "status": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/MemoryStatus"
-              },
-              {
-                "type": "null"
-              }
+            "description": "One status, or several, comma-separated.",
+            "type": [
+              "string",
+              "null"
             ]
           },
           "subjectId": {
@@ -4980,9 +5899,24 @@
               "null"
             ]
           },
-          "type": {
+          "supersededBy": {
+            "description": "The rows superseded by these, comma-separated ids.",
             "type": [
               "string",
+              "null"
+            ]
+          },
+          "type": {
+            "description": "One type, or several, comma-separated.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "unfiled": {
+            "description": "True for the rows in no layer.",
+            "type": [
+              "boolean",
               "null"
             ]
           }
@@ -5360,8 +6294,22 @@
             "format": "int64",
             "type": "integer"
           },
+          "reason": {
+            "description": "Why it moves, kept on the row moved.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "status": {
             "$ref": "#/components/schemas/MemoryStatus"
+          },
+          "text": {
+            "description": "For a move to `done`: the words it ended on, written as a new version that is then moved.",
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "required": [

@@ -57,6 +57,9 @@ pub struct Subject {
   /// The caller's identifier for it, unique within its brain and type.
   pub key: String,
   pub description: String,
+  /// The text of its newest active `name` memory, or null where it has none.
+  #[serde(default)]
+  pub name: Option<String>,
   pub created_at: i64,
 }
 
@@ -98,6 +101,9 @@ pub struct SubjectsQuery {
   /// Words the description holds, in any case.
   #[serde(skip_serializing_if = "Option::is_none")]
   pub q: Option<String>,
+  /// The subjects these ids name, comma-separated.
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub ids: Option<String>,
   #[serde(skip_serializing_if = "Option::is_none")]
   pub after: Option<i64>,
   #[serde(skip_serializing_if = "Option::is_none")]
@@ -246,6 +252,9 @@ pub struct Memory {
   pub consolidated_at: Option<i64>,
   /// Who wrote this version.
   pub actor_name: String,
+  /// Why its status was moved, as the mover said; null where nothing was said.
+  #[serde(default)]
+  pub reason: Option<String>,
   pub labels: Labels,
   pub created_at: i64,
 }
@@ -350,34 +359,135 @@ pub struct MemoryMove {
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub at: Option<i64>,
   pub actor_name: String,
+  /// Why it moves, kept on the row moved.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub reason: Option<String>,
+  /// For a move to `done`: the words it ended on, written as a new version that is then moved.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub text: Option<String>,
+}
+
+/// A closed lineage restored: a new active version written after its newest, closed one.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct Restoration {
+  /// The closed row's text where none is given.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub text: Option<String>,
+  pub actor_name: String,
 }
 
 /// Which memories to list.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct MemoriesQuery {
+  /// One type, or several, comma-separated.
   #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
   pub kind: Option<String>,
+  /// One status, or several, comma-separated.
   #[serde(skip_serializing_if = "Option::is_none")]
-  pub status: Option<MemoryStatus>,
+  pub status: Option<String>,
+  /// Types left out, comma-separated.
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub exclude_types: Option<String>,
   #[serde(skip_serializing_if = "Option::is_none")]
   pub layer_id: Option<i64>,
+  /// True for the rows in no layer.
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub unfiled: Option<bool>,
   #[serde(skip_serializing_if = "Option::is_none")]
   pub subject_id: Option<i64>,
   #[serde(skip_serializing_if = "Option::is_none")]
   pub key: Option<String>,
   #[serde(skip_serializing_if = "Option::is_none")]
   pub lineage_id: Option<i64>,
+  /// The rows these ids name, comma-separated.
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub ids: Option<String>,
+  /// The rows superseded by these, comma-separated ids.
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub superseded_by: Option<String>,
   /// `key` for rows whose label is set, `key=value` for rows whose label has that value.
   #[serde(skip_serializing_if = "Option::is_none")]
   pub label: Option<String>,
   /// Words the text holds, in any case.
   #[serde(skip_serializing_if = "Option::is_none")]
   pub q: Option<String>,
+  /// The field the list is ordered by: `id`, `position`, `validFrom`, `importance` or `hits`, descending
+  /// with a leading `-`; `id` where none is given.
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub order: Option<String>,
   #[serde(skip_serializing_if = "Option::is_none")]
   pub after: Option<i64>,
   #[serde(skip_serializing_if = "Option::is_none")]
   pub limit: Option<i64>,
+}
+
+/// What memories are grouped by in a tally.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum TallyBy {
+  Status,
+  Type,
+  Layer,
+  Subject,
+}
+
+/// Which memories to tally, under the filters the memory list takes, and what to group them by.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct TalliesQuery {
+  pub by: TallyBy,
+  /// One type, or several, comma-separated.
+  #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
+  pub kind: Option<String>,
+  /// One status, or several, comma-separated.
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub status: Option<String>,
+  /// Types left out, comma-separated.
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub exclude_types: Option<String>,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub layer_id: Option<i64>,
+  /// True for the rows in no layer.
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub unfiled: Option<bool>,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub subject_id: Option<i64>,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub key: Option<String>,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub lineage_id: Option<i64>,
+  /// The rows these ids name, comma-separated.
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub ids: Option<String>,
+  /// The rows superseded by these, comma-separated ids.
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub superseded_by: Option<String>,
+  /// `key` for rows whose label is set, `key=value` for rows whose label has that value.
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub label: Option<String>,
+  /// Words the text holds, in any case.
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub q: Option<String>,
+}
+
+/// One group of a tally.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct Tally {
+  /// The status, the type, or the layer's or subject's id in decimal; null for the rows in no layer or about
+  /// no subject.
+  pub group: Option<String>,
+  pub count: i64,
+  /// The group's mean importance.
+  pub importance: f64,
+  /// The group's mean storage strength.
+  pub strength: f64,
+  /// The group's mean retrieval strength, as of the reading.
+  pub retrieval_strength: f64,
+  /// The latest `validFrom` among the group's rows.
+  pub latest_valid_from: i64,
 }
 
 /// A reading that handed memories out.

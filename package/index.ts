@@ -32,12 +32,15 @@ export type Recall = Schemas["Recall"];
 export type RecallAsk = Schemas["RecallAsk"];
 export type RecallChoice = Schemas["RecallChoice"];
 export type Recorded = Schemas["Recorded"];
+export type Restoration = Schemas["Restoration"];
 export type Rules = Schemas["Rules"];
 export type Subject = Schemas["Subject"];
 export type SubjectChange = Schemas["SubjectChange"];
 export type SubjectKey = Schemas["SubjectKey"];
 export type SubjectPage = Schemas["SubjectPage"];
 export type SubjectRef = Schemas["SubjectRef"];
+export type Tally = Schemas["Tally"];
+export type TallyBy = Schemas["TallyBy"];
 export type TypeCount = Schemas["TypeCount"];
 export type Consolidated = Schemas["Consolidated"];
 export type Learned = Schemas["Learned"];
@@ -56,6 +59,8 @@ export type ScopedMemory = Schemas["ScopedMemory"];
 export type ScopedMemoryChange = Schemas["ScopedMemoryChange"];
 export type ScopedMemoryState = Schemas["ScopedMemoryState"];
 export type WireError = Schemas["WireError"];
+export type ConsoleManifest = Schemas["ConsoleManifest"];
+export type Role = Schemas["Role"];
 
 export type BrainClient = Client<paths>;
 

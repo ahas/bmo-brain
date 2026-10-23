@@ -8,11 +8,12 @@ use crate::brains::{
   Brain, BrainsQuery, Confirmations, Consolidated, ExportQuery, Fold, Folded, Hits, Injected, Layer,
   LayerChange, LayersQuery, Learned, Learning, MemoriesQuery, Memory, MemoryMerge, MemoryMove,
   MemoryVersion, NewBrain, NewLayer, NewMemory, NewSubject, PersonaQuery, Recall, RecallAsk, Recorded,
-  SimilarAsk, Subject, SubjectChange, SubjectsQuery, TypeCount, UnconsolidatedQuery,
+  Restoration, SimilarAsk, Subject, SubjectChange, SubjectsQuery, TalliesQuery, Tally, TypeCount,
+  UnconsolidatedQuery,
 };
 use crate::fragments::{Fragment, FragmentKind, FragmentSwitch, FragmentsQuery};
 use crate::memories::{ScopedMemoriesQuery, ScopedMemory, ScopedMemoryChange};
-use crate::wire::{Event, EventsQuery, Health, NameCursor, Page, WireError};
+use crate::wire::{ConsoleManifest, ConsoleWords, Event, EventsQuery, Health, NameCursor, Page, WireError};
 
 /// What a call came to short of the route's answer.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -122,6 +123,21 @@ impl BrainClient {
   /// `GET /health`
   pub async fn health(&self) -> Answer<Health> {
     Self::answered(self.request(Method::GET, &["health"])).await
+  }
+
+  /// `GET /console-manifest`
+  pub async fn console_manifest(&self) -> Answer<ConsoleManifest> {
+    Self::answered(self.request(Method::GET, &["console-manifest"])).await
+  }
+
+  /// `GET /console-bundle/words`
+  pub async fn console_words(&self) -> Answer<ConsoleWords> {
+    Self::answered(self.request(Method::GET, &["console-bundle", "words"])).await
+  }
+
+  /// `GET /console-bundle/{file}`: the module or the stylesheet the manifest names.
+  pub async fn console_file(&self, file: &str) -> Answer<Vec<u8>> {
+    Self::bytes(self.request(Method::GET, &["console-bundle", file])).await
   }
 
   /// `GET /events`, as a page.
@@ -280,6 +296,12 @@ impl BrainClient {
     Self::answered(self.send(Method::PATCH, &path, body)).await
   }
 
+  /// `POST /brains/{brainId}/memories/{memoryId}/restorations`
+  pub async fn memory_restore(&self, brain_id: i64, memory_id: i64, body: &Restoration) -> Answer<Memory> {
+    let path = ["brains", &brain_id.to_string(), "memories", &memory_id.to_string(), "restorations"];
+    Self::answered(self.send(Method::POST, &path, body)).await
+  }
+
   /// `GET /brains/{brainId}/lineages/{lineageId}`
   pub async fn lineage(&self, brain_id: i64, lineage_id: i64) -> Answer<Vec<Memory>> {
     let path = ["brains", &brain_id.to_string(), "lineages", &lineage_id.to_string()];
@@ -299,6 +321,11 @@ impl BrainClient {
   /// `GET /brains/{brainId}/types`
   pub async fn types(&self, brain_id: i64) -> Answer<Vec<TypeCount>> {
     Self::answered(self.request(Method::GET, &["brains", &brain_id.to_string(), "types"])).await
+  }
+
+  /// `GET /brains/{brainId}/tallies`
+  pub async fn tallies(&self, brain_id: i64, query: &TalliesQuery) -> Answer<Vec<Tally>> {
+    Self::answered(self.get(&["brains", &brain_id.to_string(), "tallies"], query)).await
   }
 
   /// `POST /brains/{brainId}/recall`

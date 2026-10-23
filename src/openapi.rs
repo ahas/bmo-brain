@@ -12,11 +12,15 @@ use bmo_brain_client::{
   NewSubject, Page, PersonaQuery, Recall, RecallAsk, Recorded, ScopedMemoriesQuery, ScopedMemory,
   ScopedMemoryChange, Subject, SubjectChange, SubjectsQuery, TypeCount, WireError,
 };
-use bmo_brain_client::{Consolidated, Learned, Learning, SimilarAsk, UnconsolidatedQuery};
+use bmo_brain_client::{
+  ConsoleManifest, ConsoleWords, Consolidated, Learned, Learning, Restoration, SimilarAsk, TalliesQuery,
+  Tally, UnconsolidatedQuery,
+};
 use schemars::generate::{SchemaGenerator, SchemaSettings};
 use schemars::{JsonSchema, Schema};
 use serde_json::{Map, Value, json};
 
+use crate::api::console;
 use crate::mcp::tools;
 
 /// Where the schemas the routes refer to stand in the document.
@@ -67,7 +71,7 @@ struct Route {
 
 impl Route {
   fn operation(self, error: &Schema) -> Value {
-    let mut codes = vec![ErrorCode::Unauthorized];
+    let mut codes = vec![ErrorCode::Unauthorized, ErrorCode::Forbidden];
     codes.extend(self.codes);
     codes.sort_by_key(|code| ErrorCode::ALL.iter().position(|all| all == code));
     codes.dedup();
@@ -101,6 +105,7 @@ impl Route {
       "summary": self.summary,
       "responses": responses,
       "x-codes": codes.iter().map(|code| code.name()).collect::<Vec<_>>(),
+      "x-console": console::reach(self.method, self.path).name(),
     });
     if !self.parameters.is_empty() {
       operation["parameters"] = self.parameters.into();
@@ -358,7 +363,8 @@ fn brain_routes(g: &mut SchemaGenerator) -> Vec<Route> {
       path: "/brains/{brainId}/memories",
       id: "listBrainMemories",
       tag: "brain-memories",
-      summary: "A brain's memories, by type, status, layer, subject, key, lineage, label and words.",
+      summary: "A brain's memories, by type, status, layer, subject, key, lineage, ids, supersession, label and \
+                words, in the order named.",
       parameters: {
         let mut parameters = brain(g);
         parameters.extend(query::<MemoriesQuery>(g));
@@ -430,6 +436,18 @@ fn brain_routes(g: &mut SchemaGenerator) -> Vec<Route> {
       codes: vec![BadRequest, NotFound, Conflict],
     },
     Route {
+      method: "post",
+      path: "/brains/{brainId}/memories/{memoryId}/restorations",
+      id: "restoreMemory",
+      tag: "brain-memories",
+      summary: "Restore a done or invalidated lineage: a new active version after its newest, closed one.",
+      parameters: under(g, "memoryId"),
+      body: body::<Restoration>(g),
+      raw_body: None,
+      answers: vec![(201, json_answer::<Memory>(g))],
+      codes: vec![BadRequest, NotFound, Conflict],
+    },
+    Route {
       method: "get",
       path: "/brains/{brainId}/lineages/{lineageId}",
       id: "readLineage",
@@ -475,6 +493,22 @@ fn brain_routes(g: &mut SchemaGenerator) -> Vec<Route> {
       body: None,
       raw_body: None,
       answers: vec![(200, json_answer::<Vec<TypeCount>>(g))],
+      codes: vec![BadRequest, NotFound],
+    },
+    Route {
+      method: "get",
+      path: "/brains/{brainId}/tallies",
+      id: "listTallies",
+      tag: "brain-memories",
+      summary: "The memories the list's filters name, counted by status, type, layer or subject, with their means.",
+      parameters: {
+        let mut parameters = brain(g);
+        parameters.extend(query::<TalliesQuery>(g));
+        parameters
+      },
+      body: None,
+      raw_body: None,
+      answers: vec![(200, json_answer::<Vec<Tally>>(g))],
       codes: vec![BadRequest, NotFound],
     },
     Route {
@@ -654,6 +688,48 @@ fn service_routes(g: &mut SchemaGenerator) -> Vec<Route> {
     },
     Route {
       method: "get",
+      path: "/console-manifest",
+      id: "readConsoleManifest",
+      tag: "console",
+      summary: "The console bundle's manifest.",
+      parameters: vec![],
+      body: None,
+      raw_body: None,
+      answers: vec![(200, json_answer::<ConsoleManifest>(g))],
+      codes: vec![NotFound],
+    },
+    Route {
+      method: "get",
+      path: "/console-bundle/words",
+      id: "readConsoleWords",
+      tag: "console",
+      summary: "The console bundle's words, each locale's tree under the locale's code.",
+      parameters: vec![],
+      body: None,
+      raw_body: None,
+      answers: vec![(200, json_answer::<ConsoleWords>(g))],
+      codes: vec![NotFound],
+    },
+    Route {
+      method: "get",
+      path: "/console-bundle/{file}",
+      id: "readConsoleFile",
+      tag: "console",
+      summary: "The console bundle's module or stylesheet, at the name the manifest gives it.",
+      parameters: vec![named(g, "file")],
+      body: None,
+      raw_body: None,
+      answers: vec![(
+        200,
+        Some(json!({
+          "text/javascript": { "schema": { "type": "string" } },
+          "text/css": { "schema": { "type": "string" } },
+        })),
+      )],
+      codes: vec![NotFound],
+    },
+    Route {
+      method: "get",
       path: "/memories",
       id: "listMemories",
       tag: "memories",
@@ -773,7 +849,7 @@ pub fn openapi() -> Value {
         "bearer": {
           "type": "http",
           "scheme": "bearer",
-          "description": "The brain's token, from the caller's own configuration.",
+          "description": "The brain's token, or the console's, from the caller's own configuration.",
         },
       },
     },

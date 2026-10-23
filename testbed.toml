@@ -4,20 +4,21 @@ testbed = 0
 name = "brain"
 
 [test]
-# The Cargo workspace's crates, and the TypeScript client under package/, a Bun project whose check script is
-# its typecheck and its tests.
+# The Cargo workspace's crates, and the two Bun projects: the TypeScript client under package/ and the console
+# bundle under client/, each with a check script of its typecheck and its tests.
 languages = ["cargo", "bun"]
-# A fresh tree gets the client's locked packages through the same frozen install the check step runs.
-setup = ["cd package && bun install --frozen-lockfile"]
+# A fresh tree gets each project's locked packages through the same frozen install its check step runs; the
+# service's console test reads its manifest through client/'s copy of bmo-ui.
+setup = ["cd package && bun install --frozen-lockfile", "cd client && bun install --frozen-lockfile"]
 
 # The tests make their own scratch databases on the server, so no template is named.
 [test.database]
 
-# The TypeScript client under package/, a project of its own with its manifest and lockfile; bun runs its
-# check script in the suite, and the check step below runs the same install and check in the static check.
-# The service's own tests stay the Cargo suite's.
+# The TypeScript client under package/ and the console bundle under client/, each a project of its own with
+# its manifest and lockfile; bun runs their check scripts in the suite, and the check steps below run the same
+# install and check in the static check. The service's own tests stay the Cargo suite's.
 [projects]
-paths = ["package"]
+paths = ["package", "client"]
 
 # The brain's own tool, checked by the command its tool.toml names.
 [tools]
@@ -47,9 +48,32 @@ id = "brain-client"
 command = "bun install --frozen-lockfile && bun run check"
 dir = "package"
 
+# The console bundle: its typecheck and its tests.
+[[check.step]]
+id = "brain-console"
+command = "bun install --frozen-lockfile && bun run check"
+dir = "client"
+lane = "wide"
+
 [build]
 # The service's binary, which also starts the harness plugin's MCP server, and the tool host's tool.
 binaries = ["bmo-brain", "brain-tool"]
+
+# The console bundle the service serves (docs/boundary-api.md, 「The console bundle」), built in the build tree,
+# where its install and Nuxt's generated project stay warm between deployments, and written into the release
+# being built: the release beside the build tree, named by the first twelve hex digits of the commit. Its
+# console/ is the folder the service reads its bundle from where the configuration names none, read once as
+# it starts.
+[[build.step]]
+id = "console-install"
+dir = "client"
+command = "bun install --frozen-lockfile"
+
+[[build.step]]
+id = "console-bundle"
+dir = "client"
+lane = "wide"
+command = "BMO_BRAIN_CONSOLE_OUT=\"$(git rev-parse --show-toplevel)/../deploy-releases/$(git rev-parse HEAD | cut -c1-12)/console\" bun run bundle"
 
 # The brain's own deploy tree, and the data root its configuration stands under: env/brain.toml, which each
 # release links to as brain.toml (docs/boundary-api.md, 「Configuration」).

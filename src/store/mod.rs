@@ -10,6 +10,7 @@ pub mod learning;
 pub mod memories;
 pub mod recall;
 pub mod rules;
+pub mod tallies;
 pub mod versions;
 
 use std::time::{SystemTime, UNIX_EPOCH};

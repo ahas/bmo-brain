@@ -201,6 +201,8 @@ impl Store {
               status: MemoryStatus::Invalidated,
               at: Some(at),
               actor_name: body.actor_name.clone(),
+              reason: None,
+              text: None,
             },
           )
           .await?;

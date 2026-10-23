@@ -5,14 +5,14 @@ use std::collections::BTreeMap;
 
 use bmo_brain_client::{
   Confirmations, Hits, Labels, MemoriesQuery, Memory, MemoryMerge, MemoryMove, MemoryStatus, MemoryVersion,
-  NewMemory, Page, SubjectKey, SubjectRef, TypeCount,
+  NewMemory, Page, Restoration, SubjectKey, SubjectRef, TypeCount,
 };
 use sqlx::types::Json;
 use sqlx::{FromRow, PgConnection, Postgres, QueryBuilder};
 
 use super::brains::{brain_of, event_scope, given, layer_of, subject_found_or_made, subjects_of};
 use super::rules::Reckoning as _;
-use super::{Fault, Held, Store, TEXT_MOST, holding, limit, now, page, publish, text};
+use super::{Fault, Held, Store, TEXT_MOST, holding, limit, listed, now, page, publish, text};
 
 /// The types code depends on the meaning of.
 pub const RESERVED_TYPES: [&str; 10] = [
@@ -30,7 +30,7 @@ pub const RESERVED_TYPES: [&str; 10] = [
 
 pub(crate) const MEMORY_COLUMNS: &str = "id, brain_id, key, type, text, layer_id, position, status, lineage_id, \
   superseded_by, valid_from, valid_to, importance, hits, hit_times, last_hit_at, last_confirmed_at, strength, \
-  consolidated_at, actor_name, labels, created_at";
+  consolidated_at, actor_name, reason, labels, created_at";
 
 #[derive(FromRow)]
 pub(crate) struct MemoryRow {
@@ -55,6 +55,7 @@ pub(crate) struct MemoryRow {
   pub strength: f64,
   pub consolidated_at: Option<i64>,
   pub actor_name: String,
+  pub reason: Option<String>,
   pub labels: Json<Labels>,
   pub created_at: i64,
 }
@@ -89,6 +90,7 @@ impl MemoryRow {
       retrieval_strength,
       consolidated_at: self.consolidated_at,
       actor_name: self.actor_name,
+      reason: self.reason,
       labels: self.labels.0,
       created_at: self.created_at,
     })
@@ -164,50 +166,39 @@ impl Store {
     Ok(self.members(conn, vec![row]).await?.remove(0))
   }
 
-  /// A page of a brain's memories.
+  /// A page of a brain's memories, under the filters and in the order the query names.
   pub async fn memories(&self, brain_id: i64, query: &MemoriesQuery) -> Held<Page<Memory>> {
     let limit = limit(query.limit)?;
+    let filter = Filter::of(query)?;
+    let (field, descending) = order(query.order.as_deref())?;
     let mut conn = self.connection().await?;
     brain_of(&mut conn, brain_id).await?;
     let mut sql =
       QueryBuilder::<Postgres>::new(format!("SELECT {MEMORY_COLUMNS} FROM memories WHERE brain_id = "));
     sql.push_bind(brain_id);
-    if let Some(kind) = &query.kind {
-      sql.push(" AND type = ").push_bind(kind.clone());
-    }
-    if let Some(status) = query.status {
-      sql.push(" AND status = ").push_bind(status.name());
-    }
-    if let Some(layer) = query.layer_id {
-      sql.push(" AND layer_id = ").push_bind(layer);
-    }
-    if let Some(subject) = query.subject_id {
-      sql
-        .push(" AND id IN (SELECT memory_id FROM memory_subjects WHERE subject_id = ")
-        .push_bind(subject)
-        .push(")");
-    }
-    if let Some(key) = &query.key {
-      sql.push(" AND key = ").push_bind(key.clone());
-    }
-    if let Some(lineage) = query.lineage_id {
-      sql.push(" AND lineage_id = ").push_bind(lineage);
-    }
-    if let Some(label) = &query.label {
-      match label.split_once('=') {
-        Some((key, value)) => {
-          sql.push(" AND labels @> ").push_bind(Json(serde_json::json!({ key: value })))
-        }
-        None => sql.push(" AND labels ? ").push_bind(label.clone()),
-      };
-    }
-    if let Some(words) = &query.q {
-      sql.push(" AND text ILIKE ").push_bind(holding(words));
-    }
+    filter.push(&mut sql);
+    let (beyond, direction) = if descending { ("<", "DESC") } else { (">", "") };
+    // The page walks the order the list stands in, the field then id, from past the row last seen.
     if let Some(after) = query.after {
-      sql.push(" AND id > ").push_bind(after);
+      if field == "id" {
+        sql.push(format!(" AND id {beyond} ")).push_bind(after);
+      } else {
+        sql
+          .push(format!(
+            " AND ({field}, id) {beyond} (SELECT {field}, id FROM memories WHERE brain_id = "
+          ))
+          .push_bind(brain_id)
+          .push(" AND id = ")
+          .push_bind(after)
+          .push(")");
+      }
     }
-    sql.push(" ORDER BY id LIMIT ").push_bind(limit + 1);
+    if field == "id" {
+      sql.push(format!(" ORDER BY id {direction}"));
+    } else {
+      sql.push(format!(" ORDER BY {field} {direction}, id {direction}"));
+    }
+    sql.push(" LIMIT ").push_bind(limit + 1);
     let rows: Vec<MemoryRow> = sql.build_query_as().fetch_all(&mut *conn).await?;
     Ok(page(self.members(&mut conn, rows).await?, limit))
   }
@@ -561,10 +552,119 @@ impl Store {
     Ok(memory)
   }
 
-  /// A memory's status moved by a caller's word.
+  /// A memory's status moved by a caller's word; a move to `done` with the words it ended on writes them as a
+  /// version first and moves that version.
   pub async fn memory_move(&self, brain_id: i64, id: i64, body: &MemoryMove) -> Held<Memory> {
     let mut tx = self.begin().await?;
-    let memory = self.move_in(&mut tx, brain_id, id, body).await?;
+    let memory = match &body.text {
+      None => self.move_in(&mut tx, brain_id, id, body).await?,
+      Some(_) if body.status != MemoryStatus::Done => {
+        return Err(Fault::BadRequest(format!(
+          "text is the words a move to done ends on; this move is to {}.",
+          body.status.name()
+        )));
+      }
+      Some(words) => {
+        given("actorName", &body.actor_name)?;
+        let was = self.row_of(&mut tx, brain_id, id, false).await?.status()?;
+        if !was.may_move_to(MemoryStatus::Done) {
+          return Err(Fault::Conflict(format!("Memory {id} is {}; it does not move to done.", was.name())));
+        }
+        let at = body.at.unwrap_or_else(now);
+        let version = MemoryVersion {
+          text: Some(words.clone()),
+          kind: None,
+          layer_id: None,
+          position: None,
+          subject_ids: None,
+          subjects: None,
+          importance: None,
+          valid_from: Some(at),
+          actor_name: body.actor_name.clone(),
+          labels: None,
+        };
+        let written = self.version_in(&mut tx, brain_id, id, &version, at).await?;
+        self.move_in(&mut tx, brain_id, written.id, body).await?
+      }
+    };
+    self.commit(tx).await?;
+    Ok(memory)
+  }
+
+  /// A closed lineage restored: a new active version written after its newest version, which is `done` or
+  /// `invalidated` and stays as it was.
+  pub async fn memory_restore(&self, brain_id: i64, id: i64, body: &Restoration) -> Held<Memory> {
+    given("actorName", &body.actor_name)?;
+    if let Some(words) = &body.text {
+      text("text", words, TEXT_MOST)?;
+    }
+    let at = now();
+    let mut tx = self.begin().await?;
+    let closed = self.row_of(&mut tx, brain_id, id, true).await?;
+    let status = closed.status()?;
+    if !matches!(status, MemoryStatus::Done | MemoryStatus::Invalidated) {
+      return Err(Fault::Conflict(format!(
+        "Memory {id} is {}; a restoration follows a done or invalidated row.",
+        status.name()
+      )));
+    }
+    let newest: i64 =
+      sqlx::query_scalar("SELECT MAX(id) FROM memories WHERE brain_id = $1 AND lineage_id = $2")
+        .bind(brain_id)
+        .bind(closed.lineage_id)
+        .fetch_one(&mut *tx)
+        .await?;
+    if newest != id {
+      return Err(Fault::Conflict(format!(
+        "Memory {id} is not the newest of lineage {}; memory {newest} is.",
+        closed.lineage_id
+      )));
+    }
+    if let Some(key) = &closed.key {
+      let holder: Option<i64> = sqlx::query_scalar(
+        "SELECT id FROM memories WHERE brain_id = $1 AND key = $2 AND status IN ('active', 'pending')",
+      )
+      .bind(brain_id)
+      .bind(key)
+      .fetch_optional(&mut *tx)
+      .await?;
+      if let Some(holder) = holder {
+        return Err(Fault::Conflict(format!("Memory {holder} holds the key {key:?} now.")));
+      }
+    }
+    let subject_ids: Vec<i64> =
+      sqlx::query_scalar("SELECT subject_id FROM memory_subjects WHERE memory_id = $1 ORDER BY subject_id")
+        .bind(id)
+        .fetch_all(&mut *tx)
+        .await?;
+    let new_id: i64 = sqlx::query_scalar(
+      "INSERT INTO memories (brain_id, key, type, text, layer_id, position, status, lineage_id, valid_from, \
+       importance, hits, hit_times, last_hit_at, last_confirmed_at, strength, consolidated_at, actor_name, labels, \
+       created_at) VALUES ($1, $2, $3, $4, $5, $6, 'active', $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, \
+       $8) RETURNING id",
+    )
+    .bind(brain_id)
+    .bind(&closed.key)
+    .bind(&closed.kind)
+    .bind(body.text.as_ref().unwrap_or(&closed.text))
+    .bind(closed.layer_id)
+    .bind(closed.position)
+    .bind(closed.lineage_id)
+    .bind(at)
+    .bind(closed.importance)
+    .bind(closed.hits)
+    .bind(&closed.hit_times)
+    .bind(closed.last_hit_at)
+    .bind(closed.last_confirmed_at)
+    .bind(closed.strength)
+    .bind(closed.consolidated_at)
+    .bind(&body.actor_name)
+    .bind(&closed.labels)
+    .fetch_one(&mut *tx)
+    .await?;
+    link_subjects(&mut tx, new_id, &subject_ids).await?;
+    let memory = self.member_of(&mut tx, brain_id, new_id).await?;
+    publish(&mut tx, "memory.written", Some(&event_scope(brain_id)), &memory).await?;
     self.commit(tx).await?;
     Ok(memory)
   }
@@ -578,6 +678,9 @@ impl Store {
     body: &MemoryMove,
   ) -> Held<Memory> {
     given("actorName", &body.actor_name)?;
+    if let Some(reason) = &body.reason {
+      text("reason", reason, REASON_MOST)?;
+    }
     let row = self.row_of(&mut *tx, brain_id, id, true).await?;
     let was = row.status()?;
     if was == body.status {
@@ -596,10 +699,11 @@ impl Store {
       MemoryStatus::Done | MemoryStatus::Invalidated => Some(at),
       _ => None,
     };
-    sqlx::query("UPDATE memories SET status = $2, valid_to = $3 WHERE id = $1")
+    sqlx::query("UPDATE memories SET status = $2, valid_to = $3, reason = $4 WHERE id = $1")
       .bind(id)
       .bind(body.status.name())
       .bind(valid_to)
+      .bind(&body.reason)
       .execute(&mut *tx)
       .await?;
     let memory = self.member_of(&mut *tx, brain_id, id).await?;
@@ -735,6 +839,9 @@ impl Store {
   }
 }
 
+/// The most characters a move's reason holds.
+const REASON_MOST: usize = 2_000;
+
 /// An importance as a row takes it: 1 to 10, 5 where none is given.
 fn importance(asked: Option<i64>) -> Held<i16> {
   match asked {
@@ -792,4 +899,133 @@ pub(crate) async fn link_subjects(
   .execute(&mut *conn)
   .await?;
   Ok(())
+}
+
+/// The filters a memory list and a tally share, read from the query and checked.
+pub(crate) struct Filter {
+  kinds: Vec<String>,
+  statuses: Vec<MemoryStatus>,
+  excluded: Vec<String>,
+  layer_id: Option<i64>,
+  unfiled: bool,
+  subject_id: Option<i64>,
+  key: Option<String>,
+  lineage_id: Option<i64>,
+  ids: Option<Vec<i64>>,
+  superseded_by: Option<Vec<i64>>,
+  label: Option<String>,
+  words: Option<String>,
+}
+
+/// The ids a comma-separated list names, or why one does not read.
+fn ids_listed(field: &str, value: Option<&str>) -> Held<Option<Vec<i64>>> {
+  value
+    .map(|value| {
+      listed(Some(value))
+        .iter()
+        .map(|id| {
+          id.parse()
+            .map_err(|_| Fault::BadRequest(format!("{field} names {id:?}, which is no id.")))
+        })
+        .collect()
+    })
+    .transpose()
+}
+
+impl Filter {
+  /// The filters a memory list's query names.
+  pub(crate) fn of(query: &MemoriesQuery) -> Held<Self> {
+    let statuses = listed(query.status.as_deref())
+      .iter()
+      .map(|name| {
+        MemoryStatus::named(name)
+          .ok_or_else(|| Fault::BadRequest(format!("status names {name:?}, which is no status.")))
+      })
+      .collect::<Held<Vec<_>>>()?;
+    Ok(Self {
+      kinds: listed(query.kind.as_deref()),
+      statuses,
+      excluded: listed(query.exclude_types.as_deref()),
+      layer_id: query.layer_id,
+      unfiled: query.unfiled.unwrap_or(false),
+      subject_id: query.subject_id,
+      key: query.key.clone(),
+      lineage_id: query.lineage_id,
+      ids: ids_listed("ids", query.ids.as_deref())?,
+      superseded_by: ids_listed("supersededBy", query.superseded_by.as_deref())?,
+      label: query.label.clone(),
+      words: query.q.clone(),
+    })
+  }
+
+  /// The conditions pushed onto a query over `memories` already narrowed to one brain.
+  pub(crate) fn push(&self, sql: &mut QueryBuilder<'_, Postgres>) {
+    if !self.kinds.is_empty() {
+      sql.push(" AND type = ANY(").push_bind(self.kinds.clone()).push(")");
+    }
+    if !self.statuses.is_empty() {
+      let names: Vec<&str> = self.statuses.iter().map(|status| status.name()).collect();
+      sql.push(" AND status = ANY(").push_bind(names).push(")");
+    }
+    if !self.excluded.is_empty() {
+      sql.push(" AND NOT (type = ANY(").push_bind(self.excluded.clone()).push("))");
+    }
+    if let Some(layer) = self.layer_id {
+      sql.push(" AND layer_id = ").push_bind(layer);
+    }
+    if self.unfiled {
+      sql.push(" AND layer_id IS NULL");
+    }
+    if let Some(subject) = self.subject_id {
+      sql
+        .push(" AND id IN (SELECT memory_id FROM memory_subjects WHERE subject_id = ")
+        .push_bind(subject)
+        .push(")");
+    }
+    if let Some(key) = &self.key {
+      sql.push(" AND key = ").push_bind(key.clone());
+    }
+    if let Some(lineage) = self.lineage_id {
+      sql.push(" AND lineage_id = ").push_bind(lineage);
+    }
+    if let Some(ids) = &self.ids {
+      sql.push(" AND id = ANY(").push_bind(ids.clone()).push(")");
+    }
+    if let Some(ids) = &self.superseded_by {
+      sql.push(" AND superseded_by = ANY(").push_bind(ids.clone()).push(")");
+    }
+    if let Some(label) = &self.label {
+      match label.split_once('=') {
+        Some((key, value)) => {
+          sql.push(" AND labels @> ").push_bind(Json(serde_json::json!({ key: value })))
+        }
+        None => sql.push(" AND labels ? ").push_bind(label.clone()),
+      };
+    }
+    if let Some(words) = &self.words {
+      sql.push(" AND text ILIKE ").push_bind(holding(words));
+    }
+  }
+}
+
+/// The column a memory list is ordered by and whether it runs descending, as `order` names it.
+fn order(asked: Option<&str>) -> Held<(&'static str, bool)> {
+  let asked = asked.map(str::trim).unwrap_or("id");
+  let (name, descending) = match asked.strip_prefix('-') {
+    Some(name) => (name, true),
+    None => (asked, false),
+  };
+  let column = match name {
+    "id" => "id",
+    "position" => "position",
+    "validFrom" => "valid_from",
+    "importance" => "importance",
+    "hits" => "hits",
+    _ => {
+      return Err(Fault::BadRequest(format!(
+        "order is {asked:?}; it is id, position, validFrom, importance or hits, descending with a leading -."
+      )));
+    }
+  };
+  Ok((column, descending))
 }

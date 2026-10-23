@@ -81,6 +81,7 @@ impl Served {
     let brain = Brain {
       store,
       token: TOKEN.to_owned(),
+      console: None,
     };
     let serving = tokio::spawn(async move {
       axum::serve(listener, router(brain)).await.unwrap();

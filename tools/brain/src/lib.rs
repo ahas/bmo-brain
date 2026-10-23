@@ -353,6 +353,8 @@ pub async fn answer(handed: Handed) -> Result<Answer, String> {
             status,
             at: integer(arguments, "at"),
             actor_name: ACTOR.to_owned(),
+            reason: None,
+            text: None,
           },
         )
         .await
@@ -386,7 +388,7 @@ pub async fn answer(handed: Handed) -> Result<Answer, String> {
           brain,
           &MemoriesQuery {
             kind: string(arguments, "type"),
-            status: string(arguments, "status").and_then(|s| MemoryStatus::named(&s)),
+            status: string(arguments, "status").filter(|s| MemoryStatus::named(s).is_some()),
             subject_id,
             key: string(arguments, "key"),
             q: string(arguments, "words"),

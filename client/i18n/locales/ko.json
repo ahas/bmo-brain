@@ -1,0 +1,160 @@
+{
+  "brain": {
+    "title": { "screen": "브레인" },
+    "action": {
+      "all_versions": "모든 버전",
+      "approve": "승인",
+      "confirm": "맞음",
+      "describe": "설명 고치기",
+      "done": "끝남",
+      "down": "아래로",
+      "edit": "고치기",
+      "export": "브레인 파일로 내보내기",
+      "filters": "필터",
+      "index": "색인",
+      "invalidate": "맞지 않음",
+      "layer_add": "레이어 더하기",
+      "more": "더 보기",
+      "next": "뒤 버전",
+      "open": "열기",
+      "open_live": "살아 있는 버전 열기",
+      "previous": "앞 버전",
+      "restore": "다시 살리기",
+      "similar": "비슷한 기억 찾기",
+      "teach": "가르치기",
+      "up": "위로"
+    },
+    "error": {
+      "conflict": "읽은 뒤에 다른 쓰는 이가 이 기억을 바꿨습니다. 새 버전을 보여 드리고, 쓰던 글은 남겨 둡니다.",
+      "english_only": "기억은 영어로 저장됩니다. 번역기가 이 화면에 닿지 않아 영어로 쓴 글만 저장할 수 있습니다.",
+      "read": "브레인을 읽지 못했습니다.",
+      "save": "저장하지 못했습니다."
+    },
+    "field": {
+      "consolidated": "정리",
+      "description": "설명",
+      "ended_on": "끝난 말",
+      "grounds": "근거",
+      "importance": "중요도",
+      "importance_short": "중요",
+      "key": "키",
+      "label": "라벨",
+      "labels": "라벨",
+      "layer": "레이어",
+      "lineage": "계보",
+      "name": "이름",
+      "position": "자리",
+      "reason": "이유",
+      "source": "출처",
+      "status": "상태",
+      "subjects": "대상",
+      "text": "본문",
+      "type": "유형",
+      "use": "쓰인 정도",
+      "valid_from": "유효 시작",
+      "writer": "쓴 이"
+    },
+    "hint": {
+      "ended_on": "적으면 이 글이 새 버전이 되고, 그 버전이 끝남으로 옮겨집니다.",
+      "english": "영어로 씁니다.",
+      "episode": "에피소드의 본문은 있었던 일 그대로라서 고칠 수 없습니다.",
+      "label": "key 또는 key=value",
+      "labels": "한 줄에 하나씩 key=value",
+      "persona_cache": "페르소나 조각이 바뀌면 렌더링의 바이트가 바뀌어, 이 페르소나를 쓰는 프롬프트의 캐시가 한 번 새로 시작됩니다.",
+      "position": "비우면 레이어의 맨 끝",
+      "reason": "이유는 이 행에 남습니다.",
+      "subjects": "유형:키, 쉼표로 여럿"
+    },
+    "index": {
+      "layers": "레이어",
+      "subjects": "대상",
+      "types": "유형"
+    },
+    "judgement": {
+      "contradicts": "어긋남 (닫고 새로 씀)",
+      "duplicate": "이미 있음 (확인만)",
+      "strengthens": "보강 (새 버전)",
+      "unrelated": "관계없음"
+    },
+    "label": {
+      "as_table": "표로 보기",
+      "brain": "브레인",
+      "count": "수",
+      "group_by": "묶는 기준",
+      "index_search": "색인에서 찾기",
+      "last_confirmed": "마지막 확인",
+      "last_hit": "마지막 인출",
+      "merged_in": "합쳐 들어온 행",
+      "more_count": "외 {n}개",
+      "order": "정렬",
+      "pieces": "조각",
+      "reading": "읽는 방식",
+      "rendering": "렌더링",
+      "reserved": "예약",
+      "retrieval": "인출 강도",
+      "search": "낱말",
+      "similar_count": "비슷한 기억 {n}개",
+      "status": "상태",
+      "strength": "저장 강도",
+      "superseded_by": "대체한 버전 #{id}",
+      "toolbar": "브레인 도구",
+      "type": "유형",
+      "unfiled": "레이어 없음",
+      "use": "인출 {hits}회 · 저장 강도 {strength} · 인출 강도 {retrieval} · 중요도 {importance}",
+      "version_of": "{of}개 중 {n}번째 버전",
+      "view": "보기",
+      "writer_agent": "에이전트",
+      "writer_person": "사람",
+      "writer_tool": "도구"
+    },
+    "order": {
+      "desc_validFrom": "새것 먼저",
+      "validFrom": "오래된 것 먼저",
+      "desc_importance": "중요도 높은 순",
+      "desc_hits": "인출 많은 순",
+      "position": "자리 순"
+    },
+    "status": {
+      "confirmed": "확인을 기록했습니다.",
+      "loading": "브레인을 읽는 중",
+      "map_choose": "가운데 둘 대상을 고르세요.",
+      "no_brains": "브레인이 없습니다.",
+      "no_layers": "레이어가 없습니다.",
+      "no_memory_open": "기억을 고르면 여기에 섭니다.",
+      "nothing": "없습니다.",
+      "superseded_band": "이 버전은 대체되었습니다.",
+      "timeline_empty": "기억을 고르면 그 계보가 여기에 섭니다."
+    },
+    "status_choice": {
+      "active": "활성",
+      "all": "전체",
+      "done": "끝남",
+      "invalidated": "맞지 않음",
+      "live": "살아 있음",
+      "pending": "승인 대기",
+      "superseded": "대체됨"
+    },
+    "status_name": {
+      "active": "활성",
+      "done": "끝남",
+      "invalidated": "맞지 않음",
+      "pending": "승인 대기",
+      "superseded": "대체됨"
+    },
+    "teach": {
+      "learning": "배운 것",
+      "piece": "레이어 조각"
+    },
+    "type_choice": {
+      "but_episodes": "에피소드 뺀 전체",
+      "every": "모든 유형"
+    },
+    "view": {
+      "book": "목차",
+      "bubbles": "버블",
+      "list": "목록",
+      "map": "마인드맵",
+      "timeline": "타임라인"
+    }
+  }
+}

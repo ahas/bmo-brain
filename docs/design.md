@@ -132,7 +132,12 @@ each, so a meaning does not split into two spellings.
   that stands for it now.
 - **A fact that stopped holding is invalidated:** `status` `invalidated`, `validTo` the moment it stopped.
   Nothing points at a replacement. A promise kept or an errand finished is `done`, with `validTo` the moment
-  it was done and the text it ended on as a new version where the writer gives one.
+  it was done and the text it ended on as a new version where the writer gives one. Whoever moves a row may
+  say why, and the reason stays on the row it moved.
+- **A closed lineage is restored by a new version,** never by reopening the closed row: the newest version
+  of a `done` or `invalidated` lineage is followed by a new `active` version in the same lineage, its text
+  the closed one's or the restorer's, and the closed row stays as it was, a record of the span it held for.
+  A lineage that holds a live version already has nothing to restore.
 - **`pending` is one thing only:** a memory waiting for a person's approval. The agent never parks a
   memory as `pending` because it has one source (「Writing」), and it does not offer common knowledge for
   approval either: what members bring to the shared knowledge the agent collects and keeps on its own, as a
@@ -295,24 +300,69 @@ agency's session records.
 
 ## The screen
 
-The brain's console bundle is one screen for a brain: its layers, subjects and memories, each row with its
-versions and its status, editable in place. An edit writes a version; taking a fact down sets its status;
-neither deletes. Into it merge what the document viewer shows of a brain today, the person sheets, the room
-rules, the knowledge, the persona and the lore, and what the memory screen shows, the promises, the checks,
-the states and the situation rules. Switching a reference piece on or off for a room is its status. A
-repository's documents, the rulebooks, the docs and the agents' instructions, are not here: a checkout is
-read in the review screen, and the composed system prompt is the agency's to show. The screen starts from
-the structure, not from a folder tree:
+The brain's console bundle is the screen where a person sees one agent's long-term memory and sets it
+right. The agent never uses it: the agent reads and writes through the brain's tools, and the screen shows
+what came of that. What a person changes there takes the shape a tool's change takes, a new version or a
+status move, and nothing is deleted. The screen is built from `client/` as a browser module on bmo-ui's
+console bundle contract and served by the brain itself (`docs/boundary-api.md`, 「The console bundle」).
 
-- **A mind map:** one subject at the centre, its memories around it, and the other subjects those memories
-  reach, coloured by layer.
-- **A bubble chart:** one circle per layer or subject, sized by its memories, shaded by how warm they are
-  (retrieval strength), so where memory gathers and where it cools is seen at once.
-- **A version timeline:** one lineage on a time axis, each version at its `validFrom`.
-- **A list** is one more view, with the passage questions, the jump and the translated reading the document
-  viewer has today.
+- **Who opens it.** An administrator, and no member. The brain does not know who sits at the screen: the
+  console relays it with its own token and the reader's role, and the screen shows every brain the brain
+  keeps. A write from the screen carries the screen's own `actorName`.
+- **One brain at a time.** The toolbar's first control chooses the brain among those `GET /brains` answers,
+  each by its name. Two brains share nothing, so no list ever mixes them.
+- **The index** stands on the left in three tabs. The layers, in position order, each with its description
+  and its count of live memories, the unfiled last; the subjects, grouped by type, each called by its newest
+  active `name` memory or else by its type and key; the types in use, the reserved ones first, each with its
+  count. Choosing one narrows the memories to it.
+- **The memories** stand in the middle as a table on a wide screen and a list on a phone, narrowed by the
+  toolbar's filters, which are the memory list's query as it stands: status (live, that is `active` and
+  `pending`, by default, or any one status, or all), type (every type but `episode` by default), layer,
+  subject, key, label and words, each status and type with its count. They are ordered newest first by
+  `validFrom`, or by importance or hits; a layer's memories by their position. The filters, the view and the
+  memory open stand in the address, so an address handed on opens the same row.
+- **The row view** stands on the right, or over the list on a phone: the text, the type, the key, the layer
+  and position, the subjects as chips, the grounds (the `episode` subjects and a learning's source), the
+  status with its span, the lineage (which version it is, the versions before and after it, the row that
+  superseded it), the hits, both strengths, the importance, the moment of its consolidation, its writer
+  and its labels. A superseded version opens under a band leading to the live one.
+- **Moves.** Only the moves the status table allows stand as buttons: an `active` row is done or
+  invalidated, a `pending` row is approved to `active`, done or invalidated, a `done` or `invalidated`
+  lineage is restored, a superseded row has none. A move down asks for its reason; a move to `done` may take
+  the words it ended on, written as a version and moved in one call. Confirming a row records a
+  confirmation.
+- **Editing in place.** An edit of a live row's text, type, layer, position, subjects, importance or labels
+  is saved as a new version. An edit is made over the version read: where another writer wrote a version in
+  between, the brain refuses it with a conflict, and the screen shows the new version and keeps the words
+  being written. A closed version, an episode's text, the fields the brain sets (ids, lineage, `validTo`,
+  hits, strengths, the moments) and a subject's type and key and a layer's name are not editable. Layers
+  are added and their descriptions and positions changed, and subjects' descriptions changed, in place.
+- **Teaching.** A person teaches through the write judgement: the screen shows the live memories most like
+  the words to teach, at most ten, the person judges them as a duplicate, a strengthening, a contradiction or
+  new, and one learning with the source `owner` applies it. A piece placed at a position in a layer, a
+  persona's, a lore's or a knowledge piece, is written as a memory into that layer. The brain's memories are
+  English, so the screen saves only English words while no translator reaches it, and says so.
+- **The layer index** reads the persona and the lore like a book: the layers in position order, each layer's
+  pieces in theirs, moved up and down as new versions. A persona layer shows its rendering, the very bytes
+  the brain hands a system prompt, placeholders left as they stand, and a change to a persona piece says
+  first that the prompts built on it start their cache afresh once. A layer is exported as a brain file from
+  here.
+- **A version timeline:** one lineage on a time axis, each version a point at its `validFrom` and a bar for
+  the span it held, the point's colour its status and its mark its writer; the rows a merge folded into it
+  reach it as lines, and the episodes a conclusion rests on stand under the axis at their moments. A point
+  opens the version with the words it changed from the one before.
+- **A bubble chart:** one bubble per type or per layer, its horizontal place the group's mean importance,
+  its vertical place the mean retrieval strength and its size its count of live memories, so the important
+  memories that are cooling stand at the lower right. A bubble narrows the list to its group, and a table
+  shows the same figures.
+- **A mind map:** one subject at the centre, its live memories around it coloured by layer, the strongest
+  first and the rest folded into one count, and the other subjects those memories reach outside them. A
+  memory opens its row; an outer subject comes to the centre.
+- **Live.** The screen reads the brain's event stream narrowed to the brain it shows, and reads again the
+  rows and counts an event touches.
 
-The screen's design is shown to the owner before it is built.
+A repository's documents, the rulebooks, the docs and the agents' instructions, are not here: a checkout is
+read in the review screen, and the composed system prompt is the agency's to show.
 
 ## The order of building
 

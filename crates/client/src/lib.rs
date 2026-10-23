@@ -12,8 +12,8 @@ pub use brains::{
   Brain, BrainsQuery, Confirmations, Consolidated, ExportQuery, Fold, Folded, Hits, Injected, Layer,
   LayerChange, LayersQuery, Learned, Learning, MemoriesQuery, Memory, MemoryMerge, MemoryMove,
   MemoryStatus, MemoryVersion, NewBrain, NewLayer, NewMemory, NewSubject, PersonaQuery, Recall, RecallAsk,
-  RecallChoice, RecallPart, Recorded, Rules, Subject, SubjectChange, SubjectKey, SubjectRef, SubjectsQuery,
-  TypeCount,
+  RecallChoice, RecallPart, Recorded, Restoration, Rules, Subject, SubjectChange, SubjectKey, SubjectRef,
+  SubjectsQuery, TalliesQuery, Tally, TallyBy, TypeCount,
 };
 pub use brains::{SimilarAsk, Source, UnconsolidatedQuery};
 pub use client::{Answer, BrainClient, ClientFailure};
@@ -22,5 +22,6 @@ pub use memories::{ScopedMemoriesQuery, ScopedMemory, ScopedMemoryChange, Scoped
 /// The HTTP client a `BrainClient` calls through, for a caller that sets its own timeout or proxy.
 pub use reqwest::Client as HttpClient;
 pub use wire::{
-  Cursor, ErrorCode, Event, EventsQuery, Health, Labels, NameCursor, Object, Page, WireError, nullable,
+  ConsoleManifest, ConsoleWords, Cursor, ErrorCode, Event, EventsQuery, Health, Labels, NameCursor, Object,
+  Page, Role, WireError, nullable,
 };

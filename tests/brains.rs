@@ -283,6 +283,8 @@ async fn a_memory_is_versioned_never_edited_and_its_key_moves_with_the_live_vers
         status: MemoryStatus::Invalidated,
         at: Some(5_000_000_000_000),
         actor_name: "writer-b".to_owned(),
+        reason: None,
+        text: None,
       },
     )
     .await
@@ -296,6 +298,8 @@ async fn a_memory_is_versioned_never_edited_and_its_key_moves_with_the_live_vers
         status: MemoryStatus::Active,
         at: None,
         actor_name: "writer-b".to_owned(),
+        reason: None,
+        text: None,
       },
     )
     .await;
@@ -316,7 +320,7 @@ async fn a_memory_is_versioned_never_edited_and_its_key_moves_with_the_live_vers
       brain,
       &MemoriesQuery {
         key: Some("home".to_owned()),
-        status: Some(MemoryStatus::Active),
+        status: Some("active".to_owned()),
         ..MemoriesQuery::default()
       },
     )
@@ -341,6 +345,8 @@ async fn a_memory_is_versioned_never_edited_and_its_key_moves_with_the_live_vers
         status: MemoryStatus::Active,
         at: None,
         actor_name: "owner".to_owned(),
+        reason: None,
+        text: None,
       },
     )
     .await
@@ -712,7 +718,7 @@ async fn a_key_may_hold_a_slash_and_an_injected_key_is_held_to_the_same_rule() {
     .memories(
       target,
       &MemoriesQuery {
-        status: Some(MemoryStatus::Active),
+        status: Some("active".to_owned()),
         ..MemoriesQuery::default()
       },
     )
@@ -839,7 +845,7 @@ async fn a_brain_file_is_exported_and_injected_without_overwriting() {
     .memories(
       target,
       &MemoriesQuery {
-        status: Some(MemoryStatus::Active),
+        status: Some("active".to_owned()),
         ..MemoriesQuery::default()
       },
     )

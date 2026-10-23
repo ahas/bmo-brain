@@ -2,27 +2,44 @@
 //! failure answered in the common error shape.
 
 mod brains;
+pub mod console;
 mod events;
 mod routes;
 
 use axum::extract::rejection::{JsonRejection, PathRejection, QueryRejection};
-use axum::extract::{FromRequest, FromRequestParts, Request, State};
+use axum::extract::{FromRequest, FromRequestParts, MatchedPath, Request, State};
 use axum::http::request::Parts;
 use axum::http::{StatusCode, header};
 use axum::middleware::{self, Next};
 use axum::response::{IntoResponse, Response};
 use axum::{Json, Router};
-use bmo_brain_client::{ErrorCode, Health, WireError};
+use bmo_brain_client::{ErrorCode, Health, Role, WireError};
 use serde::de::DeserializeOwned;
 
 use crate::store::{Fault, Store};
 
-/// What the routes stand on: the store and the token every caller presents.
+use self::console::{Console, Reach, SCREEN_ROLE};
+
+/// What the routes stand on: the store, the service's token, and the console the brain serves a bundle to,
+/// where it serves one.
 #[derive(Debug, Clone)]
 pub struct Brain {
   pub store: Store,
   pub token: String,
+  pub console: Option<Console>,
 }
+
+/// Whose token a call carries.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Caller {
+  /// The service's: every route.
+  Service,
+  /// The console's, relaying for a reader: what the screen uses (docs/boundary-api.md, 「The console bundle」).
+  Console,
+}
+
+/// The header the console names the reader's role in.
+const OWNER_ROLE: &str = "owner-role";
 
 /// A failure, answered with its code's status.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -127,15 +144,54 @@ fn path_refused(rejection: &PathRejection) -> ApiError {
   ApiError::new(ErrorCode::BadRequest, format!("The path does not read: {}", rejection.body_text()))
 }
 
-// Every route needs the brain's token as a bearer.
-async fn authorised(State(brain): State<Brain>, request: Request, next: Next) -> Response {
+// Every route needs a token as a bearer: the service's, or the console's where the brain serves one. An empty
+// token lets nobody in.
+async fn authorised(State(brain): State<Brain>, mut request: Request, next: Next) -> Response {
   let presented = request
     .headers()
     .get(header::AUTHORIZATION)
     .and_then(|value| value.to_str().ok())
-    .and_then(|value| value.strip_prefix("Bearer "));
-  if presented != Some(brain.token.as_str()) {
-    return ApiError::new(ErrorCode::Unauthorized, "The bearer token is missing or wrong.").into_response();
+    .and_then(|value| value.strip_prefix("Bearer "))
+    .filter(|token| !token.is_empty());
+  let console = brain.console.as_ref().map(|console| console.token.as_str());
+  let caller = match presented {
+    Some(token) if token == brain.token => Caller::Service,
+    Some(token) if Some(token) == console => Caller::Console,
+    _ => {
+      return ApiError::new(ErrorCode::Unauthorized, "The bearer token is missing or wrong.")
+        .into_response();
+    }
+  };
+  request.extensions_mut().insert(caller);
+  next.run(request).await
+}
+
+// The console's token reaches the manifest and the words with no role, the routes the screen uses with an
+// `Owner-Role` allowing the screen's, and nothing else.
+async fn guarded(request: Request, next: Next) -> Response {
+  if request.extensions().get::<Caller>() == Some(&Caller::Console) {
+    let path = request.extensions().get::<MatchedPath>().map(MatchedPath::as_str).unwrap_or_default();
+    match console::reach(request.method().as_str(), path) {
+      Reach::Open => {}
+      Reach::Screen => {
+        let role = request
+          .headers()
+          .get(OWNER_ROLE)
+          .and_then(|value| value.to_str().ok())
+          .and_then(Role::named);
+        if !role.is_some_and(|role| role.allows(SCREEN_ROLE)) {
+          return ApiError::new(
+            ErrorCode::Forbidden,
+            format!("The request names no role allowing the screen's, {}.", SCREEN_ROLE.name()),
+          )
+          .into_response();
+        }
+      }
+      Reach::Closed => {
+        return ApiError::new(ErrorCode::Forbidden, "The console's token does not reach this route.")
+          .into_response();
+      }
+    }
   }
   next.run(request).await
 }
@@ -167,8 +223,12 @@ pub fn router(brain: Brain) -> Router {
     .route("/health", axum::routing::get(health))
     .route("/events", axum::routing::get(events::events))
     .route("/discipline", axum::routing::get(discipline))
+    .route("/console-manifest", axum::routing::get(console::manifest))
+    .route("/console-bundle/words", axum::routing::get(console::words))
+    .route("/console-bundle/{file}", axum::routing::get(console::file))
     .merge(routes::routes())
     .merge(brains::routes())
+    .route_layer(middleware::from_fn(guarded))
     .fallback(no_route)
     .method_not_allowed_fallback(no_route)
     .layer(middleware::from_fn_with_state(brain.clone(), authorised))
