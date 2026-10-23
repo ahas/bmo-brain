@@ -44,6 +44,13 @@ it as you read, in the turn itself. Nothing writes it for you.
 - A fold also clears the brain's marks for your session (`brain_fold`), so what you knew may attach to the
   next session.
 
+## The language of a memory
+
+- **Write every memory in English,** whatever language the room speaks: the episode's text, the fact, the
+  rule, the sheet. The brain is read by prompts written in English, and one language keeps one meaning
+  under one spelling. Keep a short quotation in the original words only where the exact wording matters,
+  such as a name someone is called or a phrase the owner set as a rule.
+
 ## What not to write
 
 - Nothing a live memory already states: confirm it instead.

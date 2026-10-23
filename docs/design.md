@@ -157,6 +157,8 @@ the brain's tools. It writes in two moments.
   handed out as something heard, standing beside the facts and never closing one. A rumor becomes a fact when
   the person confirms it or a second source agrees. The brain holds this rule: a learning whose source is
   hearsay or inference is written as a rumor whatever it was called, and closes nothing.
+- **A memory is written in English,** whatever language the room speaks; a short quotation in the original
+  words stands only where the exact wording matters.
 - **Who writes is recorded** on the version as `actorName`: the agent's session, the tool it used, or the
   person who changed it at the screen.
 
