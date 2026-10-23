@@ -500,7 +500,8 @@ entries in the `bmo` namespace, each for a session holding the `room.chat` capab
 host's call protocol states.
 
 - **It finds the brain** by `BRAIN_ADDRESS` and `BRAIN_TOKEN` in its own environment, else in `env/brain.env`
-  under the data root the record's `BMO_DATA_DIR` names, which `bmo-brain --config <file> tool-env` writes
+  under the data root the record's `BMO_DATA_DIR` names, else the deployment's conventional data root under
+  the home the host passes through, which `bmo-brain --config <file> tool-env` writes
   from the configuration before a deployment flips.
 - **It finds the agent's brain** by the turn's agent, `BMO_TURN_AGENT` in the record's variables, else the
   record's holder: the one brain registered for that agent key. The turn's room, `BMO_TURN_CHAT`, is the room

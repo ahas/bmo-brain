@@ -117,11 +117,14 @@ fn env_lines(path: &Path) -> Vec<(String, String)> {
 
 /// The brain the call reaches, from the tool's environment or the data root's env file.
 pub fn brain_at(session: &Session) -> Result<BrainClient, String> {
+  // The data root: the record's, else this process's, else the deployment's conventional one under the home
+  // the host passes through.
   let root = session
     .variables
     .get(DATA_ROOT_VARIABLE)
     .map(PathBuf::from)
-    .or_else(|| std::env::var(DATA_ROOT_VARIABLE).ok().map(PathBuf::from));
+    .or_else(|| std::env::var(DATA_ROOT_VARIABLE).ok().map(PathBuf::from))
+    .or_else(|| std::env::var("HOME").ok().map(|home| PathBuf::from(home).join(".local/share/bmo/data")));
   let file = root.map(|root| env_lines(&root.join(ENV_FILE))).unwrap_or_default();
   let address = variable(ADDRESS_VARIABLE, &file).ok_or_else(|| {
     format!("no {ADDRESS_VARIABLE} in this tool's environment or in the data root's {ENV_FILE}")
