@@ -11,8 +11,7 @@ bmo-chat's `docs/conventions.md`; this document takes them from there and states
 An agent's long-term memory as a service (`docs/design.md`). The service keeps many brains, each an
 account's and one agent's: its subjects, its layers and its memories, one row a version. A turn asks a
 brain's recall for a block under a token budget; a persona is rendered as the same bytes until a piece
-changes; a brain moves in and out as a brain file. The brain calls one unit, the agency, for the
-recollector's sessions, and nothing else.
+changes; a brain moves in and out as a brain file. The brain never executes and calls no other unit.
 
 - **A brain is keyed by `accountKey` and `agentKey`,** strings the caller gives and the brain never reads.
   Every subject, layer and memory belongs to one brain and is reached under its id.
@@ -198,6 +197,24 @@ where none is given). It answers `block`, the text the turn is handed; `chosen`,
   <text>)`.
 
 `POST /folds` takes `sessionKey` and clears that session's marks, answering `clearedCount`.
+
+### Writing
+
+The agent writes its memories as it reads (`docs/design.md`, 「Writing」); these routes are the judgement's
+material and its mechanics.
+
+| Route | Does | Answers |
+|---|---|---|
+| `POST /similar` | `text`, `subjects` (each `type` and `key`), `limit` (10 where none, at most 50): the live memories most like the candidate, about one of its subjects or holding its words, neither an `episode` nor a `persona`, scored by the share of the candidate's words they hold and a shared subject | 200, a list |
+| `POST /learnings` | a learning applied whole in one transaction: `type`, `text`, `subjects`, `importance`, `source` (`own`, `owner`, `told`, `inferred`), `confirms` (ids confirmed), `strengthens` (an id given a new version with the text), `replaces` (ids invalidated, unless the source is heard), `grounds` (episode ids linked as subjects of type `episode`), `key`, `layerId`, `actorName`, `labels` | 201: `confirmedCount`, `invalidatedIds`, `written` (the version written, or null where the learning only confirms), `versioned`; 400 for a ground that is no episode; 409 where `strengthens` names a row that is not live |
+| `GET /unconsolidated` | the active `episode` rows not yet consolidated, most important first; `limit` (60 where none, at most 500) | 200, a list |
+| `POST /consolidated` | `episodeIds`: marks them consolidated | 200, `recordedCount` |
+
+A `told` or `inferred` learning of type `fact` is written as a `rumor`, and replaces nothing. Its `source` is
+kept in the row's labels. The recall answer carries `unconsolidatedImportance`, the sum of the importance of
+the unconsolidated episodes, and `consolidationDue`, whether it has reached the brain's threshold.
+
+The skill ships the discipline a chat agent's system prompt carries, `skills/brain-harness/every-turn.md`.
 
 ### Persona
 
@@ -504,6 +521,10 @@ server sends no notifications.
 | `brain_types` | `GET /brains/{brainId}/types` |
 | `brain_recall` | `POST /brains/{brainId}/recall` |
 | `brain_fold` | `POST /brains/{brainId}/folds` |
+| `brain_learn` | `POST /brains/{brainId}/learnings` |
+| `brain_similar` | `POST /brains/{brainId}/similar` |
+| `brain_unconsolidated` | `GET /brains/{brainId}/unconsolidated` |
+| `brain_consolidated` | `POST /brains/{brainId}/consolidated` |
 | `brain_persona` | `GET /brains/{brainId}/persona` |
 | `brain_memories` | `GET /memories` |
 | `brain_memory_add` | `POST /memories` |

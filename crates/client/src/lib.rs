@@ -12,11 +12,12 @@ mod watches;
 mod wire;
 
 pub use brains::{
-  Brain, BrainsQuery, Confirmations, ExportQuery, Fold, Folded, Hits, Injected, Layer, LayerChange,
-  LayersQuery, MemoriesQuery, Memory, MemoryMove, MemoryStatus, MemoryVersion, NewBrain, NewLayer,
-  NewMemory, NewSubject, Recall, RecallAsk, RecallChoice, RecallPart, Recorded, Rules, Subject,
-  SubjectChange, SubjectKey, SubjectRef, SubjectsQuery, TypeCount,
+  Brain, BrainsQuery, Confirmations, Consolidated, ExportQuery, Fold, Folded, Hits, Injected, Layer,
+  LayerChange, LayersQuery, Learned, Learning, MemoriesQuery, Memory, MemoryMove, MemoryStatus,
+  MemoryVersion, NewBrain, NewLayer, NewMemory, NewSubject, Recall, RecallAsk, RecallChoice, RecallPart,
+  Recorded, Rules, Subject, SubjectChange, SubjectKey, SubjectRef, SubjectsQuery, TypeCount,
 };
+pub use brains::{SimilarAsk, Source, UnconsolidatedQuery};
 pub use client::{Answer, BrainClient, ClientFailure};
 pub use fragments::{
   Drift, DriftChange, Fragment, FragmentHits, FragmentHitsRecorded, FragmentKind, FragmentMerge,

@@ -19,9 +19,11 @@ agent reads is a file.
 - **A fact is one row, and a change is a new row.** A row is never deleted and never edited in place. A
   correction writes a new version that supersedes the old one, and a fact that no longer holds is closed and
   hidden, with the moment it stopped holding. Who changed what, and when, is read off the versions.
-- **The brain writes its own memories.** The recollector, the part that judges what a conversation adds to
-  what is already known and that consolidates episodes into facts, is the brain's. It runs on model
-  sessions the agency supplies; what to write, when and how is decided here.
+- **The agent writes its memories as it reads.** The chat agent, the supervisor of its rooms, reads every
+  message of them anyway, so it decides at that moment what the brain learns and writes it through the
+  brain's tools; the discipline of a turn is a text the brain ships and the agent's system prompt carries. The brain supplies the
+  judgement's material, the live memories like a candidate, and does the judgement's mechanics: a confirmation,
+  a version, a closed fact, a new row, in one call. The brain runs no model and calls no unit.
 - **Per turn it hands out a short block,** chosen by relevance, importance and strength under a token
   budget, never the whole store, and never anything that goes into a system prompt. The persona is the one
   exception: it is rendered on demand as the same bytes every time, so a prompt built on it keeps its cache.
@@ -87,18 +89,18 @@ One row is one thing the agent remembers, in one version.
 | `lineageId` | the id of the first version in this row's line; a first version's own id |
 | `supersededBy` | the id of the version that replaced this one, or null |
 | `validFrom`, `validTo` | the span the memory holds for; `validTo` null while it holds |
-| `importance` | the recollector's weight at the time of writing, 1 to 10 |
+| `importance` | the writer's weight at the time of writing, 1 to 10 |
 | `hits`, `lastHitAt` | how often, and when last, a reading handed it out |
 | `lastConfirmedAt` | when the memory was last confirmed by a source apart from the reading |
 | `strength` | its storage strength, raised only by spaced confirmations (「Strength and decay」) |
-| `actorName` | who wrote this version: the recollector's run, a tool, a person at the screen |
+| `actorName` | who wrote this version: the agent's session, a tool, a person at the screen |
 | `labels` | the caller's own metadata, a map of strings |
 | `createdAt` | when this version was written |
 
 ### Types
 
-`type` is a word the recollector writes freely. A few are reserved because code depends on their meaning;
-every other value is whatever the recollector called it, and the brain lists the types in use with a count
+`type` is a word the writer writes freely. A few are reserved because code depends on their meaning;
+every other value is whatever the writer called it, and the brain lists the types in use with a count
 each, so a meaning does not split into two spellings.
 
 | Reserved type | Means |
@@ -125,7 +127,7 @@ each, so a meaning does not split into two spellings.
 - **A fact that stopped holding is invalidated:** `status` `invalidated`, `validTo` the moment it stopped.
   Nothing points at a replacement. A promise kept or an errand finished is `done`, with `validTo` the moment
   it was done and the text it ended on as a new version where the writer gives one.
-- **`pending` is one thing only:** a memory waiting for a person's approval. The recollector never parks a
+- **`pending` is one thing only:** a memory waiting for a person's approval. The agent never parks a
   memory as `pending` because it has one source (「Writing」), and it does not offer common knowledge for
   approval either: what members bring to the shared knowledge the agent collects and keeps on its own, as a
   fact or a rumor by the rule below. A `pending` row is one a person asked to be approved.
@@ -137,43 +139,41 @@ each, so a meaning does not split into two spellings.
 
 ## Writing
 
-The recollector is handed what a conversation said, who said it and in which room, and decides what the
-brain learns from it. It writes in two moments.
+The agent, reading a message in its turn, decides what the brain learns from it and writes it then, through
+the brain's tools. It writes in two moments.
 
-- **Episodes at once.** What was said is kept as `episode` rows, each linked to its speakers and its room,
-  with an `importance` the recollector weighs from how surprising and how consequential it is. Episodes are
-  the material consolidation reads and are never consolidated away.
-- **The write judgement for every fact.** Before a fact is written, the recollector reads the live memories
-  of the same subjects most like it, at most ten, and judges the candidate as one of four: a duplicate
-  (nothing is written; the existing row's `lastConfirmedAt` and strength move), a strengthening (a new
-  version of the existing lineage with the fuller text), a contradiction (the old row is closed and the new
-  one written, 「Versions」) or new (a first version).
+- **Episodes at once.** What was said that may matter later is kept as `episode` rows, each linked to its
+  speakers and its room, with an `importance` the agent weighs from how surprising and how consequential it
+  is. Episodes are the material consolidation reads and are never consolidated away.
+- **The write judgement for every fact.** Before a fact is written, the agent asks the brain for the live
+  memories of the same subjects most like it, at most ten, and judges the candidate as one of four: a
+  duplicate (nothing is written; the existing row's `lastConfirmedAt` and strength move), a strengthening (a
+  new version of the existing lineage with the fuller text), a contradiction (the old row is closed and the new
+  one written, 「Versions」) or new (a first version). The judgement is the agent's; the brain applies it whole
+  in one call, so a judgement is never half applied.
 - **A single source is enough when it is the person's own word.** What someone says about themselves, and
-  what the owner instructs, is written as a `fact` at once and closes the fact it contradicts, with no
-  second
-  source waited for. What is told about someone else, and what the recollector infers, is written as a
-  `rumor`: handed out as something heard, standing beside the facts and never closing one. A rumor becomes a
-  fact when the person confirms it or a second source agrees.
-- **Who writes is recorded** on the version as `actorName`: the recollector's run, the tool a session
-  used, or the person who changed it at the screen.
+  what the owner instructs, is written as a `fact` at once and closes the fact it contradicts, with no second
+  source waited for. What is told about someone else, and what the agent infers, is written as a `rumor`:
+  handed out as something heard, standing beside the facts and never closing one. A rumor becomes a fact when
+  the person confirms it or a second source agrees. The brain holds this rule: a learning whose source is
+  hearsay or inference is written as a rumor whatever it was called, and closes nothing.
+- **Who writes is recorded** on the version as `actorName`: the agent's session, the tool it used, or the
+  person who changed it at the screen.
 
 ## Consolidation
 
-Consolidation is the brain's own pass, outside any answer: it reads episodes not yet consolidated, together
-with the live facts about the same subjects, and writes semantic facts, reflections and corrections from
-them. It takes the episodes with the highest importance first.
+Consolidation is the agent's pass outside any answer: it reads episodes not yet consolidated, together with
+the live facts about the same subjects, and writes semantic facts, reflections and corrections from them. It
+takes the episodes with the highest importance first.
 
-- **Two triggers, and no others:** the sum of the importance of a brain's unconsolidated episodes reaching
-  the brain's threshold, and a session being folded or handed off. There is no nightly pass, no pass every N
+- **Two triggers, and no others:** the sum of the importance of a brain's unconsolidated episodes reaching the
+  brain's threshold, and a session being folded or handed off. There is no nightly pass, no pass every N
   turns and no periodic mode: the importance trigger is what stands in for one, the hand-off trigger is the
   other mode.
-- **The fold is told to the brain** by the caller that folds the session, on the consolidation route; the
-  importance trigger is the brain's own clock.
-- **It runs as a model session the brain asks the agency for,** apart, with the recollector's prompt
-  document and no tools but the brain's own; the brain reads what it writes back and ends the session. The
-  agency is the one unit the brain calls, and it calls it for sessions alone. Which provider and model a
-  brain's recollector runs on is the brain's settings.
-- **What it writes passes the write judgement** like any fact.
+- **The brain says when it is due:** every recall answers whether the importance threshold is reached, and
+  the agent consolidates in its turn when it is, and at its fold. The brain reads the unconsolidated
+  episodes out, most important first, and is told which it consolidated; it runs no pass of its own.
+- **What the agent writes passes the write judgement** like any fact, through the same call.
 
 ## Strength and decay
 
@@ -256,15 +256,15 @@ is the brain's offer, the caller's is the last word.
   rule id and its grantee among its subjects. Revoking a rule invalidates it.
 - **A person is a subject** of type `person`, keyed by the id the caller knows them by. Their standing sheet
   is a `sheet` row linked to them, and a room's sheet of them is a `sheet` row linked to them and the room.
-  The recollector writes and rewrites sheets as versions.
+  The agent writes and rewrites sheets as versions.
 - **What a user said in one room stays in that room's memories** unless it is theirs: the reading narrows
   by the room's subject, and the one carry-over, a user's own words into their private room, is the caller's
   to ask for by naming both rooms.
 
 ## What the brain acts on by itself
 
-- **Its clock:** the importance trigger of consolidation, the pruning of its event window, and nothing else.
-- **Its one outgoing call:** a model session from the agency, for the recollector.
+- **Its clock:** the pruning of its event window, and nothing else.
+- **No outgoing call.** The brain calls no unit and runs no model; what it holds is written by its callers.
 
 Reminders, waits on events and watches are not the brain's: a wait is a tool run outside the brain, which
 runs the thing waited for, holds it, and wakes the agent with the memory it was told to carry. The brain
@@ -325,8 +325,8 @@ The screen's design is shown to the owner before it is built.
 1. The three tables, the brain member, versions, the reference and recall routes, the type list, export and
    injection, the data move, the client in both languages and the documents, with the old routes still
    answering.
-2. The recollector: episodes, the write judgement, consolidation on its two triggers, strength, through
-   sessions asked of the agency.
+2. The writing: the material of the write judgement, the one call that applies it, the consolidation
+   reads and marks, and the due signal in recall.
 3. The readers move: the reference selection onto recall, the room rules and sheets onto the subject routes,
    the session records onto the agency's own; then the old routes and tables go. Once the reference
    selection reads this structure, its training data is rebuilt on it and its decision model retrained, at

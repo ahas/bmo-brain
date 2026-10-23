@@ -212,6 +212,9 @@ impl Store {
     }
     for (score, candidate) in ranked {
       let memory = candidate.memory;
+      if candidate.relevance <= 0.0 {
+        continue;
+      }
       if memory
         .subjects
         .iter()
@@ -251,12 +254,15 @@ impl Store {
         self.hit(&mut tx, brain_id, &handed, ask.session_key.as_deref(), at).await?;
       }
     }
+    let unconsolidated_importance = self.unconsolidated_importance(&mut tx, brain_id).await?;
     self.commit(tx).await?;
     Ok(Recall {
       block: lines.join("\n"),
       chosen,
       token_count: spent,
       budget_tokens: budget,
+      unconsolidated_importance,
+      consolidation_due: unconsolidated_importance >= self.rules.consolidation_threshold,
     })
   }
 

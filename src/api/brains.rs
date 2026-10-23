@@ -8,10 +8,10 @@ use axum::http::{StatusCode, header};
 use axum::response::{IntoResponse, Json, Response};
 use axum::routing::{get, post};
 use bmo_brain_client::{
-  Brain as BrainMember, BrainsQuery, Confirmations, ExportQuery, Fold, Folded, Hits, Injected, Layer,
-  LayerChange, LayersQuery, MemoriesQuery, Memory, MemoryMove, MemoryVersion, NewBrain, NewLayer,
-  NewMemory, NewSubject, Page, Recall, RecallAsk, Recorded, Subject, SubjectChange, SubjectsQuery,
-  TypeCount,
+  Brain as BrainMember, BrainsQuery, Confirmations, Consolidated, ExportQuery, Fold, Folded, Hits,
+  Injected, Layer, LayerChange, LayersQuery, Learned, Learning, MemoriesQuery, Memory, MemoryMove,
+  MemoryVersion, NewBrain, NewLayer, NewMemory, NewSubject, Page, Recall, RecallAsk, Recorded, SimilarAsk,
+  Subject, SubjectChange, SubjectsQuery, TypeCount, UnconsolidatedQuery,
 };
 
 use super::{Answer, Body, Brain, Key, Query};
@@ -184,6 +184,39 @@ async fn fold(
   Ok(Json(Folded { cleared_count }))
 }
 
+async fn learn(
+  State(brain): State<Brain>,
+  Key(id): Key<i64>,
+  Body(body): Body<Learning>,
+) -> Answer<Created<Learned>> {
+  Ok(created(brain.store.learn(id, &body).await?))
+}
+
+async fn similar(
+  State(brain): State<Brain>,
+  Key(id): Key<i64>,
+  Body(body): Body<SimilarAsk>,
+) -> Answer<Json<Vec<Memory>>> {
+  Ok(Json(brain.store.similar(id, &body).await?))
+}
+
+async fn unconsolidated(
+  State(brain): State<Brain>,
+  Key(id): Key<i64>,
+  Query(query): Query<UnconsolidatedQuery>,
+) -> Answer<Json<Vec<Memory>>> {
+  Ok(Json(brain.store.unconsolidated(id, query.limit).await?))
+}
+
+async fn consolidated(
+  State(brain): State<Brain>,
+  Key(id): Key<i64>,
+  Body(body): Body<Consolidated>,
+) -> Answer<Json<Recorded>> {
+  let recorded_count = brain.store.consolidated(id, &body.episode_ids).await?;
+  Ok(Json(Recorded { recorded_count }))
+}
+
 async fn persona(State(brain): State<Brain>, Key(id): Key<i64>) -> Answer<Response> {
   let text = brain.store.persona(id).await?;
   Ok(([(header::CONTENT_TYPE, "text/plain; charset=utf-8")], text).into_response())
@@ -229,6 +262,10 @@ pub fn routes() -> Router<Brain> {
     .route("/brains/{brainId}/types", get(types))
     .route("/brains/{brainId}/recall", post(recall))
     .route("/brains/{brainId}/folds", post(fold))
+    .route("/brains/{brainId}/learnings", post(learn))
+    .route("/brains/{brainId}/similar", post(similar))
+    .route("/brains/{brainId}/unconsolidated", get(unconsolidated))
+    .route("/brains/{brainId}/consolidated", post(consolidated))
     .route("/brains/{brainId}/persona", get(persona))
     .route("/brains/{brainId}/export", get(export))
     .route("/brains/{brainId}/injections", post(inject))

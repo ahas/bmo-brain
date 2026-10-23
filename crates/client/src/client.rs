@@ -5,9 +5,10 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 
 use crate::brains::{
-  Brain, BrainsQuery, Confirmations, ExportQuery, Fold, Folded, Hits, Injected, Layer, LayerChange,
-  LayersQuery, MemoriesQuery, Memory, MemoryMove, MemoryVersion, NewBrain, NewLayer, NewMemory, NewSubject,
-  Recall, RecallAsk, Recorded, Subject, SubjectChange, SubjectsQuery, TypeCount,
+  Brain, BrainsQuery, Confirmations, Consolidated, ExportQuery, Fold, Folded, Hits, Injected, Layer,
+  LayerChange, LayersQuery, Learned, Learning, MemoriesQuery, Memory, MemoryMove, MemoryVersion, NewBrain,
+  NewLayer, NewMemory, NewSubject, Recall, RecallAsk, Recorded, SimilarAsk, Subject, SubjectChange,
+  SubjectsQuery, TypeCount, UnconsolidatedQuery,
 };
 use crate::fragments::{
   Fragment, FragmentHits, FragmentHitsRecorded, FragmentKind, FragmentMerge, FragmentSplit, FragmentSwitch,
@@ -528,5 +529,25 @@ impl BrainClient {
       .header(reqwest::header::CONTENT_TYPE, "application/vnd.sqlite3")
       .body(file);
     Self::answered(request).await
+  }
+
+  /// `POST /brains/{brainId}/learnings`
+  pub async fn learn(&self, brain_id: i64, body: &Learning) -> Answer<Learned> {
+    Self::answered(self.send(Method::POST, &["brains", &brain_id.to_string(), "learnings"], body)).await
+  }
+
+  /// `POST /brains/{brainId}/similar`
+  pub async fn similar(&self, brain_id: i64, body: &SimilarAsk) -> Answer<Vec<Memory>> {
+    Self::answered(self.send(Method::POST, &["brains", &brain_id.to_string(), "similar"], body)).await
+  }
+
+  /// `GET /brains/{brainId}/unconsolidated`
+  pub async fn unconsolidated(&self, brain_id: i64, query: &UnconsolidatedQuery) -> Answer<Vec<Memory>> {
+    Self::answered(self.get(&["brains", &brain_id.to_string(), "unconsolidated"], query)).await
+  }
+
+  /// `POST /brains/{brainId}/consolidated`
+  pub async fn consolidated(&self, brain_id: i64, body: &Consolidated) -> Answer<Recorded> {
+    Self::answered(self.send(Method::POST, &["brains", &brain_id.to_string(), "consolidated"], body)).await
   }
 }

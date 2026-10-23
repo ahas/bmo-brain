@@ -17,6 +17,7 @@ use bmo_brain_client::{
   ScopedMemoryMatch, SessionAsk, SessionLoads, SessionNote, Subject, SubjectChange, SubjectsQuery,
   TypeCount, Watch, WatchChange, WatchesQuery, WireError,
 };
+use bmo_brain_client::{Consolidated, Learned, Learning, SimilarAsk, UnconsolidatedQuery};
 use schemars::generate::{SchemaGenerator, SchemaSettings};
 use schemars::{JsonSchema, Schema};
 use serde_json::{Map, Value, json};
@@ -492,6 +493,58 @@ fn brain_routes(g: &mut SchemaGenerator) -> Vec<Route> {
       body: body::<Fold>(g),
       raw_body: None,
       answers: vec![(200, json_answer::<Folded>(g))],
+      codes: vec![BadRequest, NotFound],
+    },
+    Route {
+      method: "post",
+      path: "/brains/{brainId}/learnings",
+      id: "learn",
+      tag: "writing",
+      summary: "Apply a learning whole: confirm, version, close and write by its judgement and source.",
+      parameters: brain(g),
+      body: body::<Learning>(g),
+      raw_body: None,
+      answers: vec![(201, json_answer::<Learned>(g))],
+      codes: vec![BadRequest, NotFound, Conflict],
+    },
+    Route {
+      method: "post",
+      path: "/brains/{brainId}/similar",
+      id: "similar",
+      tag: "writing",
+      summary: "The live memories most like a candidate, the write judgement's material.",
+      parameters: brain(g),
+      body: body::<SimilarAsk>(g),
+      raw_body: None,
+      answers: vec![(200, json_answer::<Vec<Memory>>(g))],
+      codes: vec![BadRequest, NotFound],
+    },
+    Route {
+      method: "get",
+      path: "/brains/{brainId}/unconsolidated",
+      id: "listUnconsolidated",
+      tag: "writing",
+      summary: "The episodes not yet consolidated, most important first.",
+      parameters: {
+        let mut parameters = brain(g);
+        parameters.extend(query::<UnconsolidatedQuery>(g));
+        parameters
+      },
+      body: None,
+      raw_body: None,
+      answers: vec![(200, json_answer::<Vec<Memory>>(g))],
+      codes: vec![BadRequest, NotFound],
+    },
+    Route {
+      method: "post",
+      path: "/brains/{brainId}/consolidated",
+      id: "markConsolidated",
+      tag: "writing",
+      summary: "Mark episodes consolidated.",
+      parameters: brain(g),
+      body: body::<Consolidated>(g),
+      raw_body: None,
+      answers: vec![(200, json_answer::<Recorded>(g))],
       codes: vec![BadRequest, NotFound],
     },
     Route {

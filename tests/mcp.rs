@@ -1,5 +1,5 @@
 //! The harness plugin: `bmo-brain mcp --brain <url>` starts an MCP server on standard input and output that
-//! lists exactly the plugin's thirty-four tools, and each call reaches the served brain through its client. The
+//! lists exactly the plugin's thirty-eight tools, and each call reaches the served brain through its client. The
 //! command runs as its own process, spoken to over its pipes, and is taken down before each test ends.
 
 mod support;
@@ -16,7 +16,7 @@ use tokio::process::{Child, ChildStdin, ChildStdout, Command};
 const PATIENCE: Duration = Duration::from_secs(30);
 
 /// The tools the plugin offers.
-const TOOLS: [&str; 34] = [
+const TOOLS: [&str; 38] = [
   "brain_brains",
   "brain_brain_add",
   "brain_subjects",
@@ -33,6 +33,10 @@ const TOOLS: [&str; 34] = [
   "brain_types",
   "brain_recall",
   "brain_fold",
+  "brain_learn",
+  "brain_similar",
+  "brain_unconsolidated",
+  "brain_consolidated",
   "brain_persona",
   "brain_memories",
   "brain_memory_add",

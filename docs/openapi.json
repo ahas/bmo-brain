@@ -164,6 +164,22 @@
         ],
         "type": "object"
       },
+      "Consolidated": {
+        "description": "Episodes a consolidation read.",
+        "properties": {
+          "episodeIds": {
+            "items": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "episodeIds"
+        ],
+        "type": "object"
+      },
       "Done": {
         "description": "That the call was done.",
         "properties": {
@@ -923,6 +939,142 @@
         "required": [
           "items",
           "more"
+        ],
+        "type": "object"
+      },
+      "Learned": {
+        "description": "What a learning came to.",
+        "properties": {
+          "confirmedCount": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "invalidatedIds": {
+            "items": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "versioned": {
+            "description": "Whether the row written is a new version of an existing memory.",
+            "type": "boolean"
+          },
+          "written": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Memory"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The version written, as a first version or over the memory strengthened; null where only confirmed."
+          }
+        },
+        "required": [
+          "confirmedCount",
+          "invalidatedIds",
+          "written",
+          "versioned"
+        ],
+        "type": "object"
+      },
+      "Learning": {
+        "description": "One thing the agent learned, with its judgement against the live memories like it.",
+        "properties": {
+          "actorName": {
+            "type": "string"
+          },
+          "confirms": {
+            "default": [],
+            "description": "Live memories this merely repeats: confirmed, and nothing written where nothing else is judged.",
+            "items": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "grounds": {
+            "default": [],
+            "description": "The episodes this rests on, linked as subjects of type `episode`.",
+            "items": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "importance": {
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "key": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "labels": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "default": {},
+            "type": "object"
+          },
+          "layerId": {
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "replaces": {
+            "default": [],
+            "description": "Live memories this contradicts: closed before the new row is written, unless the source is heard.",
+            "items": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "source": {
+            "$ref": "#/components/schemas/Source"
+          },
+          "strengthens": {
+            "description": "The live memory this says more fully: a new version of it is written.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "subjects": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/SubjectKey"
+            },
+            "type": "array"
+          },
+          "text": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "text",
+          "subjects",
+          "source",
+          "confirms",
+          "replaces",
+          "grounds",
+          "actorName",
+          "labels"
         ],
         "type": "object"
       },
@@ -2004,7 +2156,16 @@
             },
             "type": "array"
           },
+          "consolidationDue": {
+            "description": "Whether that sum has reached the brain's threshold, so a consolidation is due.",
+            "type": "boolean"
+          },
           "tokenCount": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "unconsolidatedImportance": {
+            "description": "The sum of the importance of the brain's unconsolidated episodes.",
             "format": "int64",
             "type": "integer"
           }
@@ -2013,7 +2174,9 @@
           "block",
           "chosen",
           "tokenCount",
-          "budgetTokens"
+          "budgetTokens",
+          "unconsolidatedImportance",
+          "consolidationDue"
         ],
         "type": "object"
       },
@@ -2764,6 +2927,59 @@
         ],
         "type": "object"
       },
+      "SimilarAsk": {
+        "description": "A candidate memory, whose likes the write judgement reads.",
+        "properties": {
+          "limit": {
+            "description": "Ten where none is given, at most fifty.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "subjects": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/SubjectKey"
+            },
+            "type": "array"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "text",
+          "subjects"
+        ],
+        "type": "object"
+      },
+      "Source": {
+        "description": "Where a learning came from, which decides whether it stands as a fact on its own.",
+        "oneOf": [
+          {
+            "const": "own",
+            "description": "The person said it about themselves.",
+            "type": "string"
+          },
+          {
+            "const": "owner",
+            "description": "The owner stated or instructed it.",
+            "type": "string"
+          },
+          {
+            "const": "told",
+            "description": "Someone said it about someone else.",
+            "type": "string"
+          },
+          {
+            "const": "inferred",
+            "description": "The agent concluded it.",
+            "type": "string"
+          }
+        ]
+      },
       "Subject": {
         "description": "Something a memory can be about, found by its type and key alone.",
         "properties": {
@@ -3054,7 +3270,7 @@
   "info": {
     "description": "An agent's long-term memory as a service. The service keeps many brains, each an account's and one agent's: subjects (what a memory is about, found by type and key), layers (the table of contents) and memories, one row a version, superseded and invalidated but never deleted. A turn asks recall for a block under a token budget; a persona is rendered as the same bytes until a piece changes; a brain moves in and out as a brain file. The rows held under a caller's opaque scope (memory rows, notes, watches, reminders, fragments, libraries, locks and the caller's own records) keep answering until their readers move to the brains. Bodies are JSON with camelCase keys, times are epoch milliseconds, lists are pages of items and more, and every failure is the error shape with its status. The harness plugin's tools, each a thin call of one route, are stated under x-tools.",
     "title": "bmo-brain",
-    "version": "0.1.0-rev.7"
+    "version": "0.1.0-rev.8"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -3318,6 +3534,62 @@
         "summary": "Record confirmations: each row's storage strength raised by the gap since its last.",
         "tags": [
           "brain-memories"
+        ],
+        "x-codes": [
+          "bad-request",
+          "unauthorized",
+          "not-found"
+        ]
+      }
+    },
+    "/brains/{brainId}/consolidated": {
+      "post": {
+        "operationId": "markConsolidated",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "brainId",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Consolidated"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Recorded"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "summary": "Mark episodes consolidated.",
+        "tags": [
+          "writing"
         ],
         "x-codes": [
           "bad-request",
@@ -3804,6 +4076,66 @@
           "bad-request",
           "unauthorized",
           "not-found"
+        ]
+      }
+    },
+    "/brains/{brainId}/learnings": {
+      "post": {
+        "operationId": "learn",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "brainId",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Learning"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Learned"
+                }
+              }
+            },
+            "description": "Created."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        },
+        "summary": "Apply a learning whole: confirm, version, close and write by its judgement and source.",
+        "tags": [
+          "writing"
+        ],
+        "x-codes": [
+          "bad-request",
+          "unauthorized",
+          "not-found",
+          "conflict"
         ]
       }
     },
@@ -4385,6 +4717,65 @@
         ]
       }
     },
+    "/brains/{brainId}/similar": {
+      "post": {
+        "operationId": "similar",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "brainId",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SimilarAsk"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Memory"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "summary": "The live memories most like a candidate, the write judgement's material.",
+        "tags": [
+          "writing"
+        ],
+        "x-codes": [
+          "bad-request",
+          "unauthorized",
+          "not-found"
+        ]
+      }
+    },
     "/brains/{brainId}/subjects": {
       "get": {
         "operationId": "listSubjects",
@@ -4713,6 +5104,69 @@
         "summary": "The types in use, counted, the reserved ones first.",
         "tags": [
           "brain-memories"
+        ],
+        "x-codes": [
+          "bad-request",
+          "unauthorized",
+          "not-found"
+        ]
+      }
+    },
+    "/brains/{brainId}/unconsolidated": {
+      "get": {
+        "operationId": "listUnconsolidated",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "brainId",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Sixty where none is given, at most five hundred.",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "description": "Sixty where none is given, at most five hundred.",
+              "format": "int64",
+              "type": [
+                "integer",
+                "null"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Memory"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "summary": "The episodes not yet consolidated, most important first.",
+        "tags": [
+          "writing"
         ],
         "x-codes": [
           "bad-request",
@@ -7204,6 +7658,9 @@
       "name": "recall"
     },
     {
+      "name": "writing"
+    },
+    {
       "name": "persona"
     },
     {
@@ -8112,6 +8569,222 @@
         "$ref": "#/components/schemas/Folded"
       },
       "route": "POST /brains/{brainId}/folds"
+    },
+    {
+      "description": "Apply a learning whole: confirm the memories it repeats, version the one it strengthens, close the ones it contradicts (unless heard), and write it as a fact or a rumor by its source.",
+      "input": {
+        "description": "A brain and what a route of it takes.",
+        "properties": {
+          "actorName": {
+            "type": "string"
+          },
+          "brainId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "confirms": {
+            "default": [],
+            "description": "Live memories this merely repeats: confirmed, and nothing written where nothing else is judged.",
+            "items": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "grounds": {
+            "default": [],
+            "description": "The episodes this rests on, linked as subjects of type `episode`.",
+            "items": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "importance": {
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "key": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "labels": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "default": {},
+            "type": "object"
+          },
+          "layerId": {
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "replaces": {
+            "default": [],
+            "description": "Live memories this contradicts: closed before the new row is written, unless the source is heard.",
+            "items": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "source": {
+            "$ref": "#/components/schemas/Source"
+          },
+          "strengthens": {
+            "description": "The live memory this says more fully: a new version of it is written.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "subjects": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/SubjectKey"
+            },
+            "type": "array"
+          },
+          "text": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "brainId",
+          "type",
+          "text",
+          "subjects",
+          "source",
+          "confirms",
+          "replaces",
+          "grounds",
+          "actorName",
+          "labels"
+        ],
+        "type": "object"
+      },
+      "name": "brain_learn",
+      "output": {
+        "$ref": "#/components/schemas/Learned"
+      },
+      "route": "POST /brains/{brainId}/learnings"
+    },
+    {
+      "description": "The live memories most like a candidate: read these before brain_learn and judge the candidate against them.",
+      "input": {
+        "description": "A brain and what a route of it takes.",
+        "properties": {
+          "brainId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "limit": {
+            "description": "Ten where none is given, at most fifty.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "subjects": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/SubjectKey"
+            },
+            "type": "array"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "brainId",
+          "text",
+          "subjects"
+        ],
+        "type": "object"
+      },
+      "name": "brain_similar",
+      "output": {
+        "items": {
+          "$ref": "#/components/schemas/Memory"
+        },
+        "type": "array"
+      },
+      "route": "POST /brains/{brainId}/similar"
+    },
+    {
+      "description": "The episodes not yet consolidated, most important first.",
+      "input": {
+        "description": "A brain and what a route of it takes.",
+        "properties": {
+          "brainId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "limit": {
+            "description": "Sixty where none is given, at most five hundred.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "brainId"
+        ],
+        "type": "object"
+      },
+      "name": "brain_unconsolidated",
+      "output": {
+        "items": {
+          "$ref": "#/components/schemas/Memory"
+        },
+        "type": "array"
+      },
+      "route": "GET /brains/{brainId}/unconsolidated"
+    },
+    {
+      "description": "Mark episodes consolidated after writing what they come to.",
+      "input": {
+        "description": "A brain and what a route of it takes.",
+        "properties": {
+          "brainId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "episodeIds": {
+            "items": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "brainId",
+          "episodeIds"
+        ],
+        "type": "object"
+      },
+      "name": "brain_consolidated",
+      "output": {
+        "$ref": "#/components/schemas/Recorded"
+      },
+      "route": "POST /brains/{brainId}/consolidated"
     },
     {
       "description": "The persona rendered as text.",

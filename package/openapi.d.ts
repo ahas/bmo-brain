@@ -57,6 +57,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/brains/{brainId}/consolidated": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark episodes consolidated. */
+        post: operations["markConsolidated"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/brains/{brainId}/export": {
         parameters: {
             query?: never;
@@ -159,6 +176,23 @@ export interface paths {
         head?: never;
         /** Change a layer's description or position. */
         patch: operations["changeLayer"];
+        trace?: never;
+    };
+    "/brains/{brainId}/learnings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Apply a learning whole: confirm, version, close and write by its judgement and source. */
+        post: operations["learn"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/brains/{brainId}/lineages/{lineageId}": {
@@ -265,6 +299,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/brains/{brainId}/similar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** The live memories most like a candidate, the write judgement's material. */
+        post: operations["similar"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/brains/{brainId}/subjects": {
         parameters: {
             query?: never;
@@ -310,6 +361,23 @@ export interface paths {
         };
         /** The types in use, counted, the reserved ones first. */
         get: operations["listTypes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/brains/{brainId}/unconsolidated": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The episodes not yet consolidated, most important first. */
+        get: operations["listUnconsolidated"];
         put?: never;
         post?: never;
         delete?: never;
@@ -890,6 +958,10 @@ export interface components {
             at?: number | null;
             memoryIds: number[];
         };
+        /** @description Episodes a consolidation read. */
+        Consolidated: {
+            episodeIds: number[];
+        };
         /** @description That the call was done. */
         Done: {
             ok: boolean;
@@ -1119,6 +1191,54 @@ export interface components {
             items: components["schemas"]["Layer"][];
             /** @description Whether anything stands past the last item. */
             more: boolean;
+        };
+        /** @description What a learning came to. */
+        Learned: {
+            /** Format: int64 */
+            confirmedCount: number;
+            invalidatedIds: number[];
+            /** @description Whether the row written is a new version of an existing memory. */
+            versioned: boolean;
+            /** @description The version written, as a first version or over the memory strengthened; null where only confirmed. */
+            written: components["schemas"]["Memory"] | null;
+        };
+        /** @description One thing the agent learned, with its judgement against the live memories like it. */
+        Learning: {
+            actorName: string;
+            /**
+             * @description Live memories this merely repeats: confirmed, and nothing written where nothing else is judged.
+             * @default []
+             */
+            confirms: number[];
+            /**
+             * @description The episodes this rests on, linked as subjects of type `episode`.
+             * @default []
+             */
+            grounds: number[];
+            /** Format: int64 */
+            importance?: number | null;
+            key?: string | null;
+            /** @default {} */
+            labels: {
+                [key: string]: string;
+            };
+            /** Format: int64 */
+            layerId?: number | null;
+            /**
+             * @description Live memories this contradicts: closed before the new row is written, unless the source is heard.
+             * @default []
+             */
+            replaces: number[];
+            source: components["schemas"]["Source"];
+            /**
+             * Format: int64
+             * @description The live memory this says more fully: a new version of it is written.
+             */
+            strengthens?: number | null;
+            /** @default [] */
+            subjects: components["schemas"]["SubjectKey"][];
+            text: string;
+            type: string;
         };
         /** @description A named set of documents the caller keeps elsewhere, handed in whole. */
         Library: {
@@ -1475,8 +1595,15 @@ export interface components {
             /** Format: int64 */
             budgetTokens: number;
             chosen: components["schemas"]["RecallChoice"][];
+            /** @description Whether that sum has reached the brain's threshold, so a consolidation is due. */
+            consolidationDue: boolean;
             /** Format: int64 */
             tokenCount: number;
+            /**
+             * Format: int64
+             * @description The sum of the importance of the brain's unconsolidated episodes.
+             */
+            unconsolidatedImportance: number;
         };
         /** @description A turn, as recall reads it. */
         RecallAsk: {
@@ -1766,6 +1893,19 @@ export interface components {
         SessionNote: {
             note: string | null;
         };
+        /** @description A candidate memory, whose likes the write judgement reads. */
+        SimilarAsk: {
+            /**
+             * Format: int64
+             * @description Ten where none is given, at most fifty.
+             */
+            limit?: number | null;
+            /** @default [] */
+            subjects: components["schemas"]["SubjectKey"][];
+            text: string;
+        };
+        /** @description Where a learning came from, which decides whether it stands as a fact on its own. */
+        Source: "own" | "owner" | "told" | "inferred";
         /** @description Something a memory can be about, found by its type and key alone. */
         Subject: {
             /** Format: int64 */
@@ -2062,6 +2202,35 @@ export interface operations {
             404: components["responses"]["NotFound"];
         };
     };
+    markConsolidated: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                brainId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Consolidated"];
+            };
+        };
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Recorded"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
     exportBrain: {
         parameters: {
             query?: {
@@ -2297,6 +2466,36 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    learn: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                brainId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Learning"];
+            };
+        };
+        responses: {
+            /** @description Created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Learned"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
         };
     };
     readLineage: {
@@ -2535,6 +2734,35 @@ export interface operations {
             404: components["responses"]["NotFound"];
         };
     };
+    similar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                brainId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SimilarAsk"];
+            };
+        };
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Memory"][];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
     listSubjects: {
         parameters: {
             query?: {
@@ -2679,6 +2907,34 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TypeCount"][];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listUnconsolidated: {
+        parameters: {
+            query?: {
+                /** @description Sixty where none is given, at most five hundred. */
+                limit?: number | null;
+            };
+            header?: never;
+            path: {
+                brainId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Memory"][];
                 };
             };
             400: components["responses"]["BadRequest"];

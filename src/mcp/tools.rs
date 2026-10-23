@@ -11,6 +11,7 @@ use bmo_brain_client::{
   NewMemory, NewNote, NewReminder, NewScopedMemory, NewSubject, NewWatch, NotesQuery, RecallAsk,
   RemindersQuery, ScopedMemoriesQuery, ScopedMemoryChange, SubjectsQuery, WatchChange, WatchesQuery,
 };
+use bmo_brain_client::{Consolidated, Learning, SimilarAsk, UnconsolidatedQuery};
 use schemars::generate::SchemaGenerator;
 use schemars::{JsonSchema, Schema};
 use serde::de::DeserializeOwned;
@@ -341,6 +342,36 @@ pub fn tools() -> Vec<BrainTool> {
       "A session folded or handed off: its marks cleared.",
       "POST /brains/{brainId}/folds",
       |client, Within { brain_id, body }: Within<Fold>| async move { client.fold(brain_id, &body).await },
+    ),
+    tool(
+      "brain_learn",
+      "Apply a learning whole: confirm the memories it repeats, version the one it strengthens, close the ones it contradicts (unless heard), and write it as a fact or a rumor by its source.",
+      "POST /brains/{brainId}/learnings",
+      |client, Within { brain_id, body }: Within<Learning>| async move { client.learn(brain_id, &body).await },
+    ),
+    tool(
+      "brain_similar",
+      "The live memories most like a candidate: read these before brain_learn and judge the candidate against them.",
+      "POST /brains/{brainId}/similar",
+      |client, Within { brain_id, body }: Within<SimilarAsk>| async move {
+        client.similar(brain_id, &body).await
+      },
+    ),
+    tool(
+      "brain_unconsolidated",
+      "The episodes not yet consolidated, most important first.",
+      "GET /brains/{brainId}/unconsolidated",
+      |client, Within { brain_id, body }: Within<UnconsolidatedQuery>| async move {
+        client.unconsolidated(brain_id, &body).await
+      },
+    ),
+    tool(
+      "brain_consolidated",
+      "Mark episodes consolidated after writing what they come to.",
+      "POST /brains/{brainId}/consolidated",
+      |client, Within { brain_id, body }: Within<Consolidated>| async move {
+        client.consolidated(brain_id, &body).await
+      },
     ),
     tool(
       "brain_persona",

@@ -4,8 +4,7 @@ The brain service, `bmo-brain`: an agent's long-term memory as a service. It kee
 account's and one agent's, as subjects (what a memory is about, found by type and key), layers (the table of
 contents) and memories, one row a version, superseded and invalidated but never deleted. A turn asks a
 brain's recall for a block under a token budget, a persona is rendered as the same bytes until a piece
-changes, and a brain moves in and out as a brain file. The brain calls one unit, the agency, for its
-recollector's model sessions, and nothing else. The rows held under a caller's opaque scope (memory rows,
+changes, and a brain moves in and out as a brain file. The brain never executes and calls no other unit. The rows held under a caller's opaque scope (memory rows,
 notes, watches, reminders, fragments, libraries, locks and the caller's own records) keep answering until
 their readers move to the brains. Its harness plugin, `brain-harness`, is the MCP server the same binary
 starts as `bmo-brain mcp` and the skill that tells a harness how to use it.

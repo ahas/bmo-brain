@@ -448,6 +448,10 @@ pub struct Recall {
   pub chosen: Vec<RecallChoice>,
   pub token_count: i64,
   pub budget_tokens: i64,
+  /// The sum of the importance of the brain's unconsolidated episodes.
+  pub unconsolidated_importance: i64,
+  /// Whether that sum has reached the brain's threshold, so a consolidation is due.
+  pub consolidation_due: bool,
 }
 
 /// A session folded or handed off.
@@ -531,4 +535,98 @@ impl Default for Rules {
       consolidation_threshold: 150,
     }
   }
+}
+
+/// Where a learning came from, which decides whether it stands as a fact on its own.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum Source {
+  /// The person said it about themselves.
+  Own,
+  /// The owner stated or instructed it.
+  Owner,
+  /// Someone said it about someone else.
+  Told,
+  /// The agent concluded it.
+  Inferred,
+}
+
+impl Source {
+  /// Whether a learning from this source is heard rather than known: written as a rumor, closing nothing.
+  pub fn is_heard(self) -> bool {
+    matches!(self, Self::Told | Self::Inferred)
+  }
+}
+
+/// One thing the agent learned, with its judgement against the live memories like it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct Learning {
+  #[serde(rename = "type")]
+  pub kind: String,
+  pub text: String,
+  #[serde(default)]
+  pub subjects: Vec<SubjectKey>,
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub importance: Option<i64>,
+  pub source: Source,
+  /// Live memories this merely repeats: confirmed, and nothing written where nothing else is judged.
+  #[serde(default)]
+  pub confirms: Vec<i64>,
+  /// The live memory this says more fully: a new version of it is written.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub strengthens: Option<i64>,
+  /// Live memories this contradicts: closed before the new row is written, unless the source is heard.
+  #[serde(default)]
+  pub replaces: Vec<i64>,
+  /// The episodes this rests on, linked as subjects of type `episode`.
+  #[serde(default)]
+  pub grounds: Vec<i64>,
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub key: Option<String>,
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub layer_id: Option<i64>,
+  pub actor_name: String,
+  #[serde(default)]
+  pub labels: Labels,
+}
+
+/// What a learning came to.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct Learned {
+  pub confirmed_count: i64,
+  pub invalidated_ids: Vec<i64>,
+  /// The version written, as a first version or over the memory strengthened; null where only confirmed.
+  pub written: Option<Memory>,
+  /// Whether the row written is a new version of an existing memory.
+  pub versioned: bool,
+}
+
+/// A candidate memory, whose likes the write judgement reads.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SimilarAsk {
+  pub text: String,
+  #[serde(default)]
+  pub subjects: Vec<SubjectKey>,
+  /// Ten where none is given, at most fifty.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub limit: Option<i64>,
+}
+
+/// Which episodes a consolidation reads.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct UnconsolidatedQuery {
+  /// Sixty where none is given, at most five hundred.
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub limit: Option<i64>,
+}
+
+/// Episodes a consolidation read.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct Consolidated {
+  pub episode_ids: Vec<i64>,
 }

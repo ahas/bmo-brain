@@ -235,6 +235,20 @@ impl Store {
 
   /// A memory written as a first version.
   pub async fn memory_add(&self, brain_id: i64, body: &NewMemory) -> Held<Memory> {
+    let mut tx = self.begin().await?;
+    let memory = self.add_in(&mut tx, brain_id, body, now()).await?;
+    self.commit(tx).await?;
+    Ok(memory)
+  }
+
+  /// A memory written as a first version, within a transaction.
+  pub(crate) async fn add_in(
+    &self,
+    tx: &mut PgConnection,
+    brain_id: i64,
+    body: &NewMemory,
+    at: i64,
+  ) -> Held<Memory> {
     given("type", &body.kind)?;
     text("text", &body.text, TEXT_MOST)?;
     given("actorName", &body.actor_name)?;
@@ -249,11 +263,9 @@ impl Store {
         status.name()
       )));
     }
-    let at = now();
-    let mut tx = self.begin().await?;
-    brain_of(&mut tx, brain_id).await?;
+    brain_of(&mut *tx, brain_id).await?;
     if let Some(layer) = body.layer_id {
-      layer_of(&mut tx, brain_id, layer).await?;
+      layer_of(&mut *tx, brain_id, layer).await?;
     }
     if let Some(key) = &body.key {
       let holder: Option<i64> = sqlx::query_scalar(
@@ -269,10 +281,10 @@ impl Store {
         )));
       }
     }
-    let subject_ids = resolve_subjects(&mut tx, brain_id, &body.subject_ids, &body.subjects, at).await?;
+    let subject_ids = resolve_subjects(&mut *tx, brain_id, &body.subject_ids, &body.subjects, at).await?;
     let position = match body.position {
       Some(position) => position,
-      None => next_position(&mut tx, brain_id, body.layer_id).await?,
+      None => next_position(&mut *tx, brain_id, body.layer_id).await?,
     };
     let id: i64 = sqlx::query_scalar(
       "INSERT INTO memories (brain_id, key, type, text, layer_id, position, status, lineage_id, valid_from, \
@@ -297,15 +309,29 @@ impl Store {
       .bind(id)
       .execute(&mut *tx)
       .await?;
-    link_subjects(&mut tx, id, &subject_ids).await?;
-    let memory = self.member_of(&mut tx, brain_id, id).await?;
-    publish(&mut tx, "memory.written", Some(&event_scope(brain_id)), &memory).await?;
-    self.commit(tx).await?;
+    link_subjects(&mut *tx, id, &subject_ids).await?;
+    let memory = self.member_of(&mut *tx, brain_id, id).await?;
+    publish(&mut *tx, "memory.written", Some(&event_scope(brain_id)), &memory).await?;
     Ok(memory)
   }
 
   /// A new version of a memory, superseding the version named.
   pub async fn memory_version(&self, brain_id: i64, id: i64, body: &MemoryVersion) -> Held<Memory> {
+    let mut tx = self.begin().await?;
+    let memory = self.version_in(&mut tx, brain_id, id, body, now()).await?;
+    self.commit(tx).await?;
+    Ok(memory)
+  }
+
+  /// A new version written over the version named, within a transaction.
+  pub(crate) async fn version_in(
+    &self,
+    tx: &mut PgConnection,
+    brain_id: i64,
+    id: i64,
+    body: &MemoryVersion,
+    at: i64,
+  ) -> Held<Memory> {
     given("actorName", &body.actor_name)?;
     if let Some(words) = &body.text {
       text("text", words, TEXT_MOST)?;
@@ -314,9 +340,7 @@ impl Store {
       given("type", kind)?;
     }
     let importance = body.importance.map(Some).map(importance).transpose()?;
-    let at = now();
-    let mut tx = self.begin().await?;
-    let old = self.row_of(&mut tx, brain_id, id, true).await?;
+    let old = self.row_of(&mut *tx, brain_id, id, true).await?;
     let status = old.status()?;
     if !status.is_live() {
       return Err(Fault::Conflict(format!(
@@ -329,7 +353,7 @@ impl Store {
       None => old.layer_id,
     };
     if let Some(layer) = layer_id {
-      layer_of(&mut tx, brain_id, layer).await?;
+      layer_of(&mut *tx, brain_id, layer).await?;
     }
     let subject_ids = match (&body.subject_ids, &body.subjects) {
       (None, None) => {
@@ -342,7 +366,7 @@ impl Store {
       }
       (ids, keys) => {
         resolve_subjects(
-          &mut tx,
+          &mut *tx,
           brain_id,
           ids.as_deref().unwrap_or(&[]),
           keys.as_deref().unwrap_or(&[]),
@@ -387,24 +411,35 @@ impl Store {
       .bind(new_id)
       .execute(&mut *tx)
       .await?;
-    link_subjects(&mut tx, new_id, &subject_ids).await?;
-    let superseded = self.member_of(&mut tx, brain_id, id).await?;
-    publish(&mut tx, "memory.moved", Some(&event_scope(brain_id)), &superseded).await?;
-    let memory = self.member_of(&mut tx, brain_id, new_id).await?;
-    publish(&mut tx, "memory.written", Some(&event_scope(brain_id)), &memory).await?;
-    self.commit(tx).await?;
+    link_subjects(&mut *tx, new_id, &subject_ids).await?;
+    let superseded = self.member_of(&mut *tx, brain_id, id).await?;
+    publish(&mut *tx, "memory.moved", Some(&event_scope(brain_id)), &superseded).await?;
+    let memory = self.member_of(&mut *tx, brain_id, new_id).await?;
+    publish(&mut *tx, "memory.written", Some(&event_scope(brain_id)), &memory).await?;
     Ok(memory)
   }
 
   /// A memory's status moved by a caller's word.
   pub async fn memory_move(&self, brain_id: i64, id: i64, body: &MemoryMove) -> Held<Memory> {
-    given("actorName", &body.actor_name)?;
     let mut tx = self.begin().await?;
-    let row = self.row_of(&mut tx, brain_id, id, true).await?;
+    let memory = self.move_in(&mut tx, brain_id, id, body).await?;
+    self.commit(tx).await?;
+    Ok(memory)
+  }
+
+  /// A memory's status moved, within a transaction.
+  pub(crate) async fn move_in(
+    &self,
+    tx: &mut PgConnection,
+    brain_id: i64,
+    id: i64,
+    body: &MemoryMove,
+  ) -> Held<Memory> {
+    given("actorName", &body.actor_name)?;
+    let row = self.row_of(&mut *tx, brain_id, id, true).await?;
     let was = row.status()?;
     if was == body.status {
-      let memory = self.member_of(&mut tx, brain_id, id).await?;
-      self.commit(tx).await?;
+      let memory = self.member_of(&mut *tx, brain_id, id).await?;
       return Ok(memory);
     }
     if !was.may_move_to(body.status) {
@@ -425,9 +460,8 @@ impl Store {
       .bind(valid_to)
       .execute(&mut *tx)
       .await?;
-    let memory = self.member_of(&mut tx, brain_id, id).await?;
-    publish(&mut tx, "memory.moved", Some(&event_scope(brain_id)), &memory).await?;
-    self.commit(tx).await?;
+    let memory = self.member_of(&mut *tx, brain_id, id).await?;
+    publish(&mut *tx, "memory.moved", Some(&event_scope(brain_id)), &memory).await?;
     Ok(memory)
   }
 
@@ -491,10 +525,25 @@ impl Store {
     if body.memory_ids.is_empty() {
       return Err(Fault::BadRequest("memoryIds names no row.".to_owned()));
     }
-    let at = body.at.unwrap_or_else(now);
     let mut tx = self.begin().await?;
-    brain_of(&mut tx, brain_id).await?;
-    let mut ids = body.memory_ids.clone();
+    let count = self
+      .confirm_in(&mut tx, brain_id, &body.memory_ids, body.at.unwrap_or_else(now))
+      .await?;
+    self.commit(tx).await?;
+    Ok(count)
+  }
+
+  /// Confirmations recorded, within a transaction: each row's storage strength raised by the gap since its
+  /// last, and its moment set; how many rows the ids reached.
+  pub(crate) async fn confirm_in(
+    &self,
+    tx: &mut PgConnection,
+    brain_id: i64,
+    memory_ids: &[i64],
+    at: i64,
+  ) -> Held<i64> {
+    brain_of(&mut *tx, brain_id).await?;
+    let mut ids = memory_ids.to_vec();
     ids.sort_unstable();
     ids.dedup();
     let rows: Vec<(i64, i64, Option<i64>)> = sqlx::query_as(
@@ -513,7 +562,6 @@ impl Store {
         .execute(&mut *tx)
         .await?;
     }
-    self.commit(tx).await?;
     Ok(rows.len() as i64)
   }
 

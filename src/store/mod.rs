@@ -6,6 +6,7 @@ pub mod brains;
 pub mod events;
 pub mod files;
 pub mod fragments;
+pub mod learning;
 pub mod libraries;
 pub mod locks;
 pub mod memories;
