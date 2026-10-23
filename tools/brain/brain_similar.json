@@ -7,7 +7,7 @@
   "properties": {
     "text": {
       "type": "string",
-      "description": "The candidate's words."
+      "description": "The candidate's words, in English."
     },
     "subjects": {
       "type": "array",

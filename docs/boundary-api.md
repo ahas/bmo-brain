@@ -506,10 +506,10 @@ host's call protocol states.
 - **It finds the agent's brain** by the turn's agent, `BMO_TURN_AGENT` in the record's variables, else the
   record's holder: the one brain registered for that agent key. The turn's room, `BMO_TURN_CHAT`, is the room
   a write links where the call names none.
-- **Its entries,** each one call: `memory_episode` (`POST /brains/{brainId}/memories`, type `episode`),
-  `memory_similar` (`POST …/similar`), `memory_learn` (`POST …/learnings`), `memory_move`
-  (`PATCH …/memories/{memoryId}`), `memory_list` (`GET …/memories`), `memory_unconsolidated`
-  (`GET …/unconsolidated`), `memory_consolidated` (`POST …/consolidated`) and `brain_fold`
+- **Its entries,** each one call: `brain_episode` (`POST /brains/{brainId}/memories`, type `episode`),
+  `brain_similar` (`POST …/similar`), `brain_learn` (`POST …/learnings`), `brain_move`
+  (`PATCH …/memories/{memoryId}`), `brain_list` (`GET …/memories`), `brain_unconsolidated`
+  (`GET …/unconsolidated`), `brain_consolidated` (`POST …/consolidated`) and `brain_fold`
   (`POST …/folds`, the session key the record's `BMO_RUN_NAME`). It writes as `agent-session`.
 - **A deployment places it** in `tools/brain/.placed/` inside the release: the executable, the manifest and
   the schemas; and once the release stays up, registers that folder with the tool host as the service's own

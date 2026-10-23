@@ -157,7 +157,7 @@ async fn the_executable_writes_an_episode_and_a_learning_into_the_agents_brain()
 
   let episode = called(
     &served,
-    "memory_episode",
+    "brain_episode",
     json!({ "text": "I moved to the south.", "speaker": "1", "importance": 7 }),
     "agent-a",
     "7",
@@ -179,7 +179,7 @@ async fn the_executable_writes_an_episode_and_a_learning_into_the_agents_brain()
 
   let learned = called(
     &served,
-    "memory_learn",
+    "brain_learn",
     json!({ "type": "fact", "text": "The member lives in the south.", "source": "own", "subjects": [{"type": "person", "key": "1"}], "grounds": [id] }),
     "agent-a",
     "7",
@@ -189,7 +189,7 @@ async fn the_executable_writes_an_episode_and_a_learning_into_the_agents_brain()
 
   let likes = called(
     &served,
-    "memory_similar",
+    "brain_similar",
     json!({ "text": "where does the member live", "subjects": [{"type": "person", "key": "1"}] }),
     "agent-a",
     "7",
@@ -209,8 +209,7 @@ async fn the_executable_writes_an_episode_and_a_learning_into_the_agents_brain()
     .unwrap();
   assert_eq!(listed.items.len(), 1);
 
-  let unknown =
-    called(&served, "memory_episode", json!({ "text": "x", "speaker": "1" }), "agent-none", "7");
+  let unknown = called(&served, "brain_episode", json!({ "text": "x", "speaker": "1" }), "agent-none", "7");
   assert_eq!(unknown["isError"], json!(true), "{unknown}");
   assert!(unknown["content"][0]["text"].as_str().unwrap().contains("no brain"));
 }

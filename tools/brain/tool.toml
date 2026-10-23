@@ -14,64 +14,64 @@ timeout = 60
 
 [[entry]]
 namespace = "bmo"
-name = "memory_episode"
+name = "brain_episode"
 title = "Keep an episode"
-description = "Keep what was just said as an episode of your brain: its text, who said it, the room, and an importance from 1 to 10."
-input = "memory_episode.json"
+description = "Keep what was just said as an episode of your brain, its text in English: who said it, the room, and an importance from 1 to 10."
+input = "brain_episode.json"
 hints = { idempotent = false }
 capabilities = ["room.chat"]
 
 [[entry]]
 namespace = "bmo"
-name = "memory_similar"
+name = "brain_similar"
 title = "Likes of a candidate"
-description = "The live memories most like a candidate fact: read these and judge the candidate before memory_learn."
-input = "memory_similar.json"
+description = "The live memories most like a candidate fact: read these and judge the candidate before brain_learn."
+input = "brain_similar.json"
 hints = { read_only = true }
 capabilities = ["room.chat"]
 
 [[entry]]
 namespace = "bmo"
-name = "memory_learn"
+name = "brain_learn"
 title = "Learn"
-description = "Apply a learning whole: confirm the memories it repeats, version the one it strengthens, close the ones it contradicts (unless heard), and write it as a fact or a rumor by its source."
-input = "memory_learn.json"
+description = "Apply a learning whole, its text in English: confirm the memories it repeats, version the one it strengthens, close the ones it contradicts (unless heard), and write it as a fact or a rumor by its source."
+input = "brain_learn.json"
 hints = { idempotent = false }
 capabilities = ["room.chat"]
 
 [[entry]]
 namespace = "bmo"
-name = "memory_move"
+name = "brain_move"
 title = "Move a memory"
 description = "Move a memory's status: done for a promise kept, invalidated for a fact that stopped holding, active to approve a pending one."
-input = "memory_move.json"
+input = "brain_move.json"
 hints = { idempotent = true }
 capabilities = ["room.chat"]
 
 [[entry]]
 namespace = "bmo"
-name = "memory_list"
+name = "brain_list"
 title = "List memories"
 description = "Your brain's memories by type, status, subject, key or words."
-input = "memory_list.json"
+input = "brain_list.json"
 hints = { read_only = true }
 capabilities = ["room.chat"]
 
 [[entry]]
 namespace = "bmo"
-name = "memory_unconsolidated"
+name = "brain_unconsolidated"
 title = "Unconsolidated episodes"
 description = "The episodes not yet consolidated, most important first, for a consolidation."
-input = "memory_unconsolidated.json"
+input = "brain_unconsolidated.json"
 hints = { read_only = true }
 capabilities = ["room.chat"]
 
 [[entry]]
 namespace = "bmo"
-name = "memory_consolidated"
+name = "brain_consolidated"
 title = "Mark consolidated"
 description = "Mark episodes consolidated after writing what they come to."
-input = "memory_consolidated.json"
+input = "brain_consolidated.json"
 hints = { idempotent = true }
 capabilities = ["room.chat"]
 

@@ -13,7 +13,7 @@
     },
     "text": {
       "type": "string",
-      "description": "One short sentence."
+      "description": "One short sentence, in English whatever language the room speaks."
     },
     "subjects": {
       "type": "array",

@@ -30,13 +30,13 @@ pub const ACTOR: &str = "agent-session";
 
 /// The entries the manifest declares, by their names.
 pub const ENTRIES: [&str; 8] = [
-  "memory_episode",
-  "memory_similar",
-  "memory_learn",
-  "memory_move",
-  "memory_list",
-  "memory_unconsolidated",
-  "memory_consolidated",
+  "brain_episode",
+  "brain_similar",
+  "brain_learn",
+  "brain_move",
+  "brain_list",
+  "brain_unconsolidated",
+  "brain_consolidated",
   "brain_fold",
 ];
 
@@ -237,7 +237,7 @@ pub async fn answer(handed: Handed) -> Result<Answer, String> {
   let arguments = &handed.arguments;
   let session = &handed.session;
   let answered: Result<Value, ClientFailure> = match name.as_str() {
-    "memory_episode" => {
+    "brain_episode" => {
       let Some(text) = string(arguments, "text") else {
         return Ok(Answer::refusal("text is required"));
       };
@@ -267,7 +267,7 @@ pub async fn answer(handed: Handed) -> Result<Answer, String> {
         .await
         .map(|memory| json!({ "memoryId": memory.id, "importance": memory.importance }))
     }
-    "memory_similar" => {
+    "brain_similar" => {
       let Some(text) = string(arguments, "text") else {
         return Ok(Answer::refusal("text is required"));
       };
@@ -290,7 +290,7 @@ pub async fn answer(handed: Handed) -> Result<Answer, String> {
           })
         })
     }
-    "memory_learn" => {
+    "brain_learn" => {
       let (Some(kind), Some(text), Some(source)) =
         (string(arguments, "type"), string(arguments, "text"), string(arguments, "source"))
       else {
@@ -338,7 +338,7 @@ pub async fn answer(handed: Handed) -> Result<Answer, String> {
           })
         })
     }
-    "memory_move" => {
+    "brain_move" => {
       let (Some(id), Some(status)) = (integer(arguments, "memory_id"), string(arguments, "status")) else {
         return Ok(Answer::refusal("memory_id and status are required"));
       };
@@ -358,7 +358,7 @@ pub async fn answer(handed: Handed) -> Result<Answer, String> {
         .await
         .map(|m| json!({ "id": m.id, "status": m.status, "validTo": m.valid_to }))
     }
-    "memory_list" => {
+    "brain_list" => {
       let subject_id = match arguments.get("subject").and_then(|s| serde_json::from_value::<SubjectKey>(s.clone()).ok()) {
         Some(named) => {
           let page = client
@@ -405,7 +405,7 @@ pub async fn answer(handed: Handed) -> Result<Answer, String> {
           })
         })
     }
-    "memory_unconsolidated" => client
+    "brain_unconsolidated" => client
       .unconsolidated(
         brain,
         &UnconsolidatedQuery {
@@ -420,7 +420,7 @@ pub async fn answer(handed: Handed) -> Result<Answer, String> {
           })).collect::<Vec<_>>()
         })
       }),
-    "memory_consolidated" => client
+    "brain_consolidated" => client
       .consolidated(
         brain,
         &Consolidated {

@@ -8,7 +8,7 @@
   "properties": {
     "text": {
       "type": "string",
-      "description": "What was said, as it matters later."
+      "description": "What was said, as it matters later, written in English whatever language it was said in."
     },
     "speaker": {
       "type": "string",
