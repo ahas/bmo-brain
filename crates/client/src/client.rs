@@ -4,6 +4,11 @@ use reqwest::{Client, Method, RequestBuilder, StatusCode, Url};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 
+use crate::brains::{
+  Brain, BrainsQuery, Confirmations, ExportQuery, Fold, Folded, Hits, Injected, Layer, LayerChange,
+  LayersQuery, MemoriesQuery, Memory, MemoryMove, MemoryVersion, NewBrain, NewLayer, NewMemory, NewSubject,
+  Recall, RecallAsk, Recorded, Subject, SubjectChange, SubjectsQuery, TypeCount,
+};
 use crate::fragments::{
   Fragment, FragmentHits, FragmentHitsRecorded, FragmentKind, FragmentMerge, FragmentSplit, FragmentSwitch,
   FragmentWrite, FragmentsQuery, Knowledge, KnowledgeQuery, Library, LibraryPut, LibrarySync,
@@ -11,7 +16,8 @@ use crate::fragments::{
 };
 use crate::holdings::{Lock, LocksQuery, NewLock, ScopeChange, ScopeHolding};
 use crate::memories::{
-  MemoriesQuery, Memory, MemoryChange, MemoryMatch, NewMemory, NewMemoryMatch, NewNote, Note, NotesQuery,
+  NewNote, NewScopedMemory, NewScopedMemoryMatch, Note, NotesQuery, ScopedMemoriesQuery, ScopedMemory,
+  ScopedMemoryChange, ScopedMemoryMatch,
 };
 use crate::records::{
   AgentAsk, Done, LoadsKeep, NoteKeep, RoomRules, RoomRulesAsk, RuleSet, SessionAsk, SessionLoads,
@@ -145,27 +151,31 @@ impl BrainClient {
   }
 
   /// `GET /memories`
-  pub async fn memories(&self, query: &MemoriesQuery) -> Answer<Page<Memory>> {
+  pub async fn scoped_memories(&self, query: &ScopedMemoriesQuery) -> Answer<Page<ScopedMemory>> {
     Self::answered(self.get(&["memories"], query)).await
   }
 
   /// `POST /memories`
-  pub async fn memory_add(&self, body: &NewMemory) -> Answer<Memory> {
+  pub async fn scoped_memory_add(&self, body: &NewScopedMemory) -> Answer<ScopedMemory> {
     Self::answered(self.send(Method::POST, &["memories"], body)).await
   }
 
   /// `GET /memories/{memoryId}`
-  pub async fn memory(&self, memory_id: i64) -> Answer<Memory> {
+  pub async fn scoped_memory(&self, memory_id: i64) -> Answer<ScopedMemory> {
     Self::answered(self.request(Method::GET, &["memories", &memory_id.to_string()])).await
   }
 
   /// `PATCH /memories/{memoryId}`
-  pub async fn memory_update(&self, memory_id: i64, body: &MemoryChange) -> Answer<Memory> {
+  pub async fn scoped_memory_update(
+    &self,
+    memory_id: i64,
+    body: &ScopedMemoryChange,
+  ) -> Answer<ScopedMemory> {
     Self::answered(self.send(Method::PATCH, &["memories", &memory_id.to_string()], body)).await
   }
 
   /// `POST /memory-matches`
-  pub async fn memory_match_add(&self, body: &NewMemoryMatch) -> Answer<MemoryMatch> {
+  pub async fn scoped_memory_match_add(&self, body: &NewScopedMemoryMatch) -> Answer<ScopedMemoryMatch> {
     Self::answered(self.send(Method::POST, &["memory-matches"], body)).await
   }
 
@@ -353,5 +363,170 @@ impl BrainClient {
   /// `POST /session-summary/clear`
   pub async fn session_note_clear(&self, ask: &AgentAsk) -> Answer<Done> {
     Self::answered(self.send(Method::POST, &["session-summary", "clear"], ask)).await
+  }
+}
+
+impl BrainClient {
+  async fn bytes(request: RequestBuilder) -> Answer<Vec<u8>> {
+    let answer = Self::sent(request).await?;
+    let bytes = answer.bytes().await.map_err(|why| ClientFailure::Unreadable(why.to_string()))?;
+    Ok(bytes.to_vec())
+  }
+
+  async fn words(request: RequestBuilder) -> Answer<String> {
+    let answer = Self::sent(request).await?;
+    answer.text().await.map_err(|why| ClientFailure::Unreadable(why.to_string()))
+  }
+
+  /// `GET /brains`
+  pub async fn brains(&self, query: &BrainsQuery) -> Answer<Page<Brain>> {
+    Self::answered(self.get(&["brains"], query)).await
+  }
+
+  /// `POST /brains`
+  pub async fn brain_add(&self, body: &NewBrain) -> Answer<Brain> {
+    Self::answered(self.send(Method::POST, &["brains"], body)).await
+  }
+
+  /// `GET /brains/{brainId}`
+  pub async fn brain(&self, brain_id: i64) -> Answer<Brain> {
+    Self::answered(self.request(Method::GET, &["brains", &brain_id.to_string()])).await
+  }
+
+  /// `DELETE /brains/{brainId}`
+  pub async fn brain_let_go(&self, brain_id: i64) -> Answer<Brain> {
+    Self::answered(self.request(Method::DELETE, &["brains", &brain_id.to_string()])).await
+  }
+
+  /// `GET /brains/{brainId}/subjects`
+  pub async fn subjects(&self, brain_id: i64, query: &SubjectsQuery) -> Answer<Page<Subject>> {
+    Self::answered(self.get(&["brains", &brain_id.to_string(), "subjects"], query)).await
+  }
+
+  /// `POST /brains/{brainId}/subjects`
+  pub async fn subject_add(&self, brain_id: i64, body: &NewSubject) -> Answer<Subject> {
+    Self::answered(self.send(Method::POST, &["brains", &brain_id.to_string(), "subjects"], body)).await
+  }
+
+  /// `GET /brains/{brainId}/subjects/{subjectId}`
+  pub async fn subject(&self, brain_id: i64, subject_id: i64) -> Answer<Subject> {
+    let path = ["brains", &brain_id.to_string(), "subjects", &subject_id.to_string()];
+    Self::answered(self.request(Method::GET, &path)).await
+  }
+
+  /// `PATCH /brains/{brainId}/subjects/{subjectId}`
+  pub async fn subject_change(
+    &self,
+    brain_id: i64,
+    subject_id: i64,
+    body: &SubjectChange,
+  ) -> Answer<Subject> {
+    let path = ["brains", &brain_id.to_string(), "subjects", &subject_id.to_string()];
+    Self::answered(self.send(Method::PATCH, &path, body)).await
+  }
+
+  /// `GET /brains/{brainId}/layers`
+  pub async fn layers(&self, brain_id: i64, query: &LayersQuery) -> Answer<Page<Layer>> {
+    Self::answered(self.get(&["brains", &brain_id.to_string(), "layers"], query)).await
+  }
+
+  /// `POST /brains/{brainId}/layers`
+  pub async fn layer_add(&self, brain_id: i64, body: &NewLayer) -> Answer<Layer> {
+    Self::answered(self.send(Method::POST, &["brains", &brain_id.to_string(), "layers"], body)).await
+  }
+
+  /// `GET /brains/{brainId}/layers/{layerId}`
+  pub async fn layer(&self, brain_id: i64, layer_id: i64) -> Answer<Layer> {
+    let path = ["brains", &brain_id.to_string(), "layers", &layer_id.to_string()];
+    Self::answered(self.request(Method::GET, &path)).await
+  }
+
+  /// `PATCH /brains/{brainId}/layers/{layerId}`
+  pub async fn layer_change(&self, brain_id: i64, layer_id: i64, body: &LayerChange) -> Answer<Layer> {
+    let path = ["brains", &brain_id.to_string(), "layers", &layer_id.to_string()];
+    Self::answered(self.send(Method::PATCH, &path, body)).await
+  }
+
+  /// `GET /brains/{brainId}/memories`
+  pub async fn memories(&self, brain_id: i64, query: &MemoriesQuery) -> Answer<Page<Memory>> {
+    Self::answered(self.get(&["brains", &brain_id.to_string(), "memories"], query)).await
+  }
+
+  /// `POST /brains/{brainId}/memories`
+  pub async fn memory_add(&self, brain_id: i64, body: &NewMemory) -> Answer<Memory> {
+    Self::answered(self.send(Method::POST, &["brains", &brain_id.to_string(), "memories"], body)).await
+  }
+
+  /// `GET /brains/{brainId}/memories/{memoryId}`
+  pub async fn memory(&self, brain_id: i64, memory_id: i64) -> Answer<Memory> {
+    let path = ["brains", &brain_id.to_string(), "memories", &memory_id.to_string()];
+    Self::answered(self.request(Method::GET, &path)).await
+  }
+
+  /// `POST /brains/{brainId}/memories/{memoryId}/versions`
+  pub async fn memory_version(
+    &self,
+    brain_id: i64,
+    memory_id: i64,
+    body: &MemoryVersion,
+  ) -> Answer<Memory> {
+    let path = ["brains", &brain_id.to_string(), "memories", &memory_id.to_string(), "versions"];
+    Self::answered(self.send(Method::POST, &path, body)).await
+  }
+
+  /// `PATCH /brains/{brainId}/memories/{memoryId}`
+  pub async fn memory_move(&self, brain_id: i64, memory_id: i64, body: &MemoryMove) -> Answer<Memory> {
+    let path = ["brains", &brain_id.to_string(), "memories", &memory_id.to_string()];
+    Self::answered(self.send(Method::PATCH, &path, body)).await
+  }
+
+  /// `GET /brains/{brainId}/lineages/{lineageId}`
+  pub async fn lineage(&self, brain_id: i64, lineage_id: i64) -> Answer<Vec<Memory>> {
+    let path = ["brains", &brain_id.to_string(), "lineages", &lineage_id.to_string()];
+    Self::answered(self.request(Method::GET, &path)).await
+  }
+
+  /// `POST /brains/{brainId}/hits`
+  pub async fn hits_record(&self, brain_id: i64, body: &Hits) -> Answer<Recorded> {
+    Self::answered(self.send(Method::POST, &["brains", &brain_id.to_string(), "hits"], body)).await
+  }
+
+  /// `POST /brains/{brainId}/confirmations`
+  pub async fn confirmations_record(&self, brain_id: i64, body: &Confirmations) -> Answer<Recorded> {
+    Self::answered(self.send(Method::POST, &["brains", &brain_id.to_string(), "confirmations"], body)).await
+  }
+
+  /// `GET /brains/{brainId}/types`
+  pub async fn types(&self, brain_id: i64) -> Answer<Vec<TypeCount>> {
+    Self::answered(self.request(Method::GET, &["brains", &brain_id.to_string(), "types"])).await
+  }
+
+  /// `POST /brains/{brainId}/recall`
+  pub async fn recall(&self, brain_id: i64, body: &RecallAsk) -> Answer<Recall> {
+    Self::answered(self.send(Method::POST, &["brains", &brain_id.to_string(), "recall"], body)).await
+  }
+
+  /// `POST /brains/{brainId}/folds`
+  pub async fn fold(&self, brain_id: i64, body: &Fold) -> Answer<Folded> {
+    Self::answered(self.send(Method::POST, &["brains", &brain_id.to_string(), "folds"], body)).await
+  }
+
+  /// `GET /brains/{brainId}/persona`
+  pub async fn persona(&self, brain_id: i64) -> Answer<String> {
+    Self::words(self.request(Method::GET, &["brains", &brain_id.to_string(), "persona"])).await
+  }
+
+  /// `GET /brains/{brainId}/export`
+  pub async fn export(&self, brain_id: i64, query: &ExportQuery) -> Answer<Vec<u8>> {
+    Self::bytes(self.get(&["brains", &brain_id.to_string(), "export"], query)).await
+  }
+
+  /// `POST /brains/{brainId}/injections`
+  pub async fn inject(&self, brain_id: i64, file: Vec<u8>) -> Answer<Injected> {
+    let request = self
+      .request(Method::POST, &["brains", &brain_id.to_string(), "injections"])
+      .header(reqwest::header::CONTENT_TYPE, "application/vnd.sqlite3")
+      .body(file);
+    Self::answered(request).await
   }
 }

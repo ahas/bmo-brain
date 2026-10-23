@@ -7,8 +7,8 @@ use bmo_brain::clock::{slow, tick};
 use bmo_brain::store::now;
 use bmo_brain::store::scopes::WITHER_AFTER_MS;
 use bmo_brain_client::{
-  FragmentHits, FragmentWrite, LocksQuery, MemoryState, NewLock, NewMemory, NewMemoryMatch, NewNote,
-  ScopeChange, ScopeCounts, ScopeState,
+  FragmentHits, FragmentWrite, LocksQuery, NewLock, NewNote, NewScopedMemory, NewScopedMemoryMatch,
+  ScopeChange, ScopeCounts, ScopeState, ScopedMemoryState,
 };
 use support::{Served, labels, refused};
 
@@ -68,8 +68,8 @@ async fn a_wait_for_the_store_answers_once_the_holder_lets_go() {
   assert_eq!(refused(served.client.locks(&too_long).await).0, 400);
 }
 
-fn row(scope: &str) -> NewMemory {
-  NewMemory {
+fn row(scope: &str) -> NewScopedMemory {
+  NewScopedMemory {
     scope: scope.into(),
     subject_key: None,
     kind: "rule".into(),
@@ -85,10 +85,10 @@ fn row(scope: &str) -> NewMemory {
 async fn a_scope_is_counted_and_let_go_of_whole() {
   let served = Served::new().await;
   let client = &served.client;
-  let kept = client.memory_add(&row("room:a")).await.unwrap();
-  client.memory_add(&row("room:b")).await.unwrap();
+  let kept = client.scoped_memory_add(&row("room:a")).await.unwrap();
+  client.scoped_memory_add(&row("room:b")).await.unwrap();
   client
-    .memory_match_add(&NewMemoryMatch {
+    .scoped_memory_match_add(&NewScopedMemoryMatch {
       memory_ids: vec![kept.id],
       actor_name: "reader-a".into(),
       spent_ms: 1,
@@ -144,8 +144,8 @@ async fn a_scope_is_counted_and_let_go_of_whole() {
 async fn a_forgotten_scope_withers_its_unmatched_rows_and_a_remembered_one_does_not() {
   let served = Served::new().await;
   let client = &served.client;
-  let forgotten = client.memory_add(&row("room:a")).await.unwrap();
-  let remembered = client.memory_add(&row("room:b")).await.unwrap();
+  let forgotten = client.scoped_memory_add(&row("room:a")).await.unwrap();
+  let remembered = client.scoped_memory_add(&row("room:b")).await.unwrap();
   let marked = client
     .scope_mark(
       "room:a",
@@ -172,8 +172,8 @@ async fn a_forgotten_scope_withers_its_unmatched_rows_and_a_remembered_one_does_
   );
 
   slow(&served.store, now()).await.unwrap();
-  assert_eq!(client.memory(forgotten.id).await.unwrap().state, MemoryState::Standing);
+  assert_eq!(client.scoped_memory(forgotten.id).await.unwrap().state, ScopedMemoryState::Standing);
   slow(&served.store, now() + WITHER_AFTER_MS + 1_000).await.unwrap();
-  assert_eq!(client.memory(forgotten.id).await.unwrap().state, MemoryState::Off);
-  assert_eq!(client.memory(remembered.id).await.unwrap().state, MemoryState::Standing);
+  assert_eq!(client.scoped_memory(forgotten.id).await.unwrap().state, ScopedMemoryState::Off);
+  assert_eq!(client.scoped_memory(remembered.id).await.unwrap().state, ScopedMemoryState::Standing);
 }

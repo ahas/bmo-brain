@@ -9,7 +9,7 @@ use crate::wire::{Labels, Object, nullable};
 /// Where a row stands.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
-pub enum MemoryState {
+pub enum ScopedMemoryState {
   /// The row holds.
   Standing,
   /// What it asked is finished.
@@ -22,7 +22,7 @@ pub enum MemoryState {
   Off,
 }
 
-impl MemoryState {
+impl ScopedMemoryState {
   /// The state as the wire writes it.
   pub fn name(self) -> &'static str {
     match self {
@@ -43,7 +43,7 @@ impl MemoryState {
 
   /// Whether a row in this state may move to `next`; moving to the state it is in changes nothing.
   pub fn may_move_to(self, next: Self) -> bool {
-    use MemoryState::*;
+    use ScopedMemoryState::*;
     self == next
       || matches!(
         (self, next),
@@ -59,14 +59,14 @@ impl MemoryState {
 /// One thing to remember.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct Memory {
+pub struct ScopedMemory {
   pub id: i64,
   pub scope: String,
   pub subject_key: Option<String>,
   /// The caller's word for what the row is.
   pub kind: String,
   pub text: String,
-  pub state: MemoryState,
+  pub state: ScopedMemoryState,
   /// The caller's objects, kept as given.
   pub conditions: Vec<Object>,
   pub labels: Labels,
@@ -83,7 +83,7 @@ pub struct Memory {
 /// Which rows to list.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct MemoriesQuery {
+pub struct ScopedMemoriesQuery {
   #[serde(skip_serializing_if = "Option::is_none")]
   pub scope: Option<String>,
   /// Rows of every scope beginning with this.
@@ -94,7 +94,7 @@ pub struct MemoriesQuery {
   #[serde(skip_serializing_if = "Option::is_none")]
   pub kind: Option<String>,
   #[serde(skip_serializing_if = "Option::is_none")]
-  pub state: Option<MemoryState>,
+  pub state: Option<ScopedMemoryState>,
   /// `key` for rows whose label is set, `key=value` for rows whose label has that value.
   #[serde(skip_serializing_if = "Option::is_none")]
   pub label: Option<String>,
@@ -114,7 +114,7 @@ pub struct MemoriesQuery {
 /// A row to add.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct NewMemory {
+pub struct NewScopedMemory {
   pub scope: String,
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub subject_key: Option<String>,
@@ -126,17 +126,17 @@ pub struct NewMemory {
   pub due_at: Option<i64>,
   /// `standing` where none is given.
   #[serde(default, skip_serializing_if = "Option::is_none")]
-  pub state: Option<MemoryState>,
+  pub state: Option<ScopedMemoryState>,
 }
 
 /// A change to a row: only the fields given change.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct MemoryChange {
+pub struct ScopedMemoryChange {
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub text: Option<String>,
   #[serde(default, skip_serializing_if = "Option::is_none")]
-  pub state: Option<MemoryState>,
+  pub state: Option<ScopedMemoryState>,
   /// The labels, replaced whole.
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub labels: Option<Labels>,
@@ -148,7 +148,7 @@ pub struct MemoryChange {
 /// That a reading matched rows, and what it spent.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct NewMemoryMatch {
+pub struct NewScopedMemoryMatch {
   pub memory_ids: Vec<i64>,
   pub actor_name: String,
   pub spent_ms: i64,
@@ -158,7 +158,7 @@ pub struct NewMemoryMatch {
 /// A reading's match, as recorded.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct MemoryMatch {
+pub struct ScopedMemoryMatch {
   pub id: i64,
   pub memory_ids: Vec<i64>,
   pub actor_name: String,

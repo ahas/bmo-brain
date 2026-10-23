@@ -2,13 +2,18 @@
 //! in the same transaction as the change. Each resource is a module of its own; the routes and the clock both
 //! work through them.
 
+pub mod brains;
 pub mod events;
+pub mod files;
 pub mod fragments;
 pub mod libraries;
 pub mod locks;
 pub mod memories;
+pub mod recall;
 pub mod records;
+pub mod rules;
 pub mod scopes;
+pub mod versions;
 pub mod watches;
 
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -58,10 +63,14 @@ impl From<sqlx::Error> for Fault {
 /// What a store call answers.
 pub type Held<T> = Result<T, Fault>;
 
-/// The database, and the signal every committed change raises so waiting readers look again.
+pub use rules::Rules;
+
+/// The database, the rules the brain reads by, and the signal every committed change raises so waiting
+/// readers look again.
 #[derive(Debug, Clone)]
 pub struct Store {
   pub pool: PgPool,
+  pub rules: Rules,
   moved: watch::Sender<u64>,
 }
 
@@ -73,12 +82,19 @@ impl Store {
     Ok(Self::over(PgPoolOptions::new().max_connections(16).connect_lazy_with(options)))
   }
 
-  /// The store over a pool already made.
+  /// The store over a pool already made, reading by the default rules.
   pub fn over(pool: PgPool) -> Self {
     Self {
       pool,
+      rules: Rules::default(),
       moved: watch::Sender::new(0),
     }
+  }
+
+  /// The same store reading by these rules.
+  pub fn by(mut self, rules: Rules) -> Self {
+    self.rules = rules;
+    self
   }
 
   /// The migrations run.

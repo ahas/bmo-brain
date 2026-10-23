@@ -815,7 +815,7 @@ async fn insert(
 /// The tables this import writes, and the key each is sampled by.
 pub const WRITTEN: [(&str, &[&str]); 6] = [
   ("fragments", &["key"]),
-  ("memories", &["id"]),
+  ("scoped_memories", &["id"]),
   ("notes", &["id"]),
   ("reminders", &["id"]),
   ("watches", &["id"]),
@@ -898,7 +898,7 @@ async fn compare(pool: &PgPool, prepared: &Prepared) -> Sample {
   let mut checked = 0;
   let tables: [(&str, &[&str], &[Mapped]); 6] = [
     ("fragments", &["key"], &prepared.fragments),
-    ("memories", &["id"], &prepared.memories),
+    ("scoped_memories", &["id"], &prepared.memories),
     ("notes", &["id"], &prepared.notes),
     ("reminders", &["id"], &prepared.reminders),
     ("watches", &["id"], &prepared.watches),
@@ -1006,7 +1006,7 @@ pub async fn run(database: &str, export: &Path, brain: &Path, dry_run: bool) -> 
     .map_err(|error| format!("the transaction could not be opened: {error}"))?;
   for (table, rows) in [
     ("fragments", &prepared.fragments),
-    ("memories", &prepared.memories),
+    ("scoped_memories", &prepared.memories),
     ("notes", &prepared.notes),
     ("reminders", &prepared.reminders),
     ("watches", &prepared.watches),
@@ -1051,7 +1051,7 @@ pub async fn run(database: &str, export: &Path, brain: &Path, dry_run: bool) -> 
     },
     Moved {
       source: "memories".to_owned(),
-      target: "memories".to_owned(),
+      target: "scoped_memories".to_owned(),
       exported: exported("memories"),
       written: prepared.memories.len() as u64,
       note: String::new(),

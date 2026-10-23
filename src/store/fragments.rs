@@ -12,7 +12,7 @@ use serde_json::json;
 use sqlx::types::Json;
 use sqlx::{FromRow, PgConnection, Postgres, QueryBuilder};
 
-use super::memories::{MEMORY_COLUMNS, MemoryRow};
+use super::memories::{SCOPED_MEMORY_COLUMNS, ScopedMemoryRow};
 use super::{
   FRAGMENT_MOST, Fault, Held, Store, holding, key, limit, listed, name, now, page, publish, scope, version,
 };
@@ -481,14 +481,14 @@ impl Store {
       fragments.sort_by_key(|fragment| slugs.iter().position(|slug| *slug == fragment.key));
     }
     let mut rows = QueryBuilder::<Postgres>::new(format!(
-      "SELECT {MEMORY_COLUMNS} FROM memories WHERE state = 'standing' AND scope = ANY("
+      "SELECT {SCOPED_MEMORY_COLUMNS} FROM scoped_memories WHERE state = 'standing' AND scope = ANY("
     ));
     rows.push_bind(scopes.clone()).push(")");
     if let Some(subject) = &query.subject_key {
       rows.push(" AND subject_key = ").push_bind(subject.clone());
     }
     rows.push(" ORDER BY id");
-    let rows: Vec<MemoryRow> = rows.build_query_as().fetch_all(&mut *conn).await?;
+    let rows: Vec<ScopedMemoryRow> = rows.build_query_as().fetch_all(&mut *conn).await?;
     let memories = super::memories::members(&mut conn, rows).await?;
     Ok(Knowledge {
       scopes,

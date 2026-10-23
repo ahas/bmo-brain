@@ -2,8 +2,8 @@
 //! 「Reminders」).
 
 use bmo_brain_client::{
-  Labels, MemoryState, NewReminder, NewWatch, Object, Page, Reminder, RemindersQuery, Watch, WatchChange,
-  WatchState, WatchesQuery,
+  Labels, NewReminder, NewWatch, Object, Page, Reminder, RemindersQuery, ScopedMemoryState, Watch,
+  WatchChange, WatchState, WatchesQuery,
 };
 use serde_json::{Value, json};
 use sqlx::types::Json;
@@ -54,7 +54,7 @@ impl WatchRow {
 /// What a condition waits on, read off it.
 enum Waits {
   At(i64),
-  Row(i64, MemoryState),
+  Row(i64, ScopedMemoryState),
   External,
 }
 
@@ -68,7 +68,7 @@ fn waits(condition: &Object) -> Held<Waits> {
     },
     Some("memory") => {
       let row = field("memoryId").and_then(Value::as_i64);
-      let state = field("state").and_then(Value::as_str).and_then(MemoryState::named);
+      let state = field("state").and_then(Value::as_str).and_then(ScopedMemoryState::named);
       match (row, state) {
         (Some(row), Some(state)) => Ok(Waits::Row(row, state)),
         _ => refused("of kind memory names no row `memoryId` and row `state`"),
@@ -109,7 +109,7 @@ async fn fire(conn: &mut PgConnection, id: i64, at: i64) -> Held<Watch> {
 pub(crate) async fn row_moved(
   conn: &mut PgConnection,
   memory_id: i64,
-  state: MemoryState,
+  state: ScopedMemoryState,
   at: i64,
 ) -> Held<()> {
   let waiting: Vec<i64> = sqlx::query_scalar(
@@ -161,7 +161,7 @@ impl Store {
     let (moment, row, holds) = match waits {
       Waits::At(moment) => (Some(moment), None, false),
       Waits::Row(row, state) => {
-        let stands: Option<String> = sqlx::query_scalar("SELECT state FROM memories WHERE id = $1")
+        let stands: Option<String> = sqlx::query_scalar("SELECT state FROM scoped_memories WHERE id = $1")
           .bind(row)
           .fetch_optional(&mut *tx)
           .await?;

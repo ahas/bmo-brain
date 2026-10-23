@@ -6,9 +6,10 @@ use std::future::Future;
 use std::pin::Pin;
 
 use bmo_brain_client::{
-  BrainClient, ClientFailure, FragmentWrite, FragmentsQuery, KnowledgeQuery, MemoriesQuery, MemoryChange,
-  NewLock, NewMemory, NewNote, NewReminder, NewWatch, NotesQuery, RemindersQuery, WatchChange,
-  WatchesQuery,
+  BrainClient, BrainsQuery, ClientFailure, Confirmations, Fold, FragmentWrite, FragmentsQuery, Hits,
+  KnowledgeQuery, LayersQuery, MemoriesQuery, MemoryMove, MemoryVersion, NewBrain, NewLayer, NewLock,
+  NewMemory, NewNote, NewReminder, NewScopedMemory, NewSubject, NewWatch, NotesQuery, RecallAsk,
+  RemindersQuery, ScopedMemoriesQuery, ScopedMemoryChange, SubjectsQuery, WatchChange, WatchesQuery,
 };
 use schemars::generate::SchemaGenerator;
 use schemars::{JsonSchema, Schema};
@@ -129,7 +130,7 @@ struct MemoryId {
 struct MemoryUpdate {
   memory_id: i64,
   #[serde(flatten)]
-  change: MemoryChange,
+  change: ScopedMemoryChange,
 }
 
 /// A watch and the move it makes.
@@ -156,6 +157,57 @@ struct FragmentPut {
   body: FragmentWrite,
 }
 
+/// One brain, by its id.
+#[derive(Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+struct BrainId {
+  brain_id: i64,
+}
+
+/// One memory of a brain, by their ids.
+#[derive(Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+struct BrainMemoryId {
+  brain_id: i64,
+  memory_id: i64,
+}
+
+/// A brain and what a route of it takes.
+#[derive(Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+struct Within<T> {
+  brain_id: i64,
+  #[serde(flatten)]
+  body: T,
+}
+
+/// A memory of a brain and the version written over it.
+#[derive(Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+struct VersionOf {
+  brain_id: i64,
+  memory_id: i64,
+  #[serde(flatten)]
+  version: MemoryVersion,
+}
+
+/// A memory of a brain and the move it makes.
+#[derive(Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+struct MoveOf {
+  brain_id: i64,
+  memory_id: i64,
+  #[serde(flatten)]
+  change: MemoryMove,
+}
+
+/// The rendered persona, as a tool answers it.
+#[derive(Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+struct PersonaText {
+  text: String,
+}
+
 /// One lock, by its id.
 #[derive(Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -163,32 +215,166 @@ struct LockId {
   lock_id: i64,
 }
 
-/// The seventeen tools, in the order the plugin lists them.
+/// The tools, in the order the plugin lists them: the brains' first, then the scope routes'.
 pub fn tools() -> Vec<BrainTool> {
   vec![
+    tool(
+      "brain_brains",
+      "The brains, by account and agent.",
+      "GET /brains",
+      |client, query: BrainsQuery| async move { client.brains(&query).await },
+    ),
+    tool(
+      "brain_brain_add",
+      "Make a brain for an account and an agent that have none.",
+      "POST /brains",
+      |client, body: NewBrain| async move { client.brain_add(&body).await },
+    ),
+    tool(
+      "brain_subjects",
+      "A brain's subjects, by type, key and words of the description.",
+      "GET /brains/{brainId}/subjects",
+      |client, Within { brain_id, body }: Within<SubjectsQuery>| async move {
+        client.subjects(brain_id, &body).await
+      },
+    ),
+    tool(
+      "brain_subject_add",
+      "Add a subject, or the one standing at its type and key.",
+      "POST /brains/{brainId}/subjects",
+      |client, Within { brain_id, body }: Within<NewSubject>| async move {
+        client.subject_add(brain_id, &body).await
+      },
+    ),
+    tool(
+      "brain_layers",
+      "A brain's layers, by position.",
+      "GET /brains/{brainId}/layers",
+      |client, Within { brain_id, body }: Within<LayersQuery>| async move {
+        client.layers(brain_id, &body).await
+      },
+    ),
+    tool(
+      "brain_layer_add",
+      "Add a layer, or the one standing at its name.",
+      "POST /brains/{brainId}/layers",
+      |client, Within { brain_id, body }: Within<NewLayer>| async move {
+        client.layer_add(brain_id, &body).await
+      },
+    ),
+    tool(
+      "brain_memories_list",
+      "A brain's memories, by type, status, layer, subject, key, lineage, label and words.",
+      "GET /brains/{brainId}/memories",
+      |client, Within { brain_id, body }: Within<MemoriesQuery>| async move {
+        client.memories(brain_id, &body).await
+      },
+    ),
+    tool(
+      "brain_memory_write",
+      "Write a memory as a first version.",
+      "POST /brains/{brainId}/memories",
+      |client, Within { brain_id, body }: Within<NewMemory>| async move {
+        client.memory_add(brain_id, &body).await
+      },
+    ),
+    tool(
+      "brain_memory_read",
+      "One memory in one version, with its subjects and strengths.",
+      "GET /brains/{brainId}/memories/{memoryId}",
+      |client,
+       BrainMemoryId {
+         brain_id,
+         memory_id,
+       }| async move { client.memory(brain_id, memory_id).await },
+    ),
+    tool(
+      "brain_memory_version",
+      "Write a new version of a memory, superseding the one named.",
+      "POST /brains/{brainId}/memories/{memoryId}/versions",
+      |client,
+       VersionOf {
+         brain_id,
+         memory_id,
+         version,
+       }| async move { client.memory_version(brain_id, memory_id, &version).await },
+    ),
+    tool(
+      "brain_memory_move",
+      "Move a memory's status: approved, done or invalidated.",
+      "PATCH /brains/{brainId}/memories/{memoryId}",
+      |client,
+       MoveOf {
+         brain_id,
+         memory_id,
+         change,
+       }| async move { client.memory_move(brain_id, memory_id, &change).await },
+    ),
+    tool(
+      "brain_hits",
+      "Record a hand-out: each row hit, and marked for the session named.",
+      "POST /brains/{brainId}/hits",
+      |client, Within { brain_id, body }: Within<Hits>| async move { client.hits_record(brain_id, &body).await },
+    ),
+    tool(
+      "brain_confirmations",
+      "Record confirmations: each row's storage strength raised by the gap since its last.",
+      "POST /brains/{brainId}/confirmations",
+      |client, Within { brain_id, body }: Within<Confirmations>| async move {
+        client.confirmations_record(brain_id, &body).await
+      },
+    ),
+    tool(
+      "brain_types",
+      "The types in use, counted, the reserved ones first.",
+      "GET /brains/{brainId}/types",
+      |client, BrainId { brain_id }| async move { client.types(brain_id).await },
+    ),
+    tool(
+      "brain_recall",
+      "What a turn is handed: the room's core and the searched part, under the budget.",
+      "POST /brains/{brainId}/recall",
+      |client, Within { brain_id, body }: Within<RecallAsk>| async move { client.recall(brain_id, &body).await },
+    ),
+    tool(
+      "brain_fold",
+      "A session folded or handed off: its marks cleared.",
+      "POST /brains/{brainId}/folds",
+      |client, Within { brain_id, body }: Within<Fold>| async move { client.fold(brain_id, &body).await },
+    ),
+    tool(
+      "brain_persona",
+      "The persona rendered as text.",
+      "GET /brains/{brainId}/persona",
+      |client, BrainId { brain_id }| async move {
+        client.persona(brain_id).await.map(|text| PersonaText { text })
+      },
+    ),
     tool(
       "brain_memories",
       "Memory rows by scope, scope prefix, subject, kind, state, label; standing rows, rows due.",
       "GET /memories",
-      |client, query: MemoriesQuery| async move { client.memories(&query).await },
+      |client, query: ScopedMemoriesQuery| async move { client.scoped_memories(&query).await },
     ),
     tool(
       "brain_memory_add",
       "Add a memory row.",
       "POST /memories",
-      |client, body: NewMemory| async move { client.memory_add(&body).await },
+      |client, body: NewScopedMemory| async move { client.scoped_memory_add(&body).await },
     ),
     tool(
       "brain_memory",
       "One memory row and the watches on it.",
       "GET /memories/{memoryId}",
-      |client, MemoryId { memory_id }| async move { client.memory(memory_id).await },
+      |client, MemoryId { memory_id }| async move { client.scoped_memory(memory_id).await },
     ),
     tool(
       "brain_memory_update",
       "Change a row: its words, or its state (done, retired, candidate, off, standing again).",
       "PATCH /memories/{memoryId}",
-      |client, MemoryUpdate { memory_id, change }| async move { client.memory_update(memory_id, &change).await },
+      |client, MemoryUpdate { memory_id, change }| async move {
+        client.scoped_memory_update(memory_id, &change).await
+      },
     ),
     tool(
       "brain_notes",

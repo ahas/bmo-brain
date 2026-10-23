@@ -2,6 +2,7 @@
 //! API as a Rust type, and `BrainClient`, one method for each route. The service's OpenAPI document is
 //! generated from these types.
 
+mod brains;
 mod client;
 mod fragments;
 mod holdings;
@@ -10,6 +11,12 @@ mod records;
 mod watches;
 mod wire;
 
+pub use brains::{
+  Brain, BrainsQuery, Confirmations, ExportQuery, Fold, Folded, Hits, Injected, Layer, LayerChange,
+  LayersQuery, MemoriesQuery, Memory, MemoryMove, MemoryStatus, MemoryVersion, NewBrain, NewLayer,
+  NewMemory, NewSubject, Recall, RecallAsk, RecallChoice, RecallPart, Recorded, Rules, Subject,
+  SubjectChange, SubjectKey, SubjectRef, SubjectsQuery, TypeCount,
+};
 pub use client::{Answer, BrainClient, ClientFailure};
 pub use fragments::{
   Drift, DriftChange, Fragment, FragmentHits, FragmentHitsRecorded, FragmentKind, FragmentMerge,
@@ -19,8 +26,8 @@ pub use fragments::{
 };
 pub use holdings::{Lock, LocksQuery, NewLock, ScopeChange, ScopeCounts, ScopeHolding, ScopeState};
 pub use memories::{
-  MemoriesQuery, Memory, MemoryChange, MemoryMatch, MemoryState, NewMemory, NewMemoryMatch, NewNote, Note,
-  NotesQuery,
+  NewNote, NewScopedMemory, NewScopedMemoryMatch, Note, NotesQuery, ScopedMemoriesQuery, ScopedMemory,
+  ScopedMemoryChange, ScopedMemoryMatch, ScopedMemoryState,
 };
 pub use records::{
   AgentAsk, Done, Load, LoadsKeep, NoteKeep, RoomRule, RoomRules, RoomRulesAsk, RuleSet, RuleText,

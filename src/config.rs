@@ -4,6 +4,7 @@
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
+use bmo_brain_client::Rules;
 use serde::Deserialize;
 
 /// The configuration, key by key as the file writes it.
@@ -13,6 +14,9 @@ pub struct Config {
   pub listen: String,
   pub token: String,
   pub database: String,
+  /// The numbers the brain reads by (docs/design.md); each has a default.
+  #[serde(default)]
+  pub rules: Rules,
 }
 
 /// How long the health command waits on one answer.

@@ -2,8 +2,8 @@
 //! (docs/boundary-api.md, 「Memory rows」, 「Notes」 and 「Scopes」).
 
 use bmo_brain_client::{
-  Labels, MemoriesQuery, Memory, MemoryChange, MemoryMatch, MemoryState, NewMemory, NewMemoryMatch,
-  NewNote, Note, NotesQuery, Object, Page, Watch,
+  Labels, NewNote, NewScopedMemory, NewScopedMemoryMatch, Note, NotesQuery, Object, Page,
+  ScopedMemoriesQuery, ScopedMemory, ScopedMemoryChange, ScopedMemoryMatch, ScopedMemoryState, Watch,
 };
 use sqlx::types::Json;
 use sqlx::{FromRow, PgConnection, Postgres, QueryBuilder};
@@ -11,11 +11,11 @@ use sqlx::{FromRow, PgConnection, Postgres, QueryBuilder};
 use super::watches::{self, WATCH_COLUMNS, WatchRow};
 use super::{Fault, Held, Store, TEXT_MOST, holding, limit, name, now, page, publish, scope, text};
 
-pub(crate) const MEMORY_COLUMNS: &str = "id, scope, subject_key, kind, text, state, conditions, labels, due_at, \
+pub(crate) const SCOPED_MEMORY_COLUMNS: &str = "id, scope, subject_key, kind, text, state, conditions, labels, due_at, \
   match_count, last_matched_at, created_at, changed_at";
 
 #[derive(FromRow)]
-pub(crate) struct MemoryRow {
+pub(crate) struct ScopedMemoryRow {
   id: i64,
   scope: String,
   subject_key: Option<String>,
@@ -31,15 +31,15 @@ pub(crate) struct MemoryRow {
   changed_at: i64,
 }
 
-impl MemoryRow {
-  fn state(&self) -> Held<MemoryState> {
-    MemoryState::named(&self.state)
+impl ScopedMemoryRow {
+  fn state(&self) -> Held<ScopedMemoryState> {
+    ScopedMemoryState::named(&self.state)
       .ok_or_else(|| Fault::Failed(format!("Row {} holds no known state: {}.", self.id, self.state)))
   }
 
-  fn member(self, watches: Vec<Watch>) -> Held<Memory> {
+  fn member(self, watches: Vec<Watch>) -> Held<ScopedMemory> {
     let state = self.state()?;
-    Ok(Memory {
+    Ok(ScopedMemory {
       id: self.id,
       scope: self.scope,
       subject_key: self.subject_key,
@@ -59,7 +59,10 @@ impl MemoryRow {
 }
 
 /// Rows as members, each with the watches whose condition names it.
-pub(crate) async fn members(conn: &mut PgConnection, rows: Vec<MemoryRow>) -> Held<Vec<Memory>> {
+pub(crate) async fn members(
+  conn: &mut PgConnection,
+  rows: Vec<ScopedMemoryRow>,
+) -> Held<Vec<ScopedMemory>> {
   let ids: Vec<i64> = rows.iter().map(|row| row.id).collect();
   let watching: Vec<WatchRow> =
     sqlx::query_as(&format!("SELECT {WATCH_COLUMNS} FROM watches WHERE memory_id = ANY($1) ORDER BY id"))
@@ -80,9 +83,9 @@ pub(crate) async fn members(conn: &mut PgConnection, rows: Vec<MemoryRow>) -> He
     .collect()
 }
 
-async fn read(conn: &mut PgConnection, id: i64, for_update: bool) -> Held<MemoryRow> {
+async fn read(conn: &mut PgConnection, id: i64, for_update: bool) -> Held<ScopedMemoryRow> {
   let lock = if for_update { " FOR UPDATE" } else { "" };
-  sqlx::query_as(&format!("SELECT {MEMORY_COLUMNS} FROM memories WHERE id = $1{lock}"))
+  sqlx::query_as(&format!("SELECT {SCOPED_MEMORY_COLUMNS} FROM scoped_memories WHERE id = $1{lock}"))
     .bind(id)
     .fetch_optional(&mut *conn)
     .await?
@@ -90,7 +93,7 @@ async fn read(conn: &mut PgConnection, id: i64, for_update: bool) -> Held<Memory
 }
 
 /// One row as a member.
-pub(crate) async fn member(conn: &mut PgConnection, id: i64) -> Held<Memory> {
+pub(crate) async fn member(conn: &mut PgConnection, id: i64) -> Held<ScopedMemory> {
   let row = read(conn, id, false).await?;
   Ok(members(conn, vec![row]).await?.remove(0))
 }
@@ -105,10 +108,11 @@ fn label_filter(label: &str) -> serde_json::Value {
 
 impl Store {
   /// A page of rows.
-  pub async fn memories(&self, query: &MemoriesQuery) -> Held<Page<Memory>> {
+  pub async fn scoped_memories(&self, query: &ScopedMemoriesQuery) -> Held<Page<ScopedMemory>> {
     let limit = limit(query.limit)?;
-    let mut sql =
-      QueryBuilder::<Postgres>::new(format!("SELECT {MEMORY_COLUMNS} FROM memories WHERE TRUE"));
+    let mut sql = QueryBuilder::<Postgres>::new(format!(
+      "SELECT {SCOPED_MEMORY_COLUMNS} FROM scoped_memories WHERE TRUE"
+    ));
     if let Some(scope) = &query.scope {
       sql.push(" AND scope = ").push_bind(scope.clone());
     }
@@ -141,26 +145,26 @@ impl Store {
     }
     sql.push(" ORDER BY id LIMIT ").push_bind(limit + 1);
     let mut conn = self.connection().await?;
-    let rows: Vec<MemoryRow> = sql.build_query_as().fetch_all(&mut *conn).await?;
+    let rows: Vec<ScopedMemoryRow> = sql.build_query_as().fetch_all(&mut *conn).await?;
     Ok(page(members(&mut conn, rows).await?, limit))
   }
 
   /// A row added.
-  pub async fn memory_add(&self, body: &NewMemory) -> Held<Memory> {
+  pub async fn scoped_memory_add(&self, body: &NewScopedMemory) -> Held<ScopedMemory> {
     scope("scope", &body.scope)?;
     name("kind", &body.kind)?;
     text("text", &body.text, TEXT_MOST)?;
     let at = now();
     let mut tx = self.begin().await?;
-    let row: MemoryRow = sqlx::query_as(&format!(
-      "INSERT INTO memories (scope, subject_key, kind, text, state, conditions, labels, due_at, created_at, \
-       changed_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $9) RETURNING {MEMORY_COLUMNS}"
+    let row: ScopedMemoryRow = sqlx::query_as(&format!(
+      "INSERT INTO scoped_memories (scope, subject_key, kind, text, state, conditions, labels, due_at, created_at, \
+       changed_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $9) RETURNING {SCOPED_MEMORY_COLUMNS}"
     ))
     .bind(&body.scope)
     .bind(&body.subject_key)
     .bind(&body.kind)
     .bind(&body.text)
-    .bind(body.state.unwrap_or(MemoryState::Standing).name())
+    .bind(body.state.unwrap_or(ScopedMemoryState::Standing).name())
     .bind(Json(&body.conditions))
     .bind(Json(&body.labels))
     .bind(body.due_at)
@@ -174,12 +178,12 @@ impl Store {
   }
 
   /// One row.
-  pub async fn memory(&self, id: i64) -> Held<Memory> {
+  pub async fn scoped_memory(&self, id: i64) -> Held<ScopedMemory> {
     member(&mut *self.connection().await?, id).await
   }
 
   /// A row changed by the fields given.
-  pub async fn memory_change(&self, id: i64, body: &MemoryChange) -> Held<Memory> {
+  pub async fn scoped_memory_change(&self, id: i64, body: &ScopedMemoryChange) -> Held<ScopedMemory> {
     if let Some(words) = &body.text {
       text("text", words, TEXT_MOST)?;
     }
@@ -196,7 +200,7 @@ impl Store {
     }
     let at = now();
     sqlx::query(
-      "UPDATE memories SET text = COALESCE($2, text), state = $3, labels = COALESCE($4, labels), \
+      "UPDATE scoped_memories SET text = COALESCE($2, text), state = $3, labels = COALESCE($4, labels), \
        due_at = CASE WHEN $5 THEN $6 ELSE due_at END, changed_at = $7 WHERE id = $1",
     )
     .bind(id)
@@ -218,7 +222,7 @@ impl Store {
   }
 
   /// A reading's match recorded, and each row it matched counted.
-  pub async fn memory_match_add(&self, body: &NewMemoryMatch) -> Held<MemoryMatch> {
+  pub async fn scoped_memory_match_add(&self, body: &NewScopedMemoryMatch) -> Held<ScopedMemoryMatch> {
     name("actorName", &body.actor_name)?;
     if body.memory_ids.is_empty() {
       return Err(Fault::BadRequest("memoryIds names no row.".to_owned()));
@@ -232,7 +236,7 @@ impl Store {
     ids.sort_unstable();
     ids.dedup();
     let counted: Vec<i64> = sqlx::query_scalar(
-      "UPDATE memories SET match_count = match_count + 1, last_matched_at = $2 WHERE id = ANY($1) RETURNING id",
+      "UPDATE scoped_memories SET match_count = match_count + 1, last_matched_at = $2 WHERE id = ANY($1) RETURNING id",
     )
     .bind(&ids)
     .bind(at)
@@ -254,7 +258,7 @@ impl Store {
     .fetch_one(&mut *tx)
     .await?;
     self.commit(tx).await?;
-    Ok(MemoryMatch {
+    Ok(ScopedMemoryMatch {
       id,
       memory_ids: body.memory_ids.clone(),
       actor_name: body.actor_name.clone(),
@@ -312,7 +316,7 @@ impl Store {
   pub async fn wither(&self, before: i64) -> Held<usize> {
     let mut tx = self.begin().await?;
     let ids: Vec<i64> = sqlx::query_scalar(
-      "SELECT m.id FROM memories m JOIN scopes s ON s.scope = m.scope \
+      "SELECT m.id FROM scoped_memories m JOIN scopes s ON s.scope = m.scope \
        WHERE s.state = 'forgotten' AND m.state = 'standing' AND COALESCE(m.last_matched_at, m.created_at) < $1 \
        ORDER BY m.id LIMIT 500 FOR UPDATE OF m SKIP LOCKED",
     )
@@ -321,12 +325,12 @@ impl Store {
     .await?;
     let at = now();
     for &id in &ids {
-      sqlx::query("UPDATE memories SET state = 'off', changed_at = $2 WHERE id = $1")
+      sqlx::query("UPDATE scoped_memories SET state = 'off', changed_at = $2 WHERE id = $1")
         .bind(id)
         .bind(at)
         .execute(&mut *tx)
         .await?;
-      watches::row_moved(&mut tx, id, MemoryState::Off, at).await?;
+      watches::row_moved(&mut tx, id, ScopedMemoryState::Off, at).await?;
       let memory = member(&mut tx, id).await?;
       publish(&mut tx, "memory.changed", Some(&memory.scope), &memory).await?;
     }

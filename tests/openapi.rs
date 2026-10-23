@@ -8,9 +8,35 @@ use bmo_brain::openapi::{openapi, openapi_json};
 const ROOT: &str = env!("CARGO_MANIFEST_DIR");
 
 /// The routes docs/boundary-api.md states, by method and path.
-const ROUTES: [&str; 43] = [
+const ROUTES: [&str; 69] = [
   "get /health",
   "get /events",
+  "get /brains",
+  "post /brains",
+  "get /brains/{brainId}",
+  "delete /brains/{brainId}",
+  "get /brains/{brainId}/subjects",
+  "post /brains/{brainId}/subjects",
+  "get /brains/{brainId}/subjects/{subjectId}",
+  "patch /brains/{brainId}/subjects/{subjectId}",
+  "get /brains/{brainId}/layers",
+  "post /brains/{brainId}/layers",
+  "get /brains/{brainId}/layers/{layerId}",
+  "patch /brains/{brainId}/layers/{layerId}",
+  "get /brains/{brainId}/memories",
+  "post /brains/{brainId}/memories",
+  "get /brains/{brainId}/memories/{memoryId}",
+  "patch /brains/{brainId}/memories/{memoryId}",
+  "post /brains/{brainId}/memories/{memoryId}/versions",
+  "get /brains/{brainId}/lineages/{lineageId}",
+  "post /brains/{brainId}/hits",
+  "post /brains/{brainId}/confirmations",
+  "get /brains/{brainId}/types",
+  "post /brains/{brainId}/recall",
+  "post /brains/{brainId}/folds",
+  "get /brains/{brainId}/persona",
+  "get /brains/{brainId}/export",
+  "post /brains/{brainId}/injections",
   "get /memories",
   "post /memories",
   "get /memories/{memoryId}",
@@ -55,7 +81,24 @@ const ROUTES: [&str; 43] = [
 ];
 
 /// The harness plugin's tools.
-pub const TOOLS: [&str; 17] = [
+pub const TOOLS: [&str; 34] = [
+  "brain_brains",
+  "brain_brain_add",
+  "brain_subjects",
+  "brain_subject_add",
+  "brain_layers",
+  "brain_layer_add",
+  "brain_memories_list",
+  "brain_memory_write",
+  "brain_memory_read",
+  "brain_memory_version",
+  "brain_memory_move",
+  "brain_hits",
+  "brain_confirmations",
+  "brain_types",
+  "brain_recall",
+  "brain_fold",
+  "brain_persona",
   "brain_memories",
   "brain_memory_add",
   "brain_memory",

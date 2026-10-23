@@ -1,14 +1,16 @@
 ---
 name: brain-harness
-description: Keep and read long-term memory with the bmo-brain MCP server. Use when a harness should remember something across sessions (a promise, a rule, a state of work, a note about someone), read what it should know for a scope before acting, keep reference fragments, set a reminder or a watch whose event its own loop takes, or hold the store while editing it at length.
+description: Keep and read an agent's long-term memory with the bmo-brain MCP server. Use when a harness should find its brain, read what a turn should know (brain_recall), write what it learns as versioned memories about subjects (brain_memory_write, brain_memory_version), close a memory that stopped holding (brain_memory_move), tell the brain a session folded (brain_fold), or read the persona; and for rows still held under scopes, the scope tools below.
 ---
 
 # brain-harness
 
-The brain stores memory as middleware: memory rows, notes, watches, reminders, fragments of reference text and
-the libraries they come from, and locks, each held under a **scope** you choose. It never acts on its own except
-on time: a reminder whose moment comes and a watch whose condition holds become events on its stream. The
-`bmo-brain` MCP server reaches one brain service and offers a tool for each route a harness needs.
+The brain is an agent's long-term memory as a service. A **brain** belongs to an account and an agent; it
+holds **subjects** (what a memory is about: a person, a room, a document, found by type and key), **layers**
+(its table of contents) and **memories**, one row a version: a correction is a new version, a fact that
+stopped holding is invalidated, nothing is deleted. The `bmo-brain` MCP server reaches one brain service and
+offers a tool for each route a harness needs. The rows held under a **scope** (memory rows, notes, watches,
+reminders, fragments) keep their own tools until their readers have moved.
 
 ## Starting the server
 
@@ -77,3 +79,22 @@ asks for it.
 
 A failure comes back as a tool error whose text is JSON: `status`, `code` and `error`, the route's own.
 `bad-request` names what is wrong with the arguments; `not-found` means no member stands at the id or key.
+
+## A brain's memory
+
+- **Find the brain first:** `brain_brains` with `accountKey` and `agentKey`, or `brain_brain_add` where none
+  stands. Every other brain tool takes `brainId`.
+- **Before answering, ask `brain_recall`** with the room (`type` `room`, its key), the speakers (`type`
+  `person`, their keys), the turn's words, your `sessionKey` and when the session opened. The answer's `block`
+  is what to read; a row marked as handed to this session already is one you have seen in this session.
+- **Write what you learn with `brain_memory_write`:** `type` (`fact`, `rumor` for what you only heard,
+  `situation` for a rule for a situation, `episode` for what happened, or your own word), `text`, the
+  `subjects` it is about (each `type` and `key`, made where none stands), `importance` 1 to 10, and your
+  `actorName`. Give a `key` to a memory you may rewrite later.
+- **Correct with `brain_memory_version`,** never by writing a second row: the old version is superseded and
+  kept. **Close with `brain_memory_move`:** `done` for a promise kept, `invalidated` for a fact that stopped
+  holding; `active` approves a `pending` row.
+- **Tell the brain when the session folds** with `brain_fold`, so the marks clear and what it knew may attach
+  to the next session.
+- **`brain_persona`** renders the agent's persona; `brain_types` lists the types in use, so one meaning keeps
+  one spelling; `brain_subjects`, `brain_layers` and `brain_memories_list` read the tables.

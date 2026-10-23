@@ -1,14 +1,18 @@
 # brain
 
-The brain service, `bmo-brain`: memory as middleware. It stores memory rows, notes, watches, reminders,
-fragments of reference text and the libraries they come from, the locks that say who is editing the store, and
-the caller's own records — a room's rules, a session's loads and a chat session's note — each under the caller's
-opaque scope, and serves them over HTTP. It never executes and calls no other service;
-its clock turns reminders and watches into events a client reads. Its harness plugin, `brain-harness`, is the MCP
-server the same binary starts as `bmo-brain mcp` and the skill that tells a harness how to use it.
+The brain service, `bmo-brain`: an agent's long-term memory as a service. It keeps many brains, each an
+account's and one agent's, as subjects (what a memory is about, found by type and key), layers (the table of
+contents) and memories, one row a version, superseded and invalidated but never deleted. A turn asks a
+brain's recall for a block under a token budget, a persona is rendered as the same bytes until a piece
+changes, and a brain moves in and out as a brain file. The brain calls one unit, the agency, for its
+recollector's model sessions, and nothing else. The rows held under a caller's opaque scope (memory rows,
+notes, watches, reminders, fragments, libraries, locks and the caller's own records) keep answering until
+their readers move to the brains. Its harness plugin, `brain-harness`, is the MCP server the same binary
+starts as `bmo-brain mcp` and the skill that tells a harness how to use it.
 
-`docs/boundary-api.md` states every route, event, tool and code; `docs/openapi.json` is the same contract in
-machine form, generated from the client's types.
+`docs/design.md` states the shape and the rules the brain keeps; `docs/boundary-api.md` states every route,
+event, tool and code; `docs/openapi.json` is the same contract in machine form, generated from the client's
+types.
 
 ## Personal data
 
@@ -21,12 +25,12 @@ fixtures or commit messages. `docs/PERSONAL-DATA.md` states the rule and the che
 | Folder | Holds |
 |---|---|
 | `.graph/` | the code dependency graph: its settings and its nodes, one feature to a node. The area files are generated in the checkout and untracked, so a fresh checkout builds them again, while `settings.toml` is the repository's configuration and stays tracked |
-| `src/` | the service's own package: its store, routes, clock, MCP server and OpenAPI document |
+| `src/` | the service's own package: its store (the brains, their subjects, layers, memories, recall and brain files, and the rows held under scopes), routes, clock, MCP server, OpenAPI document, the data move and the old archive's import |
 | `crates/` | `client/`, the crate `bmo-brain-client`, every body and member as a Rust type and one method for each route |
 | `package/` | the TypeScript package `bmo-brain-client`, generated from `docs/openapi.json`: every body as a type and a typed call for each route |
 | `migrations/` | the database's migrations, built into the binary |
 | `skills/` | `brain-harness/`, the plugin's skill |
-| `docs/` | the boundary document, the OpenAPI document and the personal-data rule |
+| `docs/` | the design, the boundary document, the OpenAPI document and the personal-data rule |
 | `tests/` | the service's tests and the checks that span the repository |
 | `deploy/` | the service's user unit, `bmo-brain.service`, which a deployment links from the deploy tree |
 

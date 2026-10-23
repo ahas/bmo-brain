@@ -4,6 +4,320 @@
  */
 
 export interface paths {
+    "/brains": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The brains, by account and agent. */
+        get: operations["listBrains"];
+        put?: never;
+        /** Make a brain for an account and an agent that have none. */
+        post: operations["createBrain"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/brains/{brainId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One brain. */
+        get: operations["readBrain"];
+        put?: never;
+        post?: never;
+        /** Let a brain go whole, with everything it held. */
+        delete: operations["deleteBrain"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/brains/{brainId}/confirmations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Record confirmations: each row's storage strength raised by the gap since its last. */
+        post: operations["recordConfirmations"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/brains/{brainId}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The brain, or the layers named, as a brain file. */
+        get: operations["exportBrain"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/brains/{brainId}/folds": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** A session folded or handed off: its marks cleared. */
+        post: operations["fold"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/brains/{brainId}/hits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Record a hand-out: each row hit, and marked for the session named. */
+        post: operations["recordHits"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/brains/{brainId}/injections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Read a brain file into the brain: keyed rows supersede, the rest are added, nothing overwritten. */
+        post: operations["injectBrain"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/brains/{brainId}/layers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A brain's layers, by position. */
+        get: operations["listLayers"];
+        put?: never;
+        /** Add a layer, or the one standing at its name. */
+        post: operations["createLayer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/brains/{brainId}/layers/{layerId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One layer. */
+        get: operations["readLayer"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Change a layer's description or position. */
+        patch: operations["changeLayer"];
+        trace?: never;
+    };
+    "/brains/{brainId}/lineages/{lineageId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Every version of a lineage, oldest first. */
+        get: operations["readLineage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/brains/{brainId}/memories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A brain's memories, by type, status, layer, subject, key, lineage, label and words. */
+        get: operations["listBrainMemories"];
+        put?: never;
+        /** Write a memory as a first version. */
+        post: operations["writeMemory"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/brains/{brainId}/memories/{memoryId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One memory in one version, with its subjects and strengths. */
+        get: operations["readBrainMemory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Move a memory's status: approved, done or invalidated. */
+        patch: operations["moveMemory"];
+        trace?: never;
+    };
+    "/brains/{brainId}/memories/{memoryId}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Write a new version of a memory, superseding the one named. */
+        post: operations["writeMemoryVersion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/brains/{brainId}/persona": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The persona rendered as text, the same bytes until a piece changes. */
+        get: operations["renderPersona"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/brains/{brainId}/recall": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** What a turn is handed: the room's core and the searched part, under the budget. */
+        post: operations["recall"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/brains/{brainId}/subjects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A brain's subjects, by type, key and words of the description. */
+        get: operations["listSubjects"];
+        put?: never;
+        /** Add a subject, or the one standing at its type and key with its description set. */
+        post: operations["createSubject"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/brains/{brainId}/subjects/{subjectId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One subject. */
+        get: operations["readSubject"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Change a subject's description. */
+        patch: operations["changeSubject"];
+        trace?: never;
+    };
+    "/brains/{brainId}/types": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The types in use, counted, the reserved ones first. */
+        get: operations["listTypes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/events": {
         parameters: {
             query?: never;
@@ -551,6 +865,31 @@ export interface components {
         AgentAsk: {
             agent: string;
         };
+        /** @description One agent's long-term memory, keyed by the account that owns it and the agent it belongs to. */
+        Brain: {
+            /** @description The account's opaque key, as the caller gives it. */
+            accountKey: string;
+            /** @description The agent's opaque key, as the caller gives it. */
+            agentKey: string;
+            /** Format: int64 */
+            createdAt: number;
+            /** Format: int64 */
+            id: number;
+            name: string;
+        };
+        /** @description One page of a list, oldest first. */
+        BrainPage: {
+            items: components["schemas"]["Brain"][];
+            /** @description Whether anything stands past the last item. */
+            more: boolean;
+        };
+        /** @description A source apart from a reading that confirmed memories. */
+        Confirmations: {
+            actorName: string;
+            /** Format: int64 */
+            at?: number | null;
+            memoryIds: number[];
+        };
         /** @description That the call was done. */
         Done: {
             ok: boolean;
@@ -578,6 +917,18 @@ export interface components {
             items: components["schemas"]["Event"][];
             /** @description Whether anything stands past the last item. */
             more: boolean;
+        };
+        /** @description A session folded or handed off. */
+        Fold: {
+            sessionKey: string;
+        };
+        /** @description What a fold came to. */
+        Folded: {
+            /**
+             * Format: int64
+             * @description The marks cleared for the session.
+             */
+            clearedCount: number;
         };
         /** @description One piece of reference text, named by its key. */
         Fragment: {
@@ -704,7 +1055,29 @@ export interface components {
             ready: boolean;
             /** @description Why it is not ready, or null. */
             reason: string | null;
+            /** @description The numbers the brain reads by. */
+            rules: components["schemas"]["Rules"];
             version: string;
+        };
+        /** @description A reading that handed memories out. */
+        Hits: {
+            actorName: string;
+            /** Format: int64 */
+            at?: number | null;
+            memoryIds: number[];
+            /** @description The session the memories were handed to, which marks them for that session. */
+            sessionKey?: string | null;
+        };
+        /** @description What an injection came to. */
+        Injected: {
+            /** Format: int64 */
+            layersAdded: number;
+            /** Format: int64 */
+            memoriesAdded: number;
+            /** Format: int64 */
+            memoriesSuperseded: number;
+            /** Format: int64 */
+            subjectsAdded: number;
         };
         /** @description A kind's words, as a library gives them. */
         KindWords: {
@@ -716,8 +1089,36 @@ export interface components {
             /** @description The active fragments held under one of the scopes or shared, switched off for none of them. */
             fragments: components["schemas"]["Fragment"][];
             /** @description The standing rows held under one of the scopes. */
-            memories: components["schemas"]["Memory"][];
+            memories: components["schemas"]["ScopedMemory"][];
             scopes: string[];
+        };
+        /** @description A heading in a brain's table of contents. */
+        Layer: {
+            /** Format: int64 */
+            brainId: number;
+            /** Format: int64 */
+            createdAt: number;
+            description: string;
+            /** Format: int64 */
+            id: number;
+            name: string;
+            /**
+             * Format: int64
+             * @description Where it stands among the brain's layers; the persona is rendered in this order.
+             */
+            position: number;
+        };
+        /** @description A change to a layer: only the fields given change. */
+        LayerChange: {
+            description?: string | null;
+            /** Format: int64 */
+            position?: number | null;
+        };
+        /** @description One page of a list, oldest first. */
+        LayerPage: {
+            items: components["schemas"]["Layer"][];
+            /** @description Whether anything stands past the last item. */
+            more: boolean;
         };
         /** @description A named set of documents the caller keeps elsewhere, handed in whole. */
         Library: {
@@ -808,65 +1209,77 @@ export interface components {
             /** @description Whether anything stands past the last item. */
             more: boolean;
         };
-        /** @description One thing to remember. */
+        /** @description One memory in one version. */
         Memory: {
+            /** @description Who wrote this version. */
+            actorName: string;
             /** Format: int64 */
-            changedAt: number;
-            /** @description The caller's objects, kept as given. */
-            conditions: {
-                [key: string]: unknown;
-            }[];
+            brainId: number;
+            /** Format: int64 */
+            consolidatedAt: number | null;
             /** Format: int64 */
             createdAt: number;
             /** Format: int64 */
-            dueAt: number | null;
+            hits: number;
             /** Format: int64 */
             id: number;
-            /** @description The caller's word for what the row is. */
-            kind: string;
+            /**
+             * Format: int64
+             * @description The writer's weight at the time of writing, 1 to 10.
+             */
+            importance: number;
+            /** @description The caller's identifier, unique among the live rows of a brain. */
+            key: string | null;
             labels: {
                 [key: string]: string;
             };
             /** Format: int64 */
-            lastMatchedAt: number | null;
+            lastConfirmedAt: number | null;
+            /** Format: int64 */
+            lastHitAt: number | null;
+            /** Format: int64 */
+            layerId: number | null;
             /**
              * Format: int64
-             * @description How many readings have matched it.
+             * @description The first version's id in this row's line.
              */
-            matchCount: number;
-            scope: string;
-            state: components["schemas"]["MemoryState"];
-            subjectKey: string | null;
+            lineageId: number;
+            /**
+             * Format: int64
+             * @description Where it stands within its layer.
+             */
+            position: number;
+            /**
+             * Format: double
+             * @description The retrieval strength, computed from the hits as the reading answers.
+             */
+            retrievalStrength: number;
+            status: components["schemas"]["MemoryStatus"];
+            /**
+             * Format: double
+             * @description The storage strength, raised by spaced confirmations alone.
+             */
+            strength: number;
+            subjects: components["schemas"]["SubjectRef"][];
+            /** Format: int64 */
+            supersededBy: number | null;
             text: string;
-            /** @description Every watch whose condition names the row. */
-            watches: components["schemas"]["Watch"][];
+            /** @description What the row is; the reserved types are stated in the design. */
+            type: string;
+            /** Format: int64 */
+            validFrom: number;
+            /** Format: int64 */
+            validTo: number | null;
         };
-        /** @description A change to a row: only the fields given change. */
-        MemoryChange: {
+        /** @description A move of a memory's status by a caller's word. */
+        MemoryMove: {
+            actorName: string;
             /**
              * Format: int64
-             * @description The moment it is due; null clears it.
+             * @description When it stopped holding, for `done` and `invalidated`; now where none is given.
              */
-            dueAt?: number | null;
-            /** @description The labels, replaced whole. */
-            labels?: {
-                [key: string]: string;
-            } | null;
-            state?: components["schemas"]["MemoryState"] | null;
-            text?: string | null;
-        };
-        /** @description A reading's match, as recorded. */
-        MemoryMatch: {
-            actorName: string;
-            /** Format: int64 */
-            createdAt: number;
-            /** Format: int64 */
-            id: number;
-            memoryIds: number[];
-            /** Format: int64 */
-            spentMs: number;
-            /** Format: int64 */
-            tokenCount: number;
+            at?: number | null;
+            status: components["schemas"]["MemoryStatus"];
         };
         /** @description One page of a list, oldest first. */
         MemoryPage: {
@@ -874,8 +1287,49 @@ export interface components {
             /** @description Whether anything stands past the last item. */
             more: boolean;
         };
-        /** @description Where a row stands. */
-        MemoryState: "standing" | "done" | "retired" | "candidate" | "off";
+        /** @description The state of one version of a memory. */
+        MemoryStatus: "active" | "pending" | "done" | "superseded" | "invalidated";
+        /** @description A new version of a memory, superseding the version it is written over: only the fields given differ. */
+        MemoryVersion: {
+            actorName: string;
+            /** Format: int64 */
+            importance?: number | null;
+            labels?: {
+                [key: string]: string;
+            } | null;
+            /** Format: int64 */
+            layerId?: number | null;
+            /** Format: int64 */
+            position?: number | null;
+            /** @description The subjects the new version is about, replacing the old version's whole where given. */
+            subjectIds?: number[] | null;
+            subjects?: components["schemas"]["SubjectKey"][] | null;
+            text?: string | null;
+            type?: string | null;
+            /**
+             * Format: int64
+             * @description When the new version began to hold, and the old one stopped; now where none is given.
+             */
+            validFrom?: number | null;
+        };
+        /** @description A brain to make. */
+        NewBrain: {
+            accountKey: string;
+            agentKey: string;
+            /** @description The agent's key where none is given. */
+            name?: string | null;
+        };
+        /** @description A layer to add. */
+        NewLayer: {
+            /** @default  */
+            description: string;
+            name: string;
+            /**
+             * Format: int64
+             * @description After the last layer where none is given.
+             */
+            position?: number | null;
+        };
         /** @description A lock to take. */
         NewLock: {
             holderName: string;
@@ -886,31 +1340,42 @@ export interface components {
              */
             ttlMs?: number | null;
         };
-        /** @description A row to add. */
+        /** @description A memory to write as a first version. */
         NewMemory: {
-            conditions: {
-                [key: string]: unknown;
-            }[];
-            /** Format: int64 */
-            dueAt?: number | null;
-            kind: string;
+            actorName: string;
+            /**
+             * Format: int64
+             * @description 1 to 10; 5 where none is given.
+             */
+            importance?: number | null;
+            key?: string | null;
+            /** @default {} */
             labels: {
                 [key: string]: string;
             };
-            scope: string;
-            /** @description `standing` where none is given. */
-            state?: components["schemas"]["MemoryState"] | null;
-            subjectKey?: string | null;
+            /** Format: int64 */
+            layerId?: number | null;
+            /** Format: int64 */
+            position?: number | null;
+            /** @description `active` where none is given; `pending` is the other status a first version takes. */
+            status?: components["schemas"]["MemoryStatus"] | null;
+            /**
+             * @description The subjects it is about, by id.
+             * @default []
+             */
+            subjectIds: number[];
+            /**
+             * @description The subjects it is about, by type and key, each made where it does not stand yet.
+             * @default []
+             */
+            subjects: components["schemas"]["SubjectKey"][];
             text: string;
-        };
-        /** @description That a reading matched rows, and what it spent. */
-        NewMemoryMatch: {
-            actorName: string;
-            memoryIds: number[];
-            /** Format: int64 */
-            spentMs: number;
-            /** Format: int64 */
-            tokenCount: number;
+            type: string;
+            /**
+             * Format: int64
+             * @description When it began to hold; now where none is given.
+             */
+            validFrom?: number | null;
         };
         /** @description A note to add. */
         NewNote: {
@@ -929,6 +1394,39 @@ export interface components {
             scope: string;
             setterName: string;
             text: string;
+        };
+        /** @description A row to add. */
+        NewScopedMemory: {
+            conditions: {
+                [key: string]: unknown;
+            }[];
+            /** Format: int64 */
+            dueAt?: number | null;
+            kind: string;
+            labels: {
+                [key: string]: string;
+            };
+            scope: string;
+            /** @description `standing` where none is given. */
+            state?: components["schemas"]["ScopedMemoryState"] | null;
+            subjectKey?: string | null;
+            text: string;
+        };
+        /** @description That a reading matched rows, and what it spent. */
+        NewScopedMemoryMatch: {
+            actorName: string;
+            memoryIds: number[];
+            /** Format: int64 */
+            spentMs: number;
+            /** Format: int64 */
+            tokenCount: number;
+        };
+        /** @description A subject to add. */
+        NewSubject: {
+            /** @default  */
+            description: string;
+            key: string;
+            type: string;
         };
         /** @description A watch to set. */
         NewWatch: {
@@ -966,6 +1464,65 @@ export interface components {
             items: components["schemas"]["Note"][];
             /** @description Whether anything stands past the last item. */
             more: boolean;
+        };
+        /** @description The rendered persona, as a tool answers it. */
+        PersonaText: {
+            text: string;
+        };
+        /** @description What a turn is handed. */
+        Recall: {
+            block: string;
+            /** Format: int64 */
+            budgetTokens: number;
+            chosen: components["schemas"]["RecallChoice"][];
+            /** Format: int64 */
+            tokenCount: number;
+        };
+        /** @description A turn, as recall reads it. */
+        RecallAsk: {
+            /**
+             * Format: int64
+             * @description The brain's own budget where none is given.
+             */
+            budgetTokens?: number | null;
+            /** @description Whether the hand-out is recorded as hits and marks; true where none is given. */
+            record?: boolean | null;
+            /** @description The room the turn is in. */
+            room?: components["schemas"]["SubjectKey"] | null;
+            /** @description The session the block goes to, whose marks and opening moment narrow it. */
+            sessionKey?: string | null;
+            /** Format: int64 */
+            sessionOpenedAt?: number | null;
+            /**
+             * @description Everyone who spoke this turn.
+             * @default []
+             */
+            speakers: components["schemas"]["SubjectKey"][];
+            /**
+             * @description The words of the turn.
+             * @default
+             */
+            words: string;
+        };
+        /** @description One memory recall chose. */
+        RecallChoice: {
+            /** @description Handed to this session before in this version, so the block carries its mark and not its text. */
+            marked: boolean;
+            /** Format: int64 */
+            memoryId: number;
+            part: components["schemas"]["RecallPart"];
+            /** Format: double */
+            score: number;
+            /** Format: int64 */
+            tokenCount: number;
+            type: string;
+        };
+        /** @description Which part of the block a memory was chosen for. */
+        RecallPart: "core" | "searched";
+        /** @description How many rows a recording reached. */
+        Recorded: {
+            /** Format: int64 */
+            recordedCount: number;
         };
         /** @description A moment to be told of. */
         Reminder: {
@@ -1025,6 +1582,81 @@ export interface components {
             subject: number;
             text: string;
         };
+        /** @description The rules, key by key as the configuration writes them. */
+        Rules: {
+            /**
+             * Format: int64
+             * @description The tokens a recall block holds where the ask names no budget.
+             * @default 1800
+             */
+            budget_tokens: number;
+            /**
+             * Format: int64
+             * @description The sum of importance of unconsolidated episodes that triggers a consolidation.
+             * @default 150
+             */
+            consolidation_threshold: number;
+            /**
+             * Format: double
+             * @description The exponent the time since each hit is raised to, negated, in the retrieval strength.
+             * @default 0.5
+             */
+            decay: number;
+            /**
+             * Format: int64
+             * @description How many hits a row keeps for its retrieval strength.
+             * @default 64
+             */
+            hit_times_kept: number;
+            /**
+             * Format: int64
+             * @description For how long after a version was superseded a reading says what the previous value was.
+             * @default 30
+             */
+            previous_value_days: number;
+            /**
+             * Format: int64
+             * @description Confirmations closer than this to the last add nothing to the storage strength.
+             * @default 3600000
+             */
+            same_session_ms: number;
+            /**
+             * Format: double
+             * @description What a spaced confirmation adds to the storage strength, per logarithm of the gap in days.
+             * @default 1
+             */
+            strength_gain: number;
+            /**
+             * Format: double
+             * @description What a memory of a subject the turn names adds to its relevance.
+             * @default 0.5
+             */
+            subject_bonus: number;
+            /**
+             * Format: int64
+             * @description The most rows one subject fills in the searched part of a block.
+             * @default 4
+             */
+            subject_cap: number;
+            /**
+             * Format: double
+             * @description The weight of a memory's importance in the recall score.
+             * @default 1
+             */
+            weight_importance: number;
+            /**
+             * Format: double
+             * @description The weight of a memory's retrieval strength in the recall score.
+             * @default 1
+             */
+            weight_recency: number;
+            /**
+             * Format: double
+             * @description The weight of a memory's relevance to the turn's words in the recall score.
+             * @default 1
+             */
+            weight_relevance: number;
+        };
         /** @description A scope marked. */
         ScopeChange: {
             state: components["schemas"]["ScopeState"];
@@ -1054,6 +1686,74 @@ export interface components {
         };
         /** @description Whether a scope's rows wither. */
         ScopeState: "remembered" | "forgotten";
+        /** @description One thing to remember. */
+        ScopedMemory: {
+            /** Format: int64 */
+            changedAt: number;
+            /** @description The caller's objects, kept as given. */
+            conditions: {
+                [key: string]: unknown;
+            }[];
+            /** Format: int64 */
+            createdAt: number;
+            /** Format: int64 */
+            dueAt: number | null;
+            /** Format: int64 */
+            id: number;
+            /** @description The caller's word for what the row is. */
+            kind: string;
+            labels: {
+                [key: string]: string;
+            };
+            /** Format: int64 */
+            lastMatchedAt: number | null;
+            /**
+             * Format: int64
+             * @description How many readings have matched it.
+             */
+            matchCount: number;
+            scope: string;
+            state: components["schemas"]["ScopedMemoryState"];
+            subjectKey: string | null;
+            text: string;
+            /** @description Every watch whose condition names the row. */
+            watches: components["schemas"]["Watch"][];
+        };
+        /** @description A change to a row: only the fields given change. */
+        ScopedMemoryChange: {
+            /**
+             * Format: int64
+             * @description The moment it is due; null clears it.
+             */
+            dueAt?: number | null;
+            /** @description The labels, replaced whole. */
+            labels?: {
+                [key: string]: string;
+            } | null;
+            state?: components["schemas"]["ScopedMemoryState"] | null;
+            text?: string | null;
+        };
+        /** @description A reading's match, as recorded. */
+        ScopedMemoryMatch: {
+            actorName: string;
+            /** Format: int64 */
+            createdAt: number;
+            /** Format: int64 */
+            id: number;
+            memoryIds: number[];
+            /** Format: int64 */
+            spentMs: number;
+            /** Format: int64 */
+            tokenCount: number;
+        };
+        /** @description One page of a list, oldest first. */
+        ScopedMemoryPage: {
+            items: components["schemas"]["ScopedMemory"][];
+            /** @description Whether anything stands past the last item. */
+            more: boolean;
+        };
+        /** @description Where a row stands. */
+        ScopedMemoryState: "standing" | "done" | "retired" | "candidate" | "off";
         /** @description The session whose loads are read or let go. */
         SessionAsk: {
             session: string;
@@ -1065,6 +1765,50 @@ export interface components {
         /** @description The handoff note an agent's chat session left, or null. */
         SessionNote: {
             note: string | null;
+        };
+        /** @description Something a memory can be about, found by its type and key alone. */
+        Subject: {
+            /** Format: int64 */
+            brainId: number;
+            /** Format: int64 */
+            createdAt: number;
+            description: string;
+            /** Format: int64 */
+            id: number;
+            /** @description The caller's identifier for it, unique within its brain and type. */
+            key: string;
+            /** @description The caller's word for what it is: a person, a room, a document, a process. */
+            type: string;
+        };
+        /** @description A change to a subject's description. */
+        SubjectChange: {
+            description: string;
+        };
+        /** @description A subject named by its type and key, made where it does not stand yet. */
+        SubjectKey: {
+            key: string;
+            type: string;
+        };
+        /** @description One page of a list, oldest first. */
+        SubjectPage: {
+            items: components["schemas"]["Subject"][];
+            /** @description Whether anything stands past the last item. */
+            more: boolean;
+        };
+        /** @description A subject a memory is about, as the memory lists it. */
+        SubjectRef: {
+            /** Format: int64 */
+            id: number;
+            key: string;
+            type: string;
+        };
+        /** @description A type in use in a brain, and how many rows carry it. */
+        TypeCount: {
+            /** Format: int64 */
+            count: number;
+            /** @description Whether code depends on the type's meaning. */
+            reserved: boolean;
+            type: string;
         };
         /** @description A condition waited on, and fired once it holds. */
         Watch: {
@@ -1185,6 +1929,763 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    listBrains: {
+        parameters: {
+            query?: {
+                accountKey?: string | null;
+                after?: number | null;
+                agentKey?: string | null;
+                limit?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrainPage"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    createBrain: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewBrain"];
+            };
+        };
+        responses: {
+            /** @description Created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Brain"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    readBrain: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                brainId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Brain"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    deleteBrain: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                brainId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Brain"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    recordConfirmations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                brainId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Confirmations"];
+            };
+        };
+        responses: {
+            /** @description Created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Recorded"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    exportBrain: {
+        parameters: {
+            query?: {
+                /** @description Comma-separated layer names; the whole brain where none is given. */
+                layers?: string | null;
+            };
+            header?: never;
+            path: {
+                brainId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.sqlite3": string;
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    fold: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                brainId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Fold"];
+            };
+        };
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Folded"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    recordHits: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                brainId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Hits"];
+            };
+        };
+        responses: {
+            /** @description Created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Recorded"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    injectBrain: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                brainId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/vnd.sqlite3": string;
+            };
+        };
+        responses: {
+            /** @description Created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Injected"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listLayers: {
+        parameters: {
+            query?: {
+                after?: number | null;
+                limit?: number | null;
+            };
+            header?: never;
+            path: {
+                brainId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LayerPage"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    createLayer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                brainId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewLayer"];
+            };
+        };
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Layer"];
+                };
+            };
+            /** @description Created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Layer"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    readLayer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                brainId: number;
+                layerId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Layer"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    changeLayer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                brainId: number;
+                layerId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LayerChange"];
+            };
+        };
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Layer"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    readLineage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                brainId: number;
+                lineageId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Memory"][];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listBrainMemories: {
+        parameters: {
+            query?: {
+                after?: number | null;
+                key?: string | null;
+                /** @description `key` for rows whose label is set, `key=value` for rows whose label has that value. */
+                label?: string | null;
+                layerId?: number | null;
+                limit?: number | null;
+                lineageId?: number | null;
+                /** @description Words the text holds, in any case. */
+                q?: string | null;
+                status?: components["schemas"]["MemoryStatus"] | null;
+                subjectId?: number | null;
+                type?: string | null;
+            };
+            header?: never;
+            path: {
+                brainId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemoryPage"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    writeMemory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                brainId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewMemory"];
+            };
+        };
+        responses: {
+            /** @description Created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Memory"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    readBrainMemory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                brainId: number;
+                memoryId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Memory"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    moveMemory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                brainId: number;
+                memoryId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MemoryMove"];
+            };
+        };
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Memory"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    writeMemoryVersion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                brainId: number;
+                memoryId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MemoryVersion"];
+            };
+        };
+        responses: {
+            /** @description Created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Memory"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    renderPersona: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                brainId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    recall: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                brainId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecallAsk"];
+            };
+        };
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Recall"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listSubjects: {
+        parameters: {
+            query?: {
+                after?: number | null;
+                key?: string | null;
+                limit?: number | null;
+                /** @description Words the description holds, in any case. */
+                q?: string | null;
+                type?: string | null;
+            };
+            header?: never;
+            path: {
+                brainId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubjectPage"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    createSubject: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                brainId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewSubject"];
+            };
+        };
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Subject"];
+                };
+            };
+            /** @description Created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Subject"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    readSubject: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                brainId: number;
+                subjectId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Subject"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    changeSubject: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                brainId: number;
+                subjectId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SubjectChange"];
+            };
+        };
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Subject"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listTypes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                brainId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TypeCount"][];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
     listEvents: {
         parameters: {
             query?: {
@@ -1722,7 +3223,7 @@ export interface operations {
                 scope?: string | null;
                 /** @description Rows of every scope beginning with this. */
                 scopePrefix?: string | null;
-                state?: components["schemas"]["MemoryState"] | null;
+                state?: components["schemas"]["ScopedMemoryState"] | null;
                 subjectKey?: string | null;
             };
             header?: never;
@@ -1737,7 +3238,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MemoryPage"];
+                    "application/json": components["schemas"]["ScopedMemoryPage"];
                 };
             };
             400: components["responses"]["BadRequest"];
@@ -1753,7 +3254,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["NewMemory"];
+                "application/json": components["schemas"]["NewScopedMemory"];
             };
         };
         responses: {
@@ -1763,7 +3264,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Memory"];
+                    "application/json": components["schemas"]["ScopedMemory"];
                 };
             };
             400: components["responses"]["BadRequest"];
@@ -1787,7 +3288,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Memory"];
+                    "application/json": components["schemas"]["ScopedMemory"];
                 };
             };
             400: components["responses"]["BadRequest"];
@@ -1806,7 +3307,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["MemoryChange"];
+                "application/json": components["schemas"]["ScopedMemoryChange"];
             };
         };
         responses: {
@@ -1816,7 +3317,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Memory"];
+                    "application/json": components["schemas"]["ScopedMemory"];
                 };
             };
             400: components["responses"]["BadRequest"];
@@ -1834,7 +3335,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["NewMemoryMatch"];
+                "application/json": components["schemas"]["NewScopedMemoryMatch"];
             };
         };
         responses: {
@@ -1844,7 +3345,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MemoryMatch"];
+                    "application/json": components["schemas"]["ScopedMemoryMatch"];
                 };
             };
             400: components["responses"]["BadRequest"];

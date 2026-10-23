@@ -1,7 +1,8 @@
 //! `bmo memory` (docs/boundary-api.md, 「The command」): the memory rows, asked of 「Memory rows」's routes.
 
 use bmo_brain_client::{
-  BrainClient, Labels, MemoriesQuery, Memory, MemoryChange, MemoryState, NewMemory, Object,
+  BrainClient, Labels, NewScopedMemory, Object, ScopedMemoriesQuery, ScopedMemory, ScopedMemoryChange,
+  ScopedMemoryState,
 };
 use clap::{Args, Subcommand};
 
@@ -129,13 +130,13 @@ pub struct List {
   limit: Option<i64>,
 }
 
-fn state_of(name: &str) -> Result<MemoryState, String> {
-  MemoryState::named(name)
+fn state_of(name: &str) -> Result<ScopedMemoryState, String> {
+  ScopedMemoryState::named(name)
     .ok_or_else(|| format!("'{name}' is no memory state: give standing, done, retired, candidate or off"))
 }
 
 /// One row as the command prints it.
-pub fn line(memory: &Memory) -> String {
+pub fn line(memory: &ScopedMemory) -> String {
   let mut details = vec![format!("scope {}", memory.scope)];
   if let Some(subject) = &memory.subject_key {
     details.push(format!("subject {subject}"));
@@ -162,9 +163,9 @@ pub async fn run(client: &BrainClient, word: Word) -> Result<Vec<String>, String
     Word::Add(asked) => add(client, asked).await,
     Word::Update(asked) => update(client, asked).await,
     Word::Done(asked) => done(client, asked).await,
-    Word::Retire(asked) => moved(client, asked.id, MemoryState::Retired).await,
-    Word::Revive(asked) => moved(client, asked.id, MemoryState::Standing).await,
-    Word::Candidate(asked) => moved(client, asked.id, MemoryState::Candidate).await,
+    Word::Retire(asked) => moved(client, asked.id, ScopedMemoryState::Retired).await,
+    Word::Revive(asked) => moved(client, asked.id, ScopedMemoryState::Standing).await,
+    Word::Candidate(asked) => moved(client, asked.id, ScopedMemoryState::Candidate).await,
     Word::List(asked) => list(client, asked).await,
   }
 }
@@ -183,7 +184,7 @@ async fn add(client: &BrainClient, asked: Add) -> Result<Vec<String>, String> {
   let text = text_of(&asked.text).map_err(refused)?;
 
   let added = client
-    .memory_add(&NewMemory {
+    .scoped_memory_add(&NewScopedMemory {
       scope: asked.scope,
       subject_key: asked.subject,
       kind: asked.kind,
@@ -220,9 +221,9 @@ async fn update(client: &BrainClient, asked: Update) -> Result<Vec<String>, Stri
   };
 
   let changed = client
-    .memory_update(
+    .scoped_memory_update(
       asked.id,
-      &MemoryChange {
+      &ScopedMemoryChange {
         text,
         state,
         labels,
@@ -240,12 +241,12 @@ async fn done(client: &BrainClient, asked: Done) -> Result<Vec<String>, String> 
   let text = asked.text.as_deref().map(text_of).transpose().map_err(refused)?;
 
   let changed = client
-    .memory_update(
+    .scoped_memory_update(
       asked.id,
-      &MemoryChange {
+      &ScopedMemoryChange {
         text,
-        state: Some(MemoryState::Done),
-        ..MemoryChange::default()
+        state: Some(ScopedMemoryState::Done),
+        ..ScopedMemoryChange::default()
       },
     )
     .await
@@ -254,13 +255,13 @@ async fn done(client: &BrainClient, asked: Done) -> Result<Vec<String>, String> 
   Ok(vec![line(&changed)])
 }
 
-async fn moved(client: &BrainClient, id: i64, state: MemoryState) -> Result<Vec<String>, String> {
+async fn moved(client: &BrainClient, id: i64, state: ScopedMemoryState) -> Result<Vec<String>, String> {
   let changed = client
-    .memory_update(
+    .scoped_memory_update(
       id,
-      &MemoryChange {
+      &ScopedMemoryChange {
         state: Some(state),
-        ..MemoryChange::default()
+        ..ScopedMemoryChange::default()
       },
     )
     .await
@@ -275,7 +276,7 @@ async fn list(client: &BrainClient, asked: List) -> Result<Vec<String>, String> 
   let due_before = asked.due_before.as_deref().map(moment).transpose().map_err(refused)?;
 
   let page = client
-    .memories(&MemoriesQuery {
+    .scoped_memories(&ScopedMemoriesQuery {
       scope: asked.scope,
       scope_prefix: asked.scope_prefix,
       subject_key: asked.subject,

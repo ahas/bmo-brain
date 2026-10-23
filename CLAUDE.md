@@ -1,9 +1,11 @@
 # Working in this repository
 
-This repository is the brain service, `bmo-brain`: memory as middleware. It stores memory rows, notes,
-watches, reminders, fragments and the libraries they come from, and locks, under the caller's opaque scopes,
-serves them over HTTP and publishes its own events. It never executes and calls no other unit. It publishes
-its client, `bmo-brain-client`, and its harness plugin, `brain-harness`: the MCP server its binary starts as
+This repository is the brain service, `bmo-brain`: an agent's long-term memory as a service. It keeps many
+brains, each an account's and one agent's, as subjects, layers and versioned memories, writes them through
+its own recollector, hands a turn its recall block, renders a persona, and moves a brain in and out as a
+brain file; `docs/design.md` states the shape. It serves them over HTTP and publishes its own events. It
+calls one unit, the agency, for the recollector's model sessions, and nothing else. It publishes its client,
+`bmo-brain-client`, and its harness plugin, `brain-harness`: the MCP server its binary starts as
 `bmo-brain mcp` and the skill under `skills/`. It is an upstream: bmo-chat's `docs/conventions.md` holds the
 rules it keeps.
 
@@ -11,13 +13,13 @@ rules it keeps.
 
 - **`docs/` is canonical.** Read the document covering a change before changing code. A change that would
   make it wrong or incomplete repairs it first, stating what is true now, and the code is then written to
-  match. `docs/boundary-api.md` states every route, event, tool and code; `docs/openapi.json` is generated
-  from the code (`bmo-brain openapi`) and a test fails where they differ.
-- **It knows nothing of its callers.** A caller's meaning stays in its `scope`, `subjectKey`, `<role>Name` and
-  `labels`, which the brain never reads, and no route, field, tool, schema, document or test names a unit, an
-  agent, an owner or anything only one caller uses. The one named surface is the caller's own records — a room's
-  rules, a session's loads and a chat session's note (`docs/boundary-api.md`, 「A caller's records」), whose keys
-  the brain takes as given and reads no meaning into.
+  match. `docs/design.md` states the shape and the rules of the brain; `docs/boundary-api.md` states every
+  route, event, tool and code; `docs/openapi.json` is generated from the code (`bmo-brain openapi`) and a
+  test fails where they differ. - **It knows nothing of its callers.** A caller's meaning stays in the keys
+  it gives, an account's, an agent's, a subject's, and in `labels` and `<role>Name` fields, which the brain
+  never reads, and no route, field, tool, schema, document or test names a particular agent, owner, host or
+  caller, or anything only one caller uses. The agency is the one unit named, as the supplier of the
+  recollector's sessions, reached over its documented API through a port of this repository.
 - **No `bmo-*` dependency but the base libraries** `bmo-chat`, `bmo-chat-client` and `bmo-ui`, and this
   repository's own crates. `tests/repository.rs` fails on any other.
 - **English only** in code, comments, strings, tests and documents, and in commit messages. What a machine

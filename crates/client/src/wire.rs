@@ -116,12 +116,14 @@ pub struct NameCursor {
 }
 
 /// Whether the service can answer.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct Health {
   pub ready: bool,
   /// Why it is not ready, or null.
   pub reason: Option<String>,
   pub version: String,
+  /// The numbers the brain reads by.
+  pub rules: crate::brains::Rules,
 }
 
 /// One event: its number, its kind, when it happened and the member it is about.

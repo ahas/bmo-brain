@@ -5,8 +5,8 @@ mod support;
 
 use bmo_brain::clock::tick;
 use bmo_brain_client::{
-  MemoryChange, MemoryState, NewMemory, NewReminder, NewWatch, Object, RemindersQuery, WatchChange,
-  WatchState, WatchesQuery,
+  NewReminder, NewScopedMemory, NewWatch, Object, RemindersQuery, ScopedMemoryChange, ScopedMemoryState,
+  WatchChange, WatchState, WatchesQuery,
 };
 use serde_json::{Value, json};
 use support::{Served, labels, refused};
@@ -54,7 +54,7 @@ async fn a_watch_on_a_row_fires_as_the_row_reaches_its_state_or_at_once_where_it
   let served = Served::new().await;
   let client = &served.client;
   let row = client
-    .memory_add(&NewMemory {
+    .scoped_memory_add(&NewScopedMemory {
       scope: "room:a".into(),
       subject_key: None,
       kind: "promise".into(),
@@ -75,13 +75,13 @@ async fn a_watch_on_a_row_fires_as_the_row_reaches_its_state_or_at_once_where_it
     .await
     .unwrap();
   assert_eq!((on_done.state, on_standing.state), (WatchState::Armed, WatchState::Fired));
-  assert_eq!(client.memory(row.id).await.unwrap().watches, vec![on_done.clone(), on_standing]);
+  assert_eq!(client.scoped_memory(row.id).await.unwrap().watches, vec![on_done.clone(), on_standing]);
 
   client
-    .memory_update(
+    .scoped_memory_update(
       row.id,
-      &MemoryChange {
-        state: Some(MemoryState::Done),
+      &ScopedMemoryChange {
+        state: Some(ScopedMemoryState::Done),
         ..Default::default()
       },
     )

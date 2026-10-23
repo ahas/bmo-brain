@@ -3,9 +3,9 @@
 
 import { expect, test } from "bun:test";
 
-import { brainClient, type Memory } from "../index";
+import { brainClient, type ScopedMemory } from "../index";
 
-const memory: Memory = {
+const memory: ScopedMemory = {
   id: 7,
   scope: "room:a",
   subjectKey: null,

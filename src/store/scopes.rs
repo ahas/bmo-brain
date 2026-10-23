@@ -9,8 +9,8 @@ use super::{Fault, Held, Store, now, publish, scope};
 
 /// The rows of every resource held under a scope, and the matches on its rows.
 const COUNTS: &str = "SELECT \
-  (SELECT count(*) FROM memories WHERE scope = $1), \
-  (SELECT count(*) FROM memory_matches WHERE memory_ids && ARRAY(SELECT id FROM memories WHERE scope = $1)), \
+  (SELECT count(*) FROM scoped_memories WHERE scope = $1), \
+  (SELECT count(*) FROM memory_matches WHERE memory_ids && ARRAY(SELECT id FROM scoped_memories WHERE scope = $1)), \
   (SELECT count(*) FROM notes WHERE scope = $1), \
   (SELECT count(*) FROM watches WHERE scope = $1), \
   (SELECT count(*) FROM reminders WHERE scope = $1), \
@@ -88,12 +88,12 @@ impl Store {
       return Ok(held);
     }
     sqlx::query(
-      "DELETE FROM memory_matches WHERE memory_ids && ARRAY(SELECT id FROM memories WHERE scope = $1)",
+      "DELETE FROM memory_matches WHERE memory_ids && ARRAY(SELECT id FROM scoped_memories WHERE scope = $1)",
     )
     .bind(name)
     .execute(&mut *tx)
     .await?;
-    for table in ["memories", "notes", "watches", "reminders", "fragment_hits", "scopes"] {
+    for table in ["scoped_memories", "notes", "watches", "reminders", "fragment_hits", "scopes"] {
       sqlx::query(&format!("DELETE FROM {table} WHERE scope = $1"))
         .bind(name)
         .execute(&mut *tx)

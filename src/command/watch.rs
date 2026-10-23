@@ -2,7 +2,7 @@
 //! 「Watches」's routes.
 
 use bmo_brain_client::{
-  BrainClient, Labels, MemoryState, NewWatch, Object, Watch, WatchState, WatchesQuery,
+  BrainClient, Labels, NewWatch, Object, ScopedMemoryState, Watch, WatchState, WatchesQuery,
 };
 use clap::{Args, Subcommand};
 use serde_json::Value;
@@ -114,7 +114,7 @@ async fn set(client: &BrainClient, asked: Set) -> Result<Vec<String>, String> {
       .state
       .as_deref()
       .map(|name| {
-        MemoryState::named(name).ok_or_else(|| {
+        ScopedMemoryState::named(name).ok_or_else(|| {
           format!("'{name}' is no memory state: give standing, done, retired, candidate or off")
         })
       })

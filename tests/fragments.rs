@@ -7,7 +7,7 @@ use bmo_brain::store::version;
 use bmo_brain_client::{
   DriftChange, FragmentHits, FragmentMerge, FragmentPiece, FragmentSplit, FragmentState, FragmentSwitch,
   FragmentWrite, FragmentsQuery, KindWords, KnowledgeQuery, LibraryDocumentPut, LibraryPut, LibrarySyncAsk,
-  MemoryState, NameCursor, NewMemory,
+  NameCursor, NewScopedMemory, ScopedMemoryState,
 };
 use support::{Served, labels, refused};
 
@@ -178,7 +178,7 @@ async fn knowledge_reads_the_scopes_own_and_shared_fragments_and_their_standing_
     )
     .await
     .unwrap();
-  let row = |scope: &str, state: Option<MemoryState>| NewMemory {
+  let row = |scope: &str, state: Option<ScopedMemoryState>| NewScopedMemory {
     scope: scope.into(),
     subject_key: None,
     kind: "rule".into(),
@@ -188,9 +188,12 @@ async fn knowledge_reads_the_scopes_own_and_shared_fragments_and_their_standing_
     due_at: None,
     state,
   };
-  let standing = client.memory_add(&row("room:a", None)).await.unwrap();
-  client.memory_add(&row("room:a", Some(MemoryState::Candidate))).await.unwrap();
-  client.memory_add(&row("room:b", None)).await.unwrap();
+  let standing = client.scoped_memory_add(&row("room:a", None)).await.unwrap();
+  client
+    .scoped_memory_add(&row("room:a", Some(ScopedMemoryState::Candidate)))
+    .await
+    .unwrap();
+  client.scoped_memory_add(&row("room:b", None)).await.unwrap();
 
   let read = client
     .knowledge(&KnowledgeQuery {

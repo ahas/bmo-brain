@@ -6,13 +6,16 @@
 use std::collections::BTreeMap;
 
 use bmo_brain_client::{
-  AgentAsk, Done, DryRun, ErrorCode, Event, EventsQuery, Fragment, FragmentHits, FragmentHitsRecorded,
-  FragmentKind, FragmentMerge, FragmentSplit, FragmentSwitch, FragmentWrite, FragmentsQuery, Health,
-  Knowledge, KnowledgeQuery, Library, LibraryPut, LibrarySync, LibrarySyncAsk, LoadsKeep, Lock, LocksQuery,
-  MemoriesQuery, Memory, MemoryChange, MemoryMatch, NameCursor, NewLock, NewMemory, NewMemoryMatch,
-  NewNote, NewReminder, NewWatch, Note, NoteKeep, NotesQuery, Page, Reminder, RemindersQuery, RoomRules,
-  RoomRulesAsk, RuleSet, ScopeChange, ScopeHolding, SessionAsk, SessionLoads, SessionNote, Watch,
-  WatchChange, WatchesQuery, WireError,
+  AgentAsk, Brain, BrainsQuery, Confirmations, Done, DryRun, ErrorCode, Event, EventsQuery, ExportQuery,
+  Fold, Folded, Fragment, FragmentHits, FragmentHitsRecorded, FragmentKind, FragmentMerge, FragmentSplit,
+  FragmentSwitch, FragmentWrite, FragmentsQuery, Health, Hits, Injected, Knowledge, KnowledgeQuery, Layer,
+  LayerChange, LayersQuery, Library, LibraryPut, LibrarySync, LibrarySyncAsk, LoadsKeep, Lock, LocksQuery,
+  MemoriesQuery, Memory, MemoryMove, MemoryVersion, NameCursor, NewBrain, NewLayer, NewLock, NewMemory,
+  NewNote, NewReminder, NewScopedMemory, NewScopedMemoryMatch, NewSubject, NewWatch, Note, NoteKeep,
+  NotesQuery, Page, Recall, RecallAsk, Recorded, Reminder, RemindersQuery, RoomRules, RoomRulesAsk,
+  RuleSet, ScopeChange, ScopeHolding, ScopedMemoriesQuery, ScopedMemory, ScopedMemoryChange,
+  ScopedMemoryMatch, SessionAsk, SessionLoads, SessionNote, Subject, SubjectChange, SubjectsQuery,
+  TypeCount, Watch, WatchChange, WatchesQuery, WireError,
 };
 use schemars::generate::{SchemaGenerator, SchemaSettings};
 use schemars::{JsonSchema, Schema};
@@ -23,23 +26,30 @@ use crate::mcp::tools;
 /// Where the schemas the routes refer to stand in the document.
 const SCHEMAS: &str = "/components/schemas";
 
-const DESCRIPTION: &str = "Memory as middleware: memory rows, notes, watches, reminders, fragments and the \
-  libraries they come from, knowledge readings and locks, stored and served through this API, and the caller's \
-  own records — a room's rules, a session's loads and a chat session's note. The service never executes: it opens \
-  no session, runs no model, calls no other service and registers no hook. A member belongs to an opaque scope \
-  and, where it is about someone or something, to an opaque subjectKey; the caller decides what they mean. Time \
-  is the one thing the service acts on: a reminder whose time comes and a watch whose condition holds become \
-  events (reminder.due, watch.fired) that a client reads and acts on. A person sheet is a fragment of kind person \
-  keyed by its subjectKey. Bodies are JSON with camelCase keys, times are epoch milliseconds, lists are pages of \
-  items and more, and every failure is the error shape with its status. The harness plugin's tools, each a thin \
-  call of one route, are stated under x-tools.";
+const DESCRIPTION: &str = "An agent's long-term memory as a service. The service keeps many brains, each an \
+  account's and one agent's: subjects (what a memory is about, found by type and key), layers (the table of \
+  contents) and memories, one row a version, superseded and invalidated but never deleted. A turn asks recall for \
+  a block under a token budget; a persona is rendered as the same bytes until a piece changes; a brain moves in and \
+  out as a brain file. The rows held under a caller's opaque scope (memory rows, notes, watches, reminders, \
+  fragments, libraries, locks and the caller's own records) keep answering until their readers move to the brains. \
+  Bodies are JSON with camelCase keys, times are epoch milliseconds, lists are pages of items and more, and every \
+  failure is the error shape with its status. The harness plugin's tools, each a thin call of one route, are \
+  stated under x-tools.";
 
-const ENTRY: &str = "A harness reads what it should remember for a scope with brain_knowledge and \
-  brain_memories, writes rows and notes as it learns, and sets reminders and watches whose events its own loop \
-  reads on GET /events.";
+const ENTRY: &str = "A harness finds or makes its brain with brain_brains and brain_brain_add, reads what a turn \
+  should know with brain_recall, writes what it learns with brain_memory_write and brain_memory_version, and keeps \
+  the scope routes' tools for rows its callers still hold under scopes.";
 
 /// The events the brain publishes.
-pub const EVENTS: [&str; 13] = [
+pub const EVENTS: [&str; 21] = [
+  "brain.created",
+  "brain.deleted",
+  "brain.injected",
+  "subject.created",
+  "subject.changed",
+  "layer.changed",
+  "memory.written",
+  "memory.moved",
   "memory.created",
   "memory.changed",
   "note.created",
@@ -64,6 +74,8 @@ struct Route {
   summary: &'static str,
   parameters: Vec<Value>,
   body: Option<Schema>,
+  /// A request body that is not JSON: its media type.
+  raw_body: Option<&'static str>,
   /// The success answers, each by its status: the content by media type, or none.
   answers: Vec<(u16, Option<Value>)>,
   /// The codes beside `unauthorized` the route can answer.
@@ -114,6 +126,12 @@ impl Route {
       operation["requestBody"] = json!({
         "required": true,
         "content": { "application/json": { "schema": body } },
+      });
+    }
+    if let Some(media) = self.raw_body {
+      operation["requestBody"] = json!({
+        "required": true,
+        "content": { media: { "schema": { "type": "string", "format": "binary" } } },
       });
     }
     operation
@@ -184,8 +202,352 @@ fn body<Body: JsonSchema>(generator: &mut SchemaGenerator) -> Option<Schema> {
 
 use ErrorCode::{BadRequest, Conflict, Gone, NotFound};
 
+fn brain_routes(g: &mut SchemaGenerator) -> Vec<Route> {
+  let brain = |g: &mut SchemaGenerator| vec![id(g, "brainId")];
+  let under = |g: &mut SchemaGenerator, name: &str| vec![id(g, "brainId"), id(g, name)];
+  vec![
+    Route {
+      method: "get",
+      path: "/brains",
+      id: "listBrains",
+      tag: "brains",
+      summary: "The brains, by account and agent.",
+      parameters: query::<BrainsQuery>(g),
+      body: None,
+      raw_body: None,
+      answers: vec![(200, json_answer::<Page<Brain>>(g))],
+      codes: vec![BadRequest],
+    },
+    Route {
+      method: "post",
+      path: "/brains",
+      id: "createBrain",
+      tag: "brains",
+      summary: "Make a brain for an account and an agent that have none.",
+      parameters: vec![],
+      body: body::<NewBrain>(g),
+      raw_body: None,
+      answers: vec![(201, json_answer::<Brain>(g))],
+      codes: vec![BadRequest, Conflict],
+    },
+    Route {
+      method: "get",
+      path: "/brains/{brainId}",
+      id: "readBrain",
+      tag: "brains",
+      summary: "One brain.",
+      parameters: brain(g),
+      body: None,
+      raw_body: None,
+      answers: vec![(200, json_answer::<Brain>(g))],
+      codes: vec![BadRequest, NotFound],
+    },
+    Route {
+      method: "delete",
+      path: "/brains/{brainId}",
+      id: "deleteBrain",
+      tag: "brains",
+      summary: "Let a brain go whole, with everything it held.",
+      parameters: brain(g),
+      body: None,
+      raw_body: None,
+      answers: vec![(200, json_answer::<Brain>(g))],
+      codes: vec![BadRequest, NotFound],
+    },
+    Route {
+      method: "get",
+      path: "/brains/{brainId}/subjects",
+      id: "listSubjects",
+      tag: "subjects",
+      summary: "A brain's subjects, by type, key and words of the description.",
+      parameters: {
+        let mut parameters = brain(g);
+        parameters.extend(query::<SubjectsQuery>(g));
+        parameters
+      },
+      body: None,
+      raw_body: None,
+      answers: vec![(200, json_answer::<Page<Subject>>(g))],
+      codes: vec![BadRequest, NotFound],
+    },
+    Route {
+      method: "post",
+      path: "/brains/{brainId}/subjects",
+      id: "createSubject",
+      tag: "subjects",
+      summary: "Add a subject, or the one standing at its type and key with its description set.",
+      parameters: brain(g),
+      body: body::<NewSubject>(g),
+      raw_body: None,
+      answers: vec![(201, json_answer::<Subject>(g)), (200, json_answer::<Subject>(g))],
+      codes: vec![BadRequest, NotFound],
+    },
+    Route {
+      method: "get",
+      path: "/brains/{brainId}/subjects/{subjectId}",
+      id: "readSubject",
+      tag: "subjects",
+      summary: "One subject.",
+      parameters: under(g, "subjectId"),
+      body: None,
+      raw_body: None,
+      answers: vec![(200, json_answer::<Subject>(g))],
+      codes: vec![BadRequest, NotFound],
+    },
+    Route {
+      method: "patch",
+      path: "/brains/{brainId}/subjects/{subjectId}",
+      id: "changeSubject",
+      tag: "subjects",
+      summary: "Change a subject's description.",
+      parameters: under(g, "subjectId"),
+      body: body::<SubjectChange>(g),
+      raw_body: None,
+      answers: vec![(200, json_answer::<Subject>(g))],
+      codes: vec![BadRequest, NotFound],
+    },
+    Route {
+      method: "get",
+      path: "/brains/{brainId}/layers",
+      id: "listLayers",
+      tag: "layers",
+      summary: "A brain's layers, by position.",
+      parameters: {
+        let mut parameters = brain(g);
+        parameters.extend(query::<LayersQuery>(g));
+        parameters
+      },
+      body: None,
+      raw_body: None,
+      answers: vec![(200, json_answer::<Page<Layer>>(g))],
+      codes: vec![BadRequest, NotFound],
+    },
+    Route {
+      method: "post",
+      path: "/brains/{brainId}/layers",
+      id: "createLayer",
+      tag: "layers",
+      summary: "Add a layer, or the one standing at its name.",
+      parameters: brain(g),
+      body: body::<NewLayer>(g),
+      raw_body: None,
+      answers: vec![(201, json_answer::<Layer>(g)), (200, json_answer::<Layer>(g))],
+      codes: vec![BadRequest, NotFound],
+    },
+    Route {
+      method: "get",
+      path: "/brains/{brainId}/layers/{layerId}",
+      id: "readLayer",
+      tag: "layers",
+      summary: "One layer.",
+      parameters: under(g, "layerId"),
+      body: None,
+      raw_body: None,
+      answers: vec![(200, json_answer::<Layer>(g))],
+      codes: vec![BadRequest, NotFound],
+    },
+    Route {
+      method: "patch",
+      path: "/brains/{brainId}/layers/{layerId}",
+      id: "changeLayer",
+      tag: "layers",
+      summary: "Change a layer's description or position.",
+      parameters: under(g, "layerId"),
+      body: body::<LayerChange>(g),
+      raw_body: None,
+      answers: vec![(200, json_answer::<Layer>(g))],
+      codes: vec![BadRequest, NotFound],
+    },
+    Route {
+      method: "get",
+      path: "/brains/{brainId}/memories",
+      id: "listBrainMemories",
+      tag: "brain-memories",
+      summary: "A brain's memories, by type, status, layer, subject, key, lineage, label and words.",
+      parameters: {
+        let mut parameters = brain(g);
+        parameters.extend(query::<MemoriesQuery>(g));
+        parameters
+      },
+      body: None,
+      raw_body: None,
+      answers: vec![(200, json_answer::<Page<Memory>>(g))],
+      codes: vec![BadRequest, NotFound],
+    },
+    Route {
+      method: "post",
+      path: "/brains/{brainId}/memories",
+      id: "writeMemory",
+      tag: "brain-memories",
+      summary: "Write a memory as a first version.",
+      parameters: brain(g),
+      body: body::<NewMemory>(g),
+      raw_body: None,
+      answers: vec![(201, json_answer::<Memory>(g))],
+      codes: vec![BadRequest, NotFound, Conflict],
+    },
+    Route {
+      method: "get",
+      path: "/brains/{brainId}/memories/{memoryId}",
+      id: "readBrainMemory",
+      tag: "brain-memories",
+      summary: "One memory in one version, with its subjects and strengths.",
+      parameters: under(g, "memoryId"),
+      body: None,
+      raw_body: None,
+      answers: vec![(200, json_answer::<Memory>(g))],
+      codes: vec![BadRequest, NotFound],
+    },
+    Route {
+      method: "patch",
+      path: "/brains/{brainId}/memories/{memoryId}",
+      id: "moveMemory",
+      tag: "brain-memories",
+      summary: "Move a memory's status: approved, done or invalidated.",
+      parameters: under(g, "memoryId"),
+      body: body::<MemoryMove>(g),
+      raw_body: None,
+      answers: vec![(200, json_answer::<Memory>(g))],
+      codes: vec![BadRequest, NotFound, Conflict],
+    },
+    Route {
+      method: "post",
+      path: "/brains/{brainId}/memories/{memoryId}/versions",
+      id: "writeMemoryVersion",
+      tag: "brain-memories",
+      summary: "Write a new version of a memory, superseding the one named.",
+      parameters: under(g, "memoryId"),
+      body: body::<MemoryVersion>(g),
+      raw_body: None,
+      answers: vec![(201, json_answer::<Memory>(g))],
+      codes: vec![BadRequest, NotFound, Conflict],
+    },
+    Route {
+      method: "get",
+      path: "/brains/{brainId}/lineages/{lineageId}",
+      id: "readLineage",
+      tag: "brain-memories",
+      summary: "Every version of a lineage, oldest first.",
+      parameters: under(g, "lineageId"),
+      body: None,
+      raw_body: None,
+      answers: vec![(200, json_answer::<Vec<Memory>>(g))],
+      codes: vec![BadRequest, NotFound],
+    },
+    Route {
+      method: "post",
+      path: "/brains/{brainId}/hits",
+      id: "recordHits",
+      tag: "brain-memories",
+      summary: "Record a hand-out: each row hit, and marked for the session named.",
+      parameters: brain(g),
+      body: body::<Hits>(g),
+      raw_body: None,
+      answers: vec![(201, json_answer::<Recorded>(g))],
+      codes: vec![BadRequest, NotFound],
+    },
+    Route {
+      method: "post",
+      path: "/brains/{brainId}/confirmations",
+      id: "recordConfirmations",
+      tag: "brain-memories",
+      summary: "Record confirmations: each row's storage strength raised by the gap since its last.",
+      parameters: brain(g),
+      body: body::<Confirmations>(g),
+      raw_body: None,
+      answers: vec![(201, json_answer::<Recorded>(g))],
+      codes: vec![BadRequest, NotFound],
+    },
+    Route {
+      method: "get",
+      path: "/brains/{brainId}/types",
+      id: "listTypes",
+      tag: "brain-memories",
+      summary: "The types in use, counted, the reserved ones first.",
+      parameters: brain(g),
+      body: None,
+      raw_body: None,
+      answers: vec![(200, json_answer::<Vec<TypeCount>>(g))],
+      codes: vec![BadRequest, NotFound],
+    },
+    Route {
+      method: "post",
+      path: "/brains/{brainId}/recall",
+      id: "recall",
+      tag: "recall",
+      summary: "What a turn is handed: the room's core and the searched part, under the budget.",
+      parameters: brain(g),
+      body: body::<RecallAsk>(g),
+      raw_body: None,
+      answers: vec![(200, json_answer::<Recall>(g))],
+      codes: vec![BadRequest, NotFound],
+    },
+    Route {
+      method: "post",
+      path: "/brains/{brainId}/folds",
+      id: "fold",
+      tag: "recall",
+      summary: "A session folded or handed off: its marks cleared.",
+      parameters: brain(g),
+      body: body::<Fold>(g),
+      raw_body: None,
+      answers: vec![(200, json_answer::<Folded>(g))],
+      codes: vec![BadRequest, NotFound],
+    },
+    Route {
+      method: "get",
+      path: "/brains/{brainId}/persona",
+      id: "renderPersona",
+      tag: "persona",
+      summary: "The persona rendered as text, the same bytes until a piece changes.",
+      parameters: brain(g),
+      body: None,
+      raw_body: None,
+      answers: vec![(200, Some(json!({ "text/plain": { "schema": { "type": "string" } } })))],
+      codes: vec![BadRequest, NotFound],
+    },
+    Route {
+      method: "get",
+      path: "/brains/{brainId}/export",
+      id: "exportBrain",
+      tag: "brain-files",
+      summary: "The brain, or the layers named, as a brain file.",
+      parameters: {
+        let mut parameters = brain(g);
+        parameters.extend(query::<ExportQuery>(g));
+        parameters
+      },
+      body: None,
+      raw_body: None,
+      answers: vec![(
+        200,
+        Some(json!({ "application/vnd.sqlite3": { "schema": { "type": "string", "format": "binary" } } })),
+      )],
+      codes: vec![BadRequest, NotFound],
+    },
+    Route {
+      method: "post",
+      path: "/brains/{brainId}/injections",
+      id: "injectBrain",
+      tag: "brain-files",
+      summary: "Read a brain file into the brain: keyed rows supersede, the rest are added, nothing overwritten.",
+      parameters: brain(g),
+      body: None,
+      raw_body: Some("application/vnd.sqlite3"),
+      answers: vec![(201, json_answer::<Injected>(g))],
+      codes: vec![BadRequest, NotFound],
+    },
+  ]
+}
+
 /// Every route, in the order docs/boundary-api.md states them.
 fn routes(g: &mut SchemaGenerator) -> Vec<Route> {
+  let mut all = brain_routes(g);
+  all.extend(scope_routes(g));
+  all
+}
+
+fn scope_routes(g: &mut SchemaGenerator) -> Vec<Route> {
   vec![
     Route {
       method: "get",
@@ -195,6 +557,7 @@ fn routes(g: &mut SchemaGenerator) -> Vec<Route> {
       summary: "Readiness and version.",
       parameters: vec![],
       body: None,
+      raw_body: None,
       answers: vec![(200, json_answer::<Health>(g))],
       codes: vec![],
     },
@@ -216,6 +579,7 @@ fn routes(g: &mut SchemaGenerator) -> Vec<Route> {
         parameters
       },
       body: None,
+      raw_body: None,
       answers: vec![(
         200,
         Some(json!({
@@ -231,9 +595,10 @@ fn routes(g: &mut SchemaGenerator) -> Vec<Route> {
       id: "listMemories",
       tag: "memories",
       summary: "Memory rows by scope, scope prefix, subject, kind, state, label; standing rows, rows due.",
-      parameters: query::<MemoriesQuery>(g),
+      parameters: query::<ScopedMemoriesQuery>(g),
       body: None,
-      answers: vec![(200, json_answer::<Page<Memory>>(g))],
+      raw_body: None,
+      answers: vec![(200, json_answer::<Page<ScopedMemory>>(g))],
       codes: vec![BadRequest],
     },
     Route {
@@ -243,8 +608,9 @@ fn routes(g: &mut SchemaGenerator) -> Vec<Route> {
       tag: "memories",
       summary: "Add a memory row.",
       parameters: vec![],
-      body: body::<NewMemory>(g),
-      answers: vec![(201, json_answer::<Memory>(g))],
+      body: body::<NewScopedMemory>(g),
+      raw_body: None,
+      answers: vec![(201, json_answer::<ScopedMemory>(g))],
       codes: vec![BadRequest],
     },
     Route {
@@ -255,7 +621,8 @@ fn routes(g: &mut SchemaGenerator) -> Vec<Route> {
       summary: "One memory row and the watches on it.",
       parameters: vec![id(g, "memoryId")],
       body: None,
-      answers: vec![(200, json_answer::<Memory>(g))],
+      raw_body: None,
+      answers: vec![(200, json_answer::<ScopedMemory>(g))],
       codes: vec![BadRequest, NotFound],
     },
     Route {
@@ -265,8 +632,9 @@ fn routes(g: &mut SchemaGenerator) -> Vec<Route> {
       tag: "memories",
       summary: "Change a row: its words, or its state (done, retired, candidate, off, standing again).",
       parameters: vec![id(g, "memoryId")],
-      body: body::<MemoryChange>(g),
-      answers: vec![(200, json_answer::<Memory>(g))],
+      body: body::<ScopedMemoryChange>(g),
+      raw_body: None,
+      answers: vec![(200, json_answer::<ScopedMemory>(g))],
       codes: vec![BadRequest, NotFound, Conflict],
     },
     Route {
@@ -276,8 +644,9 @@ fn routes(g: &mut SchemaGenerator) -> Vec<Route> {
       tag: "memory-matches",
       summary: "Record which rows a reading matched and what it spent.",
       parameters: vec![],
-      body: body::<NewMemoryMatch>(g),
-      answers: vec![(201, json_answer::<MemoryMatch>(g))],
+      body: body::<NewScopedMemoryMatch>(g),
+      raw_body: None,
+      answers: vec![(201, json_answer::<ScopedMemoryMatch>(g))],
       codes: vec![BadRequest],
     },
     Route {
@@ -288,6 +657,7 @@ fn routes(g: &mut SchemaGenerator) -> Vec<Route> {
       summary: "Notes by scope and subject.",
       parameters: query::<NotesQuery>(g),
       body: None,
+      raw_body: None,
       answers: vec![(200, json_answer::<Page<Note>>(g))],
       codes: vec![BadRequest],
     },
@@ -299,6 +669,7 @@ fn routes(g: &mut SchemaGenerator) -> Vec<Route> {
       summary: "Add a note.",
       parameters: vec![],
       body: body::<NewNote>(g),
+      raw_body: None,
       answers: vec![(201, json_answer::<Note>(g))],
       codes: vec![BadRequest],
     },
@@ -310,6 +681,7 @@ fn routes(g: &mut SchemaGenerator) -> Vec<Route> {
       summary: "A room's rules, in the order they were set.",
       parameters: vec![],
       body: body::<RoomRulesAsk>(g),
+      raw_body: None,
       answers: vec![(200, json_answer::<RoomRules>(g))],
       codes: vec![BadRequest],
     },
@@ -321,6 +693,7 @@ fn routes(g: &mut SchemaGenerator) -> Vec<Route> {
       summary: "Set or revoke one rule on a message; the room's rules as they now stand.",
       parameters: vec![],
       body: body::<RuleSet>(g),
+      raw_body: None,
       answers: vec![(200, json_answer::<RoomRules>(g))],
       codes: vec![BadRequest],
     },
@@ -332,6 +705,7 @@ fn routes(g: &mut SchemaGenerator) -> Vec<Route> {
       summary: "The documents a session was handed, by path and version.",
       parameters: vec![],
       body: body::<SessionAsk>(g),
+      raw_body: None,
       answers: vec![(200, json_answer::<SessionLoads>(g))],
       codes: vec![BadRequest],
     },
@@ -343,6 +717,7 @@ fn routes(g: &mut SchemaGenerator) -> Vec<Route> {
       summary: "Keep the documents a session was handed; sessions untouched for a week are let go.",
       parameters: vec![],
       body: body::<LoadsKeep>(g),
+      raw_body: None,
       answers: vec![(200, json_answer::<Done>(g))],
       codes: vec![BadRequest],
     },
@@ -354,6 +729,7 @@ fn routes(g: &mut SchemaGenerator) -> Vec<Route> {
       summary: "Let a session's loads go.",
       parameters: vec![],
       body: body::<SessionAsk>(g),
+      raw_body: None,
       answers: vec![(200, json_answer::<Done>(g))],
       codes: vec![BadRequest],
     },
@@ -365,6 +741,7 @@ fn routes(g: &mut SchemaGenerator) -> Vec<Route> {
       summary: "An agent's handoff note, or null where it left none.",
       parameters: vec![],
       body: body::<AgentAsk>(g),
+      raw_body: None,
       answers: vec![(200, json_answer::<SessionNote>(g))],
       codes: vec![BadRequest],
     },
@@ -376,6 +753,7 @@ fn routes(g: &mut SchemaGenerator) -> Vec<Route> {
       summary: "Keep an agent's handoff note, overwriting the one it had.",
       parameters: vec![],
       body: body::<NoteKeep>(g),
+      raw_body: None,
       answers: vec![(200, json_answer::<Done>(g))],
       codes: vec![BadRequest],
     },
@@ -387,6 +765,7 @@ fn routes(g: &mut SchemaGenerator) -> Vec<Route> {
       summary: "Clear an agent's handoff note.",
       parameters: vec![],
       body: body::<AgentAsk>(g),
+      raw_body: None,
       answers: vec![(200, json_answer::<Done>(g))],
       codes: vec![BadRequest],
     },
@@ -398,6 +777,7 @@ fn routes(g: &mut SchemaGenerator) -> Vec<Route> {
       summary: "Watches by scope, setter, holder or state.",
       parameters: query::<WatchesQuery>(g),
       body: None,
+      raw_body: None,
       answers: vec![(200, json_answer::<Page<Watch>>(g))],
       codes: vec![BadRequest],
     },
@@ -409,6 +789,7 @@ fn routes(g: &mut SchemaGenerator) -> Vec<Route> {
       summary: "Set a watch.",
       parameters: vec![],
       body: body::<NewWatch>(g),
+      raw_body: None,
       answers: vec![(201, json_answer::<Watch>(g))],
       codes: vec![BadRequest],
     },
@@ -420,6 +801,7 @@ fn routes(g: &mut SchemaGenerator) -> Vec<Route> {
       summary: "One watch.",
       parameters: vec![id(g, "watchId")],
       body: None,
+      raw_body: None,
       answers: vec![(200, json_answer::<Watch>(g))],
       codes: vec![BadRequest, NotFound],
     },
@@ -432,6 +814,7 @@ fn routes(g: &mut SchemaGenerator) -> Vec<Route> {
                 cancelled.",
       parameters: vec![id(g, "watchId")],
       body: body::<WatchChange>(g),
+      raw_body: None,
       answers: vec![(200, json_answer::<Watch>(g))],
       codes: vec![BadRequest, NotFound, Conflict],
     },
@@ -443,6 +826,7 @@ fn routes(g: &mut SchemaGenerator) -> Vec<Route> {
       summary: "Reminders by scope, due before a time, fired or waiting.",
       parameters: query::<RemindersQuery>(g),
       body: None,
+      raw_body: None,
       answers: vec![(200, json_answer::<Page<Reminder>>(g))],
       codes: vec![BadRequest],
     },
@@ -454,6 +838,7 @@ fn routes(g: &mut SchemaGenerator) -> Vec<Route> {
       summary: "Set a reminder; reminder.due is published at its time.",
       parameters: vec![],
       body: body::<NewReminder>(g),
+      raw_body: None,
       answers: vec![(201, json_answer::<Reminder>(g))],
       codes: vec![BadRequest],
     },
@@ -465,6 +850,7 @@ fn routes(g: &mut SchemaGenerator) -> Vec<Route> {
       summary: "Cancel a reminder.",
       parameters: vec![id(g, "reminderId")],
       body: None,
+      raw_body: None,
       answers: vec![(204, None)],
       codes: vec![BadRequest, NotFound],
     },
@@ -477,6 +863,7 @@ fn routes(g: &mut SchemaGenerator) -> Vec<Route> {
                 sheets.",
       parameters: query::<FragmentsQuery>(g),
       body: None,
+      raw_body: None,
       answers: vec![(200, json_answer::<Page<Fragment>>(g))],
       codes: vec![BadRequest],
     },
@@ -488,6 +875,7 @@ fn routes(g: &mut SchemaGenerator) -> Vec<Route> {
       summary: "Write a fragment whole.",
       parameters: vec![named(g, "fragmentKey")],
       body: body::<FragmentWrite>(g),
+      raw_body: None,
       answers: vec![(200, json_answer::<Fragment>(g)), (201, json_answer::<Fragment>(g))],
       codes: vec![BadRequest],
     },
@@ -499,6 +887,7 @@ fn routes(g: &mut SchemaGenerator) -> Vec<Route> {
       summary: "Switch a fragment off or on for scopes, or set its state.",
       parameters: vec![named(g, "fragmentKey")],
       body: body::<FragmentSwitch>(g),
+      raw_body: None,
       answers: vec![(200, json_answer::<Fragment>(g))],
       codes: vec![BadRequest, NotFound],
     },
@@ -510,6 +899,7 @@ fn routes(g: &mut SchemaGenerator) -> Vec<Route> {
       summary: "Remove a fragment.",
       parameters: vec![named(g, "fragmentKey")],
       body: None,
+      raw_body: None,
       answers: vec![(204, None)],
       codes: vec![NotFound],
     },
@@ -521,6 +911,7 @@ fn routes(g: &mut SchemaGenerator) -> Vec<Route> {
       summary: "Merge fragments into one.",
       parameters: vec![],
       body: body::<FragmentMerge>(g),
+      raw_body: None,
       answers: vec![(201, json_answer::<Fragment>(g))],
       codes: vec![BadRequest],
     },
@@ -532,6 +923,7 @@ fn routes(g: &mut SchemaGenerator) -> Vec<Route> {
       summary: "Split a fragment into pieces.",
       parameters: vec![],
       body: body::<FragmentSplit>(g),
+      raw_body: None,
       answers: vec![(201, json_answer::<Page<Fragment>>(g))],
       codes: vec![BadRequest],
     },
@@ -543,6 +935,7 @@ fn routes(g: &mut SchemaGenerator) -> Vec<Route> {
       summary: "Record the fragments a reading attached.",
       parameters: vec![],
       body: body::<FragmentHits>(g),
+      raw_body: None,
       answers: vec![(201, json_answer::<FragmentHitsRecorded>(g))],
       codes: vec![BadRequest],
     },
@@ -554,6 +947,7 @@ fn routes(g: &mut SchemaGenerator) -> Vec<Route> {
       summary: "The kinds of fragment, by name.",
       parameters: query::<NameCursor>(g),
       body: None,
+      raw_body: None,
       answers: vec![(200, json_answer::<Page<FragmentKind>>(g))],
       codes: vec![BadRequest],
     },
@@ -565,6 +959,7 @@ fn routes(g: &mut SchemaGenerator) -> Vec<Route> {
       summary: "The libraries by name, each with its documents and their SHA-256 versions.",
       parameters: query::<NameCursor>(g),
       body: None,
+      raw_body: None,
       answers: vec![(200, json_answer::<Page<Library>>(g))],
       codes: vec![BadRequest],
     },
@@ -576,6 +971,7 @@ fn routes(g: &mut SchemaGenerator) -> Vec<Route> {
       summary: "One library and its documents.",
       parameters: vec![named(g, "libraryName")],
       body: None,
+      raw_body: None,
       answers: vec![(200, json_answer::<Library>(g))],
       codes: vec![NotFound],
     },
@@ -587,6 +983,7 @@ fn routes(g: &mut SchemaGenerator) -> Vec<Route> {
       summary: "A library put whole, replacing what it said before.",
       parameters: vec![named(g, "libraryName")],
       body: body::<LibraryPut>(g),
+      raw_body: None,
       answers: vec![(200, json_answer::<Library>(g)), (201, json_answer::<Library>(g))],
       codes: vec![BadRequest],
     },
@@ -598,6 +995,7 @@ fn routes(g: &mut SchemaGenerator) -> Vec<Route> {
       summary: "Bring the fragments in line with their library's documents; dryRun reports the drift.",
       parameters: query::<DryRun>(g),
       body: body::<LibrarySyncAsk>(g),
+      raw_body: None,
       answers: vec![(200, json_answer::<LibrarySync>(g))],
       codes: vec![BadRequest, NotFound],
     },
@@ -609,6 +1007,7 @@ fn routes(g: &mut SchemaGenerator) -> Vec<Route> {
       summary: "Knowledge for a set of scopes: fragments by slugs and kinds, and the standing rows.",
       parameters: query::<KnowledgeQuery>(g),
       body: None,
+      raw_body: None,
       answers: vec![(200, json_answer::<Knowledge>(g))],
       codes: vec![BadRequest],
     },
@@ -620,6 +1019,7 @@ fn routes(g: &mut SchemaGenerator) -> Vec<Route> {
       summary: "Who holds the store for editing; waitMs answers once it is free.",
       parameters: query::<LocksQuery>(g),
       body: None,
+      raw_body: None,
       answers: vec![(200, json_answer::<Page<Lock>>(g))],
       codes: vec![BadRequest],
     },
@@ -631,6 +1031,7 @@ fn routes(g: &mut SchemaGenerator) -> Vec<Route> {
       summary: "Lock the store for editing; 409 while another holds it, renewed for the holder holding it.",
       parameters: vec![],
       body: body::<NewLock>(g),
+      raw_body: None,
       answers: vec![(200, json_answer::<Lock>(g)), (201, json_answer::<Lock>(g))],
       codes: vec![BadRequest, Conflict],
     },
@@ -642,6 +1043,7 @@ fn routes(g: &mut SchemaGenerator) -> Vec<Route> {
       summary: "Let a lock go.",
       parameters: vec![id(g, "lockId")],
       body: None,
+      raw_body: None,
       answers: vec![(204, None)],
       codes: vec![BadRequest, NotFound],
     },
@@ -653,6 +1055,7 @@ fn routes(g: &mut SchemaGenerator) -> Vec<Route> {
       summary: "What the service holds under a scope, counted by resource.",
       parameters: vec![named(g, "scope")],
       body: None,
+      raw_body: None,
       answers: vec![(200, json_answer::<ScopeHolding>(g))],
       codes: vec![BadRequest, NotFound],
     },
@@ -664,6 +1067,7 @@ fn routes(g: &mut SchemaGenerator) -> Vec<Route> {
       summary: "Mark a scope forgotten, so its rows wither, or remembered again.",
       parameters: vec![named(g, "scope")],
       body: body::<ScopeChange>(g),
+      raw_body: None,
       answers: vec![(200, json_answer::<ScopeHolding>(g))],
       codes: vec![BadRequest, NotFound],
     },
@@ -679,6 +1083,7 @@ fn routes(g: &mut SchemaGenerator) -> Vec<Route> {
         parameters
       },
       body: None,
+      raw_body: None,
       answers: vec![(200, json_answer::<ScopeHolding>(g))],
       codes: vec![BadRequest, NotFound],
     },

@@ -3,7 +3,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::memories::Memory;
+use crate::memories::ScopedMemory;
 use crate::wire::Labels;
 
 /// Whether a fragment is offered.
@@ -314,5 +314,5 @@ pub struct Knowledge {
   /// The active fragments held under one of the scopes or shared, switched off for none of them.
   pub fragments: Vec<Fragment>,
   /// The standing rows held under one of the scopes.
-  pub memories: Vec<Memory>,
+  pub memories: Vec<ScopedMemory>,
 }

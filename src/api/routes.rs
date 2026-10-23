@@ -10,10 +10,11 @@ use axum::routing::{delete, get, post};
 use bmo_brain_client::{
   AgentAsk, Done, DryRun, ErrorCode, Fragment, FragmentHits, FragmentHitsRecorded, FragmentKind,
   FragmentMerge, FragmentSplit, FragmentSwitch, FragmentWrite, FragmentsQuery, Knowledge, KnowledgeQuery,
-  Library, LibraryPut, LibrarySync, LibrarySyncAsk, LoadsKeep, Lock, LocksQuery, MemoriesQuery, Memory,
-  MemoryChange, MemoryMatch, NameCursor, NewLock, NewMemory, NewMemoryMatch, NewNote, NewReminder,
-  NewWatch, Note, NoteKeep, NotesQuery, Page, Reminder, RemindersQuery, RoomRules, RoomRulesAsk, RuleSet,
-  ScopeChange, ScopeHolding, SessionAsk, SessionLoads, SessionNote, Watch, WatchChange, WatchesQuery,
+  Library, LibraryPut, LibrarySync, LibrarySyncAsk, LoadsKeep, Lock, LocksQuery, NameCursor, NewLock,
+  NewNote, NewReminder, NewScopedMemory, NewScopedMemoryMatch, NewWatch, Note, NoteKeep, NotesQuery, Page,
+  Reminder, RemindersQuery, RoomRules, RoomRulesAsk, RuleSet, ScopeChange, ScopeHolding,
+  ScopedMemoriesQuery, ScopedMemory, ScopedMemoryChange, ScopedMemoryMatch, SessionAsk, SessionLoads,
+  SessionNote, Watch, WatchChange, WatchesQuery,
 };
 use tokio::time::Instant;
 
@@ -34,32 +35,35 @@ fn written<T>((new, member): (bool, T)) -> Created<T> {
 
 async fn memories(
   State(brain): State<Brain>,
-  Query(query): Query<MemoriesQuery>,
-) -> Answer<Json<Page<Memory>>> {
-  Ok(Json(brain.store.memories(&query).await?))
+  Query(query): Query<ScopedMemoriesQuery>,
+) -> Answer<Json<Page<ScopedMemory>>> {
+  Ok(Json(brain.store.scoped_memories(&query).await?))
 }
 
-async fn memory_add(State(brain): State<Brain>, Body(body): Body<NewMemory>) -> Answer<Created<Memory>> {
-  Ok(created(brain.store.memory_add(&body).await?))
+async fn memory_add(
+  State(brain): State<Brain>,
+  Body(body): Body<NewScopedMemory>,
+) -> Answer<Created<ScopedMemory>> {
+  Ok(created(brain.store.scoped_memory_add(&body).await?))
 }
 
-async fn memory(State(brain): State<Brain>, Key(id): Key<i64>) -> Answer<Json<Memory>> {
-  Ok(Json(brain.store.memory(id).await?))
+async fn memory(State(brain): State<Brain>, Key(id): Key<i64>) -> Answer<Json<ScopedMemory>> {
+  Ok(Json(brain.store.scoped_memory(id).await?))
 }
 
 async fn memory_change(
   State(brain): State<Brain>,
   Key(id): Key<i64>,
-  Body(body): Body<MemoryChange>,
-) -> Answer<Json<Memory>> {
-  Ok(Json(brain.store.memory_change(id, &body).await?))
+  Body(body): Body<ScopedMemoryChange>,
+) -> Answer<Json<ScopedMemory>> {
+  Ok(Json(brain.store.scoped_memory_change(id, &body).await?))
 }
 
 async fn memory_match_add(
   State(brain): State<Brain>,
-  Body(body): Body<NewMemoryMatch>,
-) -> Answer<Created<MemoryMatch>> {
-  Ok(created(brain.store.memory_match_add(&body).await?))
+  Body(body): Body<NewScopedMemoryMatch>,
+) -> Answer<Created<ScopedMemoryMatch>> {
+  Ok(created(brain.store.scoped_memory_match_add(&body).await?))
 }
 
 async fn notes(State(brain): State<Brain>, Query(query): Query<NotesQuery>) -> Answer<Json<Page<Note>>> {

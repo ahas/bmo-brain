@@ -67,6 +67,21 @@ enum Verb {
     #[arg(long)]
     dry_run: bool,
   },
+  /// Moves the rows held under scopes into brains, subjects, layers and memories, once (docs/design.md).
+  Move {
+    /// The PostgreSQL database moved.
+    #[arg(long, value_name = "url")]
+    database: String,
+    /// The account every brain is made under.
+    #[arg(long, value_name = "key")]
+    account: String,
+    /// The agent whose brain takes the fragments held under no scope and the room rules.
+    #[arg(long, value_name = "key")]
+    default_agent: String,
+    /// Reads, counts and writes nothing.
+    #[arg(long)]
+    dry_run: bool,
+  },
   /// The memory rows.
   Memory {
     #[command(subcommand)]
@@ -113,7 +128,7 @@ async fn stopped() {
 }
 
 async fn serve(config: &Config) -> Result<(), String> {
-  let store = Store::lazy(&config.database)?;
+  let store = Store::lazy(&config.database)?.by(config.rules.clone());
   store.migrate().await.map_err(|why| format!("the migrations: {why}"))?;
   let listener = tokio::net::TcpListener::bind(&config.listen)
     .await
@@ -252,6 +267,18 @@ async fn main() -> ExitCode {
         } else {
           Err("the count-and-sample compare failed".to_owned())
         }
+      }
+      Err(why) => Err(why),
+    },
+    Verb::Move {
+      database,
+      account,
+      default_agent,
+      dry_run,
+    } => match bmo_brain::moving::run(&database, &account, &default_agent, dry_run).await {
+      Ok(moved) => {
+        println!("{moved}");
+        Ok(())
       }
       Err(why) => Err(why),
     },

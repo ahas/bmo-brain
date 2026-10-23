@@ -1,6 +1,7 @@
 //! The brain's routes (docs/boundary-api.md): each a thin call of the store, behind the bearer token, every
 //! failure answered in the common error shape.
 
+mod brains;
 mod events;
 mod routes;
 
@@ -149,6 +150,7 @@ async fn health(State(brain): State<Brain>) -> Json<Health> {
     ready: reason.is_none(),
     reason,
     version: env!("CARGO_PKG_VERSION").to_owned(),
+    rules: brain.store.rules.clone(),
   })
 }
 
@@ -158,6 +160,7 @@ pub fn router(brain: Brain) -> Router {
     .route("/health", axum::routing::get(health))
     .route("/events", axum::routing::get(events::events))
     .merge(routes::routes())
+    .merge(brains::routes())
     .fallback(no_route)
     .method_not_allowed_fallback(no_route)
     .layer(middleware::from_fn_with_state(brain.clone(), authorised))
