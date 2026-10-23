@@ -5,9 +5,9 @@
 mod support;
 
 use bmo_brain_client::{
-  ALWAYS_LABEL, ALWAYS_VALUE, BrainClient, BrainsQuery, Confirmations, ExportQuery, Fold, Hits,
-  LayersQuery, MemoriesQuery, MemoryMerge, MemoryMove, MemoryStatus, MemoryVersion, NewBrain, NewLayer,
-  NewMemory, NewSubject, PersonaQuery, RecallAsk, RecallPart, SubjectKey, SubjectsQuery, labelled_always,
+  BrainClient, BrainsQuery, Confirmations, ExportQuery, Fold, Hits, LayersQuery, MemoriesQuery,
+  MemoryMerge, MemoryMove, MemoryStatus, MemoryVersion, NewBrain, NewLayer, NewMemory, NewSubject,
+  PersonaQuery, RecallAsk, RecallPart, SubjectKey, SubjectsQuery,
 };
 use support::{Served, labels, refused};
 
@@ -1005,51 +1005,50 @@ async fn a_merge_writes_one_row_over_several_and_supersedes_each() {
 }
 
 #[tokio::test]
-async fn recall_core_carries_the_rooms_always_rules_to_their_cap_and_searches_the_others() {
+async fn recall_core_carries_no_rule_and_a_rule_is_found_by_search_when_its_words_match() {
   let served = Served::new().await;
   let client = &served.client;
   let brain = brain_of(client, "agent-a").await;
   let room = subject("room", "7");
   let speaker = subject("person", "1");
-  let always = labels(&[(ALWAYS_LABEL, ALWAYS_VALUE)]);
-  let day = 86_400_000;
-  let start = 1_767_225_600_000;
-  let cap = served.store.rules.core_rule_cap;
-  let rule = |text: String, labels: bmo_brain_client::Labels, at: i64, room: SubjectKey| NewMemory {
-    subjects: vec![room],
-    importance: Some(5),
-    valid_from: Some(at),
-    labels,
-    ..memory("rule", &text)
-  };
-  let mut marked = Vec::new();
-  for n in 0..cap + 2 {
-    let body = rule(format!("Standing rule number {n}."), always.clone(), start + n * day, room.clone());
-    marked.push(client.memory_add(brain, &body).await.unwrap().id);
+  let mut rules = Vec::new();
+  for n in 0..12 {
+    let body = NewMemory {
+      subjects: vec![room.clone()],
+      importance: Some(9),
+      ..memory("rule", &format!("Standing instruction number {n} for this room."))
+    };
+    rules.push(client.memory_add(brain, &body).await.unwrap().id);
   }
-  let unmarked = client
-    .memory_add(brain, &rule("Never quote harvest prices.".to_owned(), labels(&[]), start, room.clone()))
-    .await
-    .unwrap();
-  let other_value = client
+  let harvest = client
     .memory_add(
       brain,
-      &rule("Keep answers short.".to_owned(), labels(&[(ALWAYS_LABEL, "no")]), start, room.clone()),
+      &NewMemory {
+        subjects: vec![room.clone()],
+        ..memory("rule", "Never quote harvest prices.")
+      },
     )
     .await
     .unwrap()
     .id;
-  let other_room = client
-    .memory_add(brain, &rule("Speak softly.".to_owned(), always.clone(), start, subject("room", "8")))
-    .await
-    .unwrap()
-    .id;
+  rules.push(harvest);
   let situation = client
     .memory_add(
       brain,
       &NewMemory {
         subjects: vec![room.clone()],
         ..memory("situation", "When asked for the weather: answer in one line.")
+      },
+    )
+    .await
+    .unwrap()
+    .id;
+  let fact = client
+    .memory_add(
+      brain,
+      &NewMemory {
+        subjects: vec![speaker.clone()],
+        ..memory("fact", "The member keeps a garden.")
       },
     )
     .await
@@ -1074,43 +1073,17 @@ async fn recall_core_carries_the_rooms_always_rules_to_their_cap_and_searches_th
   };
 
   let neutral = client.recall(brain, &ask("good morning", None)).await.unwrap();
-  let newest_first: Vec<i64> = marked.iter().rev().take(cap as usize).copied().collect();
-  let expected: Vec<i64> = std::iter::once(situation).chain(newest_first).collect();
-  assert_eq!(core_of(&neutral), expected);
-  for left_out in [unmarked.id, other_value, other_room] {
-    assert!(!core_of(&neutral).contains(&left_out), "{left_out} is no core row");
-  }
+  assert_eq!(core_of(&neutral), [situation, fact]);
   assert!(neutral.token_count <= neutral.budget_tokens);
   assert_eq!(neutral.token_count, neutral.chosen.iter().map(|c| c.token_count).sum::<i64>());
 
   let asked = client.recall(brain, &ask("what are the harvest prices", None)).await.unwrap();
+  assert!(!core_of(&asked).iter().any(|id| rules.contains(id)), "{:?}", asked.chosen);
   assert!(
-    asked
-      .chosen
-      .iter()
-      .any(|c| c.memory_id == unmarked.id && c.part == RecallPart::Searched),
-    "an unmarked rule reaches the turn when its words do: {:?}",
+    asked.chosen.iter().any(|c| c.memory_id == harvest && c.part == RecallPart::Searched),
+    "a rule reaches the turn through the searched part when its words do: {:?}",
     asked.chosen
   );
   let tight = client.recall(brain, &ask("what are the harvest prices", Some(30))).await.unwrap();
   assert!(tight.token_count <= 30, "{} tokens", tight.token_count);
-
-  // Marking the rule is a version with the label added: the new version stands in the core, newest first.
-  let toggled = client
-    .memory_version(
-      brain,
-      unmarked.id,
-      &MemoryVersion {
-        labels: Some(always.clone()),
-        actor_name: "screen".to_owned(),
-        ..MemoryVersion::default()
-      },
-    )
-    .await
-    .unwrap();
-  assert!(labelled_always(&toggled.labels));
-  assert_eq!(toggled.text, unmarked.text);
-  let after = client.recall(brain, &ask("good morning", None)).await.unwrap();
-  assert_eq!(core_of(&after)[..2], [situation, toggled.id]);
-  assert_eq!(core_of(&after).len() as i64, 1 + cap);
 }

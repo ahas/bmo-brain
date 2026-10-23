@@ -210,26 +210,6 @@ async fn the_executable_writes_an_episode_and_a_learning_into_the_agents_brain()
     .unwrap();
   assert_eq!(listed.items.len(), 1);
 
-  let ruled = called(
-    &served,
-    "brain_learn",
-    json!({ "type": "rule", "text": "Answer in the room's language.", "source": "owner", "always": true }),
-    "agent-a",
-    "7",
-  );
-  assert_eq!(ruled["isError"], json!(false), "{ruled}");
-  let rule_id = ruled["structuredContent"]["written"]["id"].as_i64().unwrap();
-  let rule = served.client.memory(brain.id, rule_id).await.unwrap();
-  assert!(bmo_brain_client::labelled_always(&rule.labels), "{:?}", rule.labels);
-  let not_a_rule = called(
-    &served,
-    "brain_learn",
-    json!({ "type": "fact", "text": "The member waters at dawn.", "source": "own", "always": true }),
-    "agent-a",
-    "7",
-  );
-  assert_eq!(not_a_rule["isError"], json!(true), "{not_a_rule}");
-
   let unknown = called(&served, "brain_episode", json!({ "text": "x", "speaker": "1" }), "agent-none", "7");
   assert_eq!(unknown["isError"], json!(true), "{unknown}");
   assert!(unknown["content"][0]["text"].as_str().unwrap().contains("no brain"));

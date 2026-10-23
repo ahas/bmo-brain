@@ -4,11 +4,10 @@
 use std::collections::BTreeSet;
 
 use bmo_brain_client::{
-  ALWAYS_LABEL, Labels, Learned, Learning, Memory, MemoryMove, MemoryStatus, MemoryVersion, NewMemory,
-  SimilarAsk, SubjectKey,
+  Labels, Learned, Learning, Memory, MemoryMove, MemoryStatus, MemoryVersion, NewMemory, SimilarAsk,
+  SubjectKey,
 };
 use sqlx::PgConnection;
-use sqlx::types::Json;
 
 use super::brains::{brain_of, given};
 use super::sheets::written_type;
@@ -163,18 +162,6 @@ impl Store {
     );
 
     if let Some(id) = body.strengthens {
-      // The row's `always`, which the owner sets, stands on the new version unless the learning names it.
-      if !labels.contains_key(ALWAYS_LABEL) {
-        let held: Option<Json<Labels>> =
-          sqlx::query_scalar("SELECT labels FROM memories WHERE brain_id = $1 AND id = $2")
-            .bind(brain_id)
-            .bind(id)
-            .fetch_optional(&mut *tx)
-            .await?;
-        if let Some(always) = held.and_then(|Json(held)| held.get(ALWAYS_LABEL).cloned()) {
-          labels.insert(ALWAYS_LABEL.to_owned(), always);
-        }
-      }
       let memory = self
         .version_in(
           &mut tx,

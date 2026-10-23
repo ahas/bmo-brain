@@ -259,18 +259,6 @@ pub struct Memory {
   pub created_at: i64,
 }
 
-/// The one label the brain reads: on a `rule`, `always=true` puts the rule in the core of every recall of its
-/// room.
-pub const ALWAYS_LABEL: &str = "always";
-
-/// The value of `ALWAYS_LABEL` that sets it.
-pub const ALWAYS_VALUE: &str = "true";
-
-/// Whether these labels set `always`.
-pub fn labelled_always(labels: &Labels) -> bool {
-  labels.get(ALWAYS_LABEL).is_some_and(|value| value == ALWAYS_VALUE)
-}
-
 /// A memory to write as a first version.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -300,7 +288,6 @@ pub struct NewMemory {
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub status: Option<MemoryStatus>,
   pub actor_name: String,
-  /// The writer's labels; `always=true` on a `rule` puts it in the core of every recall of its room.
   #[serde(default)]
   pub labels: Labels,
 }
@@ -328,7 +315,6 @@ pub struct MemoryVersion {
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub valid_from: Option<i64>,
   pub actor_name: String,
-  /// The writer's labels; `always=true` on a `rule` puts it in the core of every recall of its room.
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub labels: Option<Labels>,
 }
@@ -360,7 +346,6 @@ pub struct MemoryMerge {
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub valid_from: Option<i64>,
   pub actor_name: String,
-  /// The writer's labels; `always=true` on a `rule` puts it in the core of every recall of its room.
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub labels: Option<Labels>,
 }
@@ -684,9 +669,6 @@ pub struct Rules {
   /// The most facts of one speaker's sheet the core of a block carries; the rest reach a turn only through
   /// the searched part.
   pub core_fact_cap: i64,
-  /// The most of a room's `always` rules the core of a block carries; the rest reach a turn only through the
-  /// searched part.
-  pub core_rule_cap: i64,
   /// The exponent the time since each hit is raised to, negated, in the retrieval strength.
   pub decay: f64,
   /// How many hits a row keeps for its retrieval strength.
@@ -711,7 +693,6 @@ impl Default for Rules {
       subject_bonus: 0.5,
       subject_cap: 4,
       core_fact_cap: 8,
-      core_rule_cap: 6,
       decay: 0.5,
       hit_times_kept: 64,
       same_session_ms: 60 * 60 * 1_000,
@@ -775,7 +756,6 @@ pub struct Learning {
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub layer_id: Option<i64>,
   pub actor_name: String,
-  /// The writer's labels; `always=true` on a `rule` puts it in the core of every recall of its room.
   #[serde(default)]
   pub labels: Labels,
 }

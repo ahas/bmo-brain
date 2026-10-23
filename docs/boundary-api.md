@@ -37,7 +37,7 @@ plugin」).
 | console | `[console]` | the console bundle (「The console bundle」), where the brain serves one: `token`, the console's bearer token, which reaches what the screen uses; `bundle`, the folder the build of `client/` wrote the module, its stylesheet and its words into, the release's `console` where none is given; `calls`, the other services the screen calls through the console, each by the service name its own manifest gives it, which the manifest names under `calls`, none where none is given |
 | database | `database` | the address of the brain's own PostgreSQL database, which holds its tables and nothing else |
 | data root | `data_root` | the data root whose `env/brain.env` the brain's tool reads the service's address and token from; the `tool-env` verb writes it |
-| rules | `[rules]` | the numbers the brain reads by (`docs/design.md`), each with a default: `budget_tokens`, `weight_relevance`, `weight_importance`, `weight_recency`, `subject_bonus`, `subject_cap`, `core_fact_cap` (the most facts of one speaker's sheet the core of a recall carries, 8), `core_rule_cap` (the most `always` rules of the room the core of a recall carries, 6), `decay`, `hit_times_kept`, `same_session_ms`, `strength_gain`, `previous_value_days`, `consolidation_threshold` |
+| rules | `[rules]` | the numbers the brain reads by (`docs/design.md`), each with a default: `budget_tokens`, `weight_relevance`, `weight_importance`, `weight_recency`, `subject_bonus`, `subject_cap`, `core_fact_cap` (the most facts of one speaker's sheet the core of a recall carries, 8), `decay`, `hit_times_kept`, `same_session_ms`, `strength_gain`, `previous_value_days`, `consolidation_threshold` |
 
 Deployed, the file stands under the data root as `env/brain.toml`, and each release links to it as
 `brain.toml`. The service runs as the user unit `deploy/bmo-brain.service`, the repository's one service: a
@@ -155,11 +155,9 @@ to 10), `hits`, `lastHitAt`, `lastConfirmedAt`, `strength` (the storage strength
 moved, as the mover said, or null), `labels` and `createdAt`.
 
 `type` is the writer's word; the reserved ones are `episode`, `fact`, `rumor`, `situation`, `rule`, `name`,
-`persona`, `lore` and `knowledge` (`docs/design.md`, 「Types」). `labels` are the writer's, but for one the
-brain reads: `always=true` on a `rule` puts the rule in the core of every recall of its room (「Recall」).
-`sheet` is no type: a first version, a version, a merge or a learning that names it is answered 400
-`bad-request`, as is a brain file holding a live row of it, and a restoration whose closed row is a `sheet` is
-answered 409 `conflict`. The statuses and the
+`persona`, `lore` and `knowledge` (`docs/design.md`, 「Types」). `sheet` is no type: a first version, a
+version, a merge or a learning that names it is answered 400 `bad-request`, as is a brain file holding a live
+row of it, and a restoration whose closed row is a `sheet` is answered 409 `conflict`. The statuses and the
 moves a caller's word may make:
 
 | Status | Means | May move to |
@@ -199,14 +197,11 @@ memory starts at strength 1 with no hits.
 where none is given). It answers `block`, the text the turn is handed; `chosen`, each `memoryId`, `type`,
 `part` (`core` or `searched`), `score`, `marked` and `tokenCount`; `tokenCount` and `budgetTokens`.
 
-- **The core** is the room's active `situation` memories, its active `rule` memories labelled
-  `always=true`, and the head of the sheet of everyone who spoke, each a line of the block. The rules are at
-  most the rules' `core_rule_cap` of them, by importance, highest first, then by `validFrom`, latest first,
-  then by the moment last confirmed, latest first and a row never confirmed after the confirmed ones, then by
-  id, highest first. The head of a sheet is the first facts `GET /subjects/{subjectId}/sheet` renders for
-  each speaker with the turn's room as `roomId`, in its order, at most the rules' `core_fact_cap` of them per
-  speaker. A rule without the label or past the cap, and a speaker's other facts, are rows like any other:
-  they reach the block only through the searched part.
+- **The core** is the room's active `situation` memories and the head of the sheet of everyone who spoke:
+  the first facts `GET /subjects/{subjectId}/sheet` renders for each speaker with the turn's room as
+  `roomId`, in its order, at most the rules' `core_fact_cap` of them per speaker, each a line of the block.
+  The room's `rule` memories and a speaker's other facts are rows like any other: they reach the block only
+  through the searched part.
 - **Every line of either part keeps the budget,** a marked one as well: a line that would carry the block
   past `budgetTokens` is left out.
 - **The searched part** is the active rows holding one of the turn's words or about a subject the turn
@@ -234,10 +229,8 @@ material and its mechanics.
 | `POST /consolidated` | `episodeIds`: marks them consolidated | 200, `recordedCount` |
 
 A `told` or `inferred` learning of type `fact` is written as a `rumor`, and replaces nothing. Its `source` is
-kept in the row's labels. A learning that `strengthens` a row labelled `always` keeps that label on the new
-version unless its own `labels` name `always`. The recall answer carries `unconsolidatedImportance`, the sum
-of the importance of the unconsolidated episodes, and `consolidationDue`, whether it has reached the brain's
-threshold.
+kept in the row's labels. The recall answer carries `unconsolidatedImportance`, the sum of the importance of
+the unconsolidated episodes, and `consolidationDue`, whether it has reached the brain's threshold.
 
 The skill ships the discipline a chat agent's system prompt carries, `skills/brain-harness/every-turn.md`.
 
@@ -410,8 +403,7 @@ host's call protocol states.
   record's holder: the one brain registered for that agent key. The turn's room, `BMO_TURN_CHAT`, is the room
   a write links where the call names none.
 - **Its entries,** each one call: `brain_episode` (`POST /brains/{brainId}/memories`, type `episode`),
-  `brain_similar` (`POST …/similar`), `brain_learn` (`POST …/learnings`; its `always`, true for a `rule`
-  alone, writes the label `always=true`), `brain_move`
+  `brain_similar` (`POST …/similar`), `brain_learn` (`POST …/learnings`), `brain_move`
   (`PATCH …/memories/{memoryId}`), `brain_list` (`GET …/memories`), `brain_unconsolidated`
   (`GET …/unconsolidated`), `brain_consolidated` (`POST …/consolidated`) and `brain_fold`
   (`POST …/folds`, the session key the record's `BMO_RUN_NAME`). It writes as `agent-session`.

@@ -94,7 +94,7 @@ One row is one thing the agent remembers, in one version.
 | `lastConfirmedAt` | when the memory was last confirmed by a source apart from the reading |
 | `strength` | its storage strength, raised only by spaced confirmations (「Strength and decay」) |
 | `actorName` | who wrote this version: the agent's session, a tool, a person at the screen |
-| `labels` | the caller's own metadata, a map of strings, but for the one label the brain reads (「Types」) |
+| `labels` | the caller's own metadata, a map of strings |
 | `createdAt` | when this version was written |
 
 ### Types
@@ -117,11 +117,6 @@ a subject」), never a row, and a write that names `sheet` as its type is refuse
 | `persona` | a piece of the agent's persona, rendered into its system prompt |
 | `lore` | a piece of the agent's lore, read as reference |
 | `knowledge` | a piece of reference knowledge |
-
-One label is reserved for the same reason: `always=true` on a `rule` row marks a rule that stands on every
-turn of its room (「Rooms, people and rules」), and the rule without the label, or with another value, does
-not. The brain reads it on a `rule` alone; on any other row it is a label like the caller's own. Every other
-label is the caller's.
 
 ## Versions
 
@@ -215,8 +210,7 @@ easily it comes to mind.
   read by key, subject, type or words still answers it, and a hit there revives it.
 - **The numbers are settings,** with placeholders until the owner's own conversation logs have fitted them:
   the importance threshold of consolidation, the decay exponent, the spacing curve of storage strength, the
-  weights of the recall score, the per-subject cap, the core's cap of facts per speaker, the core's cap of
-  rules and the token budget.
+  weights of the recall score, the per-subject cap, the core's cap of facts per speaker and the token budget.
   The brain reads them from its configuration and names each in its health answer.
 
 ## Recall
@@ -226,13 +220,13 @@ spoke, the words of the turn, the session's key and the moment it opened, and th
 a block and a list of what it chose.
 
 - **Two parts within one budget** of about one and a half to two thousand tokens: the fixed core, the few
-  memories that stand on every turn of that room (its situation rules, the room's `always` rules, and the
-  head of the sheet of everyone who spoke), and the searched part, chosen by score. No line of either part
-  runs past the budget, a marked one no more than another.
-- **The core carries the room's `always` rules** (「Rooms, people and rules」), at most the core's cap of
-  rules, six where the configuration names none, in the sheet's order: by importance, highest first, and
-  among equals newest first. A rule without the label, or one past the cap, is a candidate of the searched
-  part like any other row, and reaches a turn when its words or its subjects call for it.
+  memories that stand on every turn of that room (its situation rules and the head of the sheet of everyone
+  who spoke), and the searched part, chosen by score. No line of either part runs past the budget, a marked
+  one no more than another.
+- **No rule of the room stands in the core.** A room's rules reach a turn through selection, never by
+  standing: each is a candidate of the searched part like any other row, chosen when the turn's words or
+  subjects call for it, and a caller that selects a turn's reference picks among them as it picks any
+  reference.
 - **The core carries the head of each speaker's sheet:** the first of their facts in the sheet's order
   (「Rooms, people and rules」), at most the core's cap per speaker, eight where the configuration names
   none. A person's sheet can hold hundreds of facts and a turn has room for a few; the rest of a speaker's
@@ -290,13 +284,8 @@ is the brain's offer, the caller's is the last word.
   memories
   linked to it.
 - **A room's rules are memories of type `rule`** linked to the room's subject, each with its `key` the
-  caller's rule id and its grantee among its subjects. Revoking a rule invalidates it.
-- **A rule that must stand on every turn of its room carries the label `always`:** a standing instruction
-  about how to behave in the room, never the record of an incident. The owner decides which rules carry it;
-  a rule without it is read when a turn calls for it. Recall's core reads the label, and so may any caller
-  that attaches a room's rules to every turn itself. Setting or clearing it is an edit like any other, a new
-  version; a learning that strengthens a rule keeps the label the rule carries unless it names the
-  label itself.
+  caller's rule id and its grantee among its subjects. Revoking a rule invalidates it. A rule reaches a turn
+  when it is selected for it (「Recall」); none stands on every turn.
 - **A person is a subject** of type `person`, keyed by the id the caller knows them by. What is known about
   them is rows linked to them, a fact one row each, and a fact that holds only in one room is linked to that
   room as well.
@@ -369,9 +358,7 @@ console bundle contract and served by the brain itself (`docs/boundary-api.md`, 
   invalidated, a `pending` row is approved to `active`, done or invalidated, a `done` or `invalidated`
   lineage is restored, a superseded row has none. A move down asks for its reason; a move to `done` may take
   the words it ended on, written as a version and moved in one call. Confirming a row records a
-  confirmation. A live `rule` row turns its `always` label on or off with one tap, a new version with the
-  label added or removed and nothing else changed, and the row view says whether the rule stands on every
-  turn.
+  confirmation.
 - **Editing in place.** An edit of a live row's text, type, layer, position, subjects, importance or labels
   is saved as a new version. An edit is made over the version read: where another writer wrote a version in
   between, the brain refuses it with a conflict, and the screen shows the new version and keeps the words

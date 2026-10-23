@@ -32,22 +32,6 @@ const SERVICE = "brain";
 // told the screen wrote it.
 export const SCREEN_ACTOR = "screen";
 
-// The one label the brain reads: on a rule, `always=true` puts the rule in the core of every recall of its room
-// (docs/design.md, 「Types」).
-export const ALWAYS_LABEL = "always";
-export const ALWAYS_VALUE = "true";
-
-export function labelledAlways(labels: Record<string, string>): boolean {
-  return labels[ALWAYS_LABEL] === ALWAYS_VALUE;
-}
-
-// The labels with `always` set, or with it taken out, the rest as they stand.
-export function withAlways(labels: Record<string, string>, on: boolean): Record<string, string> {
-  const rest = Object.fromEntries(Object.entries(labels).filter(([name]) => name !== ALWAYS_LABEL));
-
-  return on ? { ...rest, [ALWAYS_LABEL]: ALWAYS_VALUE } : rest;
-}
-
 // The largest page a route answers.
 const MOST = 500;
 

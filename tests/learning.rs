@@ -5,8 +5,8 @@
 mod support;
 
 use bmo_brain_client::{
-  ALWAYS_LABEL, ALWAYS_VALUE, BrainClient, Consolidated, Learning, MemoryStatus, NewBrain, NewMemory,
-  RecallAsk, SimilarAsk, Source, SubjectKey, UnconsolidatedQuery, labelled_always,
+  BrainClient, Consolidated, Learning, MemoryStatus, NewBrain, NewMemory, RecallAsk, SimilarAsk, Source,
+  SubjectKey, UnconsolidatedQuery,
 };
 use support::{Served, labels, refused};
 
@@ -342,48 +342,4 @@ async fn unconsolidated_episodes_are_read_most_important_first_and_marked_with_t
     ),
     (400, "bad-request".to_owned())
   );
-}
-
-#[tokio::test]
-async fn a_learning_that_strengthens_a_rule_keeps_its_always_label_unless_it_names_one() {
-  let served = Served::new().await;
-  let client = &served.client;
-  let brain = brain_of(client).await;
-  let room = subject("room", "7");
-  let rule = client
-    .memory_add(
-      brain,
-      &NewMemory {
-        labels: labels(&[(ALWAYS_LABEL, ALWAYS_VALUE)]),
-        ..memory("rule", "Answer in the room's language.", vec![room.clone()])
-      },
-    )
-    .await
-    .unwrap();
-  let strengthen = |id: i64, text: &str, labels| Learning {
-    subjects: vec![room.clone()],
-    strengthens: Some(id),
-    labels,
-    ..learning("rule", text, Source::Owner)
-  };
-
-  let kept = client
-    .learn(brain, &strengthen(rule.id, "Answer in the room's language, briefly.", labels(&[])))
-    .await
-    .unwrap()
-    .written
-    .unwrap();
-  assert!(labelled_always(&kept.labels), "{:?}", kept.labels);
-  assert_eq!(kept.labels.get("source").map(String::as_str), Some("owner"));
-
-  let cleared = client
-    .learn(
-      brain,
-      &strengthen(kept.id, "Answer in the room's language when asked.", labels(&[(ALWAYS_LABEL, "no")])),
-    )
-    .await
-    .unwrap()
-    .written
-    .unwrap();
-  assert!(!labelled_always(&cleared.labels), "{:?}", cleared.labels);
 }

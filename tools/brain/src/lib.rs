@@ -6,9 +6,8 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use bmo_brain_client::{
-  ALWAYS_LABEL, ALWAYS_VALUE, BrainClient, BrainsQuery, ClientFailure, Consolidated, Fold, Labels,
-  Learning, MemoriesQuery, MemoryMove, MemoryStatus, NewMemory, SimilarAsk, Source, SubjectKey,
-  UnconsolidatedQuery,
+  BrainClient, BrainsQuery, ClientFailure, Consolidated, Fold, Learning, MemoriesQuery, MemoryMove,
+  MemoryStatus, NewMemory, SimilarAsk, Source, SubjectKey, UnconsolidatedQuery,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -325,15 +324,6 @@ pub async fn answer(handed: Handed) -> Result<Answer, String> {
         Ok(at) => at,
         Err(why) => return Ok(Answer::refusal(why)),
       };
-      let always = arguments.get("always").and_then(Value::as_bool).unwrap_or(false);
-      if always && kind != "rule" {
-        return Ok(Answer::refusal(format!("always is for a rule; this is a {kind}")));
-      }
-      let labels = if always {
-        Labels::from([(ALWAYS_LABEL.to_owned(), ALWAYS_VALUE.to_owned())])
-      } else {
-        Labels::default()
-      };
       let mut about = subjects(arguments, "subjects");
       if let Some(room) = room_subject(arguments, session)
         && !about.contains(&room)
@@ -357,7 +347,7 @@ pub async fn answer(handed: Handed) -> Result<Answer, String> {
             key: string(arguments, "key"),
             layer_id: None,
             actor_name: ACTOR.to_owned(),
-            labels,
+            labels: Default::default(),
           },
         )
         .await

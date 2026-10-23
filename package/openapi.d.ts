@@ -888,10 +888,7 @@ export interface components {
             /** Format: int64 */
             importance?: number | null;
             key?: string | null;
-            /**
-             * @description The writer's labels; `always=true` on a `rule` puts it in the core of every recall of its room.
-             * @default {}
-             */
+            /** @default {} */
             labels: {
                 [key: string]: string;
             };
@@ -995,7 +992,6 @@ export interface components {
             /** Format: int64 */
             importance?: number | null;
             key?: string | null;
-            /** @description The writer's labels; `always=true` on a `rule` puts it in the core of every recall of its room. */
             labels?: {
                 [key: string]: string;
             } | null;
@@ -1042,7 +1038,6 @@ export interface components {
             actorName: string;
             /** Format: int64 */
             importance?: number | null;
-            /** @description The writer's labels; `always=true` on a `rule` puts it in the core of every recall of its room. */
             labels?: {
                 [key: string]: string;
             } | null;
@@ -1088,10 +1083,7 @@ export interface components {
              */
             importance?: number | null;
             key?: string | null;
-            /**
-             * @description The writer's labels; `always=true` on a `rule` puts it in the core of every recall of its room.
-             * @default {}
-             */
+            /** @default {} */
             labels: {
                 [key: string]: string;
             };
@@ -1225,13 +1217,6 @@ export interface components {
              * @default 8
              */
             core_fact_cap: number;
-            /**
-             * Format: int64
-             * @description The most of a room's `always` rules the core of a block carries; the rest reach a turn only through the
-             *     searched part.
-             * @default 6
-             */
-            core_rule_cap: number;
             /**
              * Format: double
              * @description The exponent the time since each hit is raised to, negated, in the retrieval strength.
