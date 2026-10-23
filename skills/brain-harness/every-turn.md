@@ -7,8 +7,8 @@ it as you read, in the turn itself. Nothing writes it for you.
 ## Before answering
 
 - The reference block you were handed is the brain's recall for this turn: the room's standing rules and
-  situation rules, the standing sheets of the people who spoke, and the memories that fit the words. Read it
-  as what you know. A line marked as handed to this session already is one you have seen in this session.
+  situation rules, the sheet of each person who spoke (the facts about them that hold everywhere and those
+  of this room, one line each), and the memories that fit the words. Read it as what you know. A line marked as handed to this session already is one you have seen in this session.
 - The recall also says whether a consolidation is due. When it is, do the consolidation (below) in this turn
   before or after your answer, whichever the conversation allows.
 
@@ -28,6 +28,12 @@ it as you read, in the turn itself. Nothing writes it for you.
   applies it whole. Give the source honestly: `own` for what someone says about themselves, `owner` for what
   the owner states or instructs, `told` for what someone says about someone else, `inferred` for what you
   conclude. The brain writes `told` and `inferred` as rumors and never lets them close a fact.
+- **One fact, one row.** What you learn about a person is one `brain_learn` per thing: type `fact`, one
+  short English sentence, the person as a subject (`type` `person`, their id). Link the room only where the
+  fact holds in this room alone; a fact that holds wherever they are links no room (`room` empty). Date it:
+  where it began holding before now, give `validFrom`, the moment of the archived message you read it in or
+  the date the speaker names. There is no sheet to write and no type `sheet`: a person's sheet is rendered
+  from their facts, so keeping it right is keeping each fact right.
 - **A promise you make, a check you owe, a follow-up you are handed, a state of something under way** are
   memories too (types `promise`, `check`, `followup`, `state`), about the room and the person. When one is
   kept, finished or over, move it to `done` with `brain_memory_move`; when it stopped holding, `invalidated`.
@@ -51,7 +57,7 @@ it as you read, in the turn itself. Nothing writes it for you.
 ## The language of a memory
 
 - **Write every memory in English,** whatever language the room speaks: the episode's text, the fact, the
-  rule, the sheet. The brain is read by prompts written in English, and one language keeps one meaning
+  rule. The brain is read by prompts written in English, and one language keeps one meaning
   under one spelling. Keep a short quotation in the original words only where the exact wording matters,
   such as a name someone is called or a phrase the owner set as a rule.
 

@@ -25,8 +25,10 @@ changes; a brain moves in and out as a brain file. The brain never executes and 
 
 The binary, `bmo-brain`, reads the TOML file `--config` names at start and holds it for its life.
 `bmo-brain --config <file> serve` runs the migrations and answers on the listen address;
-`bmo-brain --config <file> health` asks the service the file names whether it is ready and ends. The MCP
-server, `bmo-brain mcp`, takes no configuration file (「The harness plugin」).
+`bmo-brain --config <file> health` asks the service the file names whether it is ready and ends;
+`bmo-brain --config <file> sheets split` splits the live `sheet` rows of the database the file names into
+facts (「Splitting sheets」). The MCP server, `bmo-brain mcp`, takes no configuration file (「The harness
+plugin」).
 
 | Setting | Key | What it is |
 |---|---|---|
@@ -120,6 +122,14 @@ the text of its newest `active` one, or null where it has none.
 | `POST /subjects` | `type`, `key`, `description`: makes the subject, or finds the one standing and sets its description where one is given | 201 where new, 200 where it stood |
 | `GET /subjects/{subjectId}` | reads one | 200; 404 |
 | `PATCH /subjects/{subjectId}` | sets `description` | 200; 404 |
+| `GET /subjects/{subjectId}/sheet` | renders the subject's sheet; `roomId`, a subject of type `room`, takes that room's facts in as well | 200, `text/plain`; 400 for a `roomId` that is no room; 404 |
+
+A subject's sheet (`docs/design.md`, 「A person is a subject」) is its active `fact` memories that are about
+no subject of type `room`, and, where `roomId` names a room, its active facts about that room as well. They
+are ordered by importance, highest first, then by `validFrom` and then by `id`, and each is one line,
+`- [#<id> since <date>] <text>`, the date the `validFrom`'s day in UTC; the lines are joined by a newline,
+and a subject with no such fact renders as nothing. Nothing that changes between calls is in it, so the
+same rows render as the same bytes.
 
 ### Layers
 
@@ -144,8 +154,10 @@ to 10), `hits`, `lastHitAt`, `lastConfirmedAt`, `strength` (the storage strength
 moved, as the mover said, or null), `labels` and `createdAt`.
 
 `type` is the writer's word; the reserved ones are `episode`, `fact`, `rumor`, `situation`, `rule`, `name`,
-`sheet`, `persona`, `lore` and `knowledge` (`docs/design.md`, 「Types」). The statuses and the moves a
-caller's word may make:
+`persona`, `lore` and `knowledge` (`docs/design.md`, 「Types」). `sheet` is no type: a first version, a
+version, a merge or a learning that names it is answered 400 `bad-request`, as is a brain file holding a live
+row of it, and a restoration whose closed row is a `sheet` is answered 409 `conflict`. The statuses and the
+moves a caller's word may make:
 
 | Status | Means | May move to |
 |---|---|---|
@@ -184,8 +196,9 @@ memory starts at strength 1 with no hits.
 where none is given). It answers `block`, the text the turn is handed; `chosen`, each `memoryId`, `type`,
 `part` (`core` or `searched`), `score`, `marked` and `tokenCount`; `tokenCount` and `budgetTokens`.
 
-- **The core** is the room's active `situation` and `rule` memories and the `sheet` memories of everyone who
-  spoke, a room's sheet of them where the turn names a room and their common sheet always.
+- **The core** is the room's active `situation` and `rule` memories and the sheet of everyone who spoke:
+  the facts `GET /subjects/{subjectId}/sheet` renders for each speaker with the turn's room as `roomId`, in
+  its order, each a line of the block.
 - **The searched part** is the active rows holding one of the turn's words or about a subject the turn
   names, scored by relevance, importance and retrieval strength under the brain's weights, at most the
   subject cap of rows per subject, no near-double of a row already in, under the budget. A `persona` or
@@ -206,7 +219,7 @@ material and its mechanics.
 | Route | Does | Answers |
 |---|---|---|
 | `POST /similar` | `text`, `subjects` (each `type` and `key`), `limit` (10 where none, at most 50): the live memories most like the candidate, about one of its subjects or holding its words, neither an `episode` nor a `persona`, scored by the share of the candidate's words they hold and a shared subject | 200, a list |
-| `POST /learnings` | a learning applied whole in one transaction: `type`, `text`, `subjects`, `importance`, `source` (`own`, `owner`, `told`, `inferred`), `confirms` (ids confirmed), `strengthens` (an id given a new version with the text), `replaces` (ids invalidated, unless the source is heard), `grounds` (episode ids linked as subjects of type `episode`), `key`, `layerId`, `actorName`, `labels` | 201: `confirmedCount`, `invalidatedIds`, `written` (the version written, or null where the learning only confirms), `versioned`; 400 for a ground that is no episode; 409 where `strengthens` names a row that is not live |
+| `POST /learnings` | a learning applied whole in one transaction: `type`, `text`, `subjects`, `importance`, `source` (`own`, `owner`, `told`, `inferred`), `confirms` (ids confirmed), `strengthens` (an id given a new version with the text), `replaces` (ids invalidated, unless the source is heard), `grounds` (episode ids linked as subjects of type `episode`), `validFrom` (when it began holding; now where none), `key`, `layerId`, `actorName`, `labels` | 201: `confirmedCount`, `invalidatedIds`, `written` (the version written, or null where the learning only confirms), `versioned`; 400 for a ground that is no episode; 409 where `strengthens` names a row that is not live |
 | `GET /unconsolidated` | the active `episode` rows not yet consolidated, most important first; `limit` (60 where none, at most 500) | 200, a list |
 | `POST /consolidated` | `episodeIds`: marks them consolidated | 200, `recordedCount` |
 
@@ -228,7 +241,7 @@ takes the base layer alone; a named layer that does not stand is 404.
 | Route | Does | Answers |
 |---|---|---|
 | `GET /export` | the brain, or the layers `layers` names (comma-separated) with the subjects and live rows they hold, as a brain file | 200, `application/vnd.sqlite3`; 404 for a layer that does not stand |
-| `POST /injections` | reads the brain file in the body (`application/vnd.sqlite3`) into the brain: a layer is reused by its name, a subject by its type and key, a live row whose key a live row of the brain holds supersedes it unless it is the same, every other live row is added; nothing is overwritten | 201, `subjectsAdded`, `layersAdded`, `memoriesAdded`, `memoriesSuperseded`; 400 for a body that is no brain file, of another shape, or holding a live row whose key is no key; nothing of such a file is read in |
+| `POST /injections` | reads the brain file in the body (`application/vnd.sqlite3`) into the brain: a layer is reused by its name, a subject by its type and key, a live row whose key a live row of the brain holds supersedes it unless it is the same, every other live row is added; nothing is overwritten | 201, `subjectsAdded`, `layersAdded`, `memoriesAdded`, `memoriesSuperseded`; 400 for a body that is no brain file, of another shape, or holding a live row whose key is no key or whose type is `sheet`; nothing of such a file is read in |
 
 The file is a SQLite database of the tables `brain_file` (`shape`, `exported_at`, `name`), `subjects`,
 `layers`, `memories` and `memory_subjects`, its ids local to the file; this brain writes and reads shape 1.
@@ -263,7 +276,7 @@ stylesheet and its words, and guards every route the screen uses.
   403 `forbidden`, as is any other route. The OpenAPI document states each route's reach under `x-console`:
   `open`, `screen` or `closed`.
 - **The routes the screen uses:** `GET /brains` and `GET /brains/{brainId}`; under a brain, the reads of
-  subjects, layers, memories, lineages, types and tallies, the persona and the export; the writes of
+  subjects and a subject's sheet, layers, memories, lineages, types and tallies, the persona and the export; the writes of
   subjects, layers, memories, versions, moves, restorations, confirmations and learnings, and the similar
   ask; and `GET /events`.
 
@@ -346,6 +359,28 @@ command whose leading words match a declared noun to it, the noun's words includ
   `--keys`, `--after` and `--limit`. **`fragment switch <key>`** takes `--state` or `--off-for` (one flag
   each, replacing the scopes it was off for).
 
+## Splitting sheets
+
+`bmo-brain --config <file> sheets split [--dry-run]` reads the database the configuration names, not the
+routes, and splits every live `sheet` memory of every brain into `fact` memories (`docs/design.md`, 「A
+person is a subject」). It is no noun: `bmo` does not dispatch it.
+
+- **A line is a fact** where it is a bullet: a `-`, `*` or `•`, or a number followed by `.` or `)`, then its
+  words. A heading (a line beginning with `#`) and a line with no words are skipped and counted; any other
+  line with words is a fact as it stands.
+- **A bullet's leading bracket is read** where it carries one: the first date after `date` or `basis`, else
+  a date standing first in it, is the fact's `validFrom`; the date after `confirmed` its `lastConfirmedAt`.
+  The bracket is taken off the text, except where its date is a span (`<date>~<date>`), which the text keeps
+  as `[<date>~<date>]` ahead of its words. Where no date is read, the fact's `validFrom` is the sheet's.
+- **Each fact carries the sheet's** subjects, layer, importance, status (`active` or `pending`) and labels,
+  with the labels `splitFrom` (the sheet's id), `section` (the words of the nearest heading above it, where
+  one stands) and `prefix` (the bracket as it stood, where one did); its `actorName` is `migration`.
+- **The sheet is then moved to `done`** with the reason `split into facts`, in the same transaction as its
+  facts, so a sheet is split whole or not at all, and a sheet already split, being `done`, is not read again.
+- **It prints ids and counts alone,** never a text: a line per sheet, `sheet <id> brain <id> subjects
+  <ids> lines <n> facts <n> headings <n> empty <n>`, then a line per brain, `brain <id> sheets <n> facts <n>
+  skipped <n>`. `--dry-run` prints the same and writes nothing.
+
 ## Its tool
 
 The tool host serves the brain's tool, `tools/brain/`, to a chat agent's session: `tool.toml` declares its
@@ -407,6 +442,7 @@ reads what a turn should know with `brain_recall`, writes what it learns with `b
 | `brain_unconsolidated` | `GET /brains/{brainId}/unconsolidated` |
 | `brain_consolidated` | `POST /brains/{brainId}/consolidated` |
 | `brain_persona` | `GET /brains/{brainId}/persona` |
+| `brain_sheet` | `GET /brains/{brainId}/subjects/{subjectId}/sheet` |
 
 ## The client
 

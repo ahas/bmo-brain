@@ -10,6 +10,7 @@ pub mod learning;
 pub mod memories;
 pub mod recall;
 pub mod rules;
+pub mod sheets;
 pub mod tallies;
 pub mod versions;
 

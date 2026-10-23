@@ -1,8 +1,9 @@
 //! The `bmo-brain` command (docs/boundary-api.md, 「Configuration」, 「The command」 and 「The harness plugin」):
 //! `serve` runs the migrations, stands the clock and answers the routes until it is told to stop; `health`
 //! ends 0 only where the service its configuration names answers ready; `mcp` serves the harness tools over
-//! MCP on standard input and output; `openapi` prints the OpenAPI document; `nouns` declares the nouns `bmo`
-//! dispatches to this binary, and each noun asks the brain's own routes.
+//! MCP on standard input and output; `openapi` prints the OpenAPI document; `sheets split` splits the live
+//! sheet rows of the configuration's database into facts; `nouns` declares the nouns `bmo` dispatches to this
+//! binary, and each noun asks the brain's own routes.
 
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -15,6 +16,7 @@ use bmo_brain::config::{self, Config, HEALTH_PATIENCE};
 use bmo_brain::mcp::BrainServer;
 use bmo_brain::openapi::openapi_json;
 use bmo_brain::store::Store;
+use bmo_brain::store::sheets::SheetSplit;
 use bmo_brain_client::BrainClient;
 use clap::{Parser, Subcommand};
 use rmcp::ServiceExt;
@@ -59,6 +61,11 @@ enum Verb {
     #[arg(long, value_name = "dir")]
     data_root: Option<PathBuf>,
   },
+  /// The live sheet rows of the configuration's database, split into facts.
+  Sheets {
+    #[command(subcommand)]
+    word: SheetsWord,
+  },
   /// The memory rows.
   Memory {
     #[command(subcommand)]
@@ -68,6 +75,17 @@ enum Verb {
   Fragment {
     #[command(subcommand)]
     word: command::fragment::Word,
+  },
+}
+
+#[derive(Subcommand)]
+enum SheetsWord {
+  /// Splits every live sheet row into facts, one per line, and moves the sheet to done; prints ids and
+  /// counts alone.
+  Split {
+    /// Prints what each sheet would come to, and writes nothing.
+    #[arg(long)]
+    dry_run: bool,
   },
 }
 
@@ -153,6 +171,38 @@ fn configured(path: Option<&PathBuf>) -> Result<Config, String> {
   Config::read(path).map_err(|why| format!("the configuration could not be read: {why}"))
 }
 
+/// The sheets split, or what they would come to, as lines of ids and counts: a line per sheet, then a line per
+/// brain.
+async fn sheets_split(config: &Config, dry_run: bool) -> Result<(), String> {
+  let store = Store::lazy(&config.database)?.by(config.rules.clone());
+  let splits = store.sheets_split(dry_run).await.map_err(|why| why.to_string())?;
+  let mut brains: std::collections::BTreeMap<i64, (i64, i64, i64)> = std::collections::BTreeMap::new();
+  for SheetSplit {
+    sheet_id,
+    brain_id,
+    subject_ids,
+    lines,
+    facts,
+    headings,
+    empty,
+  } in &splits
+  {
+    let subjects = subject_ids.iter().map(i64::to_string).collect::<Vec<_>>().join(",");
+    println!(
+      "sheet {sheet_id} brain {brain_id} subjects {subjects} lines {lines} facts {facts} headings {headings} \
+       empty {empty}"
+    );
+    let brain = brains.entry(*brain_id).or_default();
+    brain.0 += 1;
+    brain.1 += facts;
+    brain.2 += headings + empty;
+  }
+  for (brain_id, (sheets, facts, skipped)) in brains {
+    println!("brain {brain_id} sheets {sheets} facts {facts} skipped {skipped}");
+  }
+  Ok(())
+}
+
 /// The service a noun command asks: the configuration `--config` or `BMO_BRAIN_CONFIG` names, else the one
 /// a deployment links beside the binary's directory.
 fn command_client(path: Option<&PathBuf>) -> Result<BrainClient, String> {
@@ -211,6 +261,12 @@ async fn main() -> ExitCode {
         }),
         None => Err("--data-root names no data root, and the configuration names none".to_owned()),
       },
+      Err(why) => Err(why),
+    },
+    Verb::Sheets {
+      word: SheetsWord::Split { dry_run },
+    } => match configured(config.as_ref()) {
+      Ok(config) => sheets_split(&config, dry_run).await,
       Err(why) => Err(why),
     },
     Verb::Memory { word } => {

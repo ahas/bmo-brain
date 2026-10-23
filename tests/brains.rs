@@ -451,7 +451,27 @@ async fn recall_hands_out_the_core_and_the_searched_part_marks_repeats_and_keeps
       brain,
       &NewMemory {
         subjects: vec![speaker.clone()],
-        ..memory("sheet", "The member keeps a garden.")
+        ..memory("fact", "The member keeps a garden.")
+      },
+    )
+    .await
+    .unwrap();
+  let room_sheet = client
+    .memory_add(
+      brain,
+      &NewMemory {
+        subjects: vec![speaker.clone(), room.clone()],
+        ..memory("fact", "In this room the member asks about the weather.")
+      },
+    )
+    .await
+    .unwrap();
+  let elsewhere = client
+    .memory_add(
+      brain,
+      &NewMemory {
+        subjects: vec![speaker.clone(), subject("room", "8")],
+        ..memory("fact", "In another room the member sells seedlings.")
       },
     )
     .await
@@ -460,7 +480,6 @@ async fn recall_hands_out_the_core_and_the_searched_part_marks_repeats_and_keeps
     .memory_add(
       brain,
       &NewMemory {
-        subjects: vec![speaker.clone()],
         importance: Some(8),
         ..memory("fact", "The garden grows tomatoes and beans.")
       },
@@ -499,6 +518,11 @@ async fn recall_hands_out_the_core_and_the_searched_part_marks_repeats_and_keeps
     recall.chosen.iter().map(|c| (c.memory_id, c.part, c.marked)).collect();
   assert!(chosen.contains(&(rule.id, RecallPart::Core, false)), "{chosen:?}");
   assert!(chosen.contains(&(sheet.id, RecallPart::Core, false)), "{chosen:?}");
+  assert!(chosen.contains(&(room_sheet.id, RecallPart::Core, false)), "{chosen:?}");
+  assert!(
+    !chosen.iter().any(|(id, part, _)| *id == elsewhere.id && *part == RecallPart::Core),
+    "{chosen:?}"
+  );
   assert!(chosen.contains(&(fact.id, RecallPart::Searched, false)), "{chosen:?}");
   assert!(chosen.contains(&(rumor.id, RecallPart::Searched, false)), "{chosen:?}");
   assert!(!recall.chosen.iter().any(|c| c.memory_id == pending.id), "a pending row stays out");
@@ -872,7 +896,7 @@ async fn a_merge_writes_one_row_over_several_and_supersedes_each() {
       &NewMemory {
         subjects: vec![subject("person", "1")],
         importance: Some(4),
-        ..memory("sheet", "Likes the north.")
+        ..memory("fact", "Likes the north.")
       },
     )
     .await
@@ -883,7 +907,7 @@ async fn a_merge_writes_one_row_over_several_and_supersedes_each() {
       &NewMemory {
         subjects: vec![subject("person", "1"), subject("room", "7")],
         importance: Some(7),
-        ..memory("sheet", "Lives in the north.")
+        ..memory("fact", "Lives in the north.")
       },
     )
     .await
@@ -905,7 +929,7 @@ async fn a_merge_writes_one_row_over_several_and_supersedes_each() {
       brain,
       &MemoryMerge {
         memory_ids: vec![one.id, two.id],
-        kind: "sheet".to_owned(),
+        kind: "fact".to_owned(),
         text: "Lives in the north and likes it.".to_owned(),
         key: Some("north".to_owned()),
         actor_name: "writer-b".to_owned(),
@@ -931,7 +955,7 @@ async fn a_merge_writes_one_row_over_several_and_supersedes_each() {
       brain,
       &NewMemory {
         subjects: vec![subject("person", "1")],
-        ..memory("sheet", "Also north.")
+        ..memory("fact", "Also north.")
       },
     )
     .await
@@ -941,7 +965,7 @@ async fn a_merge_writes_one_row_over_several_and_supersedes_each() {
       brain,
       &MemoryMerge {
         memory_ids: vec![merged.id, third.id],
-        kind: "sheet".to_owned(),
+        kind: "fact".to_owned(),
         text: "Lives in the north, likes it, and says so.".to_owned(),
         key: Some("north".to_owned()),
         actor_name: "writer-b".to_owned(),
@@ -957,7 +981,7 @@ async fn a_merge_writes_one_row_over_several_and_supersedes_each() {
       brain,
       &MemoryMerge {
         memory_ids: vec![one.id, under_held_key.id],
-        kind: "sheet".to_owned(),
+        kind: "fact".to_owned(),
         text: "Again".to_owned(),
         actor_name: "writer-b".to_owned(),
         ..MemoryMerge::default()
@@ -970,7 +994,7 @@ async fn a_merge_writes_one_row_over_several_and_supersedes_each() {
       brain,
       &MemoryMerge {
         memory_ids: vec![merged.id],
-        kind: "sheet".to_owned(),
+        kind: "fact".to_owned(),
         text: "Alone".to_owned(),
         actor_name: "writer-b".to_owned(),
         ..MemoryMerge::default()

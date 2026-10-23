@@ -10,7 +10,7 @@ use bmo_brain_client::{
   FragmentKind, FragmentSwitch, FragmentsQuery, Health, Hits, Injected, Layer, LayerChange, LayersQuery,
   MemoriesQuery, Memory, MemoryMerge, MemoryMove, MemoryVersion, NameCursor, NewBrain, NewLayer, NewMemory,
   NewSubject, Page, PersonaQuery, Recall, RecallAsk, Recorded, ScopedMemoriesQuery, ScopedMemory,
-  ScopedMemoryChange, Subject, SubjectChange, SubjectsQuery, TypeCount, WireError,
+  ScopedMemoryChange, SheetQuery, Subject, SubjectChange, SubjectsQuery, TypeCount, WireError,
 };
 use bmo_brain_client::{
   ConsoleManifest, ConsoleWords, Consolidated, Learned, Learning, Restoration, SimilarAsk, TalliesQuery,
@@ -304,6 +304,22 @@ fn brain_routes(g: &mut SchemaGenerator) -> Vec<Route> {
       body: body::<SubjectChange>(g),
       raw_body: None,
       answers: vec![(200, json_answer::<Subject>(g))],
+      codes: vec![BadRequest, NotFound],
+    },
+    Route {
+      method: "get",
+      path: "/brains/{brainId}/subjects/{subjectId}/sheet",
+      id: "renderSheet",
+      tag: "subjects",
+      summary: "The subject's sheet rendered from its active facts about no room, and about the room named where one is; the same bytes for the same rows.",
+      parameters: {
+        let mut parameters = under(g, "subjectId");
+        parameters.extend(query::<SheetQuery>(g));
+        parameters
+      },
+      body: None,
+      raw_body: None,
+      answers: vec![(200, Some(json!({ "text/plain": { "schema": { "type": "string" } } })))],
       codes: vec![BadRequest, NotFound],
     },
     Route {

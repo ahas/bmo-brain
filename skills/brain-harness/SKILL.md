@@ -1,6 +1,6 @@
 ---
 name: brain-harness
-description: Keep and read an agent's long-term memory with the bmo-brain MCP server. Use when a harness should find its brain, read what a turn should know (brain_recall), write what it learns as versioned memories about subjects (brain_memory_write, brain_memory_version), close a memory that stopped holding (brain_memory_move), tell the brain a session folded (brain_fold), or read the persona.
+description: Keep and read an agent's long-term memory with the bmo-brain MCP server. Use when a harness should find its brain, read what a turn should know (brain_recall), write what it learns as versioned memories about subjects (brain_memory_write, brain_memory_version), close a memory that stopped holding (brain_memory_move), tell the brain a session folded (brain_fold), render a person's sheet from their facts (brain_sheet), or read the persona.
 ---
 
 # brain-harness
@@ -59,5 +59,7 @@ apply the judgement with one `brain_learn`, and consolidate when the brain says 
   marks them.
 - **Tell the brain when the session folds** with `brain_fold`, so the marks clear and what it knew may attach
   to the next session.
+- **A person's sheet is rendered, never written:** `brain_sheet` with the person's subject id (and a room's
+  subject id as `roomId`) renders their live facts; write a fact about them, one per thing, to change it.
 - **`brain_persona`** renders the agent's persona; `brain_types` lists the types in use, so one meaning keeps
   one spelling; `brain_subjects`, `brain_layers` and `brain_memories_list` read the tables.

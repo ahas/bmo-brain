@@ -8,8 +8,8 @@ use crate::brains::{
   Brain, BrainsQuery, Confirmations, Consolidated, ExportQuery, Fold, Folded, Hits, Injected, Layer,
   LayerChange, LayersQuery, Learned, Learning, MemoriesQuery, Memory, MemoryMerge, MemoryMove,
   MemoryVersion, NewBrain, NewLayer, NewMemory, NewSubject, PersonaQuery, Recall, RecallAsk, Recorded,
-  Restoration, SimilarAsk, Subject, SubjectChange, SubjectsQuery, TalliesQuery, Tally, TypeCount,
-  UnconsolidatedQuery,
+  Restoration, SheetQuery, SimilarAsk, Subject, SubjectChange, SubjectsQuery, TalliesQuery, Tally,
+  TypeCount, UnconsolidatedQuery,
 };
 use crate::fragments::{Fragment, FragmentKind, FragmentSwitch, FragmentsQuery};
 use crate::memories::{ScopedMemoriesQuery, ScopedMemory, ScopedMemoryChange};
@@ -233,6 +233,12 @@ impl BrainClient {
   ) -> Answer<Subject> {
     let path = ["brains", &brain_id.to_string(), "subjects", &subject_id.to_string()];
     Self::answered(self.send(Method::PATCH, &path, body)).await
+  }
+
+  /// `GET /brains/{brainId}/subjects/{subjectId}/sheet`
+  pub async fn sheet(&self, brain_id: i64, subject_id: i64, query: &SheetQuery) -> Answer<String> {
+    let path = ["brains", &brain_id.to_string(), "subjects", &subject_id.to_string(), "sheet"];
+    Self::words(self.get(&path, query)).await
   }
 
   /// `GET /brains/{brainId}/layers`

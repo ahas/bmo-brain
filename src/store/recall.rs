@@ -10,6 +10,7 @@ use sqlx::PgConnection;
 
 use super::brains::{brain_of, given};
 use super::rules::tokens;
+use super::sheets::sheet_rows;
 use super::versions::{MEMORY_COLUMNS, MemoryRow};
 use super::{Fault, Held, Store, now};
 
@@ -29,8 +30,8 @@ fn words(text: &str) -> BTreeSet<String> {
     .collect()
 }
 
-/// A date as the block writes it.
-fn day(ms: i64) -> String {
+/// A date as the block and a sheet write it.
+pub(crate) fn day(ms: i64) -> String {
   chrono::DateTime::from_timestamp_millis(ms)
     .map(|at| at.format("%Y-%m-%d").to_string())
     .unwrap_or_else(|| ms.to_string())
@@ -81,7 +82,7 @@ impl Store {
     }
     let named: Vec<i64> = room.into_iter().chain(speakers.iter().copied()).collect();
 
-    // The core: the room's situation rules and rules, and the speakers' sheets.
+    // The core: the room's situation rules and rules, and each speaker's sheet, rendered from their facts.
     let mut core: Vec<MemoryRow> = Vec::new();
     if let Some(room) = room {
       core.extend(
@@ -96,23 +97,14 @@ impl Store {
         .await?,
       );
     }
-    if !speakers.is_empty() {
-      let sheets: Vec<MemoryRow> = sqlx::query_as(&format!(
-        "SELECT {MEMORY_COLUMNS} FROM memories m WHERE brain_id = $1 AND status = 'active' AND type = 'sheet' \
-         AND id IN (SELECT memory_id FROM memory_subjects WHERE subject_id = ANY($2)) \
-         AND ($3::bigint IS NULL OR id IN (SELECT memory_id FROM memory_subjects WHERE subject_id = $3) \
-           OR NOT EXISTS (SELECT 1 FROM memory_subjects ms JOIN subjects s ON s.id = ms.subject_id \
-             WHERE ms.memory_id = m.id AND s.type = 'room')) \
-         ORDER BY importance DESC, id"
-      ))
-      .bind(brain_id)
-      .bind(&speakers)
-      .bind(room)
-      .fetch_all(&mut *tx)
-      .await?;
-      core.extend(sheets);
+    let mut core_ids: BTreeSet<i64> = core.iter().map(|row| row.id).collect();
+    for speaker in &speakers {
+      for row in sheet_rows(&mut tx, brain_id, *speaker, room).await? {
+        if core_ids.insert(row.id) {
+          core.push(row);
+        }
+      }
     }
-    let core_ids: BTreeSet<i64> = core.iter().map(|row| row.id).collect();
     let core = self.members(&mut tx, core).await?;
 
     // The searched part's candidates: live rows of the searched types, not of this session's own making,

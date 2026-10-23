@@ -12,21 +12,12 @@ use sqlx::{FromRow, PgConnection, Postgres, QueryBuilder};
 
 use super::brains::{brain_of, event_scope, given, layer_of, subject_found_or_made, subjects_of};
 use super::rules::Reckoning as _;
+use super::sheets::{SHEET, written_type};
 use super::{Fault, Held, Store, TEXT_MOST, holding, limit, listed, now, page, publish, text};
 
 /// The types code depends on the meaning of.
-pub const RESERVED_TYPES: [&str; 10] = [
-  "episode",
-  "fact",
-  "rumor",
-  "situation",
-  "rule",
-  "name",
-  "sheet",
-  "persona",
-  "lore",
-  "knowledge",
-];
+pub const RESERVED_TYPES: [&str; 9] =
+  ["episode", "fact", "rumor", "situation", "rule", "name", "persona", "lore", "knowledge"];
 
 pub(crate) const MEMORY_COLUMNS: &str = "id, brain_id, key, type, text, layer_id, position, status, lineage_id, \
   superseded_by, valid_from, valid_to, importance, hits, hit_times, last_hit_at, last_confirmed_at, strength, \
@@ -240,7 +231,7 @@ impl Store {
     body: &NewMemory,
     at: i64,
   ) -> Held<Memory> {
-    given("type", &body.kind)?;
+    written_type(&body.kind)?;
     text("text", &body.text, TEXT_MOST)?;
     given("actorName", &body.actor_name)?;
     if let Some(key) = &body.key {
@@ -328,7 +319,7 @@ impl Store {
       text("text", words, TEXT_MOST)?;
     }
     if let Some(kind) = &body.kind {
-      given("type", kind)?;
+      written_type(kind)?;
     }
     let importance = body.importance.map(Some).map(importance).transpose()?;
     let old = self.row_of(&mut *tx, brain_id, id, true).await?;
@@ -338,6 +329,9 @@ impl Store {
         "Memory {id} is {}; a version is written over a live one.",
         status.name()
       )));
+    }
+    if body.kind.is_none() {
+      written_type(&old.kind)?;
     }
     let layer_id = match body.layer_id {
       Some(layer) => layer,
@@ -427,7 +421,7 @@ impl Store {
     body: &MemoryMerge,
     at: i64,
   ) -> Held<Memory> {
-    given("type", &body.kind)?;
+    written_type(&body.kind)?;
     text("text", &body.text, TEXT_MOST)?;
     given("actorName", &body.actor_name)?;
     if let Some(key) = &body.key {
@@ -601,6 +595,11 @@ impl Store {
     let at = now();
     let mut tx = self.begin().await?;
     let closed = self.row_of(&mut tx, brain_id, id, true).await?;
+    if closed.kind == SHEET {
+      return Err(Fault::Conflict(format!(
+        "Memory {id} is a sheet; a person's sheet is rendered from their facts and is not restored."
+      )));
+    }
     let status = closed.status()?;
     if !matches!(status, MemoryStatus::Done | MemoryStatus::Invalidated) {
       return Err(Fault::Conflict(format!(

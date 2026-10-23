@@ -185,6 +185,23 @@ fn integer(arguments: &Value, name: &str) -> Option<i64> {
   arguments.get(name).and_then(Value::as_i64)
 }
 
+/// A moment given as a date (`YYYY-MM-DD`, its start in UTC) or an RFC 3339 time, as epoch milliseconds;
+/// none where the argument is absent, and why where it does not read.
+fn moment(arguments: &Value, name: &str) -> Result<Option<i64>, String> {
+  let Some(text) = string(arguments, name) else {
+    return Ok(None);
+  };
+  let text = text.trim();
+  if let Ok(at) = chrono::DateTime::parse_from_rfc3339(text) {
+    return Ok(Some(at.timestamp_millis()));
+  }
+  chrono::NaiveDate::parse_from_str(text, "%Y-%m-%d")
+    .ok()
+    .and_then(|date| date.and_hms_opt(0, 0, 0))
+    .map(|start| Some(start.and_utc().timestamp_millis()))
+    .ok_or_else(|| format!("{name} is {text:?}; give a date (YYYY-MM-DD) or an RFC 3339 time"))
+}
+
 fn integers(arguments: &Value, name: &str) -> Vec<i64> {
   arguments
     .get(name)
@@ -303,6 +320,10 @@ pub async fn answer(handed: Handed) -> Result<Answer, String> {
         "inferred" => Source::Inferred,
         other => return Ok(Answer::refusal(format!("source is {other:?}; it is own, owner, told or inferred"))),
       };
+      let valid_from = match moment(arguments, "validFrom") {
+        Ok(at) => at,
+        Err(why) => return Ok(Answer::refusal(why)),
+      };
       let mut about = subjects(arguments, "subjects");
       if let Some(room) = room_subject(arguments, session)
         && !about.contains(&room)
@@ -322,6 +343,7 @@ pub async fn answer(handed: Handed) -> Result<Answer, String> {
             strengthens: integer(arguments, "strengthens"),
             replaces: integers(arguments, "replaces"),
             grounds: integers(arguments, "grounds"),
+            valid_from,
             key: string(arguments, "key"),
             layer_id: None,
             actor_name: ACTOR.to_owned(),

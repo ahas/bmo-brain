@@ -628,6 +628,15 @@ pub struct PersonaQuery {
   pub layers: Option<String>,
 }
 
+/// Which room a subject's sheet takes in.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SheetQuery {
+  /// A subject of type `room`, whose facts about the subject the sheet takes in beside those about no room.
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub room_id: Option<i64>,
+}
+
 /// What an injection came to.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -732,6 +741,9 @@ pub struct Learning {
   /// The episodes this rests on, linked as subjects of type `episode`.
   #[serde(default)]
   pub grounds: Vec<i64>,
+  /// When it began holding; now where none is given.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub valid_from: Option<i64>,
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub key: Option<String>,
   #[serde(default, skip_serializing_if = "Option::is_none")]

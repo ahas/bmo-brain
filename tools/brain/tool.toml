@@ -34,7 +34,7 @@ capabilities = ["room.chat"]
 namespace = "bmo"
 name = "brain_learn"
 title = "Learn"
-description = "Apply a learning whole, its text in English: confirm the memories it repeats, version the one it strengthens, close the ones it contradicts (unless heard), and write it as a fact or a rumor by its source."
+description = "Apply a learning whole, one fact to a call, its text in English: confirm the memories it repeats, version the one it strengthens, close the ones it contradicts (unless heard), and write it as a fact or a rumor by its source. A person's sheet is rendered from these facts; no sheet is written."
 input = "brain_learn.json"
 hints = { idempotent = false }
 capabilities = ["room.chat"]

@@ -12,8 +12,8 @@ pub use brains::{
   Brain, BrainsQuery, Confirmations, Consolidated, ExportQuery, Fold, Folded, Hits, Injected, Layer,
   LayerChange, LayersQuery, Learned, Learning, MemoriesQuery, Memory, MemoryMerge, MemoryMove,
   MemoryStatus, MemoryVersion, NewBrain, NewLayer, NewMemory, NewSubject, PersonaQuery, Recall, RecallAsk,
-  RecallChoice, RecallPart, Recorded, Restoration, Rules, Subject, SubjectChange, SubjectKey, SubjectRef,
-  SubjectsQuery, TalliesQuery, Tally, TallyBy, TypeCount,
+  RecallChoice, RecallPart, Recorded, Restoration, Rules, SheetQuery, Subject, SubjectChange, SubjectKey,
+  SubjectRef, SubjectsQuery, TalliesQuery, Tally, TallyBy, TypeCount,
 };
 pub use brains::{SimilarAsk, Source, UnconsolidatedQuery};
 pub use client::{Answer, BrainClient, ClientFailure};

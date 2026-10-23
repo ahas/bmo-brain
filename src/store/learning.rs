@@ -10,6 +10,7 @@ use bmo_brain_client::{
 use sqlx::PgConnection;
 
 use super::brains::{brain_of, given};
+use super::sheets::written_type;
 use super::versions::{MEMORY_COLUMNS, MemoryRow};
 use super::{Fault, Held, Store, now};
 
@@ -109,7 +110,7 @@ impl Store {
   /// rumor. One transaction, so a judgement is never half applied.
   pub async fn learn(&self, brain_id: i64, body: &Learning) -> Held<Learned> {
     given("actorName", &body.actor_name)?;
-    given("type", &body.kind)?;
+    written_type(&body.kind)?;
     let at = now();
     let mut tx = self.begin().await?;
     brain_of(&mut tx, brain_id).await?;
@@ -174,7 +175,7 @@ impl Store {
             subject_ids: None,
             subjects: if subjects.is_empty() { None } else { Some(subjects) },
             importance: body.importance,
-            valid_from: None,
+            valid_from: body.valid_from,
             actor_name: body.actor_name.clone(),
             labels: Some(labels),
           },
@@ -224,7 +225,7 @@ impl Store {
           subject_ids: vec![],
           subjects,
           importance: body.importance,
-          valid_from: None,
+          valid_from: body.valid_from,
           status: None,
           actor_name: body.actor_name.clone(),
           labels,

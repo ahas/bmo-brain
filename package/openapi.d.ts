@@ -386,6 +386,23 @@ export interface paths {
         patch: operations["changeSubject"];
         trace?: never;
     };
+    "/brains/{brainId}/subjects/{subjectId}/sheet": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The subject's sheet rendered from its active facts about no room, and about the room named where one is; the same bytes for the same rows. */
+        get: operations["renderSheet"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/brains/{brainId}/tallies": {
         parameters: {
             query?: never;
@@ -887,6 +904,11 @@ export interface components {
             subjects: components["schemas"]["SubjectKey"][];
             text: string;
             type: string;
+            /**
+             * Format: int64
+             * @description When it began holding; now where none is given.
+             */
+            validFrom?: number | null;
         };
         /** @description One memory in one version. */
         Memory: {
@@ -1091,10 +1113,6 @@ export interface components {
             key: string;
             type: string;
         };
-        /** @description The rendered persona, as a tool answers it. */
-        PersonaText: {
-            text: string;
-        };
         /** @description What a turn is handed. */
         Recall: {
             block: string;
@@ -1156,6 +1174,10 @@ export interface components {
         Recorded: {
             /** Format: int64 */
             recordedCount: number;
+        };
+        /** @description A rendering, the persona or a sheet, as a tool answers it. */
+        Rendered: {
+            text: string;
         };
         /** @description A closed lineage restored: a new active version written after its newest, closed one. */
         Restoration: {
@@ -2406,6 +2428,36 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Subject"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    renderSheet: {
+        parameters: {
+            query?: {
+                /** @description A subject of type `room`, whose facts about the subject the sheet takes in beside those about no room. */
+                roomId?: number | null;
+            };
+            header?: never;
+            path: {
+                brainId: number;
+                subjectId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
                 };
             };
             400: components["responses"]["BadRequest"];

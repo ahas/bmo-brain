@@ -11,8 +11,8 @@ use bmo_brain_client::{
   Brain as BrainMember, BrainsQuery, Confirmations, Consolidated, ExportQuery, Fold, Folded, Hits,
   Injected, Layer, LayerChange, LayersQuery, Learned, Learning, MemoriesQuery, Memory, MemoryMerge,
   MemoryMove, MemoryVersion, NewBrain, NewLayer, NewMemory, NewSubject, Page, PersonaQuery, Recall,
-  RecallAsk, Recorded, Restoration, SimilarAsk, Subject, SubjectChange, SubjectsQuery, TalliesQuery, Tally,
-  TypeCount, UnconsolidatedQuery,
+  RecallAsk, Recorded, Restoration, SheetQuery, SimilarAsk, Subject, SubjectChange, SubjectsQuery,
+  TalliesQuery, Tally, TypeCount, UnconsolidatedQuery,
 };
 
 use super::{Answer, Body, Brain, Key, Query};
@@ -251,6 +251,15 @@ async fn persona(
   Ok(([(header::CONTENT_TYPE, "text/plain; charset=utf-8")], text).into_response())
 }
 
+async fn sheet(
+  State(brain): State<Brain>,
+  Key((id, subject_id)): Key<(i64, i64)>,
+  Query(query): Query<SheetQuery>,
+) -> Answer<Response> {
+  let text = brain.store.sheet(id, subject_id, query.room_id).await?;
+  Ok(([(header::CONTENT_TYPE, "text/plain; charset=utf-8")], text).into_response())
+}
+
 /// The layer names a comma-separated query names, trimmed, the empty ones left out.
 fn layer_names(query: Option<&str>) -> Vec<String> {
   query
@@ -282,6 +291,7 @@ pub fn routes() -> Router<Brain> {
     .route("/brains/{brainId}", get(brain_read).delete(brain_let_go))
     .route("/brains/{brainId}/subjects", get(subjects).post(subject_add))
     .route("/brains/{brainId}/subjects/{subjectId}", get(subject).patch(subject_change))
+    .route("/brains/{brainId}/subjects/{subjectId}/sheet", get(sheet))
     .route("/brains/{brainId}/layers", get(layers).post(layer_add))
     .route("/brains/{brainId}/layers/{layerId}", get(layer).patch(layer_change))
     .route("/brains/{brainId}/memories", get(memories).post(memory_add))

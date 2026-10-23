@@ -273,6 +273,12 @@ impl Store {
       if let Some(key) = &memory.key {
         super::key("key", key)?;
       }
+      if memory.kind == super::sheets::SHEET {
+        return Err(Fault::BadRequest(format!(
+          "The brain file holds the live sheet {}; a person's sheet is rendered from their facts.",
+          memory.id
+        )));
+      }
     }
 
     let at = now();

@@ -16,7 +16,7 @@ use tokio::process::{Child, ChildStdin, ChildStdout, Command};
 const PATIENCE: Duration = Duration::from_secs(30);
 
 /// The tools the plugin offers.
-const TOOLS: [&str; 22] = [
+const TOOLS: [&str; 23] = [
   "brain_brains",
   "brain_brain_add",
   "brain_subjects",
@@ -39,6 +39,7 @@ const TOOLS: [&str; 22] = [
   "brain_unconsolidated",
   "brain_consolidated",
   "brain_persona",
+  "brain_sheet",
 ];
 
 struct Server {

@@ -11,8 +11,8 @@ study those rest on (archive document 302).
 A brain is one agent's long-term memory. The service keeps many brains, each owned by an account and
 belonging to one agent of that account, and serves them over HTTP. Everything an agent reads about the
 world beside the conversation in front of it is a memory in its brain: episodes, facts, tips, rules,
-situation rules, the sheets of the people it knows, its knowledge, its persona and its lore. Nothing an
-agent reads is a file.
+situation rules, its knowledge, its persona and its lore. Nothing an agent reads is a file, and nothing it
+reads about a person is a sheet kept apart: a person's standing sheet is rendered from the facts about them.
 
 - **One table of memories, with a type on each row.** Episodes, facts, situation rules, persona pieces and
   the rest are values of `type`, never tables of their own. No table stands for one feature.
@@ -103,6 +103,9 @@ One row is one thing the agent remembers, in one version.
 every other value is whatever the writer called it, and the brain lists the types in use with a count
 each, so a meaning does not split into two spellings.
 
+No type is called `sheet`. A person's standing sheet is a rendering of the facts about them (「A person is
+a subject」), never a row, and a write that names `sheet` as its type is refused.
+
 | Reserved type | Means |
 |---|---|
 | `episode` | what happened, as it was said; the raw material consolidation reads; never deleted |
@@ -111,7 +114,6 @@ each, so a meaning does not split into two spellings.
 | `situation` | a rule for a situation: when, and what to do then |
 | `rule` | a rule granted in a room, linked to the room's subject |
 | `name` | what a subject is called |
-| `sheet` | a person's standing sheet, linked to the person and, for a room's sheet, to the room |
 | `persona` | a piece of the agent's persona, rendered into its system prompt |
 | `lore` | a piece of the agent's lore, read as reference |
 | `knowledge` | a piece of reference knowledge |
@@ -168,6 +170,11 @@ the brain's tools. It writes in two moments.
   handed out as something heard, standing beside the facts and never closing one. A rumor becomes a fact when
   the person confirms it or a second source agrees. The brain holds this rule: a learning whose source is
   hearsay or inference is written as a rumor whatever it was called, and closes nothing.
+- **A fact is one row.** What the agent learns about a person is written one thing to a row, each through
+  the write judgement: in English, dated by its `validFrom` (the moment it began holding: the moment of the
+  message it was read in, or the date the speaker names), linked to the person, and linked to a room only
+  where it holds in that room alone. Nothing gathers a person's facts into a row of its own; their sheet is
+  rendered from these rows (「A person is a subject」).
 - **A memory is written in English,** whatever language the room speaks; a short quotation in the original
   words stands only where the exact wording matters.
 - **Who writes is recorded** on the version as `actorName`: the agent's session, the tool it used, or the
@@ -213,8 +220,9 @@ spoke, the words of the turn, the session's key and the moment it opened, and th
 a block and a list of what it chose.
 
 - **Two parts within one budget** of about one and a half to two thousand tokens: the fixed core, the few
-  memories that stand on every turn of that room (its situation rules, the standing sheets of everyone who
-  spoke, the room's rules), and the searched part, chosen by score.
+  memories that stand on every turn of that room (its situation rules, the room's rules, and the sheet of
+  everyone who spoke, rendered from their facts in the sheet's order), and the searched part, chosen by
+  score.
 - **The score** is a weighted sum of relevance to the turn's words, importance and recency, recency being
   the retrieval strength computed from the row's hits (「Strength and decay」), each normalised; a memory of a
   subject the turn names scores higher; no subject fills more than its cap of
@@ -270,9 +278,18 @@ is the brain's offer, the caller's is the last word.
 - **A room's rules are memories of type `rule`** linked to the room's subject, each with its `key` the
   caller's
   rule id and its grantee among its subjects. Revoking a rule invalidates it.
-- **A person is a subject** of type `person`, keyed by the id the caller knows them by. Their standing sheet
-  is a `sheet` row linked to them, and a room's sheet of them is a `sheet` row linked to them and the room.
-  The agent writes and rewrites sheets as versions.
+- **A person is a subject** of type `person`, keyed by the id the caller knows them by. What is known about
+  them is rows linked to them, a fact one row each, and a fact that holds only in one room is linked to that
+  room as well.
+- **A person's sheet is rendered, never stored.** Their sheet is their live `fact` rows that are about no
+  room; their sheet in a room is those together with the live facts linked to them and to that room. The
+  rendering orders the facts by importance, highest first, then by `validFrom` and then by id, one line each
+  carrying the row's id and the date it holds from, and adds nothing that changes between calls, so the same
+  rows give the same bytes, as the persona's rendering does. A change to a sheet is a change to a fact: a new
+  version, a closed row or a new row.
+- **A `sheet` row a store still holds live is split into facts** by the brain's own command
+  (`docs/boundary-api.md`, 「Splitting sheets」): one fact per line of it, carrying its subjects, and the
+  sheet row is then `done`.
 - **What a user said in one room stays in that room's memories** unless it is theirs: the reading narrows
   by the room's subject, and the one carry-over, a user's own words into their private room, is the caller's
   to ask for by naming both rooms.

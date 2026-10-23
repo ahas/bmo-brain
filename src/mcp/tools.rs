@@ -8,7 +8,7 @@ use std::pin::Pin;
 use bmo_brain_client::{
   BrainClient, BrainsQuery, ClientFailure, Confirmations, Fold, Hits, LayersQuery, MemoriesQuery,
   MemoryMerge, MemoryMove, MemoryVersion, NewBrain, NewLayer, NewMemory, NewSubject, PersonaQuery,
-  RecallAsk, SubjectsQuery,
+  RecallAsk, SheetQuery, SubjectsQuery,
 };
 use bmo_brain_client::{Consolidated, Learning, SimilarAsk, UnconsolidatedQuery};
 use schemars::generate::SchemaGenerator;
@@ -165,10 +165,20 @@ struct MoveOf {
   change: MemoryMove,
 }
 
-/// The rendered persona, as a tool answers it.
+/// A subject of a brain whose sheet is rendered, and the room it takes in.
+#[derive(Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+struct SheetOf {
+  brain_id: i64,
+  subject_id: i64,
+  #[serde(flatten)]
+  query: SheetQuery,
+}
+
+/// A rendering, the persona or a sheet, as a tool answers it.
 #[derive(Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-struct PersonaText {
+struct Rendered {
   text: String,
 }
 
@@ -340,11 +350,19 @@ pub fn tools() -> Vec<BrainTool> {
       "The persona rendered as text.",
       "GET /brains/{brainId}/persona",
       |client, BrainId { brain_id }| async move {
-        client
-          .persona(brain_id, &PersonaQuery::default())
-          .await
-          .map(|text| PersonaText { text })
+        client.persona(brain_id, &PersonaQuery::default()).await.map(|text| Rendered { text })
       },
+    ),
+    tool(
+      "brain_sheet",
+      "A subject's sheet rendered from its live facts: those about no room, and with roomId those about that room as well.",
+      "GET /brains/{brainId}/subjects/{subjectId}/sheet",
+      |client,
+       SheetOf {
+         brain_id,
+         subject_id,
+         query,
+       }| async move { client.sheet(brain_id, subject_id, &query).await.map(|text| Rendered { text }) },
     ),
   ]
 }

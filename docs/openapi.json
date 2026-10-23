@@ -829,6 +829,14 @@
           },
           "type": {
             "type": "string"
+          },
+          "validFrom": {
+            "description": "When it began holding; now where none is given.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
           }
         },
         "required": [
@@ -1429,18 +1437,6 @@
         ],
         "type": "object"
       },
-      "PersonaText": {
-        "description": "The rendered persona, as a tool answers it.",
-        "properties": {
-          "text": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "text"
-        ],
-        "type": "object"
-      },
       "Recall": {
         "description": "What a turn is handed.",
         "properties": {
@@ -1605,6 +1601,18 @@
         },
         "required": [
           "recordedCount"
+        ],
+        "type": "object"
+      },
+      "Rendered": {
+        "description": "A rendering, the persona or a sheet, as a tool answers it.",
+        "properties": {
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
         ],
         "type": "object"
       },
@@ -2178,7 +2186,7 @@
   "info": {
     "description": "An agent's long-term memory as a service. The service keeps many brains, each an account's and one agent's: subjects (what a memory is about, found by type and key), layers (the table of contents) and memories, one row a version, superseded and invalidated but never deleted. A turn asks recall for a block under a token budget; a persona is rendered as the same bytes until a piece changes; a brain moves in and out as a brain file. The memory rows and fragments held under a caller's opaque scope stand for the console's screens until those read brains. Bodies are JSON with camelCase keys, times are epoch milliseconds, lists are pages of items and more, and every failure is the error shape with its status. The harness plugin's tools, each a thin call of one route, are stated under x-tools.",
     "title": "bmo-brain",
-    "version": "0.1.0-rev.18"
+    "version": "0.1.0-rev.19"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -4329,6 +4337,80 @@
           }
         },
         "summary": "Change a subject's description.",
+        "tags": [
+          "subjects"
+        ],
+        "x-codes": [
+          "bad-request",
+          "unauthorized",
+          "forbidden",
+          "not-found"
+        ],
+        "x-console": "screen"
+      }
+    },
+    "/brains/{brainId}/subjects/{subjectId}/sheet": {
+      "get": {
+        "operationId": "renderSheet",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "brainId",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "subjectId",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "A subject of type `room`, whose facts about the subject the sheet takes in beside those about no room.",
+            "in": "query",
+            "name": "roomId",
+            "required": false,
+            "schema": {
+              "description": "A subject of type `room`, whose facts about the subject the sheet takes in beside those about no room.",
+              "format": "int64",
+              "type": [
+                "integer",
+                "null"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "summary": "The subject's sheet rendered from its active facts about no room, and about the room named where one is; the same bytes for the same rows.",
         "tags": [
           "subjects"
         ],
@@ -6627,6 +6709,14 @@
           },
           "type": {
             "type": "string"
+          },
+          "validFrom": {
+            "description": "When it began holding; now where none is given.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
           }
         },
         "required": [
@@ -6771,9 +6861,43 @@
       },
       "name": "brain_persona",
       "output": {
-        "$ref": "#/components/schemas/PersonaText"
+        "$ref": "#/components/schemas/Rendered"
       },
       "route": "GET /brains/{brainId}/persona"
+    },
+    {
+      "description": "A subject's sheet rendered from its live facts: those about no room, and with roomId those about that room as well.",
+      "input": {
+        "description": "A subject of a brain whose sheet is rendered, and the room it takes in.",
+        "properties": {
+          "brainId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "roomId": {
+            "description": "A subject of type `room`, whose facts about the subject the sheet takes in beside those about no room.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "subjectId": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "brainId",
+          "subjectId"
+        ],
+        "type": "object"
+      },
+      "name": "brain_sheet",
+      "output": {
+        "$ref": "#/components/schemas/Rendered"
+      },
+      "route": "GET /brains/{brainId}/subjects/{subjectId}/sheet"
     }
   ]
 }

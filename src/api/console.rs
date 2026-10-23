@@ -52,7 +52,7 @@ impl Reach {
 }
 
 /// The routes the screen uses, by method and path as the router writes them.
-const SCREEN_ROUTES: [(&str, &str); 26] = [
+const SCREEN_ROUTES: [(&str, &str); 27] = [
   ("get", "/events"),
   ("get", "/console-bundle/{file}"),
   ("get", "/brains"),
@@ -61,6 +61,7 @@ const SCREEN_ROUTES: [(&str, &str); 26] = [
   ("post", "/brains/{brainId}/subjects"),
   ("get", "/brains/{brainId}/subjects/{subjectId}"),
   ("patch", "/brains/{brainId}/subjects/{subjectId}"),
+  ("get", "/brains/{brainId}/subjects/{subjectId}/sheet"),
   ("get", "/brains/{brainId}/layers"),
   ("post", "/brains/{brainId}/layers"),
   ("get", "/brains/{brainId}/layers/{layerId}"),

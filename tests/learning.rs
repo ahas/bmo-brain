@@ -45,6 +45,7 @@ fn learning(kind: &str, text: &str, source: Source) -> Learning {
     strengthens: None,
     replaces: vec![],
     grounds: vec![],
+    valid_from: None,
     key: None,
     layer_id: None,
     actor_name: "agent-session".to_owned(),
