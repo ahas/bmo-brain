@@ -25,7 +25,8 @@ export interface Reader {
   offered: boolean;
   // The language the texts are read in: English or the console's own.
   language: Ref<string>;
-  // Whether a translation was asked for and did not come, which the screen says in one sentence.
+  // Whether a translation was asked for and did not come, or came back untranslated, which the screen says in one
+  // sentence.
   failed: Ref<boolean>;
   // Asks for the readings of texts in the reading language; the English stands until each comes.
   want: (texts: readonly string[]) => void;
@@ -54,7 +55,9 @@ export function readerOver(home: string, translate: Translate, translator: boole
 
   const keyOf = (tag: string, text: string): string => `${tag}\u0000${text}`;
 
-  // Each batch is put on the shelf as it comes, so a page's first texts stand translated before its last.
+  // Each batch is put on the shelf as it comes, so a page's first texts stand translated before its last. A text the
+  // translator stayed too busy to read comes back untranslated and is missed as a failed one is: the English stands
+  // with the one sentence, and choosing the language again asks for it again.
   async function flush(): Promise<void> {
     timer = null;
 
@@ -74,7 +77,14 @@ export function readerOver(home: string, translate: Translate, translator: boole
         try {
           const readings = await translate(batch, tag);
 
-          batch.forEach((text, at) => shelf.set(keyOf(tag, text), readings[at]!));
+          batch.forEach((text, at) => {
+            const reading = readings[at]!;
+
+            if (reading.untranslated) {
+              failed.value = true;
+              missed.add(keyOf(tag, text));
+            } else shelf.set(keyOf(tag, text), reading);
+          });
         } catch {
           failed.value = true;
           for (const text of batch) missed.add(keyOf(tag, text));
@@ -133,7 +143,10 @@ export function useReading(): Reader {
   return reader;
 }
 
-/** Why words could not be made English for a row: no translator, a translation that failed, or Hangul still in it. */
+/**
+ * Why words could not be made English for a row: no translator, a translation that failed or came back
+ * untranslated, or Hangul still in it.
+ */
 export type EnglishFault = "no-translator" | "failed" | "not-english";
 
 /** The key, in the screen's words, of the one sentence that says why words were not saved. */
@@ -184,7 +197,8 @@ export function useEnglishWords(words: () => string) {
     try {
       const [reading] = await translate([typed], ENGLISH);
 
-      english.value = reading?.text ?? typed;
+      if (reading?.untranslated) fault.value = "failed";
+      else english.value = reading?.text ?? typed;
     } catch {
       fault.value = "failed";
     } finally {

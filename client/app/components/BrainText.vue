@@ -1,8 +1,8 @@
 <template>
   <!-- A text of the brain as the screen reads it (docs/design.md, 「The screen」): its reading in the reading
        language once it has come, saying it is translated, with its English one tap away; the English while the
-       reading is on its way, where it failed, or while the screen reads English. The English may be drawn by
-       the slot, as the timeline draws a version's change. -->
+       reading is on its way, where it failed or came back untranslated, or while the screen reads English. The
+       English may be drawn by the slot, as the timeline draws a version's change. -->
   <div class="flex flex-col gap-1">
     <component :is="tag" v-if="reading !== undefined && !original" :class="textClass">{{ reading.text }}</component>
     <slot v-else>

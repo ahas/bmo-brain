@@ -19,6 +19,10 @@ async function refusing(): Promise<Reading[]> {
   throw new Error("the translator did not answer");
 }
 
+async function busy(texts: readonly string[]): Promise<Reading[]> {
+  return texts.map((text) => ({ text, whole: false, untranslated: true }));
+}
+
 const settled = () => new Promise((done) => setTimeout(done, 5));
 
 test("a reader starts in the console's language where a translator is named, and in English otherwise", () => {
@@ -73,6 +77,27 @@ test("a failed translation leaves the English, says so, and is asked again once 
   expect(reader.pending("Keeps a garden")).toBe(true);
 });
 
+test("an untranslated reading shows the English as a failed one does, and is asked again once the language is chosen again", async () => {
+  const reader = readerOver("ko", busy, true);
+
+  reader.want(["Keeps a garden"]);
+  await settled();
+
+  expect(reader.failed.value).toBe(true);
+  expect(reader.of("Keeps a garden")).toBeUndefined();
+  expect(reader.shown("Keeps a garden")).toBe("Keeps a garden");
+  expect(reader.pending("Keeps a garden")).toBe(false);
+
+  reader.choose(ENGLISH);
+
+  expect(reader.failed.value).toBe(false);
+  expect(reader.shown("Keeps a garden")).toBe("Keeps a garden");
+
+  reader.choose("ko");
+
+  expect(reader.pending("Keeps a garden")).toBe(true);
+});
+
 test("English words are saved as they are typed", async () => {
   const typed = ref("Prefers green tea");
   const words = useEnglishWords(() => typed.value);
@@ -111,6 +136,10 @@ test("words in another script are not saved where no translator is named or the 
   expect(words.fault.value).toBe("no-translator");
 
   expect(await words.ready(refusing, true)).toBeNull();
+  expect(words.fault.value).toBe("failed");
+  expect(words.english.value).toBeNull();
+
+  expect(await words.ready(busy, true)).toBeNull();
   expect(words.fault.value).toBe("failed");
   expect(words.english.value).toBeNull();
 });

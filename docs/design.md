@@ -372,17 +372,18 @@ console bundle contract and served by the brain itself (`docs/boundary-api.md`, 
   rendering are shown translated through the translator the console names, page by page as they are shown; each
   translated text in the row view, the timeline, the sheet and the rendering says so and opens its English
   original with one tap, and the toggle turns every text back to English at once. The English stands while a
-  translation is on its way, so a translation never holds the English view back, and where one fails the English
-  stays with one sentence saying so. Where the console names no translator, the toggle does not stand and the
-  screen reads English.
+  translation is on its way, so a translation never holds the English view back, and where one fails, or the
+  translator stays too busy to read a text and answers it untranslated, the English stays, without the
+  translated label or the link to an original, with one sentence saying so. Where the console names no
+  translator, the toggle does not stand and the screen reads English.
 - **A subject's sheet** stands folded over the memories narrowed to that subject, as the brain renders it from
   the facts about it (「A person is a subject」), and not at all where the subject has no fact.
 - **Writing in another language.** The brain's rows stay English: no word of another script reaches a row. Words
   typed in the console's own language to teach, to edit a text, or as a move's reason or the words a row ended on
   are translated into English through the same translator before they are saved, and the screen shows the
   English to confirm, with a label saying it was translated; the English, which the person may still change, is
-  what is saved. Where the translation fails or no translator is named, the screen says so in one sentence and
-  saves nothing until the words are English.
+  what is saved. Where the translation fails, the words come back untranslated, or no translator is named, the
+  screen says so in one sentence and saves nothing until the words are English.
 - **The layer index** reads the persona and the lore like a book: the layers in position order, each layer's
   pieces in theirs, moved up and down as new versions. A persona layer shows its rendering, the very bytes
   the brain hands a system prompt, placeholders left as they stand, and a change to a persona piece says
