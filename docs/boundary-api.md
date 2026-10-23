@@ -131,7 +131,8 @@ A layer is a heading in the brain's table of contents: `id`, `brainId`, `name` (
 ### Memories
 
 One row is one memory in one version: `id`, `brainId`, `key` (the caller's identifier, or null; unique among
-the live rows of a brain), `type`, `text`, `layerId` (or null), `position`, `subjects` (each `id`, `type`,
+the live rows of a brain; 1 to 200 characters with no control character and no whitespace, whether written or
+injected), `type`, `text`, `layerId` (or null), `position`, `subjects` (each `id`, `type`,
 `key`), `status`, `lineageId`, `supersededBy` (or null), `validFrom`, `validTo` (or null), `importance` (1
 to 10), `hits`, `lastHitAt`, `lastConfirmedAt`, `strength` (the storage strength), `retrievalStrength`
 (computed from the hits as the reading answers), `consolidatedAt`, `actorName`, `labels` and `createdAt`.
@@ -215,7 +216,7 @@ takes the base layer alone; a named layer that does not stand is 404.
 | Route | Does | Answers |
 |---|---|---|
 | `GET /export` | the brain, or the layers `layers` names (comma-separated) with the subjects and live rows they hold, as a brain file | 200, `application/vnd.sqlite3`; 404 for a layer that does not stand |
-| `POST /injections` | reads the brain file in the body (`application/vnd.sqlite3`) into the brain: a layer is reused by its name, a subject by its type and key, a live row whose key a live row of the brain holds supersedes it unless it is the same, every other live row is added; nothing is overwritten | 201, `subjectsAdded`, `layersAdded`, `memoriesAdded`, `memoriesSuperseded`; 400 for a body that is no brain file or of another shape |
+| `POST /injections` | reads the brain file in the body (`application/vnd.sqlite3`) into the brain: a layer is reused by its name, a subject by its type and key, a live row whose key a live row of the brain holds supersedes it unless it is the same, every other live row is added; nothing is overwritten | 201, `subjectsAdded`, `layersAdded`, `memoriesAdded`, `memoriesSuperseded`; 400 for a body that is no brain file, of another shape, or holding a live row whose key is no key; nothing of such a file is read in |
 
 The file is a SQLite database of the tables `brain_file` (`shape`, `exported_at`, `name`), `subjects`,
 `layers`, `memories` and `memory_subjects`, its ids local to the file; this brain writes and reads shape 1.

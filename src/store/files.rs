@@ -269,6 +269,11 @@ impl Store {
     .map_err(failed)?;
     let _ = std::fs::remove_file(&path);
     let (subjects, layers, memories) = read?;
+    for memory in &memories {
+      if let Some(key) = &memory.key {
+        super::key("key", key)?;
+      }
+    }
 
     let at = now();
     let mut tx = self.begin().await?;

@@ -672,6 +672,56 @@ async fn the_persona_renders_in_layer_order_and_the_same_bytes_twice() {
 }
 
 #[tokio::test]
+async fn a_key_may_hold_a_slash_and_an_injected_key_is_held_to_the_same_rule() {
+  let served = Served::new().await;
+  let client = &served.client;
+  let source = brain_of(client, "agent-a").await;
+  let piece = client
+    .memory_add(
+      source,
+      &NewMemory {
+        key: Some("lore/lake".to_owned()),
+        ..memory("lore", "The lake is wide.")
+      },
+    )
+    .await
+    .unwrap();
+  assert_eq!(piece.key.as_deref(), Some("lore/lake"));
+  let bad = client
+    .memory_add(
+      source,
+      &NewMemory {
+        key: Some("lore lake".to_owned()),
+        ..memory("lore", "The lake is wide.")
+      },
+    )
+    .await;
+  assert_eq!(refused(bad), (400, "bad-request".to_owned()));
+  let file = client.export(source, &ExportQuery::default()).await.unwrap();
+  let path = std::env::temp_dir().join(format!("brain-file-{}.sqlite", std::process::id()));
+  std::fs::write(&path, &file).unwrap();
+  {
+    let db = rusqlite::Connection::open(&path).unwrap();
+    db.execute("UPDATE memories SET key = 'lore lake'", []).unwrap();
+  }
+  let broken = std::fs::read(&path).unwrap();
+  std::fs::remove_file(&path).ok();
+  let target = brain_of(client, "agent-b").await;
+  assert_eq!(refused(client.inject(target, broken).await), (400, "bad-request".to_owned()));
+  let kept = client
+    .memories(
+      target,
+      &MemoriesQuery {
+        status: Some(MemoryStatus::Active),
+        ..MemoriesQuery::default()
+      },
+    )
+    .await
+    .unwrap();
+  assert!(kept.items.is_empty(), "nothing of a refused file is read in");
+}
+
+#[tokio::test]
 async fn a_brain_file_is_exported_and_injected_without_overwriting() {
   let served = Served::new().await;
   let client = &served.client;

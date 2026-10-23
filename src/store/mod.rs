@@ -191,20 +191,16 @@ pub(crate) fn scope(field: &str, value: &str) -> Held<()> {
   }
 }
 
-/// A key a caller names a member by: 1 to 200 characters, none of them `/`, a control character
-/// or whitespace, and neither `.` nor `..`.
+/// A key: 1 to 200 characters, none of them a control character or whitespace. A key never stands in a
+/// path, so a slash is as good a character as any other.
 pub(crate) fn key(field: &str, value: &str) -> Held<()> {
   let length = value.chars().count();
-  let fits = (1..=200).contains(&length)
-    && value != "."
-    && value != ".."
-    && !value.chars().any(|c| c == '/' || c.is_control() || c.is_whitespace());
+  let fits = (1..=200).contains(&length) && !value.chars().any(|c| c.is_control() || c.is_whitespace());
   if fits {
     Ok(())
   } else {
     Err(Fault::BadRequest(format!(
-      "{field} {value:?} is no key: 1 to 200 characters, none of them '/', a control character or whitespace, \
-       and neither '.' nor '..'."
+      "{field} {value:?} is no key: 1 to 200 characters, none of them a control character or whitespace."
     )))
   }
 }
