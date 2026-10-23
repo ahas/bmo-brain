@@ -311,7 +311,7 @@ fn brain_routes(g: &mut SchemaGenerator) -> Vec<Route> {
       path: "/brains/{brainId}/subjects/{subjectId}/sheet",
       id: "renderSheet",
       tag: "subjects",
-      summary: "The subject's sheet rendered from its active facts about no room, and about the room named where one is; the same bytes for the same rows.",
+      summary: "The subject's sheet rendered from its active facts about no room, and about the room named where one is, most important and newest first, the first `limit` lines alone where one is given; the same bytes for the same rows.",
       parameters: {
         let mut parameters = under(g, "subjectId");
         parameters.extend(query::<SheetQuery>(g));

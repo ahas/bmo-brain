@@ -256,7 +256,7 @@ async fn sheet(
   Key((id, subject_id)): Key<(i64, i64)>,
   Query(query): Query<SheetQuery>,
 ) -> Answer<Response> {
-  let text = brain.store.sheet(id, subject_id, query.room_id).await?;
+  let text = brain.store.sheet(id, subject_id, query.room_id, query.limit).await?;
   Ok(([(header::CONTENT_TYPE, "text/plain; charset=utf-8")], text).into_response())
 }
 

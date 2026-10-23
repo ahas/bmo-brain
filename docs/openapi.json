@@ -1659,6 +1659,12 @@
             "format": "int64",
             "type": "integer"
           },
+          "core_fact_cap": {
+            "default": 8,
+            "description": "The most facts of one speaker's sheet the core of a block carries; the rest reach a turn only through\nthe searched part.",
+            "format": "int64",
+            "type": "integer"
+          },
           "decay": {
             "default": 0.5,
             "description": "The exponent the time since each hit is raised to, negated, in the retrieval strength.",
@@ -1727,6 +1733,7 @@
           "weight_recency",
           "subject_bonus",
           "subject_cap",
+          "core_fact_cap",
           "decay",
           "hit_times_kept",
           "same_session_ms",
@@ -2186,7 +2193,7 @@
   "info": {
     "description": "An agent's long-term memory as a service. The service keeps many brains, each an account's and one agent's: subjects (what a memory is about, found by type and key), layers (the table of contents) and memories, one row a version, superseded and invalidated but never deleted. A turn asks recall for a block under a token budget; a persona is rendered as the same bytes until a piece changes; a brain moves in and out as a brain file. The memory rows and fragments held under a caller's opaque scope stand for the console's screens until those read brains. Bodies are JSON with camelCase keys, times are epoch milliseconds, lists are pages of items and more, and every failure is the error shape with its status. The harness plugin's tools, each a thin call of one route, are stated under x-tools.",
     "title": "bmo-brain",
-    "version": "0.1.0-rev.19"
+    "version": "0.1.0-rev.20"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -4372,6 +4379,20 @@
             }
           },
           {
+            "description": "The first that many lines alone, at least one; the whole sheet where none is given.",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "description": "The first that many lines alone, at least one; the whole sheet where none is given.",
+              "format": "int64",
+              "type": [
+                "integer",
+                "null"
+              ]
+            }
+          },
+          {
             "description": "A subject of type `room`, whose facts about the subject the sheet takes in beside those about no room.",
             "in": "query",
             "name": "roomId",
@@ -4410,7 +4431,7 @@
             "$ref": "#/components/responses/NotFound"
           }
         },
-        "summary": "The subject's sheet rendered from its active facts about no room, and about the room named where one is; the same bytes for the same rows.",
+        "summary": "The subject's sheet rendered from its active facts about no room, and about the room named where one is, most important and newest first, the first `limit` lines alone where one is given; the same bytes for the same rows.",
         "tags": [
           "subjects"
         ],
@@ -6866,13 +6887,21 @@
       "route": "GET /brains/{brainId}/persona"
     },
     {
-      "description": "A subject's sheet rendered from its live facts: those about no room, and with roomId those about that room as well.",
+      "description": "A subject's sheet rendered from its live facts, most important and newest first: those about no room, and with roomId those about that room as well; with limit its first lines alone.",
       "input": {
         "description": "A subject of a brain whose sheet is rendered, and the room it takes in.",
         "properties": {
           "brainId": {
             "format": "int64",
             "type": "integer"
+          },
+          "limit": {
+            "description": "The first that many lines alone, at least one; the whole sheet where none is given.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
           },
           "roomId": {
             "description": "A subject of type `room`, whose facts about the subject the sheet takes in beside those about no room.",

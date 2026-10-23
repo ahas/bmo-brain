@@ -7,8 +7,9 @@ it as you read, in the turn itself. Nothing writes it for you.
 ## Before answering
 
 - The reference block you were handed is the brain's recall for this turn: the room's standing rules and
-  situation rules, the sheet of each person who spoke (the facts about them that hold everywhere and those
-  of this room, one line each), and the memories that fit the words. Read it as what you know. A line marked as handed to this session already is one you have seen in this session.
+  situation rules, the head of the sheet of each person who spoke (their most important and newest facts,
+  those that hold everywhere and those of this room, one line each; their other facts come up when the
+  turn's words call for them), and the memories that fit the words. Read it as what you know. A line marked as handed to this session already is one you have seen in this session.
 - The recall also says whether a consolidation is due. When it is, do the consolidation (below) in this turn
   before or after your answer, whichever the conversation allows.
 

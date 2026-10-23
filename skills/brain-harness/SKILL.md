@@ -60,6 +60,7 @@ apply the judgement with one `brain_learn`, and consolidate when the brain says 
 - **Tell the brain when the session folds** with `brain_fold`, so the marks clear and what it knew may attach
   to the next session.
 - **A person's sheet is rendered, never written:** `brain_sheet` with the person's subject id (and a room's
-  subject id as `roomId`) renders their live facts; write a fact about them, one per thing, to change it.
+  subject id as `roomId`) renders their live facts, most important and newest first, the first `limit` of them
+  where one is given; write a fact about them, one per thing, to change it.
 - **`brain_persona`** renders the agent's persona; `brain_types` lists the types in use, so one meaning keeps
   one spelling; `brain_subjects`, `brain_layers` and `brain_memories_list` read the tables.

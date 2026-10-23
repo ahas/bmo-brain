@@ -37,7 +37,7 @@ plugin」).
 | console | `[console]` | the console bundle (「The console bundle」), where the brain serves one: `token`, the console's bearer token, which reaches what the screen uses; `bundle`, the folder the build of `client/` wrote the module, its stylesheet and its words into, the release's `console` where none is given |
 | database | `database` | the address of the brain's own PostgreSQL database, which holds its tables and nothing else |
 | data root | `data_root` | the data root whose `env/brain.env` the brain's tool reads the service's address and token from; the `tool-env` verb writes it |
-| rules | `[rules]` | the numbers the brain reads by (`docs/design.md`), each with a default: `budget_tokens`, `weight_relevance`, `weight_importance`, `weight_recency`, `subject_bonus`, `subject_cap`, `decay`, `hit_times_kept`, `same_session_ms`, `strength_gain`, `previous_value_days`, `consolidation_threshold` |
+| rules | `[rules]` | the numbers the brain reads by (`docs/design.md`), each with a default: `budget_tokens`, `weight_relevance`, `weight_importance`, `weight_recency`, `subject_bonus`, `subject_cap`, `core_fact_cap` (the most facts of one speaker's sheet the core of a recall carries, 8), `decay`, `hit_times_kept`, `same_session_ms`, `strength_gain`, `previous_value_days`, `consolidation_threshold` |
 
 Deployed, the file stands under the data root as `env/brain.toml`, and each release links to it as
 `brain.toml`. The service runs as the user unit `deploy/bmo-brain.service`, the repository's one service: a
@@ -122,11 +122,12 @@ the text of its newest `active` one, or null where it has none.
 | `POST /subjects` | `type`, `key`, `description`: makes the subject, or finds the one standing and sets its description where one is given | 201 where new, 200 where it stood |
 | `GET /subjects/{subjectId}` | reads one | 200; 404 |
 | `PATCH /subjects/{subjectId}` | sets `description` | 200; 404 |
-| `GET /subjects/{subjectId}/sheet` | renders the subject's sheet; `roomId`, a subject of type `room`, takes that room's facts in as well | 200, `text/plain`; 400 for a `roomId` that is no room; 404 |
+| `GET /subjects/{subjectId}/sheet` | renders the subject's sheet; `roomId`, a subject of type `room`, takes that room's facts in as well; `limit`, at least 1, renders the first that many lines alone, the whole sheet where none is given | 200, `text/plain`; 400 for a `roomId` that is no room or a `limit` below 1; 404 |
 
 A subject's sheet (`docs/design.md`, 「A person is a subject」) is its active `fact` memories that are about
 no subject of type `room`, and, where `roomId` names a room, its active facts about that room as well. They
-are ordered by importance, highest first, then by `validFrom` and then by `id`, and each is one line,
+are ordered by importance, highest first, then by `validFrom`, latest first, then by `lastConfirmedAt`, latest
+first and a fact never confirmed after the confirmed ones, then by `id`, highest first, and each is one line,
 `- [#<id> since <date>] <text>`, the date the `validFrom`'s day in UTC; the lines are joined by a newline,
 and a subject with no such fact renders as nothing. Nothing that changes between calls is in it, so the
 same rows render as the same bytes.
@@ -196,9 +197,12 @@ memory starts at strength 1 with no hits.
 where none is given). It answers `block`, the text the turn is handed; `chosen`, each `memoryId`, `type`,
 `part` (`core` or `searched`), `score`, `marked` and `tokenCount`; `tokenCount` and `budgetTokens`.
 
-- **The core** is the room's active `situation` and `rule` memories and the sheet of everyone who spoke:
-  the facts `GET /subjects/{subjectId}/sheet` renders for each speaker with the turn's room as `roomId`, in
-  its order, each a line of the block.
+- **The core** is the room's active `situation` and `rule` memories and the head of the sheet of everyone
+  who spoke: the first facts `GET /subjects/{subjectId}/sheet` renders for each speaker with the turn's room
+  as `roomId`, in its order, at most the rules' `core_fact_cap` of them per speaker, each a line of the block.
+  A speaker's other facts are rows like any other: they reach the block only through the searched part.
+- **Every line of either part keeps the budget,** a marked one as well: a line that would carry the block
+  past `budgetTokens` is left out.
 - **The searched part** is the active rows holding one of the turn's words or about a subject the turn
   names, scored by relevance, importance and retrieval strength under the brain's weights, at most the
   subject cap of rows per subject, no near-double of a row already in, under the budget. A `persona` or

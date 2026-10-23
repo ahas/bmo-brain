@@ -1,6 +1,7 @@
 //! A subject's sheet, rendered from its facts and never stored (docs/design.md, 「A person is a subject」;
 //! docs/boundary-api.md, 「Subjects」 and 「Splitting sheets」): the rendering and its room, the refusal of the
-//! type `sheet`, and the split of the sheet rows a store still holds live, run through the binary.
+//! type `sheet`, the head of it recall's core carries (docs/boundary-api.md, 「Recall」), and the split of the
+//! sheet rows a store still holds live, run through the binary.
 
 mod support;
 
@@ -10,7 +11,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 
 use bmo_brain_client::{
   BrainClient, ExportQuery, Learning, MemoriesQuery, MemoryMerge, MemoryMove, MemoryStatus, MemoryVersion,
-  NewBrain, NewMemory, NewSubject, Restoration, SheetQuery, Source, SubjectKey,
+  NewBrain, NewMemory, NewSubject, RecallAsk, RecallPart, Restoration, SheetQuery, Source, SubjectKey,
 };
 use support::{Served, TOKEN, labels, refused};
 use tokio::process::Command;
@@ -202,22 +203,23 @@ async fn a_sheet_renders_the_live_facts_in_a_fixed_order_and_the_same_bytes_twic
   assert_eq!(
     common,
     format!(
-      "- [#{} since 2026-04-01] Owns the plot.\n- [#{} since 2026-02-01] Keeps a garden.\n- [#{} since 2026-03-01] \
-       Grows beans.",
-      weighty.id, older.id, newer.id
+      "- [#{} since 2026-04-01] Owns the plot.\n- [#{} since 2026-03-01] Grows beans.\n- [#{} since 2026-02-01] \
+       Keeps a garden.",
+      weighty.id, newer.id, older.id
     )
   );
   assert_eq!(client.sheet(brain, person_id, &SheetQuery::default()).await.unwrap(), common);
 
   let roomed = SheetQuery {
     room_id: Some(room_id),
+    ..SheetQuery::default()
   };
   let in_the_room = client.sheet(brain, person_id, &roomed).await.unwrap();
   let ids: Vec<i64> = in_the_room
     .lines()
     .map(|line| line.trim_start_matches("- [#").split(' ').next().unwrap().parse().unwrap())
     .collect();
-  assert_eq!(ids, [weighty.id, in_room.id, older.id, newer.id]);
+  assert_eq!(ids, [weighty.id, in_room.id, newer.id, older.id]);
   assert_eq!(client.sheet(brain, person_id, &roomed).await.unwrap(), in_the_room);
 
   let quiet = subject_id(client, brain, "person", "3").await;
@@ -229,7 +231,8 @@ async fn a_sheet_renders_the_live_facts_in_a_fixed_order_and_the_same_bytes_twic
           brain,
           person_id,
           &SheetQuery {
-            room_id: Some(person_id)
+            room_id: Some(person_id),
+            ..SheetQuery::default()
           }
         )
         .await
@@ -243,7 +246,8 @@ async fn a_sheet_renders_the_live_facts_in_a_fixed_order_and_the_same_bytes_twic
           brain,
           person_id,
           &SheetQuery {
-            room_id: Some(999_999)
+            room_id: Some(999_999),
+            ..SheetQuery::default()
           }
         )
         .await
@@ -254,6 +258,139 @@ async fn a_sheet_renders_the_live_facts_in_a_fixed_order_and_the_same_bytes_twic
     refused(client.sheet(brain, 999_999, &SheetQuery::default()).await),
     (404, "not-found".to_owned())
   );
+}
+
+/// A fact's last confirmation set as a confirmation would set it.
+async fn confirm(served: &Served, id: i64, at: i64) {
+  sqlx::query("UPDATE memories SET last_confirmed_at = $2 WHERE id = $1")
+    .bind(id)
+    .bind(at)
+    .execute(&served.store.pool)
+    .await
+    .unwrap();
+}
+
+/// The ids of a sheet's lines, in their order.
+fn line_ids(sheet: &str) -> Vec<i64> {
+  sheet
+    .lines()
+    .map(|line| line.trim_start_matches("- [#").split(' ').next().unwrap().parse().unwrap())
+    .collect()
+}
+
+#[tokio::test]
+async fn a_sheet_orders_equal_importance_newest_first_and_renders_its_first_lines_on_a_limit() {
+  let served = Served::new().await;
+  let client = &served.client;
+  let brain = brain_of(client, "agent-a").await;
+  let person = subject("person", "1");
+  let write = |text: &'static str, importance, at: &str| {
+    let body = NewMemory {
+      subjects: vec![person.clone()],
+      importance: Some(importance),
+      valid_from: Some(day(at)),
+      ..memory("fact", text)
+    };
+    async move { client.memory_add(brain, &body).await.unwrap().id }
+  };
+  let weighty = write("Owns the plot.", 9, "2026-01-01").await;
+  let unconfirmed = write("Grows beans.", 5, "2026-03-01").await;
+  let confirmed = write("Grows peas.", 5, "2026-03-01").await;
+  let confirmed_later = write("Grows leeks.", 5, "2026-03-01").await;
+  let unconfirmed_later = write("Grows kale.", 5, "2026-03-01").await;
+  let newest = write("Grows squash.", 5, "2026-04-01").await;
+  confirm(&served, confirmed, day("2026-05-01")).await;
+  confirm(&served, confirmed_later, day("2026-06-01")).await;
+  let person_id = subject_id(client, brain, "person", "1").await;
+
+  let whole = client.sheet(brain, person_id, &SheetQuery::default()).await.unwrap();
+  assert_eq!(
+    line_ids(&whole),
+    [weighty, newest, confirmed_later, confirmed, unconfirmed_later, unconfirmed]
+  );
+  let limited = |limit| SheetQuery {
+    limit: Some(limit),
+    ..SheetQuery::default()
+  };
+  let head = client.sheet(brain, person_id, &limited(3)).await.unwrap();
+  assert_eq!(head, whole.lines().take(3).collect::<Vec<_>>().join("\n"));
+  assert_eq!(client.sheet(brain, person_id, &limited(3)).await.unwrap(), head);
+  assert_eq!(client.sheet(brain, person_id, &limited(50)).await.unwrap(), whole);
+  assert_eq!(
+    refused(client.sheet(brain, person_id, &limited(0)).await),
+    (400, "bad-request".to_owned())
+  );
+}
+
+#[tokio::test]
+async fn recall_core_carries_the_cap_of_a_speakers_facts_newest_first_and_keeps_the_budget() {
+  let served = Served::new().await;
+  let client = &served.client;
+  let brain = brain_of(client, "agent-a").await;
+  let room = subject("room", "7");
+  let speaker = subject("person", "1");
+  let cap = served.store.rules.core_fact_cap;
+  let many = cap + 12;
+  let mut facts = Vec::new();
+  for n in 0..many {
+    let body = NewMemory {
+      subjects: vec![speaker.clone()],
+      importance: Some(5),
+      valid_from: Some(day("2026-01-01") + n * 86_400_000),
+      ..memory("fact", &format!("Remembered detail number {n}."))
+    };
+    facts.push(client.memory_add(brain, &body).await.unwrap().id);
+  }
+  // The oldest of all, past the cap, holding the turn's word.
+  let old_tomatoes = client
+    .memory_add(
+      brain,
+      &NewMemory {
+        subjects: vec![speaker.clone()],
+        importance: Some(5),
+        valid_from: Some(day("2025-06-01")),
+        ..memory("fact", "Grows tomatoes every summer.")
+      },
+    )
+    .await
+    .unwrap()
+    .id;
+  let ask = |budget: Option<i64>| RecallAsk {
+    room: Some(room.clone()),
+    speakers: vec![speaker.clone()],
+    words: "how are the tomatoes".to_owned(),
+    session_key: Some("session-a".to_owned()),
+    session_opened_at: None,
+    budget_tokens: budget,
+    record: None,
+  };
+
+  let recall = client.recall(brain, &ask(None)).await.unwrap();
+  let core: Vec<i64> = recall
+    .chosen
+    .iter()
+    .filter(|c| c.part == RecallPart::Core)
+    .map(|c| c.memory_id)
+    .collect();
+  let newest_first: Vec<i64> = facts.iter().rev().take(cap as usize).copied().collect();
+  assert_eq!(core, newest_first);
+  assert!(
+    recall
+      .chosen
+      .iter()
+      .any(|c| c.memory_id == old_tomatoes && c.part == RecallPart::Searched),
+    "a fact past the cap reaches the turn through the searched part: {:?}",
+    recall.chosen
+  );
+  assert!(recall.token_count <= recall.budget_tokens);
+  assert_eq!(recall.token_count, recall.chosen.iter().map(|c| c.token_count).sum::<i64>());
+
+  // A tight budget, then the same session again with its rows marked: neither runs past it.
+  for _ in 0..2 {
+    let tight = client.recall(brain, &ask(Some(40))).await.unwrap();
+    assert!(tight.token_count <= 40, "{} tokens", tight.token_count);
+    assert!(!tight.chosen.is_empty());
+  }
 }
 
 #[tokio::test]

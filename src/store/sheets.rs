@@ -31,12 +31,15 @@ pub(crate) fn written_type(kind: &str) -> Held<()> {
 }
 
 /// The facts a subject's sheet renders: its active facts about no room, and about the room named where one
-/// is, by importance, highest first, then by the moment they hold from, then by id.
+/// is, by importance, highest first, then newest first: by the moment they hold from, by the moment last
+/// confirmed (a fact never confirmed after the confirmed ones), and by id; the first `limit` alone where one
+/// is given.
 pub(crate) async fn sheet_rows(
   conn: &mut PgConnection,
   brain_id: i64,
   subject_id: i64,
   room: Option<i64>,
+  limit: Option<i64>,
 ) -> Held<Vec<MemoryRow>> {
   Ok(
     sqlx::query_as(&format!(
@@ -45,11 +48,12 @@ pub(crate) async fn sheet_rows(
        AND (NOT EXISTS (SELECT 1 FROM memory_subjects ms JOIN subjects s ON s.id = ms.subject_id \
              WHERE ms.memory_id = m.id AND s.type = 'room') \
          OR ($3::bigint IS NOT NULL AND id IN (SELECT memory_id FROM memory_subjects WHERE subject_id = $3))) \
-       ORDER BY importance DESC, valid_from, id"
+       ORDER BY importance DESC, valid_from DESC, last_confirmed_at DESC NULLS LAST, id DESC LIMIT $4"
     ))
     .bind(brain_id)
     .bind(subject_id)
     .bind(room)
+    .bind(limit)
     .fetch_all(&mut *conn)
     .await?,
   )
@@ -221,7 +225,18 @@ pub fn sheet_line_read(line: &str) -> SheetLine {
 impl Store {
   /// A subject's sheet rendered: the facts `sheet_rows` reads, one line each, joined by a newline, the same
   /// bytes for the same rows.
-  pub async fn sheet(&self, brain_id: i64, subject_id: i64, room_id: Option<i64>) -> Held<String> {
+  pub async fn sheet(
+    &self,
+    brain_id: i64,
+    subject_id: i64,
+    room_id: Option<i64>,
+    limit: Option<i64>,
+  ) -> Held<String> {
+    if let Some(limit) = limit
+      && limit < 1
+    {
+      return Err(Fault::BadRequest(format!("limit is {limit}; it is at least 1.")));
+    }
     let mut conn = self.connection().await?;
     brain_of(&mut conn, brain_id).await?;
     let standing: Option<String> =
@@ -248,7 +263,7 @@ impl Store {
         }
       }
     }
-    let rows = sheet_rows(&mut conn, brain_id, subject_id, room_id).await?;
+    let rows = sheet_rows(&mut conn, brain_id, subject_id, room_id, limit).await?;
     Ok(rows.iter().map(sheet_line).collect::<Vec<_>>().join("\n"))
   }
 

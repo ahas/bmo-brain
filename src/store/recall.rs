@@ -82,7 +82,8 @@ impl Store {
     }
     let named: Vec<i64> = room.into_iter().chain(speakers.iter().copied()).collect();
 
-    // The core: the room's situation rules and rules, and each speaker's sheet, rendered from their facts.
+    // The core: the room's situation rules and rules, and the head of each speaker's sheet, at most the cap of
+    // their facts; the rest are candidates of the searched part like any other row.
     let mut core: Vec<MemoryRow> = Vec::new();
     if let Some(room) = room {
       core.extend(
@@ -98,8 +99,9 @@ impl Store {
       );
     }
     let mut core_ids: BTreeSet<i64> = core.iter().map(|row| row.id).collect();
+    let cap = Some(self.rules.core_fact_cap.max(0));
     for speaker in &speakers {
-      for row in sheet_rows(&mut tx, brain_id, *speaker, room).await? {
+      for row in sheet_rows(&mut tx, brain_id, *speaker, room, cap).await? {
         if core_ids.insert(row.id) {
           core.push(row);
         }
@@ -187,7 +189,7 @@ impl Store {
       let is_marked = marked.contains(&memory.id);
       let line = self.line(&mut tx, &memory, is_marked, at).await?;
       let cost = tokens(&line);
-      if spent + cost > budget && !is_marked {
+      if spent + cost > budget {
         continue;
       }
       spent += cost;

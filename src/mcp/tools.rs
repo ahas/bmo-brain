@@ -355,7 +355,7 @@ pub fn tools() -> Vec<BrainTool> {
     ),
     tool(
       "brain_sheet",
-      "A subject's sheet rendered from its live facts: those about no room, and with roomId those about that room as well.",
+      "A subject's sheet rendered from its live facts, most important and newest first: those about no room, and with roomId those about that room as well; with limit its first lines alone.",
       "GET /brains/{brainId}/subjects/{subjectId}/sheet",
       |client,
        SheetOf {

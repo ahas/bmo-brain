@@ -210,8 +210,8 @@ easily it comes to mind.
   read by key, subject, type or words still answers it, and a hit there revives it.
 - **The numbers are settings,** with placeholders until the owner's own conversation logs have fitted them:
   the importance threshold of consolidation, the decay exponent, the spacing curve of storage strength, the
-  weights of the recall score, the per-subject cap and the token budget. The brain reads them from its
-  configuration and names each in its health answer.
+  weights of the recall score, the per-subject cap, the core's cap of facts per speaker and the token budget.
+  The brain reads them from its configuration and names each in its health answer.
 
 ## Recall
 
@@ -220,9 +220,13 @@ spoke, the words of the turn, the session's key and the moment it opened, and th
 a block and a list of what it chose.
 
 - **Two parts within one budget** of about one and a half to two thousand tokens: the fixed core, the few
-  memories that stand on every turn of that room (its situation rules, the room's rules, and the sheet of
-  everyone who spoke, rendered from their facts in the sheet's order), and the searched part, chosen by
-  score.
+  memories that stand on every turn of that room (its situation rules, the room's rules, and the head of the
+  sheet of everyone who spoke), and the searched part, chosen by score. No line of either part runs past the
+  budget, a marked one no more than another.
+- **The core carries the head of each speaker's sheet:** the first of their facts in the sheet's order
+  (「Rooms, people and rules」), at most the core's cap per speaker, eight where the configuration names
+  none. A person's sheet can hold hundreds of facts and a turn has room for a few; the rest of a speaker's
+  facts reach a turn only through the searched part, scored and capped as any other row is.
 - **The score** is a weighted sum of relevance to the turn's words, importance and recency, recency being
   the retrieval strength computed from the row's hits (「Strength and decay」), each normalised; a memory of a
   subject the turn names scores higher; no subject fills more than its cap of
@@ -283,10 +287,13 @@ is the brain's offer, the caller's is the last word.
   room as well.
 - **A person's sheet is rendered, never stored.** Their sheet is their live `fact` rows that are about no
   room; their sheet in a room is those together with the live facts linked to them and to that room. The
-  rendering orders the facts by importance, highest first, then by `validFrom` and then by id, one line each
-  carrying the row's id and the date it holds from, and adds nothing that changes between calls, so the same
-  rows give the same bytes, as the persona's rendering does. A change to a sheet is a change to a fact: a new
-  version, a closed row or a new row.
+  rendering orders the facts by importance, highest first, and among equal importance newest first: by
+  `validFrom`, latest first, then by the moment last confirmed, latest first and a row never confirmed after
+  the confirmed ones, then by id, highest first. Each fact is one line carrying the row's id and the date it
+  holds from, and the rendering adds nothing that changes between calls, so the same rows give the same
+  bytes, as the persona's rendering does. The rendering is the whole sheet; a reader may ask for its first
+  lines alone, in the same order. A change to a sheet is a change to a fact: a new version, a closed row or a
+  new row.
 - **A `sheet` row a store still holds live is split into facts** by the brain's own command
   (`docs/boundary-api.md`, 「Splitting sheets」): one fact per line of it, carrying its subjects, and the
   sheet row is then `done`.

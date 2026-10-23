@@ -628,13 +628,16 @@ pub struct PersonaQuery {
   pub layers: Option<String>,
 }
 
-/// Which room a subject's sheet takes in.
+/// Which room a subject's sheet takes in, and how many of its lines.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct SheetQuery {
   /// A subject of type `room`, whose facts about the subject the sheet takes in beside those about no room.
   #[serde(skip_serializing_if = "Option::is_none")]
   pub room_id: Option<i64>,
+  /// The first that many lines alone, at least one; the whole sheet where none is given.
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub limit: Option<i64>,
 }
 
 /// What an injection came to.
@@ -663,6 +666,9 @@ pub struct Rules {
   pub subject_bonus: f64,
   /// The most rows one subject fills in the searched part of a block.
   pub subject_cap: i64,
+  /// The most facts of one speaker's sheet the core of a block carries; the rest reach a turn only through
+  /// the searched part.
+  pub core_fact_cap: i64,
   /// The exponent the time since each hit is raised to, negated, in the retrieval strength.
   pub decay: f64,
   /// How many hits a row keeps for its retrieval strength.
@@ -686,6 +692,7 @@ impl Default for Rules {
       weight_recency: 1.0,
       subject_bonus: 0.5,
       subject_cap: 4,
+      core_fact_cap: 8,
       decay: 0.5,
       hit_times_kept: 64,
       same_session_ms: 60 * 60 * 1_000,

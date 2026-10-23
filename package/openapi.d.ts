@@ -393,7 +393,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The subject's sheet rendered from its active facts about no room, and about the room named where one is; the same bytes for the same rows. */
+        /** The subject's sheet rendered from its active facts about no room, and about the room named where one is, most important and newest first, the first `limit` lines alone where one is given; the same bytes for the same rows. */
         get: operations["renderSheet"];
         put?: never;
         post?: never;
@@ -1205,6 +1205,13 @@ export interface components {
              * @default 150
              */
             consolidation_threshold: number;
+            /**
+             * Format: int64
+             * @description The most facts of one speaker's sheet the core of a block carries; the rest reach a turn only through
+             *     the searched part.
+             * @default 8
+             */
+            core_fact_cap: number;
             /**
              * Format: double
              * @description The exponent the time since each hit is raised to, negated, in the retrieval strength.
@@ -2439,6 +2446,8 @@ export interface operations {
     renderSheet: {
         parameters: {
             query?: {
+                /** @description The first that many lines alone, at least one; the whole sheet where none is given. */
+                limit?: number | null;
                 /** @description A subject of type `room`, whose facts about the subject the sheet takes in beside those about no room. */
                 roomId?: number | null;
             };
