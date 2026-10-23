@@ -48,7 +48,7 @@ async fn the_page_reads_events_past_a_cursor_narrowed_by_kind_and_scope() {
   assert_eq!(of_scope.items, all.items[1..]);
   let of_kind = client
     .events(&EventsQuery {
-      kinds: Some("memory.changed".into()),
+      kinds: Some("memory.written".into()),
       ..Default::default()
     })
     .await
@@ -114,10 +114,13 @@ async fn every_route_takes_the_token_and_a_route_no_one_serves_is_no_route() {
   let http = reqwest::Client::new();
   for (method, path) in [
     (reqwest::Method::GET, "/nowhere"),
-    (reqwest::Method::POST, "/fragments"),
+    (reqwest::Method::GET, "/memories"),
     (reqwest::Method::POST, "/memories"),
     (reqwest::Method::GET, "/memories/1"),
-    (reqwest::Method::PUT, "/fragments/tea"),
+    (reqwest::Method::PATCH, "/memories/1"),
+    (reqwest::Method::GET, "/fragments"),
+    (reqwest::Method::PATCH, "/fragments/tea"),
+    (reqwest::Method::GET, "/fragment-kinds"),
     (reqwest::Method::GET, "/notes"),
     (reqwest::Method::GET, "/watches"),
     (reqwest::Method::GET, "/reminders"),
@@ -140,7 +143,7 @@ async fn every_route_takes_the_token_and_a_route_no_one_serves_is_no_route() {
     assert_eq!(body["code"], "no-route");
   }
   let unread = http
-    .patch(format!("{}/memories/1", served.base))
+    .patch(format!("{}/brains/1/memories/1", served.base))
     .bearer_auth(TOKEN)
     .header("content-type", "application/json")
     .body("{\"state\": 1}")

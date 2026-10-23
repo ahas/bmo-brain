@@ -44,13 +44,6 @@ pub struct ConsoleConfig {
 /// How long the health command waits on one answer.
 pub const HEALTH_PATIENCE: Duration = Duration::from_secs(5);
 
-/// The configuration a deployment links beside the binary's directory: `brain.toml` in the directory above
-/// the one holding the running binary.
-pub fn beside_binary() -> Option<PathBuf> {
-  let binary = std::env::current_exe().ok()?;
-  Some(binary.parent()?.parent()?.join("brain.toml"))
-}
-
 impl Config {
   /// The configuration a file holds, or why it could not be read.
   pub fn read(path: &Path) -> Result<Self, String> {

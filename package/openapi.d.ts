@@ -539,57 +539,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/fragment-kinds": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** The kinds of fragment, by name. */
-        get: operations["listFragmentKinds"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/fragments": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Fragments by kind, scope, subject, library, words, state, ids or keys. */
-        get: operations["listFragments"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/fragments/{fragmentKey}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /** Switch a fragment off or on for scopes, or set its state. */
-        patch: operations["changeFragment"];
-        trace?: never;
-    };
     "/health": {
         parameters: {
             query?: never;
@@ -605,40 +554,6 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
-        trace?: never;
-    };
-    "/memories": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Memory rows by scope, scope prefix, subject, kind, state, label, due moment and words. */
-        get: operations["listMemories"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/memories/{memoryId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /** Change a row: its words, or its state (done, retired, candidate, off, standing again). */
-        patch: operations["changeMemory"];
         trace?: never;
     };
 }
@@ -738,72 +653,6 @@ export interface components {
              * @description The marks cleared for the session.
              */
             clearedCount: number;
-        };
-        /** @description One piece of reference text, named by its key. */
-        Fragment: {
-            /** Format: int64 */
-            changedAt: number;
-            /** Format: int64 */
-            createdAt: number;
-            /**
-             * Format: int64
-             * @description How many readings have attached it.
-             */
-            hitCount: number;
-            /** Format: int64 */
-            id: number;
-            key: string;
-            kind: string;
-            labels: {
-                [key: string]: string;
-            };
-            /** Format: int64 */
-            lastHitAt: number | null;
-            /** @description The caller's name for the set it came in. */
-            libraryName: string | null;
-            /** @description Where the caller keeps it. */
-            path: string | null;
-            /** @description The scope it is held under, or null for one shared by every scope. */
-            scope: string | null;
-            state: components["schemas"]["FragmentState"];
-            subjectKey: string | null;
-            /** @description The scopes it is switched off for. */
-            switchedOff: string[];
-            text: string;
-            title: string | null;
-            /** @description The SHA-256 of the text, in hex. */
-            version: string;
-        };
-        /** @description A kind of fragment and the words a reader calls it by. */
-        FragmentKind: {
-            /** @description Empty where the store holds none. */
-            description: string;
-            /** Format: int64 */
-            fragmentCount: number;
-            name: string;
-        };
-        /** @description One page of a list, oldest first. */
-        FragmentKindPage: {
-            items: components["schemas"]["FragmentKind"][];
-            /** @description Whether anything stands past the last item. */
-            more: boolean;
-        };
-        /** @description One page of a list, oldest first. */
-        FragmentPage: {
-            items: components["schemas"]["Fragment"][];
-            /** @description Whether anything stands past the last item. */
-            more: boolean;
-        };
-        /**
-         * @description Whether a fragment is offered.
-         * @enum {string}
-         */
-        FragmentState: "active" | "off";
-        /** @description A fragment switched: only the fields given change. */
-        FragmentSwitch: {
-            state?: components["schemas"]["FragmentState"] | null;
-            /** @description The scopes it is switched off for, replaced whole. */
-            switchedOff?: string[] | null;
         };
         /** @description Whether the service can answer. */
         Health: {
@@ -1278,59 +1127,6 @@ export interface components {
              */
             weight_relevance: number;
         };
-        /** @description One thing to remember. */
-        ScopedMemory: {
-            /** Format: int64 */
-            changedAt: number;
-            /** @description The caller's objects, kept as given. */
-            conditions: {
-                [key: string]: unknown;
-            }[];
-            /** Format: int64 */
-            createdAt: number;
-            /** Format: int64 */
-            dueAt: number | null;
-            /** Format: int64 */
-            id: number;
-            /** @description The caller's word for what the row is. */
-            kind: string;
-            labels: {
-                [key: string]: string;
-            };
-            /** Format: int64 */
-            lastMatchedAt: number | null;
-            /**
-             * Format: int64
-             * @description How many readings have matched it.
-             */
-            matchCount: number;
-            scope: string;
-            state: components["schemas"]["ScopedMemoryState"];
-            subjectKey: string | null;
-            text: string;
-        };
-        /** @description A change to a row: only the fields given change. */
-        ScopedMemoryChange: {
-            /**
-             * Format: int64
-             * @description The moment it is due; null clears it.
-             */
-            dueAt?: number | null;
-            /** @description The labels, replaced whole. */
-            labels?: {
-                [key: string]: string;
-            } | null;
-            state?: components["schemas"]["ScopedMemoryState"] | null;
-            text?: string | null;
-        };
-        /** @description One page of a list, oldest first. */
-        ScopedMemoryPage: {
-            items: components["schemas"]["ScopedMemory"][];
-            /** @description Whether anything stands past the last item. */
-            more: boolean;
-        };
-        /** @description Where a row stands. */
-        ScopedMemoryState: "standing" | "done" | "retired" | "candidate" | "off";
         /** @description A candidate memory, whose likes the write judgement reads. */
         SimilarAsk: {
             /**
@@ -2715,102 +2511,6 @@ export interface operations {
             410: components["responses"]["Gone"];
         };
     };
-    listFragmentKinds: {
-        parameters: {
-            query?: {
-                /** @description The last name seen; the page begins after it. */
-                after?: string | null;
-                /** @description How many items at most: 50 where none is given, at most 500. */
-                limit?: number | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Answered. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["FragmentKindPage"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-        };
-    };
-    listFragments: {
-        parameters: {
-            query?: {
-                /** @description The last id seen. */
-                after?: number | null;
-                /** @description Comma-separated ids. */
-                ids?: string | null;
-                /** @description Comma-separated keys. */
-                keys?: string | null;
-                kind?: string | null;
-                libraryName?: string | null;
-                limit?: number | null;
-                /** @description Words the title or the text holds, in any case. */
-                q?: string | null;
-                scope?: string | null;
-                state?: components["schemas"]["FragmentState"] | null;
-                subjectKey?: string | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Answered. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["FragmentPage"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-        };
-    };
-    changeFragment: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                fragmentKey: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["FragmentSwitch"];
-            };
-        };
-        responses: {
-            /** @description Answered. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Fragment"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-        };
-    };
     readHealth: {
         parameters: {
             query?: never;
@@ -2831,76 +2531,6 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
-        };
-    };
-    listMemories: {
-        parameters: {
-            query?: {
-                /** @description The last id seen. */
-                after?: number | null;
-                /** @description Rows due at or before this moment. */
-                dueBefore?: number | null;
-                kind?: string | null;
-                /** @description `key` for rows whose label is set, `key=value` for rows whose label has that value. */
-                label?: string | null;
-                limit?: number | null;
-                /** @description Words the text holds, in any case. */
-                q?: string | null;
-                scope?: string | null;
-                /** @description Rows of every scope beginning with this. */
-                scopePrefix?: string | null;
-                state?: components["schemas"]["ScopedMemoryState"] | null;
-                subjectKey?: string | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Answered. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ScopedMemoryPage"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-        };
-    };
-    changeMemory: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                memoryId: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ScopedMemoryChange"];
-            };
-        };
-        responses: {
-            /** @description Answered. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ScopedMemory"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
         };
     };
 }

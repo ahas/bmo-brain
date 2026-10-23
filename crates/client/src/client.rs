@@ -11,9 +11,7 @@ use crate::brains::{
   Restoration, SheetQuery, SimilarAsk, Subject, SubjectChange, SubjectsQuery, TalliesQuery, Tally,
   TypeCount, UnconsolidatedQuery,
 };
-use crate::fragments::{Fragment, FragmentKind, FragmentSwitch, FragmentsQuery};
-use crate::memories::{ScopedMemoriesQuery, ScopedMemory, ScopedMemoryChange};
-use crate::wire::{ConsoleManifest, ConsoleWords, Event, EventsQuery, Health, NameCursor, Page, WireError};
+use crate::wire::{ConsoleManifest, ConsoleWords, Event, EventsQuery, Health, Page, WireError};
 
 /// What a call came to short of the route's answer.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -144,35 +142,6 @@ impl BrainClient {
   pub async fn events(&self, query: &EventsQuery) -> Answer<Page<Event>> {
     let request = self.get(&["events"], query).header(reqwest::header::ACCEPT, "application/json");
     Self::answered(request).await
-  }
-
-  /// `GET /memories`
-  pub async fn scoped_memories(&self, query: &ScopedMemoriesQuery) -> Answer<Page<ScopedMemory>> {
-    Self::answered(self.get(&["memories"], query)).await
-  }
-
-  /// `PATCH /memories/{memoryId}`
-  pub async fn scoped_memory_update(
-    &self,
-    memory_id: i64,
-    body: &ScopedMemoryChange,
-  ) -> Answer<ScopedMemory> {
-    Self::answered(self.send(Method::PATCH, &["memories", &memory_id.to_string()], body)).await
-  }
-
-  /// `GET /fragments`
-  pub async fn fragments(&self, query: &FragmentsQuery) -> Answer<Page<Fragment>> {
-    Self::answered(self.get(&["fragments"], query)).await
-  }
-
-  /// `PATCH /fragments/{fragmentKey}`
-  pub async fn fragment_switch(&self, fragment_key: &str, body: &FragmentSwitch) -> Answer<Fragment> {
-    Self::answered(self.send(Method::PATCH, &["fragments", fragment_key], body)).await
-  }
-
-  /// `GET /fragment-kinds`
-  pub async fn fragment_kinds(&self, query: &NameCursor) -> Answer<Page<FragmentKind>> {
-    Self::answered(self.get(&["fragment-kinds"], query)).await
   }
 }
 

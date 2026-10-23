@@ -4,7 +4,6 @@
 mod brains;
 pub mod console;
 mod events;
-mod routes;
 
 use axum::extract::rejection::{JsonRejection, PathRejection, QueryRejection};
 use axum::extract::{FromRequest, FromRequestParts, MatchedPath, Request, State};
@@ -226,7 +225,6 @@ pub fn router(brain: Brain) -> Router {
     .route("/console-manifest", axum::routing::get(console::manifest))
     .route("/console-bundle/words", axum::routing::get(console::words))
     .route("/console-bundle/{file}", axum::routing::get(console::file))
-    .merge(routes::routes())
     .merge(brains::routes())
     .route_layer(middleware::from_fn(guarded))
     .fallback(no_route)

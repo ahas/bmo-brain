@@ -6,11 +6,10 @@
 use std::collections::BTreeMap;
 
 use bmo_brain_client::{
-  Brain, BrainsQuery, Confirmations, ErrorCode, Event, EventsQuery, ExportQuery, Fold, Folded, Fragment,
-  FragmentKind, FragmentSwitch, FragmentsQuery, Health, Hits, Injected, Layer, LayerChange, LayersQuery,
-  MemoriesQuery, Memory, MemoryMerge, MemoryMove, MemoryVersion, NameCursor, NewBrain, NewLayer, NewMemory,
-  NewSubject, Page, PersonaQuery, Recall, RecallAsk, Recorded, ScopedMemoriesQuery, ScopedMemory,
-  ScopedMemoryChange, SheetQuery, Subject, SubjectChange, SubjectsQuery, TypeCount, WireError,
+  Brain, BrainsQuery, Confirmations, ErrorCode, Event, EventsQuery, ExportQuery, Fold, Folded, Health,
+  Hits, Injected, Layer, LayerChange, LayersQuery, MemoriesQuery, Memory, MemoryMerge, MemoryMove,
+  MemoryVersion, NewBrain, NewLayer, NewMemory, NewSubject, Page, PersonaQuery, Recall, RecallAsk,
+  Recorded, SheetQuery, Subject, SubjectChange, SubjectsQuery, TypeCount, WireError,
 };
 use bmo_brain_client::{
   ConsoleManifest, ConsoleWords, Consolidated, Learned, Learning, Restoration, SimilarAsk, TalliesQuery,
@@ -30,16 +29,15 @@ const DESCRIPTION: &str = "An agent's long-term memory as a service. The service
   account's and one agent's: subjects (what a memory is about, found by type and key), layers (the table of \
   contents) and memories, one row a version, superseded and invalidated but never deleted. A turn asks recall for \
   a block under a token budget; a persona is rendered as the same bytes until a piece changes; a brain moves in and \
-  out as a brain file. The memory rows and fragments held under a caller's opaque scope stand for the console's \
-  screens until those read brains. Bodies are JSON with camelCase keys, times are epoch milliseconds, lists are \
-  pages of items and more, and every failure is the error shape with its status. The harness plugin's tools, each \
-  a thin call of one route, are stated under x-tools.";
+  out as a brain file. Nothing is held outside a brain. Bodies are JSON with camelCase keys, times are epoch \
+  milliseconds, lists are pages of items and more, and every failure is the error shape with its status. The \
+  harness plugin's tools, each a thin call of one route, are stated under x-tools.";
 
 const ENTRY: &str = "A harness finds or makes its brain with brain_brains and brain_brain_add, reads what a turn \
   should know with brain_recall, and writes what it learns with brain_memory_write and brain_memory_version.";
 
 /// The events the brain publishes.
-pub const EVENTS: [&str; 10] = [
+pub const EVENTS: [&str; 8] = [
   "brain.created",
   "brain.deleted",
   "brain.injected",
@@ -48,8 +46,6 @@ pub const EVENTS: [&str; 10] = [
   "layer.changed",
   "memory.written",
   "memory.moved",
-  "memory.changed",
-  "fragment.changed",
 ];
 
 /// One route as the document states it.
@@ -743,66 +739,6 @@ fn service_routes(g: &mut SchemaGenerator) -> Vec<Route> {
         })),
       )],
       codes: vec![NotFound],
-    },
-    Route {
-      method: "get",
-      path: "/memories",
-      id: "listMemories",
-      tag: "memories",
-      summary: "Memory rows by scope, scope prefix, subject, kind, state, label, due moment and words.",
-      parameters: query::<ScopedMemoriesQuery>(g),
-      body: None,
-      raw_body: None,
-      answers: vec![(200, json_answer::<Page<ScopedMemory>>(g))],
-      codes: vec![BadRequest],
-    },
-    Route {
-      method: "patch",
-      path: "/memories/{memoryId}",
-      id: "changeMemory",
-      tag: "memories",
-      summary: "Change a row: its words, or its state (done, retired, candidate, off, standing again).",
-      parameters: vec![id(g, "memoryId")],
-      body: body::<ScopedMemoryChange>(g),
-      raw_body: None,
-      answers: vec![(200, json_answer::<ScopedMemory>(g))],
-      codes: vec![BadRequest, NotFound, Conflict],
-    },
-    Route {
-      method: "get",
-      path: "/fragments",
-      id: "listFragments",
-      tag: "fragments",
-      summary: "Fragments by kind, scope, subject, library, words, state, ids or keys.",
-      parameters: query::<FragmentsQuery>(g),
-      body: None,
-      raw_body: None,
-      answers: vec![(200, json_answer::<Page<Fragment>>(g))],
-      codes: vec![BadRequest],
-    },
-    Route {
-      method: "patch",
-      path: "/fragments/{fragmentKey}",
-      id: "changeFragment",
-      tag: "fragments",
-      summary: "Switch a fragment off or on for scopes, or set its state.",
-      parameters: vec![named(g, "fragmentKey")],
-      body: body::<FragmentSwitch>(g),
-      raw_body: None,
-      answers: vec![(200, json_answer::<Fragment>(g))],
-      codes: vec![BadRequest, NotFound],
-    },
-    Route {
-      method: "get",
-      path: "/fragment-kinds",
-      id: "listFragmentKinds",
-      tag: "fragment-kinds",
-      summary: "The kinds of fragment, by name.",
-      parameters: query::<NameCursor>(g),
-      body: None,
-      raw_body: None,
-      answers: vec![(200, json_answer::<Page<FragmentKind>>(g))],
-      codes: vec![BadRequest],
     },
   ]
 }

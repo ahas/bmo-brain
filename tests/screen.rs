@@ -603,7 +603,7 @@ async fn the_consoles_token_reaches_the_screens_routes_with_the_administrators_r
   let (status, body) =
     relayed(&served, reqwest::Method::DELETE, &format!("/brains/{brain}"), Some("administrator")).await;
   assert_eq!((status, code(&body)), (403, "forbidden".to_owned()));
-  let (status, body) = relayed(&served, get.clone(), "/memories", Some("administrator")).await;
+  let (status, body) = relayed(&served, get.clone(), "/discipline", Some("administrator")).await;
   assert_eq!((status, code(&body)), (403, "forbidden".to_owned()));
   // With no bundle built, the manifest is not found, so a console leaves the brain out.
   let (status, body) = relayed(&served, get.clone(), "/console-manifest", None).await;

@@ -2,7 +2,7 @@
 # and restarts it as the repository's one service, waiting on its health; it runs the release binary over the
 # configuration each release links to the data root's env/brain.toml.
 [Unit]
-Description=bmo-brain: memory rows, notes, watches, reminders, fragments and locks, served under the caller's scopes
+Description=bmo-brain: an agent's long-term memory as brains of subjects, layers and versioned memories
 After=network-online.target
 # Without its configuration the service does not stand, so the unit does not start where the data root holds none.
 ConditionPathExists=%h/.local/share/bmo/data/env/brain.toml

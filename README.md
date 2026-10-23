@@ -4,10 +4,9 @@ The brain service, `bmo-brain`: an agent's long-term memory as a service. It kee
 account's and one agent's, as subjects (what a memory is about, found by type and key), layers (the table of
 contents) and memories, one row a version, superseded and invalidated but never deleted. A turn asks a
 brain's recall for a block under a token budget, a persona is rendered as the same bytes until a piece
-changes, and a brain moves in and out as a brain file. The brain never executes and calls no other unit. The rows held under a caller's opaque scope (memory rows,
-notes, watches, reminders, fragments, libraries, locks and the caller's own records) keep answering until
-their readers move to the brains. Its harness plugin, `brain-harness`, is the MCP server the same binary
-starts as `bmo-brain mcp` and the skill that tells a harness how to use it.
+changes, and a brain moves in and out as a brain file. The brain never executes and calls no other unit, and
+holds nothing outside a brain. Its harness plugin, `brain-harness`, is the MCP server the same binary starts
+as `bmo-brain mcp` and the skill that tells a harness how to use it.
 
 `docs/design.md` states the shape and the rules the brain keeps; `docs/boundary-api.md` states every route,
 event, tool and code; `docs/openapi.json` is the same contract in machine form, generated from the client's
@@ -24,7 +23,7 @@ fixtures or commit messages. `docs/PERSONAL-DATA.md` states the rule and the che
 | Folder | Holds |
 |---|---|
 | `.graph/` | the code dependency graph: its settings and its nodes, one feature to a node. The area files are generated in the checkout and untracked, so a fresh checkout builds them again, while `settings.toml` is the repository's configuration and stays tracked |
-| `src/` | the service's own package: its store (the brains, their subjects, layers, memories, recall and brain files, and the rows held under scopes), routes, clock, MCP server, OpenAPI document, the data move and the old archive's import |
+| `src/` | the service's own package: its store (the brains, their subjects, layers, memories, recall, sheets and brain files), routes, clock, MCP server, OpenAPI document and the sheet split |
 | `crates/` | `client/`, the crate `bmo-brain-client`, every body and member as a Rust type and one method for each route |
 | `package/` | the TypeScript package `bmo-brain-client`, generated from `docs/openapi.json`: every body as a type and a typed call for each route |
 | `client/` | the brain's screen, a Nuxt layer on bmo-ui built into the console bundle the brain serves: its pages, components, words, build and tests |
@@ -59,7 +58,7 @@ The service publishes its client in two languages, both from `docs/openapi.json`
 - A downstream checkout installs the TypeScript package from its pack: `bun pm pack` in `package/` makes
   `bmo-brain-client-<version>.tgz`, which the checkout adds by path. The package's version is the service's.
 - `brainClient(<address>, <token>)` answers a client whose calls are the document's routes, typed by it:
-  `brain.GET("/memories/{memoryId}", { params: { path: { memoryId } } })`. Every call carries the token,
+  `brain.GET("/brains/{brainId}/memories/{memoryId}", { params: { path: { brainId, memoryId } } })`. Every call carries the token,
   and `GET /events` answers a page; a caller reading the live stream reads server-sent events itself.
 - `bun run --cwd package generate` writes the package's types from the document, and its check fails where
   the committed types differ.

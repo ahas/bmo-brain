@@ -15,10 +15,9 @@ changes; a brain moves in and out as a brain file. The brain never executes and 
 
 - **A brain is keyed by `accountKey` and `agentKey`,** strings the caller gives and the brain never reads.
   Every subject, layer and memory belongs to one brain and is reached under its id.
-- **The memory rows and fragments held under a caller's opaque scope** stand for the console's screens
-  alone, until those screens read brains (「Memory rows」, 「Fragments」). There `scope` is a string the caller
-  wrote, `subjectKey` its key for who or what a member is about, and `labels` is the caller's metadata; the
-  brain gives none of them a meaning.
+- **Nothing is held outside a brain** (`docs/design.md`, 「What the brain holds besides brains」). A
+  memory's `key` and `labels` and a subject's `type` and `key` are the caller's; the brain gives none of them
+  a meaning.
 - **Its clock is the one thing the brain acts on by itself:** it prunes the event window.
 
 ## Configuration
@@ -28,7 +27,7 @@ The binary, `bmo-brain`, reads the TOML file `--config` names at start and holds
 `bmo-brain --config <file> health` asks the service the file names whether it is ready and ends;
 `bmo-brain --config <file> sheets split` splits the live `sheet` rows of the database the file names into
 facts (「Splitting sheets」). The MCP server, `bmo-brain mcp`, takes no configuration file (「The harness
-plugin」).
+plugin」). The binary declares no noun, so the platform's `bmo` hands it no command.
 
 | Setting | Key | What it is |
 |---|---|---|
@@ -54,12 +53,10 @@ answers ready and 1 otherwise, saying why on its error stream.
   route is answered 403 `forbidden` to it.
 - **Pages.** A list answers `{"items": [...], "more": boolean}`, oldest first by the member's `id` where its
   route names no other order, and is paged by `after`, the last `id` seen, the page continuing past that
-  member in the order the list stands in, and `limit` (50 where none is given, at most 500). The fragment
-  kinds are ordered by name instead, and `after` is the last name seen.
-- **Times** are epoch milliseconds. **Ids** are signed 64-bit integers the brain assigns. A fragment is also
-  keyed by the name the caller gave it, `key`.
-- **Strings.** `scope` is 1 to 200 characters; `text` of a row is not blank and at most 64000 characters.
-  Anything outside is answered 400 `bad-request`.
+  member in the order the list stands in, and `limit` (50 where none is given, at most 500).
+- **Times** are epoch milliseconds. **Ids** are signed 64-bit integers the brain assigns.
+- **Strings.** `text` of a memory is not blank and at most 64000 characters. Anything outside is answered 400
+  `bad-request`.
 
 ## Health
 
@@ -73,9 +70,8 @@ reads by. The service is ready where its database answers.
 `GET` answers it, or its key alone for a deletion. A reader asking `Accept: application/json` reads the same
 events as a page instead.
 
-- **Narrowing:** `kinds`, a comma-separated list of kinds; `scope`, the events of members held under one
-  scope, a brain's being `brain:<id>` (an event of a member with no scope, such as a fragment shared by
-  every scope, is never narrowed in).
+- **Narrowing:** `kinds`, a comma-separated list of kinds; `scope`, `brain:<id>`, the events of that brain's
+  members.
 - **Resuming:** `Last-Event-ID` or `after`. The brain keeps seven days of events; a resume from before the
   oldest it keeps is answered 410 `gone`, and the reader reads the collections again.
 - **Keeping the stream open:** a comment line every fifteen seconds.
@@ -90,8 +86,6 @@ events as a page instead.
 | `layer.changed` | a layer is added or changed | the layer |
 | `memory.written` | a version of a memory is written, first or superseding | the memory |
 | `memory.moved` | a memory's status moves | the memory |
-| `memory.changed` | a memory row's words, state, labels or due moment change | the row |
-| `fragment.changed` | a fragment is switched | the fragment |
 
 ## Brains
 
@@ -287,90 +281,11 @@ stylesheet and its words, and guards every route the screen uses.
   subjects, layers, memories, versions, moves, restorations, confirmations and learnings, and the similar
   ask; and `GET /events`.
 
-## Memory rows
-
-The rows below are held under a caller's scope; a brain's memories are 「Brains」. These rows and the
-fragments stand only for the console's screens until those screens read brains (`docs/design.md`, 「What the
-brain holds besides brains」): a row is listed and changed, and none is added.
-
-A memory row is one thing to remember: `id`, `scope`, `subjectKey` (or null), `kind`, `text`, `state`,
-`conditions`, `labels`, `dueAt` (or null), `matchCount`, `lastMatchedAt` (or null), `createdAt` and
-`changedAt`. `kind` is the caller's word for what the row is; the brain reads none. `conditions` is a list of
-the caller's objects, kept as given.
-
-The states, and the moves a `PATCH` may make; moving to the state a row is in already changes nothing.
-
-| State | Means | May move to |
-|---|---|---|
-| `standing` | the row holds | `done`, `retired`, `candidate`, `off` |
-| `done` | what it asked is finished | `standing`, `retired` |
-| `retired` | it is no longer of use | `standing` |
-| `candidate` | it waits for someone's approval | `standing`, `retired` |
-| `off` | it is set aside | `standing`, `retired` |
-
-| Route | Does | Answers |
-|---|---|---|
-| `GET /memories` | lists rows by `scope`, `scopePrefix`, `subjectKey`, `kind`, `state`, `label` (`key` for a label that is set, `key=value` for its value), `dueBefore` (a `dueAt` at or before it) and `q` (words the text holds, any case) | 200, a page |
-| `PATCH /memories/{memoryId}` | changes `text`, `state`, `labels` (replacing them whole) or `dueAt` (null clears it) | 200, the row; 404 `not-found`; 409 `conflict` for a move the table does not allow |
-
-## Fragments
-
-A fragment is one piece of reference text: `id`, `key`, `kind`, `scope` (or null for one shared by every
-scope), `subjectKey` (or null), `title` (or null), `path` (or null, where the caller keeps it), `text`,
-`version` (the SHA-256 of the text, in hex), `libraryName` (or null, the caller's name for the set it came
-in), `state` (`active` or `off`), `switchedOff` (the scopes it is switched off for), `labels`, `hitCount`,
-`lastHitAt` (or null), `createdAt` and `changedAt`. The key is the caller's and names it in every route.
-Like the memory rows, the fragments stand only for the console's screens: a fragment is listed and
-switched, and none is written.
-
-| Route | Does | Answers |
-|---|---|---|
-| `GET /fragments` | lists by `kind`, `scope`, `subjectKey`, `libraryName`, `state`, `q` (words its title or text holds, any case), `ids` (comma-separated ids) and `keys` (comma-separated keys) | 200, a page |
-| `PATCH /fragments/{fragmentKey}` | sets `switchedOff` (whole) and `state` | 200; 404 |
-| `GET /fragment-kinds` | the kinds: every kind a fragment names or the store holds a description of, each `name`, `description` (empty where none is held) and `fragmentCount` | 200, a page by name |
-
-## The command
-
-`bmo-brain` is the service and its command in one binary. The platform's `bmo` asks it `nouns` and hands a
-command whose leading words match a declared noun to it, the noun's words included.
-
-- **`bmo-brain nouns`** prints the nouns it carries, one a line: `memory` and `fragment`. No noun carries a
-  mark: every command asks the service's routes over HTTP, so it runs wherever the service is reachable.
-- **The service asked** is the one the configuration names: the file `--config` gives, else the one
-  `BMO_BRAIN_CONFIG` names, else the `brain.toml` a deployment links in the directory above the binary's.
-  The command reads the configuration's `listen` (an unspecified host asked at the loopback one) and
-  `token`, and calls the routes through the brain's client.
-- **Moments** are given as epoch milliseconds or an RFC 3339 time, and printed as RFC 3339 in UTC to the
-  millisecond. **Labels** are given as `key=value`, one `--label` each.
-- **`--via <road>`**, which `bmo` hands on after the noun, is taken and passed over: the brain reads no
-  turn.
-- **Output** begins each member on a line, prefixed with the noun, and prints its text as it stands.
-  **Ending:** 0 where the command finished; 1 where the brain refused or a value did not read, with
-  `bmo-brain: <the refusal>` on standard error; 2 where the words are no form the command takes.
-
-| Noun | Form | Route |
-|---|---|---|
-| `memory` | `update <id>` | `PATCH /memories/{memoryId}` |
-| | `done <id> [--text <text>]` | `PATCH /memories/{memoryId}` |
-| | `retire <id>`, `revive <id>`, `candidate <id>` | `PATCH /memories/{memoryId}` |
-| | `list` | `GET /memories` |
-| `fragment` | `list` | `GET /fragments` |
-| | `switch <key>` | `PATCH /fragments/{fragmentKey}` |
-
-- **`memory update`** takes at least one of `--text`, `--state`, `--label` (replacing the labels whole),
-  `--due` or `--no-due`; `--text -` reads standard input. **`memory done`** moves a row to `done`, with the
-  text it ends on where `--text` gives one. **`memory list`** narrows by `--scope`, `--scope-prefix`,
-  `--subject`, `--kind`, `--state`, `--label` (`key` or `key=value`), `--due-before`, `--q`, `--after` and
-  `--limit`.
-- **`fragment list`** narrows by `--kind`, `--scope`, `--subject`, `--library`, `--state`, `--q`, `--ids`,
-  `--keys`, `--after` and `--limit`. **`fragment switch <key>`** takes `--state` or `--off-for` (one flag
-  each, replacing the scopes it was off for).
-
 ## Splitting sheets
 
 `bmo-brain --config <file> sheets split [--dry-run]` reads the database the configuration names, not the
 routes, and splits every live `sheet` memory of every brain into `fact` memories (`docs/design.md`, 「A
-person is a subject」). It is no noun: `bmo` does not dispatch it.
+person is a subject」).
 
 - **A line is a fact** where it is a bullet: a `-`, `*` or `•`, or a number followed by `.` or `)`, then its
   words. A heading (a line beginning with `#`) and a line with no words are skipped and counted; any other

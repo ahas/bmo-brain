@@ -110,18 +110,6 @@ pub struct Cursor {
   pub limit: Option<i64>,
 }
 
-/// A page asked for by the last name seen.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct NameCursor {
-  /// The last name seen; the page begins after it.
-  #[serde(skip_serializing_if = "Option::is_none")]
-  pub after: Option<String>,
-  /// How many items at most: 50 where none is given, at most 500.
-  #[serde(skip_serializing_if = "Option::is_none")]
-  pub limit: Option<i64>,
-}
-
 /// Whether the service can answer.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct Health {

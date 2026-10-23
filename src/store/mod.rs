@@ -5,9 +5,7 @@
 pub mod brains;
 pub mod events;
 pub mod files;
-pub mod fragments;
 pub mod learning;
-pub mod memories;
 pub mod recall;
 pub mod rules;
 pub mod sheets;
@@ -181,16 +179,6 @@ pub(crate) async fn publish<T: Serialize>(
     .execute(&mut *conn)
     .await?;
   Ok(())
-}
-
-/// A scope as every member takes it: 1 to 200 characters.
-pub(crate) fn scope(field: &str, value: &str) -> Held<()> {
-  let length = value.chars().count();
-  if (1..=200).contains(&length) {
-    Ok(())
-  } else {
-    Err(Fault::BadRequest(format!("{field} is {length} characters; it is 1 to 200.")))
-  }
 }
 
 /// A key: 1 to 200 characters, none of them a control character or whitespace. A key never stands in a

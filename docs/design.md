@@ -316,15 +316,11 @@ keeps the memory; the wait keeps itself.
 
 ## What the brain holds besides brains
 
-Two members of the shape the brains replace stand, for the console alone: the memory rows held under a
-caller's opaque scope and the fragments of reference text. The console's memory and document screens read
-them, list them, move a row's state and switch a fragment; nothing adds one, and they go once those screens
-read brains (「The screen」).
-
-Nothing else stands outside a brain. An episode is an `episode` row; a reference piece is a memory of a
-reference type in a layer; a room's rule is a `rule` memory; a wait or a reminder is the wait tool's, outside
-the brain (「What the brain acts on by itself」); a session's loaded documents and its handoff note are the
-agency's session records.
+Nothing but its event window. Every member a caller reads or writes stands inside a brain: an episode is an
+`episode` row; a reference piece is a memory of a reference type in a layer; a room's rule is a `rule`
+memory; a wait or a reminder is the wait tool's, outside the brain (「What the brain acts on by itself」); a
+session's loaded documents and its handoff note are the agency's session records. No row is held under a
+caller's opaque scope, and no table stands beside the brains' own.
 
 ## The screen
 
@@ -417,10 +413,9 @@ read in the review screen, and the composed system prompt is the agency's to sho
 2. The writing: the material of the write judgement, the one call that applies it, the consolidation
    reads and marks, and the due signal in recall.
 3. The readers move: the reference selection onto recall, the room rules and sheets onto the subject routes,
-   the session records onto the agency's own; then the old routes and tables go, all but the memory rows and
-   fragments the console reads (「What the brain holds besides brains」). Once the reference
-   selection reads this structure, its training data is rebuilt on it and its decision model retrained, at
-   the owner's word only, as that unit's own item.
+   the session records onto the agency's own; then the old routes and tables go (「What the brain holds
+   besides brains」). Once the reference selection reads this structure, its training data is rebuilt on it
+   and its decision model retrained, at the owner's word only, as that unit's own item.
 4. The persona and lore of each agent injected from their content repositories' exports, and the agency's
    prompt composition onto the persona rendering.
-5. The screen, and with it the memory rows and fragments go.
+5. The screen, the console's one view of a brain (「The screen」).
