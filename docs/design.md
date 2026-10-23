@@ -230,8 +230,11 @@ is the brain's offer, the caller's is the last word.
   same bytes until a persona piece is actually changed, and a change is a new version like any other.
 - **Placeholders stay placeholders.** A persona piece may carry a placeholder for a value the deployment
   supplies; the brain renders it as it stands, and the caller that builds the prompt fills it.
-- **The lore is memories of type `lore`:** the index is layers, the people and places are subjects, and each
-  piece is a row, handed out through recall like any reference.
+- **The persona is short and goes into the system prompt; the lore does not.** The persona already reflects
+  the lore as far as a prompt should, so the rendering stays a few pieces. The lore is memories of type
+  `lore`: the index is layers, the people and places are subjects, and each piece is a row. A turn gets the
+  lore it needs the way it gets any reference: the gate's Laya reads the brain's table of contents, the
+  layers, picks the pieces for the turn, and the gate serves them; nothing of the lore stands in the prompt.
 - **Each agent's persona is in its own brain.** The brain knows no persona repository: a persona reaches a
   brain by injection and leaves it by export.
 
