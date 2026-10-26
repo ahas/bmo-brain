@@ -1,28 +1,43 @@
 <template>
-  <!-- The memories under the toolbar's filters (docs/design.md, 「The screen」): a table where there is room
-       and a list of items on a phone, each row keyed by its id so rows the brain writes or moves come and
-       go where they stand. A row opens the memory. -->
+  <!-- The memories under the toolbar's filters (docs/design.md, 「The screen」): the console's shared table where its
+       pane holds it, and a list of items, each keyed by its id so items the brain writes or moves come and go where
+       they stand, where it does not. A row or an item opens the memory. -->
   <div class="flex min-h-0 flex-1 flex-col">
     <BrainHeading v-bind="heading" :count="memories === null ? null : count" />
     <ContentSkeleton v-if="memories === null" class="p-3" :rows="10" list-class="flex flex-col gap-2" :label="t('brain.status.loading')">
       <SkeletonBar class="h-8 w-full" />
     </ContentSkeleton>
 
-    <div v-else ref="scroller" class="min-h-0 flex-1 overflow-y-auto">
+    <!-- The pane is measured for the table: where it holds it the memories stand in the shared table, which fills
+         the pane and scrolls its own rows, or under a subject's sheet takes its own height while the pane scrolls
+         both; where it does not, they stand stacked. -->
+    <div v-else ref="scroller" class="flex min-h-0 min-w-0 flex-1 flex-col" :class="tableFills ? '' : 'overflow-y-auto'">
       <BrainSheet v-if="subjectId !== null" :brain-id="brainId" :subject-id="subjectId" :name="subjectNames.get(subjectId) ?? ''" :changes="changes" />
       <p v-if="failure" class="p-4 text-sm text-error">{{ failure }}</p>
       <p v-else-if="memories.length === 0" class="p-6 text-center text-sm text-muted">{{ t("brain.status.nothing") }}</p>
 
-      <div v-if="!stacked && memories.length > 0" role="row" class="sticky top-0 z-10 grid gap-3 border-b border-default bg-default px-3 py-2 text-xs font-medium text-muted" :class="COLUMNS">
-        <span class="truncate">{{ t("brain.field.type") }}</span>
-        <span class="truncate">{{ t("brain.field.text") }}</span>
-        <span class="truncate">{{ t("brain.field.layer") }}</span>
-        <span class="truncate">{{ t("brain.field.status") }}</span>
-        <span class="truncate text-end">{{ t("brain.field.importance_short") }}</span>
-        <span class="truncate text-end">{{ t("brain.field.valid_from") }}</span>
-      </div>
+      <DataTable
+        v-if="!stacked && memories.length > 0"
+        data-memory-table
+        :data="memories"
+        :columns="columns"
+        layout="dense"
+        selectable
+        :class="tableFills ? 'min-h-0 flex-1' : 'shrink-0'"
+        :row-class="(memory: Memory) => (memory.id === openId ? 'bg-elevated' : '')"
+        @select="(memory: Memory) => emit('open', memory.id)"
+      >
+        <template #type-cell="{ row }">{{ typeName(t, te, row.original.type) }}</template>
+        <template #text-cell="{ row }">
+          <span :title="reader.of(row.original.text) === undefined ? undefined : row.original.text">{{ reader.shown(row.original.text) }}</span>
+        </template>
+        <template #layer-cell="{ row }">{{ layerName(row.original.layerId) }}</template>
+        <template #status-cell="{ row }"><BrainStatus :status="row.original.status" /></template>
+        <template #importance-cell="{ row }">{{ row.original.importance }}</template>
+        <template #validFrom-cell="{ row }">{{ day(row.original.validFrom) }}</template>
+      </DataTable>
 
-      <MovingList tag="ul" class="flex flex-col">
+      <MovingList v-else-if="stacked" tag="ul" class="flex flex-col">
         <li v-for="memory in memories" :key="memory.id">
           <button
             type="button"
@@ -30,15 +45,7 @@
             :class="{ 'bg-elevated': memory.id === openId }"
             @click="emit('open', memory.id)"
           >
-            <div v-if="!stacked" class="grid items-center gap-3 text-sm" :class="COLUMNS">
-              <span class="truncate text-muted">{{ typeName(t, te, memory.type) }}</span>
-              <span class="truncate" :title="reader.of(memory.text) === undefined ? undefined : memory.text">{{ reader.shown(memory.text) }}</span>
-              <span class="truncate text-muted">{{ layerName(memory.layerId) }}</span>
-              <BrainStatus :status="memory.status" />
-              <span class="text-end tabular-nums">{{ memory.importance }}</span>
-              <span class="text-end text-xs text-muted tabular-nums">{{ day(memory.validFrom) }}</span>
-            </div>
-            <div v-else class="flex flex-col gap-1">
+            <div class="flex flex-col gap-1">
               <div class="flex items-center gap-2 text-xs text-muted">
                 <span>{{ typeName(t, te, memory.type) }}</span>
                 <BrainStatus :status="memory.status" />
@@ -53,7 +60,7 @@
         </li>
       </MovingList>
 
-      <div v-if="more" class="flex justify-center p-3">
+      <div v-if="more" class="flex shrink-0 justify-center p-3">
         <UButton color="neutral" variant="outline" :loading="loadingMore" :label="t('brain.action.more')" @click="emit('more')" />
       </div>
     </div>
@@ -66,8 +73,11 @@ import BrainSheet from "./BrainSheet.vue";
 import { typeName } from "../domain/brain-names";
 import BrainStatus from "./BrainStatus.vue";
 import { useReading } from "../domain/brain-reading";
+import { MEMORY_COLUMNS, STACK_BELOW_PX } from "../domain/brain-table";
 
+import type { TableColumn } from "@nuxt/ui";
 import type { Layer, Memory } from "../domain/brain-api";
+import type { MemoryColumnId } from "../domain/brain-table";
 import type { Heading } from "../domain/brain-heading";
 
 const props = defineProps<{
@@ -89,16 +99,28 @@ const props = defineProps<{
 const emit = defineEmits<{ open: [id: number]; more: [] }>();
 
 const { t, te } = useI18n();
+
+// Each column's name, in the bundle's words.
+const HEADERS: Readonly<Record<MemoryColumnId, string>> = {
+  type: "brain.field.type",
+  text: "brain.field.text",
+  layer: "brain.field.layer",
+  status: "brain.field.status",
+  importance: "brain.field.importance_short",
+  validFrom: "brain.field.valid_from"
+};
 const reader = useReading();
 const scroller = ref<HTMLElement | null>(null);
 
-// The table's columns (docs/design.md, 「The screen」): the text takes what is left, at least 8rem, and every other
-// column one narrow width of its own, as wide as its header and its usual values. Where the pane is narrower than the
-// table's least width — the columns, their gaps and the row's side room — the rows stand stacked instead.
-const COLUMNS = "grid-cols-[5rem_minmax(8rem,1fr)_6rem_4.5rem_2.5rem_5.5rem]";
-const TABLE_LEAST_PX = (5 + 8 + 6 + 4.5 + 2.5 + 5.5) * 16 + 5 * 12 + 2 * 12;
+// The table's columns, each named and laid out by its own rule (docs/design.md, 「The screen」; `brain-table.ts`), and
+// the pane's width, under which the rows stand stacked instead.
+const columns = computed<TableColumn<Memory>[]>(() =>
+  MEMORY_COLUMNS.map((column) => ({ id: column.id, header: t(HEADERS[column.id]), meta: { class: { th: column.th, td: column.td } } }))
+);
 const paneWidth = ref<number | null>(null);
-const stacked = computed(() => props.narrow || (paneWidth.value !== null && paneWidth.value < TABLE_LEAST_PX));
+const stacked = computed(() => props.narrow || (paneWidth.value !== null && paneWidth.value < STACK_BELOW_PX));
+// The table fills the pane and scrolls its own rows, but for under a subject's sheet, where the pane scrolls both.
+const tableFills = computed(() => !stacked.value && props.subjectId === null);
 let sized: ResizeObserver | null = null;
 
 watch(
@@ -119,10 +141,13 @@ watch(
 
 onBeforeUnmount(() => sized?.disconnect());
 
-// A changed choice shows its memories from their start.
+// A changed choice shows its memories from their start, whichever box scrolls them.
 watch(
   () => JSON.stringify(props.heading.chips.map((chip) => [chip.choice, chip.value])),
-  () => scroller.value?.scrollTo({ top: 0 })
+  () => {
+    scroller.value?.scrollTo({ top: 0 });
+    scroller.value?.querySelector("[data-memory-table]")?.scrollTo({ top: 0 });
+  }
 );
 
 // Each page's texts are asked for in the reading language as the page comes; the English stands meanwhile.

@@ -344,11 +344,15 @@ console bundle contract and served by the brain itself (`docs/boundary-api.md`, 
 - **Three panes.** The index on the left, the view in the middle and the memory open on the right. The right
   pane stands only while a memory is open; with none open the view takes its room. On a phone the view is the
   body, the index rises from the bottom edge and a memory stands over the view.
-- **The memories stand as a table where their pane holds it.** Its text column takes the room left, never less
-  than a readable width, and every other column — the type, the layer, the status, the importance and the start
-  of validity — keeps one narrow width of its own down the whole table, a value too long for it cut with its
-  whole value in the cut line's tooltip; no header ever stands over another. Where the pane is narrower than the
-  table's least width, as it is beside an open memory, the rows stand stacked as on a phone, with no header.
+- **The memories stand as the console's shared table where their pane holds it** (bmo-ui's `DataTable`, the
+  record browser's close grid): its column names held overhead while the rows scroll, a row pressed to open its
+  memory, and every column's width moved by dragging the edge of its name. Its text column takes the room left,
+  never less than 8rem; every other column — the type, the layer, the status, the importance and the start of
+  validity — keeps one narrow width of its own down the whole table, a value too long for it cut with its whole
+  value in the cut line's tooltip; no name ever stands over another. The table fills the view and scrolls its
+  own rows; under a subject's sheet it takes its own height and the view scrolls both. Where the pane is
+  narrower than 588 pixels, as it is beside an open memory, the rows stand stacked as on a phone, with no names
+  over them.
 - **One toolbar** under the title bar carries the brain, the view and every filter, and nothing else is a toolbar:
   a view's own controls stand at the end of the view's heading. Every select carries a visible label naming
   what it chooses (the brain, the view, the status, the type, the order), and its value reads as words a
