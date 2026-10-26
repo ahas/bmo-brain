@@ -1218,7 +1218,10 @@ export interface components {
         TallyBy: "status" | "type" | "layer" | "subject";
         /** @description A type in use in a brain, and how many rows carry it. */
         TypeCount: {
-            /** Format: int64 */
+            /**
+             * Format: int64
+             * @description Its live memories, `active` and `pending`.
+             */
             count: number;
             /** @description Whether code depends on the type's meaning. */
             reserved: boolean;

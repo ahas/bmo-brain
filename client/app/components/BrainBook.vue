@@ -1,36 +1,37 @@
 <template>
-  <!-- The layer index read as a book (docs/design.md, 「The screen」): the layers in position order, each
-       layer's pieces in theirs, moved up and down as new versions. A layer holding persona pieces shows its
-       rendering, the very bytes the brain hands a system prompt; a layer is exported as a brain file. -->
+  <!-- The layer view (docs/design.md, 「The screen」): the layer chosen in the index, the first where none is, its
+       items in position order narrowed by the type, the subject, the status and the words, moved up and down as
+       new versions. A layer holding persona items shows its prompt source, the very bytes the brain hands a
+       system prompt, which no filter narrows; a layer is exported as a brain file. -->
   <div class="flex min-h-0 flex-1 flex-col">
-    <ToolBar :label="t('brain.view.book')">
-      <div>
-        <USelect :model-value="current?.id" :items="layerItems" :placeholder="t('brain.field.layer')" variant="ghost" class="min-w-40" @update:model-value="emit('layer', Number($event))" />
-      </div>
-      <TabSwitch v-if="hasPersona" v-model="reading" :items="readings" :label="t('brain.label.reading')" />
-      <div class="ms-auto">
-        <UButton v-if="current" icon="i-material-symbols-download" color="neutral" variant="ghost" :aria-label="t('brain.action.export')" :to="exportHref" external download />
-      </div>
-    </ToolBar>
+    <BrainHeading v-bind="heading" :title="title" :count="current === undefined && layer !== 'unfiled' ? null : pieces.length" :notes="notes">
+      <template #tools>
+        <TabSwitch v-if="hasPersona" v-model="reading" :items="readings" :label="t('brain.label.reading')" />
+        <UTooltip v-if="current" :text="t('brain.action.export')">
+          <UButton icon="i-material-symbols-download" color="neutral" variant="ghost" :aria-label="t('brain.action.export')" :to="exportHref" external download />
+        </UTooltip>
+      </template>
+    </BrainHeading>
 
-    <p v-if="current === undefined" class="p-6 text-center text-sm text-muted">{{ t("brain.status.no_layers") }}</p>
-    <div v-else class="min-h-0 flex-1 overflow-y-auto">
-      <div class="border-b border-default px-4 py-3">
-        <h2 class="text-base font-semibold">{{ current.name }}</h2>
-        <p v-if="current.description" class="text-sm text-muted">{{ current.description }}</p>
-      </div>
+    <p v-if="current === undefined && layer !== 'unfiled'" class="p-6 text-center text-sm text-muted">{{ t("brain.status.no_layers") }}</p>
+    <div v-else ref="scroller" class="min-h-0 flex-1 overflow-y-auto">
+      <div v-if="current?.description" class="border-b border-default px-4 py-2 text-sm text-muted">{{ current.description }}</div>
 
       <BrainText v-if="reading === 'rendering' && hasPersona" :text="rendering" tag="pre" text-class="font-mono text-sm whitespace-pre-wrap select-text" class="p-4" />
 
       <template v-else>
         <ol class="flex flex-col">
-          <li v-for="(piece, index) in pieces" :key="piece.id" class="flex items-start gap-2 border-b border-default px-4 py-3">
-            <span class="w-8 shrink-0 text-xs text-muted tabular-nums">{{ piece.position }}</span>
+          <li v-for="(piece, index) in pieces" :key="piece.id" class="group flex items-start gap-2 border-b border-default px-4 py-3">
+            <span class="w-8 shrink-0 text-sm text-muted tabular-nums">{{ piece.position }}</span>
             <button type="button" class="min-w-0 flex-1 text-start text-sm whitespace-pre-wrap hover:text-primary" @click="emit('open', piece.id)">{{ reader.shown(piece.text) }}</button>
-            <span class="shrink-0 text-xs text-muted">{{ piece.type }}</span>
-            <div class="flex shrink-0 flex-col">
-              <UButton size="xs" color="neutral" variant="ghost" icon="i-material-symbols-keyboard-arrow-up" :aria-label="t('brain.action.up')" :disabled="index === 0 || busy" @click="swap(index, index - 1)" />
-              <UButton size="xs" color="neutral" variant="ghost" icon="i-material-symbols-keyboard-arrow-down" :aria-label="t('brain.action.down')" :disabled="index === pieces.length - 1 || busy" @click="swap(index, index + 1)" />
+            <span class="shrink-0 text-sm text-muted">{{ typeName(t, te, piece.type) }}</span>
+            <div class="flex shrink-0 items-center opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 pointer-coarse:opacity-100">
+              <UTooltip :text="t('brain.action.up')">
+                <UButton size="xs" color="neutral" variant="ghost" icon="i-material-symbols-keyboard-arrow-up" :aria-label="t('brain.action.up')" :disabled="index === 0 || busy" @click="swap(index, index - 1)" />
+              </UTooltip>
+              <UTooltip :text="t('brain.action.down')">
+                <UButton size="xs" color="neutral" variant="ghost" icon="i-material-symbols-keyboard-arrow-down" :aria-label="t('brain.action.down')" :disabled="index === pieces.length - 1 || busy" @click="swap(index, index + 1)" />
+              </UTooltip>
             </div>
           </li>
         </ol>
@@ -42,17 +43,28 @@
 
 <script setup lang="ts">
 import { useIsland } from "bmo-ui/app/domain/island";
+import BrainHeading from "./BrainHeading.vue";
 import BrainText from "./BrainText.vue";
+import { typeName } from "../domain/brain-names";
 import * as api from "../domain/brain-api";
 import { useReading } from "../domain/brain-reading";
 
-import type { Layer, Memory } from "../domain/brain-api";
+import type { Layer, Memory, MemoryFilter } from "../domain/brain-api";
+import type { Heading } from "../domain/brain-heading";
 
-const props = defineProps<{ brainId: number; layers: Layer[]; layerId: number | null; changes: number }>();
+const props = defineProps<{
+  brainId: number;
+  heading: Heading;
+  layers: Layer[];
+  layer: number | "unfiled" | null;
+  filter: MemoryFilter;
+  changes: number;
+}>();
 
-const emit = defineEmits<{ layer: [id: number]; open: [id: number]; changed: [] }>();
+const emit = defineEmits<{ open: [id: number]; changed: [] }>();
 
-const { t } = useI18n();
+const { t, te } = useI18n();
+const scroller = ref<HTMLElement | null>(null);
 const island = useIsland(t);
 const reader = useReading();
 
@@ -61,9 +73,30 @@ const rendering = ref("");
 const reading = ref<"pieces" | "rendering">("pieces");
 const busy = ref(false);
 
-const current = computed(() => props.layers.find((layer) => layer.id === props.layerId) ?? props.layers[0]);
-const layerItems = computed(() => props.layers.map((layer) => ({ value: layer.id, label: layer.name })));
-const hasPersona = computed(() => pieces.value.some((piece) => piece.type === "persona" && piece.status === "active"));
+// The layer shown: the one chosen in the index, the first where none is, and none for the unfiled.
+const current = computed(() =>
+  props.layer === "unfiled" ? undefined : (props.layers.find((layer) => layer.id === props.layer) ?? props.layers[0])
+);
+const title = computed(() => {
+  const name =
+    props.layer === "unfiled"
+      ? t("brain.label.unfiled")
+      : current.value === undefined
+        ? ""
+        : props.layer === null
+          ? t("brain.label.first_layer", { name: current.value.name })
+          : current.value.name;
+
+  return name === "" ? props.heading.title : `${props.heading.title} · ${name}`;
+});
+// Every filter but the layer narrows the items; the prompt source is the whole layer's and says so while one does.
+const narrowed = computed(() => props.heading.chips.some((chip) => chip.choice !== "layer" && chip.honoured));
+const notes = computed(() => [
+  ...props.heading.notes,
+  ...(reading.value === "rendering" && hasPersona.value && narrowed.value ? [t("brain.unhonoured.prompt")] : [])
+]);
+// Whether the layer holds a live persona item, read whatever the filters narrow the items to.
+const hasPersona = ref(false);
 const readings = computed(() => [
   { value: "pieces" as const, label: t("brain.label.pieces") },
   { value: "rendering" as const, label: t("brain.label.rendering") }
@@ -73,17 +106,28 @@ const exportHref = computed(() => (current.value === undefined ? undefined : api
 async function read(): Promise<void> {
   const layer = current.value;
 
-  if (layer === undefined) return;
+  if (layer === undefined && props.layer !== "unfiled") return;
+
+  const filter: MemoryFilter = { ...props.filter, layerId: undefined, unfiled: undefined };
+
+  if (layer === undefined) filter.unfiled = true;
+  else filter.layerId = layer.id;
 
   try {
-    pieces.value = (await api.memoryPage(props.brainId, { layerId: layer.id, status: "active,pending" }, "position", null, 500)).items;
-    rendering.value = hasPersona.value ? await api.persona(props.brainId, layer.name) : "";
+    pieces.value = (await api.memoryPage(props.brainId, filter, "position", null, 500)).items;
+
+    const persona = layer !== undefined && (await api.memoryPage(props.brainId, { layerId: layer.id, type: "persona", status: "active" }, "position", null, 1)).items.length > 0;
+
+    hasPersona.value = persona;
+    rendering.value = persona && layer !== undefined ? await api.persona(props.brainId, layer.name) : "";
   } catch (error) {
     island.fail(error, t("brain.error.read"));
   }
+
+  scroller.value?.scrollTo({ top: 0 });
 }
 
-watch(() => [props.brainId, current.value?.id, props.changes], () => void read(), { immediate: true });
+watch(() => [props.brainId, current.value?.id, props.layer, JSON.stringify(props.filter), props.changes], () => void read(), { immediate: true });
 
 watch(() => [pieces.value, reader.language.value] as const, ([shown]) => reader.want(shown.map((piece) => piece.text)), { immediate: true });
 

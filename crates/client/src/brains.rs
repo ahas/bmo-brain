@@ -526,6 +526,7 @@ pub struct Recorded {
 pub struct TypeCount {
   #[serde(rename = "type")]
   pub kind: String,
+  /// Its live memories, `active` and `pending`.
   pub count: i64,
   /// Whether code depends on the type's meaning.
   pub reserved: bool,

@@ -16,66 +16,90 @@
       <div v-else class="flex min-h-0 flex-1 flex-col">
         <ToolBar :label="t('brain.label.toolbar')">
           <div>
+            <span class="text-muted">{{ t("brain.label.brain") }}</span>
             <USelect
               :model-value="place.brainId ?? undefined"
               :items="brainItems"
               :placeholder="t('brain.label.brain')"
               :aria-label="t('brain.label.brain')"
               variant="ghost"
-              class="min-w-36"
+              class="min-w-20"
               @update:model-value="chooseBrain(Number($event))"
             />
           </div>
           <div v-if="narrow">
             <UButton icon="i-material-symbols-toc" color="neutral" variant="ghost" :aria-label="t('brain.action.index')" @click="indexOpen = true" />
           </div>
-          <TabSwitch
-            :items="viewItems"
-            :model-value="place.view"
-            :label="t('brain.label.view')"
-            :compact="narrow"
-            @update:model-value="go({ view: $event })"
-          />
           <div>
-            <UInput
-              :model-value="place.q"
-              icon="i-material-symbols-search"
-              :placeholder="t('brain.label.search')"
-              variant="none"
-              class="w-40"
-              @change="go({ q: ($event.target as HTMLInputElement).value, memory: null })"
+            <span class="text-muted">{{ t("brain.label.view") }}</span>
+            <USelect
+              :model-value="place.view"
+              :items="viewItems"
+              :icon="viewItems.find((item) => item.value === place.view)?.icon"
+              :aria-label="t('brain.label.view')"
+              variant="ghost"
+              class="min-w-24"
+              @update:model-value="go({ view: $event as View })"
             />
           </div>
           <div>
-            <USelect
-              :model-value="place.status"
-              :items="statusItems"
-              :aria-label="t('brain.label.status')"
-              variant="ghost"
-              @update:model-value="go({ status: $event as StatusChoice })"
-            />
+            <UTooltip :text="unhonoured('q')" :disabled="honours(place.view, 'q')">
+              <UInput
+                :model-value="place.q"
+                icon="i-material-symbols-search"
+                :placeholder="t('brain.label.search')"
+                :aria-label="t('brain.label.words')"
+                :disabled="!honours(place.view, 'q')"
+                variant="none"
+                class="w-28"
+                @change="go({ q: ($event.target as HTMLInputElement).value, memory: null })"
+              />
+            </UTooltip>
           </div>
           <div>
-            <USelect
-              :model-value="place.type"
-              :items="typeItems"
-              :aria-label="t('brain.label.type')"
-              variant="ghost"
-              @update:model-value="go({ type: String($event) })"
-            />
+            <span class="text-muted">{{ t("brain.label.status") }}</span>
+            <UTooltip :text="unhonoured('status')" :disabled="honours(place.view, 'status')">
+              <USelect
+                :model-value="place.status"
+                :items="statusItems"
+                :aria-label="t('brain.label.status')"
+                :disabled="!honours(place.view, 'status')"
+                variant="ghost"
+                @update:model-value="go({ status: $event as StatusChoice })"
+              />
+            </UTooltip>
           </div>
           <div>
-            <USelect
-              :model-value="place.order"
-              :items="orderItems"
-              :aria-label="t('brain.label.order')"
-              variant="ghost"
-              @update:model-value="go({ order: $event as Order })"
-            />
+            <span class="text-muted">{{ t("brain.label.type") }}</span>
+            <UTooltip :text="unhonoured('type')" :disabled="honours(place.view, 'type')">
+              <USelect
+                :model-value="place.type"
+                :items="typeItems"
+                :aria-label="t('brain.label.type')"
+                :disabled="!honours(place.view, 'type')"
+                variant="ghost"
+                @update:model-value="go({ type: String($event) })"
+              />
+            </UTooltip>
+          </div>
+          <div>
+            <span class="text-muted">{{ t("brain.label.order") }}</span>
+            <UTooltip :text="unhonoured('order')" :disabled="honours(place.view, 'order')">
+              <USelect
+                :model-value="orderOf(place) as Order"
+                :items="orderItems"
+                :aria-label="t('brain.label.order')"
+                :disabled="!honours(place.view, 'order')"
+                variant="ghost"
+                @update:model-value="go({ order: $event as Order })"
+              />
+            </UTooltip>
           </div>
           <div>
             <UPopover>
-              <UButton icon="i-material-symbols-filter-list" color="neutral" variant="ghost" :aria-label="t('brain.action.filters')" />
+              <UTooltip :text="t('brain.action.filters')">
+                <UButton icon="i-material-symbols-filter-list" color="neutral" variant="ghost" :aria-label="t('brain.action.filters')" :disabled="!honours(place.view, 'key')" />
+              </UTooltip>
               <template #content>
                 <div class="flex w-72 flex-col gap-3 p-3">
                   <UFormField :label="t('brain.field.key')">
@@ -88,30 +112,9 @@
               </template>
             </UPopover>
           </div>
-          <div v-if="place.layer !== null || place.subject !== null" class="gap-1">
-            <UBadge
-              v-if="place.layer !== null"
-              color="neutral"
-              variant="subtle"
-              :label="layerName(place.layer)"
-              trailing-icon="i-material-symbols-close"
-              class="cursor-pointer"
-              @click="go({ layer: null })"
-            />
-            <UBadge
-              v-if="place.subject !== null"
-              color="neutral"
-              variant="subtle"
-              :label="subjectName(place.subject)"
-              trailing-icon="i-material-symbols-close"
-              class="cursor-pointer"
-              @click="go({ subject: null })"
-            />
-          </div>
           <div v-if="reader.offered" class="ms-auto">
             <UButton
               icon="i-material-symbols-translate"
-              :label="narrow ? undefined : t('brain.action.reading')"
               :aria-label="t('brain.action.reading')"
               :aria-pressed="translating"
               color="neutral"
@@ -120,7 +123,9 @@
             />
           </div>
           <div :class="{ 'ms-auto': !reader.offered }">
-            <UButton icon="i-material-symbols-school-outline" :label="narrow ? undefined : t('brain.action.teach')" color="neutral" variant="ghost" :aria-label="t('brain.action.teach')" :disabled="place.brainId === null" @click="teachOpen = true" />
+            <UTooltip :text="t('brain.action.teach')">
+              <UButton icon="i-material-symbols-school-outline" color="neutral" variant="ghost" :aria-label="t('brain.action.teach')" :disabled="place.brainId === null" @click="teachOpen = true" />
+            </UTooltip>
           </div>
         </ToolBar>
 
@@ -144,7 +149,8 @@
           v-else
           id="brain-splitter"
           auto-save-id="bmo-brain-splitter"
-          :items="SIDES"
+          :key="place.memory === null ? 'two' : 'three'"
+          :items="place.memory === null ? TWO_SIDES : SIDES"
           :ui="{ handle: SPLIT_HANDLE }"
           class="min-h-0 flex-1"
         >
@@ -158,10 +164,9 @@
               <component :is="viewPart" v-bind="viewProps" />
             </div>
           </template>
-          <template #row>
+          <template v-if="place.memory !== null" #row>
             <div class="flex min-h-0 min-w-0 flex-1 flex-col">
-              <BrainRow v-if="place.memory !== null" v-bind="rowProps" :narrow="false" @close="go({ memory: null })" @open="openMemory" @subject="go({ subject: $event, memory: null })" @layer="go({ layer: $event, memory: null })" @changed="reread" @timeline="go({ view: 'timeline' })" />
-              <p v-else class="p-6 text-center text-sm text-muted">{{ t("brain.status.no_memory_open") }}</p>
+              <BrainRow v-bind="rowProps" :narrow="false" @close="go({ memory: null })" @open="openMemory" @subject="go({ subject: $event, memory: null })" @layer="go({ layer: $event, memory: null })" @changed="reread" @timeline="go({ view: 'timeline' })" />
             </div>
           </template>
         </USplitter>
@@ -193,12 +198,14 @@ import BrainRow from "../../components/BrainRow.vue";
 import BrainTeach from "../../components/BrainTeach.vue";
 import BrainTimeline from "../../components/BrainTimeline.vue";
 import * as api from "../../domain/brain-api";
-import { EVERY_TYPE, EVERY_TYPE_BUT_EPISODES, ORDERS, STATUS_CHOICES, filterOf, orderOf, pathOf, placeOf, queryOf } from "../../domain/brain-place";
+import { EVERY_TYPE, EVERY_TYPE_BUT_EPISODES, ORDERS, STATUS_CHOICES, cleared, filterOf, honours, orderOf, pathOf, placeOf, queryOf, standing } from "../../domain/brain-place";
+import { subjectTypeName, typeName } from "../../domain/brain-names";
 import { ENGLISH, useReading } from "../../domain/brain-reading";
 import { useBrainStream } from "../../domain/brain-stream";
 
 import type { Brain, Layer, Memory, Subject, Tally, TypeCount } from "../../domain/brain-api";
-import type { Order, Place, StatusChoice, View } from "../../domain/brain-place";
+import type { Heading, HeadingChip } from "../../domain/brain-heading";
+import type { Choice, Order, Place, StatusChoice, View } from "../../domain/brain-place";
 import type { SplitterItem } from "@nuxt/ui";
 
 // The screen is one screen for every place inside it, so a memory opened or a filter changed reads again
@@ -211,11 +218,17 @@ const SIDES: SplitterItem[] = [
   { slot: "row", minSize: 20, defaultSize: 32, collapsible: true, collapsedSize: 0 }
 ];
 
+// With no memory open the view takes the row pane's room: no pane stands empty.
+const TWO_SIDES: SplitterItem[] = [
+  { slot: "index", minSize: 12, defaultSize: 22, collapsible: true, collapsedSize: 0 },
+  { slot: "view", minSize: 40, defaultSize: 78 }
+];
+
 const PAGE = 50;
 
 const route = useRoute();
 const router = useRouter();
-const { t } = useI18n();
+const { t, te } = useI18n();
 const island = useIsland(t);
 const narrow = useNarrow();
 // The reading language (docs/design.md, 「The screen」): the console's own where a translator is named.
@@ -289,7 +302,7 @@ const statusItems = computed(() =>
     const all = statusCounts.value.reduce((sum, tally) => sum + tally.count, 0);
     const count = choice === "all" ? all : choice === "live" ? countOf(statusCounts.value, ["active", "pending"]) : countOf(statusCounts.value, [choice]);
 
-    return { value: choice, label: `${t(`brain.status_choice.${choice}`)} · ${count}` };
+    return { value: choice, label: `${t(`brain.status_choice.${choice}`)} · ${count.toLocaleString()}` };
   })
 );
 
@@ -298,12 +311,12 @@ const typeItems = computed(() => {
   const episodes = countOf(typeCounts.value, ["episode"]);
   const named = typeList.value.map((type) => ({
     value: type.type,
-    label: `${type.type} · ${countOf(typeCounts.value, [type.type])}`
+    label: `${typeName(t, te, type.type)} · ${countOf(typeCounts.value, [type.type]).toLocaleString()}`
   }));
 
   return [
-    { value: EVERY_TYPE_BUT_EPISODES, label: `${t("brain.type_choice.but_episodes")} · ${all - episodes}` },
-    { value: EVERY_TYPE, label: `${t("brain.type_choice.every")} · ${all}` },
+    { value: EVERY_TYPE_BUT_EPISODES, label: `${t("brain.type_choice.but_episodes")} · ${(all - episodes).toLocaleString()}` },
+    { value: EVERY_TYPE, label: `${t("brain.type_choice.every")} · ${all.toLocaleString()}` },
     ...named
   ];
 });
@@ -319,8 +332,76 @@ function layerName(layer: number | "unfiled"): string {
 function subjectName(id: number): string {
   const subject = subjectList.value.find((found) => found.id === id);
 
-  return subject === undefined ? `#${id}` : subject.name ?? `${subject.type} ${subject.key}`;
+  return subject === undefined ? `#${id}` : (subject.name ?? `${subjectTypeName(t, te, subject.type)} ${subject.key}`);
 }
+
+// Why a view does not honour a choice, in one line, or nothing where it does.
+function unhonoured(choice: Choice): string {
+  if (honours(place.value.view, choice)) return "";
+
+  return place.value.view === "timeline" ? t("brain.unhonoured.timeline") : t("brain.unhonoured.order");
+}
+
+// The value a standing choice reads as, in words.
+function choiceValue(choice: Choice): string {
+  const at = place.value;
+
+  switch (choice) {
+    case "layer":
+      return at.layer === null ? "" : layerName(at.layer);
+    case "subject":
+      return at.subject === null ? "" : subjectName(at.subject);
+    case "type":
+      return at.type === EVERY_TYPE ? t("brain.type_choice.every") : typeName(t, te, at.type);
+    case "status":
+      return t(`brain.status_choice.${at.status}`);
+    case "order":
+      return t(`brain.order.${at.order.replace("-", "desc_")}`);
+    default:
+      return at[choice];
+  }
+}
+
+// The heading every view stands under: the brain and the view, each standing choice, and why any is not honoured.
+const heading = computed<Heading>(() => {
+  const brain = (brainList.value ?? []).find((found) => found.id === place.value.brainId);
+  const view = t(`brain.view.${place.value.view}`);
+  const chips: HeadingChip[] = standing(place.value).map((choice) => ({
+    choice,
+    what: t(`brain.heading.${choice}`),
+    value: choiceValue(choice),
+    honoured: honours(place.value.view, choice),
+    clear: () => go({ ...cleared(), ...keep(choice), memory: place.value.memory })
+  }));
+  const notes = [...new Set(chips.filter((chip) => !chip.honoured).map((chip) => unhonoured(chip.choice as Choice)))];
+
+  return {
+    title: t("brain.heading.brain_view", { brain: brain?.name || brain?.agentKey || "", view }),
+    chips,
+    notes,
+    clearAll: () => go({ ...cleared(), memory: place.value.memory })
+  };
+});
+
+// Every standing choice kept but one.
+function keep(without: Choice): Partial<Place> {
+  const kept: Partial<Place> = {};
+
+  for (const choice of standing(place.value)) {
+    if (choice !== without) (kept as Record<string, unknown>)[choice] = place.value[choice];
+  }
+
+  return kept;
+}
+
+// What the memory list holds under every choice, read off the status counts.
+const listCount = computed(() => {
+  const choice = place.value.status;
+
+  if (choice === "all") return statusCounts.value.reduce((sum, tally) => sum + tally.count, 0);
+
+  return countOf(statusCounts.value, choice === "live" ? ["active", "pending"] : [choice]);
+});
 
 // The brains, read once; a screen opened with no brain stands on the first.
 async function readBrains(): Promise<void> {
@@ -462,7 +543,7 @@ useBrainStream(() => place.value.brainId, reread);
 
 onMounted(() => void readBrains());
 
-const subjectNames = computed(() => new Map(subjectList.value.map((subject) => [subject.id, subject.name ?? `${subject.type} ${subject.key}`])));
+const subjectNames = computed(() => new Map(subjectList.value.map((subject) => [subject.id, subject.name ?? `${subjectTypeName(t, te, subject.type)} ${subject.key}`])));
 
 const indexProps = computed(() => ({
   brainId: place.value.brainId,
@@ -499,48 +580,48 @@ const viewPart = computed(() => {
 
 const viewProps = computed(() => {
   const brainId = place.value.brainId ?? 0;
+  const common = { brainId, heading: heading.value, changes: changes.value };
 
   switch (place.value.view) {
     case "map":
       return {
-        brainId,
+        ...common,
         subjectId: place.value.subject,
+        filter: filterOf(place.value),
         subjects: subjectList.value,
         layers: layerList.value,
-        changes: changes.value,
         onOpen: openMemory,
         onCentre: (subject: number) => go({ subject }),
         onNarrow: (subject: number) => go({ subject, view: "list" })
       };
     case "bubbles":
       return {
-        brainId,
+        ...common,
         by: place.value.by,
+        filter: filterOf(place.value),
         layers: layerList.value,
-        status: place.value.status,
-        changes: changes.value,
         onBy: (by: "type" | "layer") => go({ by }),
         onNarrow: (patch: Partial<Place>) => go({ ...patch, view: "list" })
       };
     case "timeline":
       return {
-        brainId,
+        ...common,
         memoryId: place.value.memory,
-        changes: changes.value,
         onOpen: openMemory
       };
     case "book":
       return {
-        brainId,
+        ...common,
         layers: layerList.value,
-        layerId: typeof place.value.layer === "number" ? place.value.layer : null,
-        changes: changes.value,
-        onLayer: (layer: number) => go({ layer }),
+        layer: place.value.layer,
+        filter: filterOf(place.value),
         onOpen: openMemory,
         onChanged: reread
       };
     default:
       return {
+        ...common,
+        count: listCount.value,
         memories: memories.value,
         more: more.value,
         loadingMore: loadingMore.value,
@@ -549,9 +630,7 @@ const viewProps = computed(() => {
         subjectNames: subjectNames.value,
         openId: place.value.memory,
         narrow: narrow.value,
-        brainId,
         subjectId: place.value.subject,
-        changes: changes.value,
         onOpen: openMemory,
         onMore: readMore
       };

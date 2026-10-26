@@ -100,8 +100,9 @@ One row is one thing the agent remembers, in one version.
 ### Types
 
 `type` is a word the writer writes freely. A few are reserved because code depends on their meaning;
-every other value is whatever the writer called it, and the brain lists the types in use with a count
-each, so a meaning does not split into two spellings.
+every other value is whatever the writer called it, and the brain lists the types in use with the count of
+live memories each, so a meaning does not split into two spellings; a type whose rows are all closed is no
+longer in use, and its history is read by status.
 
 No type is called `sheet`. A person's standing sheet is a rendering of the facts about them (「A person is
 a subject」), never a row, and a write that names `sheet` as its type is refused.
@@ -335,21 +336,49 @@ console bundle contract and served by the brain itself (`docs/boundary-api.md`, 
   keeps. A write from the screen carries the screen's own `actorName`.
 - **One brain at a time.** The toolbar's first control chooses the brain among those `GET /brains` answers,
   each by its name. Two brains share nothing, so no list ever mixes them.
-- **The index** stands on the left in three tabs. The layers, in position order, each with its description
-  and its count of live memories, the unfiled last; the subjects, grouped by type, each called by its newest
-  active `name` memory or else by its type and key; the types in use, the reserved ones first, each with its
-  count. Choosing one narrows the memories to it.
+- **Three panes.** The index on the left, the view in the middle and the memory open on the right. The right
+  pane stands only while a memory is open; with none open the view takes its room. On a phone the view is the
+  body, the index rises from the bottom edge and a memory stands over the view.
+- **One toolbar** across the top carries the brain, the view and every filter, and nothing else is a toolbar:
+  a view's own controls stand at the end of the view's heading. Every select carries a visible label naming
+  what it chooses (the brain, the view, the status, the type, the order), and its value reads as words a
+  person understands, with its count: the live memories, a status, every type but episodes, a type by its
+  name. On a phone the view is chosen by a labelled select rather than a row of marks, and the toolbar flows
+  sideways.
+- **The index** stands on the left in three tabs, 레이어, 대상 and 유형 in the Korean pack, each with one line
+  under the tab head saying what it lists and that choosing one narrows the view. The layers, in position
+  order, each with its description and its count of live memories, the unfiled last; the subjects, grouped by
+  type, each called by its newest active `name` memory or else by its type and key; the types in use, the
+  reserved ones first, each with its count of live memories. A chosen row stands highlighted and is scrolled
+  into sight, the tab holding it is the one open, and choosing it again clears it.
+- **Every choice narrows the view, or says why it cannot.** A layer, a subject or a type chosen in the index,
+  and every toolbar filter, narrows whatever the view shows: the memories, the layer's items, the memories
+  around the map's centre, the bubbles. Where a view cannot honour a choice (the version timeline shows one
+  lineage, so it honours none; the layer view and the map keep their own order), that choice is disabled there,
+  in the index and in the toolbar alike, with one line saying why, and it is never silently ignored. The view
+  scrolls back to its start whenever the choice changes.
+- **The heading** stands at the top of the middle pane and names exactly what is shown: the brain, the view,
+  each choice standing (the layer, the subject, the type, the status, the words, the key, the label), each
+  removable on its own, and the count of what the view holds under them. One press beside them clears every
+  choice. The view's own controls stand at its end: the layer view's switch between its items and the prompt
+  source and its export, the bubble chart's grouping and its table.
 - **The memories** stand in the middle as a table on a wide screen and a list on a phone, narrowed by the
-  toolbar's filters, which are the memory list's query as it stands: status (live, that is `active` and
-  `pending`, by default, or any one status, or all), type (every type but `episode` by default), layer,
-  subject, key, label and words, each status and type with its count. They are ordered newest first by
-  `validFrom`, or by importance or hits; a layer's memories by their position. The filters, the view and the
-  memory open stand in the address, so an address handed on opens the same row.
-- **The row view** stands on the right, or over the list on a phone: the text, the type, the key, the layer
-  and position, the subjects as chips, the grounds (the `episode` subjects and a learning's source), the
-  status with its span, the lineage (which version it is, the versions before and after it, the row that
-  superseded it), the hits, both strengths, the importance, the moment of its consolidation, its writer
-  and its labels. A superseded version opens under a band leading to the live one.
+  filters, which are the memory list's query as it stands: status (live, that is `active` and `pending`, by
+  default, or any one status, or all), type (every type but `episode` by default), layer, subject, key, label
+  and words, each status and type with its count. They are ordered newest first by `validFrom`, or by
+  importance or hits; a layer's memories by their position. The filters, the view and the memory open stand
+  in the address, so an address handed on opens the same row.
+- **Names in the reader's language.** A type, a subject's type and a status are shown by their names in the
+  language pack, a type the pack does not name by its own word; no code, enum word or JSON stands in the
+  screen.
+- **The row view** stands on the right, or over the list on a phone, under a heading naming the memory (its
+  type's name and its number) with a close control at its start and its own actions, editing and its version
+  timeline, as labelled icon buttons at its end. It has no tabs: its sections stand one under another, the
+  text, the moves, then the fields: the type, the key, the layer and position, the subjects as chips, the
+  grounds (the `episode` subjects and a learning's source), the status with its span, the version history
+  (which version it is, the versions before and after it, the row that superseded it), the use (hits, both
+  strengths, the importance), the moment of its consolidation, its writer and its labels. A superseded
+  version opens under a band leading to the live one.
 - **Moves.** Only the moves the status table allows stand as buttons: an `active` row is done or
   invalidated, a `pending` row is approved to `active`, done or invalidated, a `done` or `invalidated`
   lineage is restored, a superseded row has none. A move down asks for its reason; a move to `done` may take
@@ -368,36 +397,38 @@ console bundle contract and served by the brain itself (`docs/boundary-api.md`, 
 - **The reading language.** The brain's memories and its persona are English, and the person at the screen may
   read another language. A toggle in the toolbar chooses the reading language: the console's own locale by
   default, or English. In a language other than English, a memory's text wherever it stands (the list, the row
-  view, the timeline, the book and the memories offered while teaching), a subject's sheet and a persona layer's
-  rendering are shown translated through the translator the console names, page by page as they are shown; each
-  translated text in the row view, the timeline, the sheet and the rendering says so and opens its English
-  original with one tap, and the toggle turns every text back to English at once. The English stands while a
+  view, the timeline, the layer view and the memories offered while teaching), a subject's summary and a persona
+  layer's prompt source are shown translated through the translator the console names, page by page as they
+  are shown; each translated text in the row view, the timeline, the summary and the prompt source says so and
+  opens its English original with one tap, and the toggle turns every text back to English at once. The English stands while a
   translation is on its way, so a translation never holds the English view back, and where one fails, or the
   translator stays too busy to read a text and answers it untranslated, the English stays, without the
   translated label or the link to an original, with one sentence saying so. Where the console names no
   translator, the toggle does not stand and the screen reads English.
-- **A subject's sheet** stands folded over the memories narrowed to that subject, as the brain renders it from
-  the facts about it (「A person is a subject」), and not at all where the subject has no fact.
+- **A subject's summary** (인물 요약 in the Korean pack) stands folded over the memories narrowed to that
+  subject, headed by the subject's name, as the brain renders it from the facts about it (「A person is a
+  subject」), and not at all where the subject has no fact.
 - **Writing in another language.** The brain's rows stay English: no word of another script reaches a row. Words
   typed in the console's own language to teach, to edit a text, or as a move's reason or the words a row ended on
   are translated into English through the same translator before they are saved, and the screen shows the
   English to confirm, with a label saying it was translated; the English, which the person may still change, is
   what is saved. Where the translation fails, the words come back untranslated, or no translator is named, the
   screen says so in one sentence and saves nothing until the words are English.
-- **The layer index** reads the persona and the lore like a book: the layers in position order, each layer's
-  pieces in theirs, moved up and down as new versions. A persona layer shows its rendering, the very bytes
-  the brain hands a system prompt, placeholders left as they stand, and a change to a persona piece says
-  first that the prompts built on it start their cache afresh once. A layer is exported as a brain file from
-  here.
+- **The layer view** (레이어 in the Korean pack) reads the persona and the lore like a book: the layer chosen in
+  the index, the first where none is, its items in position order, moved up and down as new versions, narrowed
+  by the type, the subject, the status and the words. A persona layer shows its prompt source, the very bytes
+  the brain hands a system prompt, placeholders left as they stand; the prompt source is the whole layer's
+  and no filter narrows it. A change to a persona item says first that the prompts built on it start their
+  cache afresh once. A layer is exported as a brain file from here.
 - **A version timeline:** one lineage on a time axis, each version a point at its `validFrom` and a bar for
   the span it held, the point's colour its status and its mark its writer; the rows a merge folded into it
   reach it as lines, and the episodes a conclusion rests on stand under the axis at their moments. A point
   opens the version with the words it changed from the one before.
 - **A bubble chart:** one bubble per type or per layer, its horizontal place the group's mean importance,
-  its vertical place the mean retrieval strength and its size its count of live memories, so the important
-  memories that are cooling stand at the lower right. A bubble narrows the list to its group, and a table
+  its vertical place the mean retrieval strength and its size its count of memories under the filters, so the
+  important memories that are cooling stand at the lower right. A bubble narrows the list to its group, and a table
   shows the same figures.
-- **A mind map:** one subject at the centre, its live memories around it coloured by layer, the strongest
+- **A mind map:** one subject at the centre, its memories under the filters around it coloured by layer, the strongest
   first and the rest folded into one count, and the other subjects those memories reach outside them. A
   memory opens its row; an outer subject comes to the centre.
 - **Live.** The screen reads the brain's event stream narrowed to the brain it shows, and reads again the

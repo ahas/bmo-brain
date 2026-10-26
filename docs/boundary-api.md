@@ -174,7 +174,7 @@ moves a caller's word may make:
 | `GET /lineages/{lineageId}` | every version of a lineage, oldest first | 200, a list; 404 |
 | `POST /hits` | records a hand-out: `memoryIds`, `actorName`, `sessionKey` (which marks the rows for that session), `at` | 201, `recordedCount` |
 | `POST /confirmations` | records confirmations: `memoryIds`, `actorName`, `at`; each row's storage strength rises by the gap since its last confirmation, nothing within the same session | 201, `recordedCount` |
-| `GET /types` | the types in use, each `type`, `count` and `reserved`, the reserved ones first | 200, a list |
+| `GET /types` | the types in use, each `type`, `count` (its live memories, `active` and `pending`) and `reserved`, the reserved ones first; a type with no live memory is in use only where it is reserved, with the count 0, and the closed rows of every type stay readable through `GET /memories` and `GET /tallies` by status | 200, a list |
 | `GET /tallies` | the memories `GET /memories` would list under the same filters (paging and order aside), grouped `by` `status`, `type`, `layer` or `subject`: each group's `group` (the status, the type, or the layer's or subject's id in decimal; null for the rows in no layer or about no subject), `count`, `importance`, `strength` and `retrievalStrength` (each the group's mean, the retrieval strength as of the reading) and `latestValidFrom`, the largest groups first; a row about several subjects counts in each | 200, a list |
 
 `order` is a field the list is ordered by, `id` (where none is given), `position` (by layer position, then

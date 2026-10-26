@@ -4,12 +4,15 @@
        important memories that are cooling stand at the lower right. A bubble narrows the list to its
        group; a table shows the same figures. -->
   <div class="flex min-h-0 flex-1 flex-col">
-    <ToolBar :label="t('brain.view.bubbles')">
-      <TabSwitch :items="byItems" :model-value="by" :label="t('brain.label.group_by')" @update:model-value="emit('by', $event)" />
-      <div class="ms-auto">
-        <UButton :icon="asTable ? 'i-material-symbols-bubble-chart-outline' : 'i-material-symbols-table-outline'" color="neutral" variant="ghost" :aria-label="asTable ? t('brain.view.bubbles') : t('brain.label.as_table')" @click="asTable = !asTable" />
-      </div>
-    </ToolBar>
+    <BrainHeading v-bind="heading" :count="total">
+      <template #tools>
+        <span class="text-sm text-muted">{{ t("brain.label.group_by") }}</span>
+        <TabSwitch :items="byItems" :model-value="by" :label="t('brain.label.group_by')" @update:model-value="emit('by', $event)" />
+        <UTooltip :text="asTable ? t('brain.view.bubbles') : t('brain.label.as_table')">
+          <UButton :icon="asTable ? 'i-material-symbols-bubble-chart-outline' : 'i-material-symbols-table-outline'" color="neutral" variant="ghost" :aria-label="asTable ? t('brain.view.bubbles') : t('brain.label.as_table')" @click="asTable = !asTable" />
+        </UTooltip>
+      </template>
+    </BrainHeading>
 
     <div class="min-h-0 flex-1 overflow-auto p-3">
       <p v-if="groups.length === 0" class="p-6 text-center text-sm text-muted">{{ t("brain.status.nothing") }}</p>
@@ -50,18 +53,20 @@
 
 <script setup lang="ts">
 import { useIsland } from "bmo-ui/app/domain/island";
+import BrainHeading from "./BrainHeading.vue";
 import * as api from "../domain/brain-api";
 import { groupColour } from "../domain/brain-colour";
-import { statusAsked } from "../domain/brain-place";
+import { typeName } from "../domain/brain-names";
 
-import type { Layer, Tally } from "../domain/brain-api";
-import type { Place, StatusChoice } from "../domain/brain-place";
+import type { Layer, MemoryFilter, Tally } from "../domain/brain-api";
+import type { Heading } from "../domain/brain-heading";
+import type { Place } from "../domain/brain-place";
 
-const props = defineProps<{ brainId: number; by: "type" | "layer"; layers: Layer[]; status: StatusChoice; changes: number }>();
+const props = defineProps<{ brainId: number; heading: Heading; by: "type" | "layer"; layers: Layer[]; filter: MemoryFilter; changes: number }>();
 
 const emit = defineEmits<{ by: [by: "type" | "layer"]; narrow: [patch: Partial<Place>] }>();
 
-const { t } = useI18n();
+const { t, te } = useI18n();
 const island = useIsland(t);
 
 const WIDTH = 640;
@@ -80,19 +85,21 @@ const byItems = computed(() => [
 
 async function read(): Promise<void> {
   try {
-    tallied.value = await api.tallies(props.brainId, props.by, { status: statusAsked(props.status) });
+    tallied.value = await api.tallies(props.brainId, props.by, props.filter);
   } catch (error) {
     island.fail(error, t("brain.error.read"));
   }
 }
 
-watch(() => [props.brainId, props.by, props.status, props.changes], () => void read(), { immediate: true });
+watch(() => [props.brainId, props.by, JSON.stringify(props.filter), props.changes], () => void read(), { immediate: true });
+
+const total = computed(() => tallied.value.reduce((sum, tally) => sum + tally.count, 0));
 
 const groups = computed(() =>
   tallied.value.map((tally) => {
     const key = tally.group ?? "";
     const name =
-      props.by === "type" ? key : tally.group === null ? t("brain.label.unfiled") : (props.layers.find((layer) => String(layer.id) === key)?.name ?? `#${key}`);
+      props.by === "type" ? typeName(t, te, key) : tally.group === null ? t("brain.label.unfiled") : (props.layers.find((layer) => String(layer.id) === key)?.name ?? `#${key}`);
 
     return {
       key,

@@ -3,7 +3,9 @@
        at its validFrom and a bar for the span it held, its colour its status and its mark its writer. Rows a
        merge folded into a version reach it as lines from above; the episodes a version rests on stand under
        the axis. A point opens the version below with the words it changed from the one before. -->
-  <div class="flex min-h-0 flex-1 flex-col overflow-y-auto">
+  <div class="flex min-h-0 flex-1 flex-col">
+    <BrainHeading v-bind="heading" :title="memoryId === null ? heading.title : `${heading.title} · #${memoryId}`" :count="versions === null || memoryId === null ? null : versions.length" />
+    <div class="flex min-h-0 flex-1 flex-col overflow-y-auto">
     <p v-if="memoryId === null" class="p-6 text-center text-sm text-muted">{{ t("brain.status.timeline_empty") }}</p>
     <ContentSkeleton v-else-if="versions === null" class="p-4" :rows="4" list-class="flex flex-col gap-3" :label="t('brain.status.loading')">
       <SkeletonBar class="h-6 w-full" />
@@ -28,7 +30,7 @@
               <circle v-if="markOf(version) === 'person'" :cx="x(version.validFrom)" :cy="AXIS" r="7" :fill="colour(version.status)" :stroke-width="chosen === version.id ? 3 : 0" class="stroke-(--ui-text-highlighted)" />
               <rect v-else-if="markOf(version) === 'tool'" :x="x(version.validFrom) - 6" :y="AXIS - 6" width="12" height="12" :fill="colour(version.status)" :stroke-width="chosen === version.id ? 3 : 0" class="stroke-(--ui-text-highlighted)" />
               <path v-else :d="`M ${x(version.validFrom)} ${AXIS - 8} l 7 8 l -7 8 l -7 -8 z`" :fill="colour(version.status)" :stroke-width="chosen === version.id ? 3 : 0" class="stroke-(--ui-text-highlighted)" />
-              <title>#{{ version.id }} · {{ version.status }} · {{ version.actorName }}</title>
+              <title>#{{ version.id }} · {{ t(`brain.status_name.${version.status}`) }} · {{ version.actorName }}</title>
             </g>
             <text v-if="version.validTo !== null && version.validTo !== undefined && (version.status === 'done' || version.status === 'invalidated')" :x="x(version.validTo)" :y="AXIS - 12" text-anchor="middle" class="fill-(--ui-text-muted) text-[12px]">⊣</text>
           </g>
@@ -63,19 +65,22 @@
         </BrainText>
       </div>
     </template>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { useIsland } from "bmo-ui/app/domain/island";
+import BrainHeading from "./BrainHeading.vue";
 import BrainStatus from "./BrainStatus.vue";
 import BrainText from "./BrainText.vue";
 import * as api from "../domain/brain-api";
 import { wordChange } from "../domain/brain-words";
 
 import type { Memory, MemoryStatus } from "../domain/brain-api";
+import type { Heading } from "../domain/brain-heading";
 
-const props = defineProps<{ brainId: number; memoryId: number | null; changes: number }>();
+const props = defineProps<{ brainId: number; heading: Heading; memoryId: number | null; changes: number }>();
 
 const emit = defineEmits<{ open: [id: number] }>();
 

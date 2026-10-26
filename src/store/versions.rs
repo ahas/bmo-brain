@@ -810,15 +810,18 @@ impl Store {
     Ok(rows.len() as i64)
   }
 
-  /// The types in use in a brain, with a count each, the reserved ones first.
+  /// The types in use in a brain, with the count of live memories each, the reserved ones first: a type whose
+  /// rows are all closed is not in use.
   pub async fn types(&self, brain_id: i64) -> Held<Vec<TypeCount>> {
     let mut conn = self.connection().await?;
     brain_of(&mut conn, brain_id).await?;
-    let counted: Vec<(String, i64)> =
-      sqlx::query_as("SELECT type, COUNT(*) FROM memories WHERE brain_id = $1 GROUP BY type ORDER BY type")
-        .bind(brain_id)
-        .fetch_all(&mut *conn)
-        .await?;
+    let counted: Vec<(String, i64)> = sqlx::query_as(
+      "SELECT type, COUNT(*) FROM memories WHERE brain_id = $1 AND status IN ('active', 'pending') \
+       GROUP BY type ORDER BY type",
+    )
+    .bind(brain_id)
+    .fetch_all(&mut *conn)
+    .await?;
     let mut types: Vec<TypeCount> = RESERVED_TYPES
       .iter()
       .map(|name| TypeCount {

@@ -4,10 +4,11 @@
        subjects those memories reach. A memory opens its row; an outer subject comes to the centre, every
        point moving to its new place at once. -->
   <div class="flex min-h-0 flex-1 flex-col">
+    <BrainHeading v-bind="heading" :title="subjectId === null ? heading.title : `${heading.title} · ${nameOf(subjectId)}`" :count="subjectId === null ? null : memories.length" :notes="subjectId === null ? [...heading.notes, t('brain.heading.map_needs_subject')] : heading.notes" />
     <div v-if="subjectId === null" class="flex flex-col gap-2 p-4">
       <p class="text-sm text-muted">{{ t("brain.status.map_choose") }}</p>
       <div class="flex flex-wrap gap-1">
-        <UButton v-for="subject in subjects.slice(0, 40)" :key="subject.id" size="xs" color="neutral" variant="outline" :label="subject.name ?? `${subject.type} ${subject.key}`" @click="emit('centre', subject.id)" />
+        <UButton v-for="subject in subjects.slice(0, 40)" :key="subject.id" size="xs" color="neutral" variant="outline" :label="subject.name ?? `${subjectTypeName(t, te, subject.type)} ${subject.key}`" @click="emit('centre', subject.id)" />
       </div>
     </div>
     <div v-else class="min-h-0 flex-1 overflow-auto p-2">
@@ -27,16 +28,27 @@
 
 <script setup lang="ts">
 import { useIsland } from "bmo-ui/app/domain/island";
+import BrainHeading from "./BrainHeading.vue";
 import * as api from "../domain/brain-api";
 import { groupColour } from "../domain/brain-colour";
+import { subjectTypeName } from "../domain/brain-names";
 
-import type { Layer, Memory, Subject } from "../domain/brain-api";
+import type { Layer, Memory, MemoryFilter, Subject } from "../domain/brain-api";
+import type { Heading } from "../domain/brain-heading";
 
-const props = defineProps<{ brainId: number; subjectId: number | null; subjects: Subject[]; layers: Layer[]; changes: number }>();
+const props = defineProps<{
+  brainId: number;
+  heading: Heading;
+  subjectId: number | null;
+  filter: MemoryFilter;
+  subjects: Subject[];
+  layers: Layer[];
+  changes: number;
+}>();
 
 const emit = defineEmits<{ open: [id: number]; centre: [id: number]; narrow: [id: number] }>();
 
-const { t } = useI18n();
+const { t, te } = useI18n();
 const island = useIsland(t);
 
 const SIZE = 640;
@@ -51,7 +63,7 @@ async function read(): Promise<void> {
   if (props.subjectId === null) return;
 
   try {
-    const live = await api.memoriesNamed(props.brainId, { subjectId: props.subjectId, status: "active,pending", excludeTypes: "episode" });
+    const live = await api.memoriesNamed(props.brainId, { ...props.filter, subjectId: props.subjectId });
 
     memories.value = live.sort((a, b) => b.retrievalStrength - a.retrievalStrength || b.importance - a.importance);
   } catch (error) {
@@ -59,7 +71,7 @@ async function read(): Promise<void> {
   }
 }
 
-watch(() => [props.brainId, props.subjectId, props.changes], () => void read(), { immediate: true });
+watch(() => [props.brainId, props.subjectId, JSON.stringify(props.filter), props.changes], () => void read(), { immediate: true });
 
 interface Point {
   key: string;
@@ -77,7 +89,7 @@ interface Point {
 function nameOf(id: number): string {
   const subject = props.subjects.find((found) => found.id === id);
 
-  return subject === undefined ? `#${id}` : (subject.name ?? `${subject.type} ${subject.key}`);
+  return subject === undefined ? `#${id}` : (subject.name ?? `${subjectTypeName(t, te, subject.type)} ${subject.key}`);
 }
 
 function short(text: string): string {

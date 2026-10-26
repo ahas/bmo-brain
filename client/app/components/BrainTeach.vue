@@ -41,7 +41,7 @@
           </div>
           <ul v-if="candidates !== null && candidates.length > 0" class="flex flex-col divide-y divide-default rounded-md border border-default">
             <li v-for="candidate in candidates" :key="candidate.id" class="flex flex-col gap-2 p-2">
-              <p class="text-sm">{{ reader.shown(candidate.text) }} <span class="text-xs text-muted">#{{ candidate.id }} · {{ candidate.type }}</span></p>
+              <p class="text-sm">{{ reader.shown(candidate.text) }} <span class="text-xs text-muted">#{{ candidate.id }} · {{ typeName(t, te, candidate.type) }}</span></p>
               <USelect v-model="judged[candidate.id]" :items="judgements" size="xs" class="w-48" />
             </li>
           </ul>
@@ -62,6 +62,8 @@ import { useIsland } from "bmo-ui/app/domain/island";
 import * as api from "../domain/brain-api";
 import { faultKey, useEnglishWords, useReading } from "../domain/brain-reading";
 
+import { typeName } from "../domain/brain-names";
+
 import type { Layer, Memory, SubjectKey } from "../domain/brain-api";
 
 const props = defineProps<{ brainId: number; layers: Layer[]; narrow: boolean }>();
@@ -70,7 +72,7 @@ const emit = defineEmits<{ taught: [memory: Memory | null] }>();
 
 const open = defineModel<boolean>("open", { required: true });
 
-const { t } = useI18n();
+const { t, te } = useI18n();
 const island = useIsland(t);
 
 type Mode = "learning" | "piece";

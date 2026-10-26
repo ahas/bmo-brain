@@ -125,3 +125,43 @@ export function filterOf(place: Place, without: "status" | "type" | null = null)
 export function orderOf(place: Place): string {
   return place.layer !== null && place.order === "-validFrom" ? "position" : place.order;
 }
+
+// The choices a place narrows by, each standing in the heading and removable on its own.
+export const CHOICES = ["layer", "subject", "type", "status", "q", "key", "label", "order"] as const;
+export type Choice = (typeof CHOICES)[number];
+
+// What each view honours of the place's choices (docs/design.md, 「The screen」): the memory list every one; the
+// layer view, the map and the bubbles every one but the order, since each keeps an order of its own; the version
+// timeline none, since it shows one lineage. A choice a view does not honour is disabled there, never ignored.
+export function honours(view: View, choice: Choice): boolean {
+  switch (view) {
+    case "list":
+      return true;
+    case "timeline":
+      return false;
+    default:
+      return choice !== "order";
+  }
+}
+
+// The place with every narrowing choice taken back to its default.
+export function cleared(): Partial<Place> {
+  return {
+    layer: null,
+    subject: null,
+    type: EVERY_TYPE_BUT_EPISODES,
+    status: "live",
+    q: "",
+    key: "",
+    label: "",
+    order: "-validFrom",
+    memory: null
+  };
+}
+
+// The choices that stand away from their defaults.
+export function standing(place: Place): Choice[] {
+  const defaults = { ...place, ...cleared() } as Place;
+
+  return CHOICES.filter((choice) => place[choice] !== defaults[choice]);
+}

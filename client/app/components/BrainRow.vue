@@ -3,11 +3,19 @@
        lineage, the moves its status allows, and an edit saved as a new version. A superseded version opens
        under a band leading to the live one. -->
   <div class="flex min-h-0 flex-1 flex-col">
-    <div class="flex h-9 shrink-0 items-center gap-1 border-b border-default px-1 pointer-coarse:h-10">
-      <UButton :icon="narrow ? 'i-material-symbols-arrow-back' : 'i-material-symbols-close'" color="neutral" variant="ghost" :aria-label="t('common.action.close')" @click="emit('close')" />
-      <span class="min-w-0 flex-1 truncate text-sm font-medium">#{{ memoryId }}<template v-if="memory"> · {{ memory.type }}</template></span>
-      <UButton v-if="memory && editable" icon="i-material-symbols-edit-outline" color="neutral" variant="ghost" :aria-label="t('brain.action.edit')" @click="startEdit" />
-      <UButton icon="i-material-symbols-timeline" color="neutral" variant="ghost" :aria-label="t('brain.action.all_versions')" @click="emit('timeline')" />
+    <div class="flex shrink-0 items-center gap-1 border-b border-default px-1 py-1">
+      <UTooltip :text="t('brain.action.close_memory')">
+        <UButton :icon="narrow ? 'i-material-symbols-arrow-back' : 'i-material-symbols-close'" color="neutral" variant="ghost" :aria-label="t('brain.action.close_memory')" @click="emit('close')" />
+      </UTooltip>
+      <h2 class="min-w-0 flex-1 truncate text-base font-semibold">
+        {{ memory ? t("brain.label.memory_head", { id: memoryId, type: typeName(t, te, memory.type) }) : `#${memoryId}` }}
+      </h2>
+      <UTooltip v-if="memory && editable" :text="t('brain.action.edit')">
+        <UButton icon="i-material-symbols-edit-outline" color="neutral" variant="ghost" :aria-label="t('brain.action.edit')" @click="startEdit" />
+      </UTooltip>
+      <UTooltip :text="t('brain.action.all_versions')">
+        <UButton icon="i-material-symbols-timeline" color="neutral" variant="ghost" :aria-label="t('brain.action.all_versions')" @click="emit('timeline')" />
+      </UTooltip>
     </div>
 
     <ContentSkeleton v-if="memory === null && failure === ''" class="p-4" :rows="6" list-class="flex flex-col gap-3" :label="t('brain.status.loading')">
@@ -91,7 +99,7 @@
             <dt>{{ t("brain.field.subjects") }}</dt>
             <dd class="flex flex-wrap gap-1">
               <UBadge v-for="subject in topics" :key="subject.id" color="neutral" variant="outline" class="cursor-pointer" @click="emit('subject', subject.id)">
-                {{ subjectNames.get(subject.id) ?? subject.key }} <span class="text-muted">{{ subject.type }}</span>
+                {{ subjectNames.get(subject.id) ?? subject.key }} <span class="text-muted">{{ subjectTypeName(t, te, subject.type) }}</span>
               </UBadge>
             </dd>
           </template>
@@ -99,7 +107,7 @@
             <dt>{{ t("brain.field.grounds") }}</dt>
             <dd class="flex flex-wrap gap-1">
               <UBadge v-if="source" color="neutral" variant="soft" :label="t('brain.field.source') + ': ' + source" />
-              <UBadge v-for="ground in grounds" :key="ground.id" color="neutral" variant="outline" class="cursor-pointer" :label="`episode ${ground.key}`" @click="openGround(ground.key)" />
+              <UBadge v-for="ground in grounds" :key="ground.id" color="neutral" variant="outline" class="cursor-pointer" :label="`${typeName(t, te, 'episode')} ${ground.key}`" @click="openGround(ground.key)" />
             </dd>
           </template>
           <dt>{{ t("brain.field.lineage") }}</dt>
@@ -165,6 +173,7 @@ import { useIsland } from "bmo-ui/app/domain/island";
 import BrainStatus from "./BrainStatus.vue";
 import BrainText from "./BrainText.vue";
 import * as api from "../domain/brain-api";
+import { subjectTypeName, typeName } from "../domain/brain-names";
 import { faultKey, useEnglishWords } from "../domain/brain-reading";
 
 import type { Layer, Memory, MemoryStatus } from "../domain/brain-api";
@@ -187,7 +196,7 @@ const emit = defineEmits<{
   timeline: [];
 }>();
 
-const { t } = useI18n();
+const { t, te } = useI18n();
 const island = useIsland(t);
 
 const memory = ref<Memory | null>(null);

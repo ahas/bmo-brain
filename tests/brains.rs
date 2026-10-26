@@ -412,17 +412,45 @@ async fn hits_raise_retrieval_strength_and_spaced_confirmations_raise_storage_st
 }
 
 #[tokio::test]
-async fn the_types_in_use_are_counted_with_the_reserved_ones_first() {
+async fn the_types_in_use_count_their_live_rows_with_the_reserved_ones_first() {
   let served = Served::new().await;
   let client = &served.client;
   let brain = brain_of(client, "agent-a").await;
+  let closing = |status| MemoryMove {
+    status,
+    at: None,
+    actor_name: "writer-a".to_owned(),
+    reason: Some("closed".to_owned()),
+    text: None,
+  };
   client.memory_add(brain, &memory("fact", "A")).await.unwrap();
+  let versioned = client.memory_add(brain, &memory("fact", "A2")).await.unwrap();
+  client
+    .memory_version(
+      brain,
+      versioned.id,
+      &MemoryVersion {
+        text: Some("A2, written again".to_owned()),
+        actor_name: "writer-a".to_owned(),
+        ..MemoryVersion::default()
+      },
+    )
+    .await
+    .unwrap();
   client.memory_add(brain, &memory("tip", "B")).await.unwrap();
   client.memory_add(brain, &memory("tip", "C")).await.unwrap();
+  let done = client.memory_add(brain, &memory("tip", "D")).await.unwrap();
+  client.memory_move(brain, done.id, &closing(MemoryStatus::Done)).await.unwrap();
+  let gone = client.memory_add(brain, &memory("retired", "E")).await.unwrap();
+  client.memory_move(brain, gone.id, &closing(MemoryStatus::Invalidated)).await.unwrap();
   let types = client.types(brain).await.unwrap();
   let fact = types.iter().find(|t| t.kind == "fact").unwrap();
   let tip = types.iter().find(|t| t.kind == "tip").unwrap();
-  assert_eq!((fact.count, fact.reserved, tip.count, tip.reserved), (1, true, 2, false));
+  // The superseded version and the closed rows count for nothing, and a type whose rows are all closed is not in
+  // use; a reserved type stands with no live row.
+  assert_eq!((fact.count, fact.reserved, tip.count, tip.reserved), (2, true, 2, false));
+  assert!(types.iter().all(|t| t.kind != "retired"), "{types:?}");
+  assert_eq!(types.iter().find(|t| t.kind == "rumor").map(|t| t.count), Some(0));
   assert!(
     types.iter().position(|t| t.kind == "episode").unwrap()
       < types.iter().position(|t| t.kind == "tip").unwrap()
