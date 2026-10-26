@@ -197,7 +197,7 @@ dependencies = [
 
 [[package]]
 name = "bmo-brain"
-version = "0.1.0-rev.26"
+version = "0.1.0-rev.27"
 dependencies = [
  "axum",
  "bmo-brain-client",
@@ -220,7 +220,7 @@ dependencies = [
 
 [[package]]
 name = "bmo-brain-client"
-version = "0.1.0-rev.26"
+version = "0.1.0-rev.27"
 dependencies = [
  "reqwest",
  "schemars",
@@ -230,7 +230,7 @@ dependencies = [
 
 [[package]]
 name = "brain-tool"
-version = "0.1.0-rev.26"
+version = "0.1.0-rev.27"
 dependencies = [
  "axum",
  "bmo-brain",

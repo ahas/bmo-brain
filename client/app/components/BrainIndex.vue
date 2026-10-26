@@ -2,7 +2,8 @@
   <!-- The index (docs/design.md, 「The screen」): the layers in position order with their live counts and the
        unfiled last, the subjects grouped by type and called by their names, and the types in use. Choosing
        one narrows the memories to it. A layer is added and its description changed here; a subject's
-       description too. -->
+       description too. A row's actions are icon buttons at its end, shown while the row is hovered or
+       focused and always on a coarse pointer; a row never grows a second line of buttons. -->
   <div class="flex min-h-0 flex-1 flex-col">
     <UTabs v-model="tab" :items="tabs" :content="false" variant="link" class="w-full shrink-0" :ui="{ list: 'border-b border-default px-2' }" />
     <div class="border-b border-default p-2">
@@ -11,11 +12,10 @@
 
     <div class="min-h-0 flex-1 overflow-y-auto">
       <ul v-if="tab === 'layers'" class="flex flex-col py-1">
-        <li v-for="layer in shownLayers" :key="layer.id" class="group">
+        <li v-for="layer in shownLayers" :key="layer.id" class="group flex items-stretch hover:bg-elevated" :class="{ 'bg-elevated': place.layer === layer.id }">
           <button
             type="button"
-            class="flex w-full items-start gap-2 px-3 py-2 text-start hover:bg-elevated"
-            :class="{ 'bg-elevated': place.layer === layer.id }"
+            class="flex min-w-0 flex-1 items-start gap-2 py-2 ps-3 text-start"
             @click="emit('choose', { layer: layer.id })"
           >
             <div class="min-w-0 flex-1">
@@ -24,8 +24,10 @@
             </div>
             <UBadge color="neutral" variant="soft" size="sm"><RollingNumber :value="layerCount(String(layer.id))" /></UBadge>
           </button>
-          <div class="hidden gap-1 px-3 pb-2 group-hover:flex group-focus-within:flex pointer-coarse:flex">
-            <UButton size="xs" color="neutral" variant="ghost" icon="i-material-symbols-edit-outline" :label="t('brain.action.describe')" @click="describeLayer(layer)" />
+          <div class="flex items-center pe-2 ps-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 pointer-coarse:opacity-100">
+            <UTooltip :text="t('brain.action.describe')">
+              <UButton size="xs" color="neutral" variant="ghost" icon="i-material-symbols-edit-outline" :aria-label="t('brain.action.describe')" @click="describeLayer(layer)" />
+            </UTooltip>
           </div>
         </li>
         <li>
@@ -48,11 +50,10 @@
         <section v-for="[kind, members] in subjectGroups" :key="kind">
           <h3 class="px-3 pt-3 pb-1 text-xs font-semibold text-muted uppercase">{{ kind }}</h3>
           <ul>
-            <li v-for="subject in members" :key="subject.id" class="group">
+            <li v-for="subject in members" :key="subject.id" class="group flex items-stretch hover:bg-elevated" :class="{ 'bg-elevated': place.subject === subject.id }">
               <button
                 type="button"
-                class="flex w-full items-start gap-2 px-3 py-2 text-start hover:bg-elevated"
-                :class="{ 'bg-elevated': place.subject === subject.id }"
+                class="flex min-w-0 flex-1 items-start gap-2 py-2 ps-3 text-start"
                 @click="emit('choose', { subject: subject.id })"
               >
                 <div class="min-w-0 flex-1">
@@ -61,9 +62,13 @@
                 </div>
                 <UBadge color="neutral" variant="soft" size="sm"><RollingNumber :value="subjectCount(subject.id)" /></UBadge>
               </button>
-              <div class="hidden gap-1 px-3 pb-2 group-hover:flex group-focus-within:flex pointer-coarse:flex">
-                <UButton size="xs" color="neutral" variant="ghost" icon="i-material-symbols-edit-outline" :label="t('brain.action.describe')" @click="describeSubject(subject)" />
-                <UButton size="xs" color="neutral" variant="ghost" icon="i-material-symbols-hub-outline" :label="t('brain.view.map')" @click="emit('choose', { subject: subject.id, view: 'map' })" />
+              <div class="flex items-center gap-0.5 pe-2 ps-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 pointer-coarse:opacity-100">
+                <UTooltip :text="t('brain.action.describe')">
+                  <UButton size="xs" color="neutral" variant="ghost" icon="i-material-symbols-edit-outline" :aria-label="t('brain.action.describe')" @click="describeSubject(subject)" />
+                </UTooltip>
+                <UTooltip :text="t('brain.view.map')">
+                  <UButton size="xs" color="neutral" variant="ghost" icon="i-material-symbols-hub-outline" :aria-label="t('brain.view.map')" @click="emit('choose', { subject: subject.id, view: 'map' })" />
+                </UTooltip>
               </div>
             </li>
           </ul>
