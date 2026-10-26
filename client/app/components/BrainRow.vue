@@ -86,7 +86,7 @@
           </template>
           <template v-if="memory.key">
             <dt>{{ t("brain.field.key") }}</dt>
-            <dd class="font-mono text-xs">{{ memory.key }}</dd>
+            <dd class="font-mono text-xs break-all">{{ memory.key }}</dd>
           </template>
           <template v-if="memory.layerId !== null && memory.layerId !== undefined">
             <dt>{{ t("brain.field.layer") }}</dt>
@@ -97,17 +97,20 @@
           </template>
           <template v-if="topics.length > 0">
             <dt>{{ t("brain.field.subjects") }}</dt>
-            <dd class="flex flex-wrap gap-1">
-              <UBadge v-for="subject in topics" :key="subject.id" color="neutral" variant="outline" class="cursor-pointer" @click="emit('subject', subject.id)">
-                {{ subjectNames.get(subject.id) ?? subject.key }} <span class="text-muted">{{ subjectTypeName(t, te, subject.type) }}</span>
+            <!-- A subject's name takes the room the field has and no more: one too long for it is cut, and the cut line's
+                 tooltip shows it whole (the design rules' lists, 「A line cut short」). -->
+            <dd class="flex min-w-0 flex-wrap gap-1">
+              <UBadge v-for="subject in topics" :key="subject.id" color="neutral" variant="outline" class="max-w-full cursor-pointer" @click="emit('subject', subject.id)">
+                <span class="min-w-0 truncate">{{ subjectNames.get(subject.id) ?? subject.key }}</span>
+                <span class="shrink-0 text-muted">{{ subjectTypeName(t, te, subject.type) }}</span>
               </UBadge>
             </dd>
           </template>
           <template v-if="grounds.length > 0 || source">
             <dt>{{ t("brain.field.grounds") }}</dt>
-            <dd class="flex flex-wrap gap-1">
-              <UBadge v-if="source" color="neutral" variant="soft" :label="t('brain.field.source') + ': ' + source" />
-              <UBadge v-for="ground in grounds" :key="ground.id" color="neutral" variant="outline" class="cursor-pointer" :label="`${typeName(t, te, 'episode')} ${ground.key}`" @click="openGround(ground.key)" />
+            <dd class="flex min-w-0 flex-wrap gap-1">
+              <UBadge v-if="source" color="neutral" variant="soft" class="max-w-full" :label="t('brain.field.source') + ': ' + source" />
+              <UBadge v-for="ground in grounds" :key="ground.id" color="neutral" variant="outline" class="max-w-full cursor-pointer" :label="`${typeName(t, te, 'episode')} ${ground.key}`" @click="openGround(ground.key)" />
             </dd>
           </template>
           <dt>{{ t("brain.field.lineage") }}</dt>

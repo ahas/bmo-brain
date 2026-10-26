@@ -6,7 +6,16 @@
        description too. A row's actions are icon buttons at its end, shown while the row is hovered or
        focused and always on a coarse pointer; a row never grows a second line of buttons. -->
   <div class="flex min-h-0 flex-1 flex-col">
-    <UTabs v-model="tab" :items="tabs" :content="false" variant="link" class="w-full shrink-0" :ui="{ list: 'border-b border-default px-2' }" />
+    <!-- The three tabs share the column's width, each its short name whole at the column's default width; a column
+         dragged narrower cuts a name, and the cut line's tooltip shows it whole. -->
+    <UTabs
+      v-model="tab"
+      :items="tabs"
+      :content="false"
+      variant="link"
+      class="w-full min-w-0 shrink-0"
+      :ui="{ list: 'border-b border-default px-1 min-w-0', trigger: 'flex-1 min-w-0 justify-center px-1' }"
+    />
     <div class="border-b border-default px-3 py-2 text-sm text-muted">
       <p>{{ t(`brain.index.${tab}_about`) }} {{ t("brain.index.again_clears") }}</p>
       <p v-if="!usable" class="mt-1 text-warning">{{ t("brain.unhonoured.timeline") }}</p>
