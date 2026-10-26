@@ -20,7 +20,7 @@ test("one column takes the room left, the text, from a floor of 8rem", () => {
   expect(flexible[0]!.th.split(" ")).toContain("w-full");
 });
 
-test("every other column keeps the one width its rem names, its cells no wider", () => {
+test("every other column stands at its contents' width, under the ceiling its rem names", () => {
   for (const column of MEMORY_COLUMNS.filter((one) => !one.flexible)) {
     expect(remOf(column.th, "w-")).toBe(column.rem);
     expect(remOf(column.td, "max-w-")).toBe(column.rem);

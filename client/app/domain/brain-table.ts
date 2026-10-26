@@ -1,12 +1,13 @@
 // The memory table's columns (docs/design.md, 「The screen」): the text takes the room left from a floor of its own,
-// and every other column one narrow width down the whole table. Each width is held twice — as the rem it stands
-// for, and as the literal class the stylesheet is built from — so the two are read together and never part.
+// and every other column stands at its contents' width under a ceiling of its own, one width down the whole table.
+// Each width is held twice — as the rem it stands for, and as the literal class the stylesheet is built from — so
+// the two are read together and never part.
 
 export type MemoryColumnId = "type" | "text" | "layer" | "status" | "importance" | "validFrom";
 
 export interface MemoryColumn {
   id: MemoryColumnId;
-  // The column's width in rem: the one width it keeps, or for the flexible column the least it takes.
+  // The column's width in rem: its ceiling, or for the flexible column the least it takes.
   rem: number;
   flexible: boolean;
   // The classes its name and its cells stand under.
