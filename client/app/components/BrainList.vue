@@ -92,11 +92,11 @@ const { t, te } = useI18n();
 const reader = useReading();
 const scroller = ref<HTMLElement | null>(null);
 
-// The table's columns (docs/design.md, 「The screen」): the text takes what is left, at least 10rem, and every other
-// column one narrow width of its own. Where the pane is narrower than the table's least width — the columns, their
-// gaps and the row's side room — the rows stand stacked instead.
-const COLUMNS = "grid-cols-[5.5rem_minmax(10rem,1fr)_6rem_5.5rem_2.5rem_6rem]";
-const TABLE_LEAST_PX = (5.5 + 10 + 6 + 5.5 + 2.5 + 6) * 16 + 5 * 12 + 2 * 12;
+// The table's columns (docs/design.md, 「The screen」): the text takes what is left, at least 8rem, and every other
+// column one narrow width of its own, as wide as its header and its usual values. Where the pane is narrower than the
+// table's least width — the columns, their gaps and the row's side room — the rows stand stacked instead.
+const COLUMNS = "grid-cols-[5rem_minmax(8rem,1fr)_6rem_4.5rem_2.5rem_5.5rem]";
+const TABLE_LEAST_PX = (5 + 8 + 6 + 4.5 + 2.5 + 5.5) * 16 + 5 * 12 + 2 * 12;
 const paneWidth = ref<number | null>(null);
 const stacked = computed(() => props.narrow || (paneWidth.value !== null && paneWidth.value < TABLE_LEAST_PX));
 let sized: ResizeObserver | null = null;
