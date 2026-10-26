@@ -4,7 +4,10 @@
        phone the view is the body, the index rises from the bottom edge and a memory stands over the view.
        The brain, the view, the filters and the memory open are the address. -->
   <UDashboardPanel id="brain" :ui="{ body: 'p-0 sm:p-0 gap-0 sm:gap-0 overflow-y-hidden [&>*]:max-w-none' }">
-    <template #header>
+    <!-- Under a console that offers its title bar the screen draws none of its own, and its two actions on the
+         screen as a whole stand in the place the bar keeps for them (bmo-ui's `docs/console-bundles.md`,
+         "The title bar"). -->
+    <template v-if="bar === null" #header>
       <UDashboardNavbar :title="t('brain.title.screen')" icon="i-material-symbols-neurology-outline" />
     </template>
 
@@ -112,21 +115,23 @@
               </template>
             </UPopover>
           </div>
-          <div v-if="reader.offered" class="ms-auto">
-            <UButton
-              icon="i-material-symbols-translate"
-              :aria-label="t('brain.action.reading')"
-              :aria-pressed="translating"
-              color="neutral"
-              :variant="translating ? 'soft' : 'ghost'"
-              @click="reader.choose(translating ? ENGLISH : reader.home)"
-            />
-          </div>
-          <div :class="{ 'ms-auto': !reader.offered }">
-            <UTooltip :text="t('brain.action.teach')">
-              <UButton icon="i-material-symbols-school-outline" color="neutral" variant="ghost" :aria-label="t('brain.action.teach')" :disabled="place.brainId === null" @click="teachOpen = true" />
-            </UTooltip>
-          </div>
+          <Teleport defer :to="bar?.screenActions ?? 'body'" :disabled="bar === null">
+            <div v-if="reader.offered" :class="{ 'ms-auto': bar === null }">
+              <UButton
+                icon="i-material-symbols-translate"
+                :aria-label="t('brain.action.reading')"
+                :aria-pressed="translating"
+                color="neutral"
+                :variant="translating ? 'soft' : 'ghost'"
+                @click="reader.choose(translating ? ENGLISH : reader.home)"
+              />
+            </div>
+            <div :class="{ 'ms-auto': bar === null && !reader.offered }">
+              <UTooltip :text="t('brain.action.teach')">
+                <UButton icon="i-material-symbols-school-outline" color="neutral" variant="ghost" :aria-label="t('brain.action.teach')" :disabled="place.brainId === null" @click="teachOpen = true" />
+              </UTooltip>
+            </div>
+          </Teleport>
         </ToolBar>
 
         <p v-if="translating && reader.failed.value" role="status" class="border-b border-default px-3 py-1.5 text-sm text-warning">{{ t("brain.error.translate_read") }}</p>
@@ -229,6 +234,9 @@ const PAGE = 50;
 const route = useRoute();
 const router = useRouter();
 const { t, te } = useI18n();
+// The console's title bar where the console this screen stands in offers one, under the key the layer names for it:
+// the selector of the place it keeps for the screen's actions.
+const bar = inject<{ screenActions: string } | null>("bmo-console-title-bar", null);
 const island = useIsland(t);
 const narrow = useNarrow();
 // The reading language (docs/design.md, 「The screen」): the console's own where a translator is named.

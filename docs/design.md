@@ -334,12 +334,17 @@ console bundle contract and served by the brain itself (`docs/boundary-api.md`, 
 - **Who opens it.** An administrator, and no member. The brain does not know who sits at the screen: the
   console relays it with its own token and the reader's role, and the screen shows every brain the brain
   keeps. A write from the screen carries the screen's own `actorName`.
+- **One title bar.** The screen's route asks for the console's one title bar (bmo-ui's
+  `docs/console-bundles.md`, 「The title bar」). Under a console that offers it, the screen draws no bar of its
+  own and lays its two actions on the screen as a whole, the reading language's toggle and teaching, in the
+  place the bar keeps for them; standing alone, it draws its own bar with the screen's name and keeps the two
+  at the end of the toolbar.
 - **One brain at a time.** The toolbar's first control chooses the brain among those `GET /brains` answers,
   each by its name. Two brains share nothing, so no list ever mixes them.
 - **Three panes.** The index on the left, the view in the middle and the memory open on the right. The right
   pane stands only while a memory is open; with none open the view takes its room. On a phone the view is the
   body, the index rises from the bottom edge and a memory stands over the view.
-- **One toolbar** across the top carries the brain, the view and every filter, and nothing else is a toolbar:
+- **One toolbar** under the title bar carries the brain, the view and every filter, and nothing else is a toolbar:
   a view's own controls stand at the end of the view's heading. Every select carries a visible label naming
   what it chooses (the brain, the view, the status, the type, the order), and its value reads as words a
   person understands, with its count: the live memories, a status, every type but episodes, a type by its
@@ -395,7 +400,7 @@ console bundle contract and served by the brain itself (`docs/boundary-api.md`, 
   new, and one learning with the source `owner` applies it. A piece placed at a position in a layer, a
   persona's, a lore's or a knowledge piece, is written as a memory into that layer.
 - **The reading language.** The brain's memories and its persona are English, and the person at the screen may
-  read another language. A toggle in the toolbar chooses the reading language: the console's own locale by
+  read another language. A toggle among the screen's actions chooses the reading language: the console's own locale by
   default, or English. In a language other than English, a memory's text wherever it stands (the list, the row
   view, the timeline, the layer view and the memories offered while teaching), a subject's summary and a persona
   layer's prompt source are shown translated through the translator the console names, page by page as they
