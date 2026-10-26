@@ -87,6 +87,9 @@ units = ["deploy/*.service"]
 # Answers 0 once the service the deployed configuration names answers ready (docs/boundary-api.md,
 # 「Configuration」).
 health = "~/.local/share/bmo-brain/deploy/bin/bmo-brain --config ~/.local/share/bmo-brain/deploy/brain.toml health"
+# Answers 0 where no chat turn or research run stands under way that the restart would cut: the receiver's
+# own `quiet` command, by its deployed path, waited on before the flip (the testbed's docs/deploy.md).
+quiet = "~/.local/share/bmo-receiver/deploy/bin/bmo-receiver --config ~/.local/share/bmo-receiver/deploy/settings.toml quiet"
 
 # Where the brain's tool finds it: the data root's env/brain.env, written from the configuration.
 [[deploy.step]]

@@ -41,7 +41,9 @@ plugin」). The binary declares no noun, so the platform's `bmo` hands it no com
 Deployed, the file stands under the data root as `env/brain.toml`, and each release links to it as
 `brain.toml`. The service runs as the user unit `deploy/bmo-brain.service`, the repository's one service: a
 deployment restarts it, waits on its health command, `bmo-brain --config <deploy tree>/brain.toml health`,
-and rolls back where it does not come up ready. The health command asks the listen address (an unspecified
+and rolls back where it does not come up ready. Before its flip it waits for quiet (`testbed.toml`, `quiet`): the
+receiver's `quiet` command, run by its deployed path, says whether a chat turn or a research run stands under way
+that the restart would cut (the receiver's `docs/boundary-api.md`, 「The service and its commands」). The health command asks the listen address (an unspecified
 host asked at the loopback one) with the token, waits at most five seconds, and ends 0 where the service
 answers ready and 1 otherwise, saying why on its error stream.
 
