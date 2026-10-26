@@ -13,13 +13,13 @@
       <p v-if="failure" class="p-4 text-sm text-error">{{ failure }}</p>
       <p v-else-if="memories.length === 0" class="p-6 text-center text-sm text-muted">{{ t("brain.status.nothing") }}</p>
 
-      <div v-if="!narrow && memories.length > 0" role="row" class="sticky top-0 z-10 grid grid-cols-[5.5rem_minmax(0,1fr)_6rem_5.5rem_2.5rem_6rem] gap-3 border-b border-default bg-default px-3 py-2 text-xs font-medium text-muted">
-        <span>{{ t("brain.field.type") }}</span>
-        <span>{{ t("brain.field.text") }}</span>
-        <span>{{ t("brain.field.layer") }}</span>
-        <span>{{ t("brain.field.status") }}</span>
-        <span class="text-end">{{ t("brain.field.importance_short") }}</span>
-        <span class="text-end">{{ t("brain.field.valid_from") }}</span>
+      <div v-if="!stacked && memories.length > 0" role="row" class="sticky top-0 z-10 grid gap-3 border-b border-default bg-default px-3 py-2 text-xs font-medium text-muted" :class="COLUMNS">
+        <span class="truncate">{{ t("brain.field.type") }}</span>
+        <span class="truncate">{{ t("brain.field.text") }}</span>
+        <span class="truncate">{{ t("brain.field.layer") }}</span>
+        <span class="truncate">{{ t("brain.field.status") }}</span>
+        <span class="truncate text-end">{{ t("brain.field.importance_short") }}</span>
+        <span class="truncate text-end">{{ t("brain.field.valid_from") }}</span>
       </div>
 
       <MovingList tag="ul" class="flex flex-col">
@@ -30,7 +30,7 @@
             :class="{ 'bg-elevated': memory.id === openId }"
             @click="emit('open', memory.id)"
           >
-            <div v-if="!narrow" class="grid grid-cols-[5.5rem_minmax(0,1fr)_6rem_5.5rem_2.5rem_6rem] items-center gap-3 text-sm">
+            <div v-if="!stacked" class="grid items-center gap-3 text-sm" :class="COLUMNS">
               <span class="truncate text-muted">{{ typeName(t, te, memory.type) }}</span>
               <span class="truncate" :title="reader.of(memory.text) === undefined ? undefined : memory.text">{{ reader.shown(memory.text) }}</span>
               <span class="truncate text-muted">{{ layerName(memory.layerId) }}</span>
@@ -91,6 +91,33 @@ const emit = defineEmits<{ open: [id: number]; more: [] }>();
 const { t, te } = useI18n();
 const reader = useReading();
 const scroller = ref<HTMLElement | null>(null);
+
+// The table's columns (docs/design.md, 「The screen」): the text takes what is left, at least 10rem, and every other
+// column one narrow width of its own. Where the pane is narrower than the table's least width — the columns, their
+// gaps and the row's side room — the rows stand stacked instead.
+const COLUMNS = "grid-cols-[5.5rem_minmax(10rem,1fr)_6rem_5.5rem_2.5rem_6rem]";
+const TABLE_LEAST_PX = (5.5 + 10 + 6 + 5.5 + 2.5 + 6) * 16 + 5 * 12 + 2 * 12;
+const paneWidth = ref<number | null>(null);
+const stacked = computed(() => props.narrow || (paneWidth.value !== null && paneWidth.value < TABLE_LEAST_PX));
+let sized: ResizeObserver | null = null;
+
+watch(
+  scroller,
+  (element) => {
+    sized?.disconnect();
+    sized = null;
+
+    if (element === null) return;
+
+    sized = new ResizeObserver(([entry]) => {
+      paneWidth.value = entry?.contentRect.width ?? null;
+    });
+    sized.observe(element);
+  },
+  { flush: "post" }
+);
+
+onBeforeUnmount(() => sized?.disconnect());
 
 // A changed choice shows its memories from their start.
 watch(
