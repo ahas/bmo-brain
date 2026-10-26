@@ -17,9 +17,9 @@
       "more": "더 보기",
       "next": "뒤 버전",
       "open": "열기",
-      "open_live": "살아 있는 버전 열기",
+      "open_live": "활성 버전 열기",
       "previous": "앞 버전",
-      "reading": "번역해 읽기",
+      "reading": "번역",
       "restore": "다시 살리기",
       "show_original": "원문 보기",
       "show_translation": "번역 보기",
@@ -132,10 +132,10 @@
       "map_choose": "가운데 둘 대상을 고르세요.",
       "no_brains": "브레인이 없습니다.",
       "no_layers": "레이어가 없습니다.",
-      "no_memory_open": "기억을 고르면 여기에 섭니다.",
+      "no_memory_open": "선택된 기억이 이곳에 표시됩니다.",
       "nothing": "없습니다.",
       "superseded_band": "이 버전은 대체되었습니다.",
-      "timeline_empty": "기억을 고르면 그 계보가 여기에 섭니다.",
+      "timeline_empty": "선택된 기억의 계보가 이곳에 표시됩니다.",
       "translating": "번역하는 중"
     },
     "status_choice": {
@@ -143,7 +143,7 @@
       "all": "전체",
       "done": "끝남",
       "invalidated": "맞지 않음",
-      "live": "살아 있음",
+      "live": "활성",
       "pending": "승인 대기",
       "superseded": "대체됨"
     },
@@ -159,7 +159,7 @@
       "piece": "레이어 조각"
     },
     "type_choice": {
-      "but_episodes": "에피소드 뺀 전체",
+      "but_episodes": "에피소드 제외",
       "every": "모든 유형"
     },
     "view": {
