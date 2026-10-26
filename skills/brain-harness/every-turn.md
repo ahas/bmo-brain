@@ -37,10 +37,12 @@ it as you read, in the turn itself. Nothing writes it for you.
   read the likes,
   and judge the candidate: a duplicate (list it under `confirms`), a fuller statement of one (`strengthens`),
   a contradiction of some (`replaces`), or new. Then call `brain_learn` once with that judgement. The brain
-  applies it whole. Give the source honestly: `own` for what someone says about themselves, `owner` for what
-  the owner states or instructs, `told` for what someone says about someone else, `inferred` for what you
-  conclude. The brain writes `told` and `inferred` as rumors and never lets them close a fact.
-- **One fact, one row.** What you learn about a person is one `brain_learn` per thing: type `fact`, one
+  applies it whole. The source is always who said it: `own` for what someone says about themselves, `owner`
+  only for what the owner states or instructs, `told` for what someone says about someone else, `inferred` for
+  what you conclude. The brain writes `told` and `inferred` as rumors and never lets them close a fact.
+- **One thing, one row.** Whatever one sentence tells you is written once, under the one type it is: never a
+  row of one type and another row of another type for the same thing. What you learn about a person is one
+  `brain_learn` per thing: type `fact`, one
   short English sentence, the person as a subject (`type` `person`, their id). Link the room only where the
   fact holds in this room alone; a fact that holds wherever they are links no room (`room` empty). Date it:
   where it began holding before now, give `validFrom`, the moment of the archived message you read it in or
@@ -52,8 +54,10 @@ it as you read, in the turn itself. Nothing writes it for you.
   holding, `invalidated`. Write these with `brain_learn` under their type.
 - **A rule the owner sets for a situation** ("whenever X, do Y") is a `situation` memory about the room, or
   about no room where it holds everywhere, with the situation and the act in its text.
-- **What someone is called** is a `name` memory about them. A person is always a subject by their id, never
-  by a name.
+- **What someone wants to be called** is one `name` memory about that person alone: in English, the title
+  itself the one part quoted in its original letters, with no room, since a person's name holds wherever they
+  are, and the source `own` when they say it themselves. It is no `situation` rule and no fact about the room.
+  A person is always a subject by their id, never by a name.
 - **Never edit a memory in place and never delete one.** A correction is a version; a fact that stopped
   holding is invalidated; what you are unsure of is a rumor.
 
@@ -70,9 +74,10 @@ it as you read, in the turn itself. Nothing writes it for you.
 ## The language of a memory
 
 - **Write every memory in English,** whatever language the room speaks: the episode's text, the fact, the
-  rule. The brain is read by prompts written in English, and one language keeps one meaning
-  under one spelling. Keep a short quotation in the original words only where the exact wording matters,
-  such as a name someone is called or a phrase the owner set as a rule.
+  rule, the name, every sentence of each. The brain is read by prompts written in English, and one language
+  keeps one meaning under one spelling. Quote in the original letters only the words whose exact form matters,
+  such as the title someone is called by or a phrase the owner set as a rule; the sentence around them is
+  English. Nothing translates what you write: writing it in English is yours to do.
 
 ## When the brain does not hold it
 
