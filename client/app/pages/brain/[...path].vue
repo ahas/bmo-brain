@@ -115,7 +115,7 @@
               </template>
             </UPopover>
           </div>
-          <Teleport defer :to="bar?.screenActions ?? 'body'" :disabled="bar === null">
+          <Teleport v-if="bar === null || placed" defer :to="bar?.screenActions ?? 'body'" :disabled="bar === null">
             <div v-if="reader.offered" :class="{ 'ms-auto': bar === null }">
               <UButton
                 icon="i-material-symbols-translate"
@@ -237,6 +237,32 @@ const { t, te } = useI18n();
 // The console's title bar where the console this screen stands in offers one, under the key the layer names for it:
 // the selector of the place it keeps for the screen's actions.
 const bar = inject<{ screenActions: string } | null>("bmo-console-title-bar", null);
+// Whether the bar's place for the screen's actions stands yet. On the first arrival from a screen without the bar
+// the console may lay the place only after the screen is mounted, so the actions wait until it is in the document.
+const placed = ref(false);
+let placing: MutationObserver | null = null;
+
+onMounted(() => {
+  if (bar === null) return;
+
+  const stands = () => document.querySelector(bar.screenActions) !== null;
+
+  if (stands()) {
+    placed.value = true;
+
+    return;
+  }
+
+  placing = new MutationObserver(() => {
+    if (!stands()) return;
+
+    placed.value = true;
+    placing?.disconnect();
+    placing = null;
+  });
+  placing.observe(document.body, { childList: true, subtree: true });
+});
+onScopeDispose(() => placing?.disconnect());
 const island = useIsland(t);
 const narrow = useNarrow();
 // The reading language (docs/design.md, 「The screen」): the console's own where a translator is named.

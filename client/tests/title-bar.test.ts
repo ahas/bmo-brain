@@ -16,7 +16,7 @@ test("the screen draws a bar of its own only where the console offers none", () 
 });
 
 test("the reading toggle and teaching stand in the bar's place for the screen's actions, deferred", () => {
-  const from = page.indexOf('<Teleport defer :to="bar?.screenActions');
+  const from = page.indexOf('<Teleport v-if="bar === null || placed" defer :to="bar?.screenActions');
   const to = page.indexOf("</Teleport>", from);
   const moved = page.slice(from, to);
 
