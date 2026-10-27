@@ -101,7 +101,7 @@
         "string",
         "null"
       ],
-      "description": "When it began holding, where that was before now: a date (YYYY-MM-DD) or an RFC 3339 time, such as the moment of the archived message it was read in; now where none is given."
+      "description": "When it began holding, where that was before now: a date (YYYY-MM-DD) or an RFC 3339 time, such as the moment of the archived message it was read in, or the day a state began (moved house, started a job); never a date the fact itself states, such as a birthday or a deadline, which belongs in the text; now where none is given."
     }
   }
 }
