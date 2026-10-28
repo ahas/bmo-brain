@@ -52,7 +52,7 @@ capabilities = ["room.chat"]
 namespace = "bmo"
 name = "brain_list"
 title = "List memories"
-description = "Your brain's memories by type, status, subject, key or words."
+description = "Your brain's memories by type, status, subject, key, words, or the situation they are for."
 input = "brain_list.json"
 hints = { read_only = true }
 capabilities = ["room.chat"]

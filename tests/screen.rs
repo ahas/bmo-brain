@@ -22,6 +22,8 @@ fn memory(kind: &str, text: &str) -> NewMemory {
     subjects: vec![],
     importance: None,
     valid_from: None,
+    recall_condition: None,
+    release_condition: None,
     status: None,
     actor_name: "writer-a".to_owned(),
     labels: labels(&[]),
@@ -53,6 +55,7 @@ fn tallies(by: TallyBy) -> TalliesQuery {
     superseded_by: None,
     label: None,
     q: None,
+    situation: None,
   }
 }
 
@@ -188,6 +191,8 @@ async fn the_list_finds_the_unfiled_and_the_rows_a_version_superseded() {
         subjects: None,
         importance: None,
         valid_from: None,
+        recall_condition: None,
+        release_condition: None,
         actor_name: "writer-b".to_owned(),
         labels: None,
       },

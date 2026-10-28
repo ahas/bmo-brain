@@ -276,6 +276,8 @@ pub async fn answer(handed: Handed) -> Result<Answer, String> {
             subjects: about,
             importance: integer(arguments, "importance").or(Some(3)),
             valid_from: None,
+            recall_condition: None,
+            release_condition: None,
             status: None,
             actor_name: ACTOR.to_owned(),
             labels: Default::default(),
@@ -344,6 +346,8 @@ pub async fn answer(handed: Handed) -> Result<Answer, String> {
             replaces: integers(arguments, "replaces"),
             grounds: integers(arguments, "grounds"),
             valid_from,
+            recall_condition: string(arguments, "recallCondition"),
+            release_condition: string(arguments, "releaseCondition"),
             key: string(arguments, "key"),
             layer_id: None,
             actor_name: ACTOR.to_owned(),
@@ -414,6 +418,7 @@ pub async fn answer(handed: Handed) -> Result<Answer, String> {
             subject_id,
             key: string(arguments, "key"),
             q: string(arguments, "words"),
+            situation: string(arguments, "situation"),
             limit: integer(arguments, "limit"),
             ..Default::default()
           },
@@ -424,6 +429,7 @@ pub async fn answer(handed: Handed) -> Result<Answer, String> {
             "memories": page.items.iter().map(|m| json!({
               "id": m.id, "type": m.kind, "text": m.text, "status": m.status, "importance": m.importance,
               "subjects": m.subjects, "validFrom": m.valid_from, "validTo": m.valid_to,
+              "recallCondition": m.recall_condition, "releaseCondition": m.release_condition,
             })).collect::<Vec<_>>(),
             "more": page.more,
           })

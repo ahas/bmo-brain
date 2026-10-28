@@ -743,6 +743,10 @@ export interface components {
             };
             /** Format: int64 */
             layerId?: number | null;
+            /** @description The situation in which it is needed, in words. */
+            recallCondition?: string | null;
+            /** @description The situation that ends it, in words. */
+            releaseCondition?: string | null;
             /**
              * @description Live memories this contradicts: closed before the new row is written, unless the source is heard.
              * @default []
@@ -810,6 +814,16 @@ export interface components {
              */
             reason: string | null;
             /**
+             * @description The situation in which it is needed, in words, or null where it carries none.
+             * @default null
+             */
+            recallCondition: string | null;
+            /**
+             * @description The situation that ends it, in words, or null where it carries none.
+             * @default null
+             */
+            releaseCondition: string | null;
+            /**
              * Format: double
              * @description The retrieval strength, computed from the hits as the reading answers.
              */
@@ -850,6 +864,10 @@ export interface components {
             memoryIds: number[];
             /** Format: int64 */
             position?: number | null;
+            /** @description The situation in which it is needed; the one every merged row shares where none is given. */
+            recallCondition?: string | null;
+            /** @description The situation that ends it; the one every merged row shares where none is given. */
+            releaseCondition?: string | null;
             subjectIds?: number[] | null;
             subjects?: components["schemas"]["SubjectKey"][] | null;
             text: string;
@@ -894,6 +912,10 @@ export interface components {
             layerId?: number | null;
             /** Format: int64 */
             position?: number | null;
+            /** @description The situation in which it is needed: the old version's where not given, and a null clears it. */
+            recallCondition?: string | null;
+            /** @description The situation that ends it: the old version's where not given, and a null clears it. */
+            releaseCondition?: string | null;
             /** @description The subjects the new version is about, replacing the old version's whole where given. */
             subjectIds?: number[] | null;
             subjects?: components["schemas"]["SubjectKey"][] | null;
@@ -940,6 +962,10 @@ export interface components {
             layerId?: number | null;
             /** Format: int64 */
             position?: number | null;
+            /** @description The situation in which it is needed, in words. */
+            recallCondition?: string | null;
+            /** @description The situation that ends it, in words. */
+            releaseCondition?: string | null;
             /** @description `active` where none is given; `pending` is the other status a first version takes. */
             status?: components["schemas"]["MemoryStatus"] | null;
             /**
@@ -975,6 +1001,11 @@ export interface components {
             chosen: components["schemas"]["RecallChoice"][];
             /** @description Whether that sum has reached the brain's threshold, so a consolidation is due. */
             consolidationDue: boolean;
+            /**
+             * @description The rows whose release condition this turn held, ended as invalidated by this recall.
+             * @default []
+             */
+            released: number[];
             /** Format: int64 */
             tokenCount: number;
             /**
@@ -1053,6 +1084,12 @@ export interface components {
              * @default 1800
              */
             budget_tokens: number;
+            /**
+             * Format: double
+             * @description The share of a condition's words the turn must hold for the condition to match it.
+             * @default 0.5
+             */
+            condition_share: number;
             /**
              * Format: int64
              * @description The sum of importance of unconsolidated episodes that triggers a consolidation.
@@ -1808,6 +1845,8 @@ export interface operations {
                 order?: string | null;
                 /** @description Words the text holds, in any case. */
                 q?: string | null;
+                /** @description Words the recall condition holds, in any case: the rows a situation calls for. */
+                situation?: string | null;
                 /** @description One status, or several, comma-separated. */
                 status?: string | null;
                 subjectId?: number | null;
@@ -2294,6 +2333,8 @@ export interface operations {
                 lineageId?: number | null;
                 /** @description Words the text holds, in any case. */
                 q?: string | null;
+                /** @description Words the recall condition holds, in any case: the rows a situation calls for. */
+                situation?: string | null;
                 /** @description One status, or several, comma-separated. */
                 status?: string | null;
                 subjectId?: number | null;

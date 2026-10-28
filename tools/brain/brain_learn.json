@@ -102,6 +102,20 @@
         "null"
       ],
       "description": "When it began holding, where that was before now: a date (YYYY-MM-DD) or an RFC 3339 time, such as the moment of the archived message it was read in, or the day a state began (moved house, started a job); never a date the fact itself states, such as a birthday or a deadline, which belongs in the text; now where none is given."
+    },
+    "recallCondition": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "The situation in which this is needed, in a few English words: a turn that says it brings this memory out. Leave it out where the memory should come to mind by its words or its subjects alone."
+    },
+    "releaseCondition": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "The situation that ends it, in a few English words: the turn whose words hold it closes this memory as invalidated, so it is never handed out again. Leave it out where nothing ends it."
     }
   }
 }

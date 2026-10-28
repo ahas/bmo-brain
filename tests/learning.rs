@@ -28,6 +28,8 @@ fn memory(kind: &str, text: &str, subjects: Vec<SubjectKey>) -> NewMemory {
     subjects,
     importance: None,
     valid_from: None,
+    recall_condition: None,
+    release_condition: None,
     status: None,
     actor_name: "writer-a".to_owned(),
     labels: labels(&[]),
@@ -46,6 +48,8 @@ fn learning(kind: &str, text: &str, source: Source) -> Learning {
     replaces: vec![],
     grounds: vec![],
     valid_from: None,
+    recall_condition: None,
+    release_condition: None,
     key: None,
     layer_id: None,
     actor_name: "agent-session".to_owned(),
@@ -341,5 +345,68 @@ async fn unconsolidated_episodes_are_read_most_important_first_and_marked_with_t
         .await
     ),
     (400, "bad-request".to_owned())
+  );
+}
+
+#[tokio::test]
+async fn a_promise_a_check_and_a_followup_carry_the_same_two_situations() {
+  let served = Served::new().await;
+  let client = &served.client;
+  let brain = brain_of(client).await;
+  let mut promises = Vec::new();
+  for (kind, text, when, ends) in [
+    ("promise", "Bring the ladder back.", "the ladder is needed", "the ladder is back"),
+    (
+      "check",
+      "Ask whether the gate closed.",
+      "the gate is mentioned",
+      "the gate is found shut",
+    ),
+    (
+      "followup",
+      "Tell the member the price.",
+      "the member asks about the price",
+      "the price is told",
+    ),
+  ] {
+    let learned = client
+      .learn(
+        brain,
+        &Learning {
+          recall_condition: Some(when.to_owned()),
+          release_condition: Some(ends.to_owned()),
+          ..learning(kind, text, Source::Own)
+        },
+      )
+      .await
+      .unwrap();
+    let written = learned.written.expect("a learning writes its row");
+    assert_eq!(
+      (
+        written.kind.as_str(),
+        written.recall_condition.as_deref(),
+        written.release_condition.as_deref()
+      ),
+      (kind, Some(when), Some(ends))
+    );
+    promises.push(written.id);
+  }
+
+  // A fuller version that gives no condition keeps the ones it carried; the row it replaced keeps its own.
+  let strengthened = client
+    .learn(
+      brain,
+      &Learning {
+        strengthens: Some(promises[0]),
+        ..learning("promise", "Bring the ladder back before dark.", Source::Own)
+      },
+    )
+    .await
+    .unwrap();
+  let version = strengthened.written.expect("a strengthening writes a version");
+  assert!(strengthened.versioned);
+  assert_eq!(
+    (version.recall_condition.as_deref(), version.release_condition.as_deref()),
+    (Some("the ladder is needed"), Some("the ladder is back"))
   );
 }

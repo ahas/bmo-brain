@@ -8,11 +8,11 @@ use bmo_brain_client::{
 };
 use sqlx::PgConnection;
 
-use super::brains::{brain_of, given};
+use super::brains::{brain_of, event_scope, given};
 use super::rules::tokens;
 use super::sheets::sheet_rows;
 use super::versions::{MEMORY_COLUMNS, MemoryRow};
-use super::{Fault, Held, Store, now};
+use super::{Fault, Held, Store, now, publish};
 
 /// The types the searched part never offers: the persona goes into a prompt by its own route, and an episode
 /// is consolidation's material.
@@ -81,6 +81,11 @@ impl Store {
       }
     }
     let named: Vec<i64> = room.into_iter().chain(speakers.iter().copied()).collect();
+    let asked = words(&ask.words);
+
+    // The situations this turn holds, and with them the rows they end: a row whose release condition the turn
+    // says is not handed out, and is moved to invalidated with that condition as its reason.
+    let released = self.release_in(&mut tx, brain_id, &asked, at).await?;
 
     // The core: the room's situation rules and the head of each speaker's sheet, at most the cap of their facts;
     // the room's rules and the rest are candidates of the searched part like any other row.
@@ -110,15 +115,15 @@ impl Store {
     let core = self.members(&mut tx, core).await?;
 
     // The searched part's candidates: live rows of the searched types, not of this session's own making,
-    // holding one of the turn's words or about a subject the turn names.
-    let asked = words(&ask.words);
+    // holding one of the turn's words in its text or its recall condition, or about a subject the turn names.
     let mut candidates: Vec<MemoryRow> = Vec::new();
     if !asked.is_empty() || !named.is_empty() {
       let patterns: Vec<String> = asked.iter().map(|word| super::holding(word)).collect();
       candidates = sqlx::query_as(&format!(
         "SELECT {MEMORY_COLUMNS} FROM memories WHERE brain_id = $1 AND status = 'active' \
          AND NOT (type = ANY($2)) AND ($3::bigint IS NULL OR created_at <= $3) \
-         AND (text ILIKE ANY($4) OR id IN (SELECT memory_id FROM memory_subjects WHERE subject_id = ANY($5))) \
+         AND (text ILIKE ANY($4) OR recall_condition ILIKE ANY($4) \
+              OR id IN (SELECT memory_id FROM memory_subjects WHERE subject_id = ANY($5))) \
          ORDER BY last_hit_at DESC NULLS LAST, id DESC LIMIT $6"
       ))
       .bind(brain_id)
@@ -135,9 +140,22 @@ impl Store {
     let mut scored: Vec<Candidate> = candidates
       .into_iter()
       .map(|memory| {
+        // A row whose recall condition the turn says is carried: its relevance is the whole a relevance
+        // reaches, though neither its words nor its subjects name it. A row without one, or whose condition
+        // the turn does not say, is scored by its words as before.
         let mine = words(&memory.text);
         let overlap = asked.iter().filter(|word| mine.contains(*word)).count();
-        let mut relevance = if asked.is_empty() { 0.0 } else { overlap as f64 / asked.len() as f64 };
+        let said = memory
+          .recall_condition
+          .as_deref()
+          .is_some_and(|condition| holds(condition, &asked, self.rules.condition_share));
+        let mut relevance = if said {
+          1.0
+        } else if asked.is_empty() {
+          0.0
+        } else {
+          overlap as f64 / asked.len() as f64
+        };
         if memory.subjects.iter().any(|subject| named.contains(&subject.id)) {
           relevance += self.rules.subject_bonus;
         }
@@ -257,7 +275,50 @@ impl Store {
       budget_tokens: budget,
       unconsolidated_importance,
       consolidation_due: unconsolidated_importance >= self.rules.consolidation_threshold,
+      released,
     })
+  }
+
+  /// The rows this turn ends: each live row whose release condition the turn's words hold, moved to
+  /// `invalidated` with the moment and the condition, in the recall's own transaction.
+  async fn release_in(
+    &self,
+    conn: &mut PgConnection,
+    brain_id: i64,
+    asked: &BTreeSet<String>,
+    at: i64,
+  ) -> Held<Vec<i64>> {
+    if asked.is_empty() {
+      return Ok(Vec::new());
+    }
+    let patterns: Vec<String> = asked.iter().map(|word| super::holding(word)).collect();
+    let rows: Vec<MemoryRow> = sqlx::query_as(&format!(
+      "SELECT {MEMORY_COLUMNS} FROM memories WHERE brain_id = $1 AND status = 'active' \
+       AND release_condition IS NOT NULL AND release_condition ILIKE ANY($2) ORDER BY id"
+    ))
+    .bind(brain_id)
+    .bind(&patterns)
+    .fetch_all(&mut *conn)
+    .await?;
+    let mut released = Vec::new();
+    for row in rows {
+      let Some(condition) = row.release_condition.as_deref() else {
+        continue;
+      };
+      if !holds(condition, asked, self.rules.condition_share) {
+        continue;
+      }
+      sqlx::query("UPDATE memories SET status = 'invalidated', valid_to = $2, reason = $3 WHERE id = $1")
+        .bind(row.id)
+        .bind(at)
+        .bind(condition)
+        .execute(&mut *conn)
+        .await?;
+      let memory = self.member_of(conn, brain_id, row.id).await?;
+      publish(conn, "memory.moved", Some(&event_scope(brain_id)), &memory).await?;
+      released.push(row.id);
+    }
+    Ok(released)
   }
 
   /// One memory as a line of the block: its id, its type, since when it holds, its words, and what it
@@ -351,6 +412,16 @@ fn norm(value: f64, lo: f64, hi: f64) -> f64 {
     return 0.5;
   }
   (value - lo) / (hi - lo)
+}
+
+/// Whether the turn's words hold a condition: at least `share` of the condition's words are among them.
+fn holds(condition: &str, asked: &BTreeSet<String>, share: f64) -> bool {
+  let mine = words(condition);
+  if mine.is_empty() {
+    return false;
+  }
+  let held = mine.intersection(asked).count() as f64 / mine.len() as f64;
+  held >= share
 }
 
 /// Whether two word sets are near-doubles: more than six tenths of the smaller is in the other.

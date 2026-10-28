@@ -89,6 +89,8 @@ One row is one thing the agent remembers, in one version.
 | `lineageId` | the id of the first version in this row's line; a first version's own id |
 | `supersededBy` | the id of the version that replaced this one, or null |
 | `validFrom`, `validTo` | the span the memory holds for; `validTo` null while it holds |
+| `recallCondition` | the situation in which it is needed, in words, or null (「Recall」) |
+| `releaseCondition` | the situation that ends it, in words, or null (「Recall」) |
 | `importance` | the writer's weight at the time of writing, 1 to 10 |
 | `hits`, `lastHitAt` | how often, and when last, a reading handed it out |
 | `lastConfirmedAt` | when the memory was last confirmed by a source apart from the reading |
@@ -123,6 +125,10 @@ a subject」), never a row, and a write that names `sheet` as its type is refuse
 
 - **Every row is a version.** A new memory is its own first version: `lineageId` equals its id, `validFrom`
   is the moment it is written (or the moment the writer names), `validTo` is null.
+- **A condition changes the way the text does.** The two situations a memory may carry, the one that recalls it
+  and the one that ends it, are the writer's like its words: a first version sets them, a new version changes
+  them and takes the old version's where it gives none, and a merge carries them, while no route changes either
+  on a row that stands.
 - **A correction is a new row in the same lineage.** The old row's `supersededBy` names the new one, its
   `status` becomes `superseded` and its `validTo` the new row's `validFrom`. The new row carries the lineage
   id. A reading hands out the newest row of a lineage that is `active`, and says for a row whose predecessor
@@ -174,8 +180,10 @@ the brain's tools. It writes in two moments.
 - **A fact is one row.** What the agent learns about a person is written one thing to a row, each through
   the write judgement: in English, dated by its `validFrom` (the moment it began holding: the moment of the
   message it was read in, or the date the speaker names), linked to the person, and linked to a room only
-  where it holds in that room alone. Nothing gathers a person's facts into a row of its own; their sheet is
-  rendered from these rows (「A person is a subject」).
+  where it holds in that room alone. Where the writer knows when the memory is needed and what ends it, it says
+  so in the same call, as the situations `recallCondition` and `releaseCondition` (「Recall」); both may stand
+  empty, and what a memory knows is unchanged by them. Nothing gathers a person's facts into a row of its own;
+  their sheet is rendered from these rows (「A person is a subject」).
 - **A memory is written in English,** whatever language the room speaks; a short quotation in the original
   words stands only where the exact wording matters.
 - **Who writes is recorded** on the version as `actorName`: the agent's session, the tool it used, or the
@@ -211,7 +219,8 @@ easily it comes to mind.
   read by key, subject, type or words still answers it, and a hit there revives it.
 - **The numbers are settings,** with placeholders until the owner's own conversation logs have fitted them:
   the importance threshold of consolidation, the decay exponent, the spacing curve of storage strength, the
-  weights of the recall score, the per-subject cap, the core's cap of facts per speaker and the token budget.
+  weights of the recall score, the per-subject cap, the core's cap of facts per speaker, the share of a
+  condition's words a turn holds before the condition matches, and the token budget.
   The brain reads them from its configuration and names each in its health answer.
 
 ## Recall
@@ -236,6 +245,16 @@ a block and a list of what it chose.
   the retrieval strength computed from the row's hits (「Strength and decay」), each normalised; a memory of a
   subject the turn names scores higher; no subject fills more than its cap of
   three or four rows; a diversity pass keeps the block from being one topic.
+- **A situation is words.** A memory's `recallCondition` says when it is needed, and a turn says it where the
+  turn's words hold at least the share of the condition's words the rules name: that row is carried, its
+  relevance the whole a relevance reaches, though neither its own words nor its subjects name it. A row that
+  carries no condition, or whose condition the turn does not say, is reached by its words and its subjects as it
+  was.
+- **A release condition that comes true ends the memory.** Where the turn's words hold a row's
+  `releaseCondition`, at least the share of its words the rules name, that situation has come true: the row is
+  not handed out, and recall moves it to `invalidated` with the moment and the condition as its reason, in the
+  same transaction as the rest of the recall, whether or not the row would have been carried. The answer names
+  each row it released.
 - **Only live rows, with their span.** A row goes out with the dates it holds for; a row whose predecessor
   was superseded lately goes out with one line saying what the previous value was and until when.
 - **What this session already knows is left out.** A memory written after the session opened is not handed

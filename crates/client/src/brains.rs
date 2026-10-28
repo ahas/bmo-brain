@@ -240,6 +240,12 @@ pub struct Memory {
   pub superseded_by: Option<i64>,
   pub valid_from: i64,
   pub valid_to: Option<i64>,
+  /// The situation in which it is needed, in words, or null where it carries none.
+  #[serde(default)]
+  pub recall_condition: Option<String>,
+  /// The situation that ends it, in words, or null where it carries none.
+  #[serde(default)]
+  pub release_condition: Option<String>,
   /// The writer's weight at the time of writing, 1 to 10.
   pub importance: i64,
   pub hits: i64,
@@ -284,6 +290,12 @@ pub struct NewMemory {
   /// When it began to hold; now where none is given.
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub valid_from: Option<i64>,
+  /// The situation in which it is needed, in words.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub recall_condition: Option<String>,
+  /// The situation that ends it, in words.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub release_condition: Option<String>,
   /// `active` where none is given; `pending` is the other status a first version takes.
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub status: Option<MemoryStatus>,
@@ -314,6 +326,20 @@ pub struct MemoryVersion {
   /// When the new version began to hold, and the old one stopped; now where none is given.
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub valid_from: Option<i64>,
+  /// The situation in which it is needed: the old version's where not given, and a null clears it.
+  #[serde(
+    default,
+    deserialize_with = "crate::wire::nullable",
+    skip_serializing_if = "Option::is_none"
+  )]
+  pub recall_condition: Option<Option<String>>,
+  /// The situation that ends it: the old version's where not given, and a null clears it.
+  #[serde(
+    default,
+    deserialize_with = "crate::wire::nullable",
+    skip_serializing_if = "Option::is_none"
+  )]
+  pub release_condition: Option<Option<String>>,
   pub actor_name: String,
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub labels: Option<Labels>,
@@ -345,6 +371,12 @@ pub struct MemoryMerge {
   /// When the merged row began to hold, and the merged ones stopped; now where none is given.
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub valid_from: Option<i64>,
+  /// The situation in which it is needed; the one every merged row shares where none is given.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub recall_condition: Option<String>,
+  /// The situation that ends it; the one every merged row shares where none is given.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub release_condition: Option<String>,
   pub actor_name: String,
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub labels: Option<Labels>,
@@ -413,6 +445,9 @@ pub struct MemoriesQuery {
   /// Words the text holds, in any case.
   #[serde(skip_serializing_if = "Option::is_none")]
   pub q: Option<String>,
+  /// Words the recall condition holds, in any case: the rows a situation calls for.
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub situation: Option<String>,
   /// The field the list is ordered by: `id`, `position`, `validFrom`, `importance` or `hits`, descending
   /// with a leading `-`; `id` where none is given.
   #[serde(skip_serializing_if = "Option::is_none")]
@@ -470,6 +505,9 @@ pub struct TalliesQuery {
   /// Words the text holds, in any case.
   #[serde(skip_serializing_if = "Option::is_none")]
   pub q: Option<String>,
+  /// Words the recall condition holds, in any case: the rows a situation calls for.
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub situation: Option<String>,
 }
 
 /// One group of a tally.
@@ -594,6 +632,9 @@ pub struct Recall {
   pub unconsolidated_importance: i64,
   /// Whether that sum has reached the brain's threshold, so a consolidation is due.
   pub consolidation_due: bool,
+  /// The rows whose release condition this turn held, ended as invalidated by this recall.
+  #[serde(default)]
+  pub released: Vec<i64>,
 }
 
 /// A session folded or handed off.
@@ -680,6 +721,8 @@ pub struct Rules {
   pub strength_gain: f64,
   /// For how long after a version was superseded a reading says what the previous value was.
   pub previous_value_days: i64,
+  /// The share of a condition's words the turn must hold for the condition to match it.
+  pub condition_share: f64,
   /// The sum of importance of unconsolidated episodes that triggers a consolidation.
   pub consolidation_threshold: i64,
 }
@@ -699,6 +742,7 @@ impl Default for Rules {
       same_session_ms: 60 * 60 * 1_000,
       strength_gain: 1.0,
       previous_value_days: 30,
+      condition_share: 0.5,
       consolidation_threshold: 150,
     }
   }
@@ -752,6 +796,12 @@ pub struct Learning {
   /// When it began holding; now where none is given.
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub valid_from: Option<i64>,
+  /// The situation in which it is needed, in words.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub recall_condition: Option<String>,
+  /// The situation that ends it, in words.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub release_condition: Option<String>,
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub key: Option<String>,
   #[serde(default, skip_serializing_if = "Option::is_none")]

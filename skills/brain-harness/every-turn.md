@@ -14,8 +14,9 @@ it as you read, in the turn itself. Nothing writes it for you.
 - **When the answer needs something the recall does not hold,** look it up before you answer:
   - a person's fact, a room's own memory, what someone is called: `brain_list` with the subject and the type
     wanted, the subject `{"type": "person", "key": "<their id>"}` or `{"type": "room", "key": "<the room's
-    id>"}` and `type` such as `fact`, `name`, `promise` or `situation`; or `brain_similar` with the question's
-    words as `text` and the subject under `subjects`;
+    id>"}` and `type` such as `fact`, `name`, `promise` or `situation`; `situation` with the words of the
+    situation in front of you, for the memories written for one; or `brain_similar` with the question's words
+    as `text` and the subject under `subjects`;
   - a document, a room's rule, a piece of knowledge, a person's whole sheet: `reference_search` with the words
     the entry would hold as `query`, then `reference_piece` with the `slug` and `group` it answers.
 - **The brain is reached through these tools alone.** Never through its database, its files or its port: no
@@ -57,7 +58,11 @@ it as you read, in the turn itself. Nothing writes it for you.
   write may already stand, and the thing you just learned may be what one of them was waiting for. When one is
   kept, finished or over, move it to `done` with `brain_move` (its `memory_id` and the `status`); when it stopped
   holding, `invalidated`. Learning a fact that an open follow-up was waiting for closes that follow-up in the
-  same turn. Write these with `brain_learn` under their type.
+  same turn. Write these with `brain_learn` under their type. Any memory may carry the situation that brings it
+  to mind and the situation that ends it, in a few English words: `recallCondition` is said by the turn that
+  needs it, and the brain hands the memory out then; `releaseCondition` is said by the turn that ends it, and
+  the brain closes the memory as `invalidated` itself. Set them only where you know them, leave both out
+  otherwise, and change one with a new version, never by an edit.
 - **A rule the owner sets for a situation** ("whenever X, do Y") is a `situation` memory about the room, or
   about no room where it holds everywhere, with the situation and the act in its text.
 - **What someone wants to be called** is one `name` memory about that person alone: in English, the title

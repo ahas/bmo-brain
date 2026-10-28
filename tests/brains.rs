@@ -29,6 +29,8 @@ fn memory(kind: &str, text: &str) -> NewMemory {
     subjects: vec![],
     importance: None,
     valid_from: None,
+    recall_condition: None,
+    release_condition: None,
     status: None,
     actor_name: "writer-a".to_owned(),
     labels: labels(&[]),
@@ -1114,4 +1116,173 @@ async fn recall_core_carries_no_rule_and_a_rule_is_found_by_search_when_its_word
   );
   let tight = client.recall(brain, &ask("what are the harvest prices", Some(30))).await.unwrap();
   assert!(tight.token_count <= 30, "{} tokens", tight.token_count);
+}
+
+#[tokio::test]
+async fn a_memory_carries_the_situation_that_recalls_it_and_the_one_that_ends_it() {
+  let served = Served::new().await;
+  let client = &served.client;
+  let brain = brain_of(client, "agent-a").await;
+  let recall = "the member asks about the harvest";
+  let release = "the harvest is sold";
+  let written = client
+    .memory_add(
+      brain,
+      &NewMemory {
+        recall_condition: Some(recall.to_owned()),
+        release_condition: Some(release.to_owned()),
+        ..memory("fact", "The member's field yields barley.")
+      },
+    )
+    .await
+    .unwrap();
+  let read = client.memory(brain, written.id).await.unwrap();
+  assert_eq!(
+    (read.recall_condition.as_deref(), read.release_condition.as_deref()),
+    (Some(recall), Some(release))
+  );
+
+  // The list is narrowed by the words a situation holds against the recall condition.
+  let found = |words: &str| {
+    let query = MemoriesQuery {
+      situation: Some(words.to_owned()),
+      ..Default::default()
+    };
+    async move { client.memories(brain, &query).await.unwrap() }
+  };
+  assert_eq!(found("harvest").await.items.len(), 1);
+  assert!(found("tomatoes").await.items.is_empty());
+
+  // A version changes one and keeps the other where it gives none, and the version it supersedes keeps its own.
+  let changed = client
+    .memory_version(
+      brain,
+      written.id,
+      &MemoryVersion {
+        recall_condition: Some(Some("the member asks about barley".to_owned())),
+        actor_name: "writer-b".to_owned(),
+        ..MemoryVersion::default()
+      },
+    )
+    .await
+    .unwrap();
+  assert_eq!(
+    (changed.recall_condition.as_deref(), changed.release_condition.as_deref()),
+    (Some("the member asks about barley"), Some(release))
+  );
+  let superseded = client.memory(brain, written.id).await.unwrap();
+  assert_eq!(
+    (superseded.status, superseded.recall_condition.as_deref()),
+    (MemoryStatus::Superseded, Some(recall))
+  );
+
+  // A condition is cleared by a version that says null, and the other stands.
+  let cleared = client
+    .memory_version(
+      brain,
+      changed.id,
+      &MemoryVersion {
+        release_condition: Some(None),
+        actor_name: "writer-b".to_owned(),
+        ..MemoryVersion::default()
+      },
+    )
+    .await
+    .unwrap();
+  assert_eq!(
+    (cleared.recall_condition.as_deref(), cleared.release_condition),
+    (Some("the member asks about barley"), None)
+  );
+
+  // A condition is words: blank, or longer than a condition holds, is refused.
+  let blank = client
+    .memory_add(
+      brain,
+      &NewMemory {
+        recall_condition: Some("  ".to_owned()),
+        ..memory("fact", "Nothing at all.")
+      },
+    )
+    .await;
+  assert_eq!(refused(blank), (400, "bad-request".to_owned()));
+  let long = client
+    .memory_add(
+      brain,
+      &NewMemory {
+        release_condition: Some("x".repeat(1001)),
+        ..memory("fact", "Nothing at all.")
+      },
+    )
+    .await;
+  assert_eq!(refused(long), (400, "bad-request".to_owned()));
+}
+
+#[tokio::test]
+async fn recall_brings_a_memory_out_by_its_situation_and_ends_the_one_a_turn_releases() {
+  let served = Served::new().await;
+  let client = &served.client;
+  let brain = brain_of(client, "agent-a").await;
+  let room = subject("room", "7");
+  let roof = client
+    .memory_add(
+      brain,
+      &NewMemory {
+        recall_condition: Some("asks about the roof".to_owned()),
+        ..memory("fact", "Gutters cleared in spring.")
+      },
+    )
+    .await
+    .unwrap();
+  let promise = client
+    .memory_add(
+      brain,
+      &NewMemory {
+        recall_condition: Some("the fence comes up in conversation".to_owned()),
+        release_condition: Some("the back fence is painted".to_owned()),
+        ..memory("promise", "Paint the back fence before the frost.")
+      },
+    )
+    .await
+    .unwrap();
+  let plain = client
+    .memory_add(brain, &memory("fact", "The back gate latches loosely."))
+    .await
+    .unwrap();
+  let ask = |words: &str| RecallAsk {
+    room: Some(room.clone()),
+    speakers: vec![],
+    words: words.to_owned(),
+    session_key: None,
+    session_opened_at: None,
+    budget_tokens: None,
+    record: Some(false),
+  };
+  let chosen =
+    |recall: &bmo_brain_client::Recall| -> Vec<i64> { recall.chosen.iter().map(|c| c.memory_id).collect() };
+
+  // The turn says the row's situation though its words never name the row: the condition brings it out.
+  let asked = client.recall(brain, &ask("does anyone know about the roof")).await.unwrap();
+  assert!(chosen(&asked).contains(&roof.id), "{:?}", asked.chosen);
+  assert!(asked.released.is_empty(), "{:?}", asked.released);
+
+  // A turn that says neither reaches neither.
+  let quiet = client.recall(brain, &ask("what is for dinner tonight")).await.unwrap();
+  assert!(!chosen(&quiet).contains(&roof.id), "{:?}", quiet.chosen);
+
+  // The turn says the promise's release condition: the row is not handed out, and is ended with its reason.
+  let ended = client.recall(brain, &ask("the back fence is painted at last")).await.unwrap();
+  assert_eq!(ended.released, [promise.id]);
+  assert!(!chosen(&ended).contains(&promise.id), "{:?}", ended.chosen);
+  let closed = client.memory(brain, promise.id).await.unwrap();
+  assert_eq!(
+    (closed.status, closed.reason.as_deref()),
+    (MemoryStatus::Invalidated, Some("the back fence is painted"))
+  );
+  assert!(closed.valid_to.is_some());
+  // A row with no condition is reached by its words as it was.
+  assert!(chosen(&ended).contains(&plain.id), "{:?}", ended.chosen);
+  assert!(
+    served.event_kinds().await.iter().any(|kind| kind == "memory.moved"),
+    "the release is published"
+  );
 }

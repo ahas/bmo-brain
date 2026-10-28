@@ -599,6 +599,20 @@
               "null"
             ]
           },
+          "recallCondition": {
+            "description": "The situation in which it is needed, in words.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "releaseCondition": {
+            "description": "The situation that ends it, in words.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "replaces": {
             "default": [],
             "description": "Live memories this contradicts: closed before the new row is written, unless the source is heard.",
@@ -741,6 +755,22 @@
               "null"
             ]
           },
+          "recallCondition": {
+            "default": null,
+            "description": "The situation in which it is needed, in words, or null where it carries none.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "releaseCondition": {
+            "default": null,
+            "description": "The situation that ends it, in words, or null where it carries none.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "retrievalStrength": {
             "description": "The retrieval strength, computed from the hits as the reading answers.",
             "format": "double",
@@ -800,6 +830,8 @@
           "supersededBy",
           "validFrom",
           "validTo",
+          "recallCondition",
+          "releaseCondition",
           "importance",
           "hits",
           "lastHitAt",
@@ -861,6 +893,20 @@
             "format": "int64",
             "type": [
               "integer",
+              "null"
+            ]
+          },
+          "recallCondition": {
+            "description": "The situation in which it is needed; the one every merged row shares where none is given.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "releaseCondition": {
+            "description": "The situation that ends it; the one every merged row shares where none is given.",
+            "type": [
+              "string",
               "null"
             ]
           },
@@ -1030,6 +1076,20 @@
               "null"
             ]
           },
+          "recallCondition": {
+            "description": "The situation in which it is needed: the old version's where not given, and a null clears it.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "releaseCondition": {
+            "description": "The situation that ends it: the old version's where not given, and a null clears it.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "subjectIds": {
             "description": "The subjects the new version is about, replacing the old version's whole where given.",
             "items": {
@@ -1165,6 +1225,20 @@
               "null"
             ]
           },
+          "recallCondition": {
+            "description": "The situation in which it is needed, in words.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "releaseCondition": {
+            "description": "The situation that ends it, in words.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "status": {
             "anyOf": [
               {
@@ -1259,6 +1333,15 @@
             "description": "Whether that sum has reached the brain's threshold, so a consolidation is due.",
             "type": "boolean"
           },
+          "released": {
+            "default": [],
+            "description": "The rows whose release condition this turn held, ended as invalidated by this recall.",
+            "items": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "type": "array"
+          },
           "tokenCount": {
             "format": "int64",
             "type": "integer"
@@ -1275,7 +1358,8 @@
           "tokenCount",
           "budgetTokens",
           "unconsolidatedImportance",
-          "consolidationDue"
+          "consolidationDue",
+          "released"
         ],
         "type": "object"
       },
@@ -1455,6 +1539,12 @@
             "format": "int64",
             "type": "integer"
           },
+          "condition_share": {
+            "default": 0.5,
+            "description": "The share of a condition's words the turn must hold for the condition to match it.",
+            "format": "double",
+            "type": "number"
+          },
           "consolidation_threshold": {
             "default": 150,
             "description": "The sum of importance of unconsolidated episodes that triggers a consolidation.",
@@ -1541,6 +1631,7 @@
           "same_session_ms",
           "strength_gain",
           "previous_value_days",
+          "condition_share",
           "consolidation_threshold"
         ],
         "type": "object"
@@ -1821,7 +1912,7 @@
   "info": {
     "description": "An agent's long-term memory as a service. The service keeps many brains, each an account's and one agent's: subjects (what a memory is about, found by type and key), layers (the table of contents) and memories, one row a version, superseded and invalidated but never deleted. A turn asks recall for a block under a token budget; a persona is rendered as the same bytes until a piece changes; a brain moves in and out as a brain file. Nothing is held outside a brain. Bodies are JSON with camelCase keys, times are epoch milliseconds, lists are pages of items and more, and every failure is the error shape with its status. The harness plugin's tools, each a thin call of one route, are stated under x-tools.",
     "title": "bmo-brain",
-    "version": "0.1.0-rev.30"
+    "version": "0.1.0-rev.31"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -2959,6 +3050,19 @@
             "required": false,
             "schema": {
               "description": "Words the text holds, in any case.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "Words the recall condition holds, in any case: the rows a situation calls for.",
+            "in": "query",
+            "name": "situation",
+            "required": false,
+            "schema": {
+              "description": "Words the recall condition holds, in any case: the rows a situation calls for.",
               "type": [
                 "string",
                 "null"
@@ -4181,6 +4285,19 @@
             }
           },
           {
+            "description": "Words the recall condition holds, in any case: the rows a situation calls for.",
+            "in": "query",
+            "name": "situation",
+            "required": false,
+            "schema": {
+              "description": "Words the recall condition holds, in any case: the rows a situation calls for.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
             "description": "One status, or several, comma-separated.",
             "in": "query",
             "name": "status",
@@ -5088,6 +5205,13 @@
               "null"
             ]
           },
+          "situation": {
+            "description": "Words the recall condition holds, in any case: the rows a situation calls for.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "status": {
             "description": "One status, or several, comma-separated.",
             "type": [
@@ -5179,6 +5303,20 @@
             "format": "int64",
             "type": [
               "integer",
+              "null"
+            ]
+          },
+          "recallCondition": {
+            "description": "The situation in which it is needed, in words.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "releaseCondition": {
+            "description": "The situation that ends it, in words.",
+            "type": [
+              "string",
               "null"
             ]
           },
@@ -5324,6 +5462,20 @@
               "null"
             ]
           },
+          "recallCondition": {
+            "description": "The situation in which it is needed; the one every merged row shares where none is given.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "releaseCondition": {
+            "description": "The situation that ends it; the one every merged row shares where none is given.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "subjectIds": {
             "items": {
               "format": "int64",
@@ -5416,6 +5568,20 @@
             "format": "int64",
             "type": [
               "integer",
+              "null"
+            ]
+          },
+          "recallCondition": {
+            "description": "The situation in which it is needed: the old version's where not given, and a null clears it.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "releaseCondition": {
+            "description": "The situation that ends it: the old version's where not given, and a null clears it.",
+            "type": [
+              "string",
               "null"
             ]
           },
@@ -5795,6 +5961,20 @@
             "format": "int64",
             "type": [
               "integer",
+              "null"
+            ]
+          },
+          "recallCondition": {
+            "description": "The situation in which it is needed, in words.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "releaseCondition": {
+            "description": "The situation that ends it, in words.",
+            "type": [
+              "string",
               "null"
             ]
           },

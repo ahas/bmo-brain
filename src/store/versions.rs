@@ -20,8 +20,8 @@ pub const RESERVED_TYPES: [&str; 9] =
   ["episode", "fact", "rumor", "situation", "rule", "name", "persona", "lore", "knowledge"];
 
 pub(crate) const MEMORY_COLUMNS: &str = "id, brain_id, key, type, text, layer_id, position, status, lineage_id, \
-  superseded_by, valid_from, valid_to, importance, hits, hit_times, last_hit_at, last_confirmed_at, strength, \
-  consolidated_at, actor_name, reason, labels, created_at";
+  superseded_by, valid_from, valid_to, recall_condition, release_condition, importance, hits, hit_times, \
+  last_hit_at, last_confirmed_at, strength, consolidated_at, actor_name, reason, labels, created_at";
 
 #[derive(FromRow)]
 pub(crate) struct MemoryRow {
@@ -38,6 +38,8 @@ pub(crate) struct MemoryRow {
   pub superseded_by: Option<i64>,
   pub valid_from: i64,
   pub valid_to: Option<i64>,
+  pub recall_condition: Option<String>,
+  pub release_condition: Option<String>,
   pub importance: i16,
   pub hits: i64,
   pub hit_times: Vec<i64>,
@@ -73,6 +75,8 @@ impl MemoryRow {
       superseded_by: self.superseded_by,
       valid_from: self.valid_from,
       valid_to: self.valid_to,
+      recall_condition: self.recall_condition,
+      release_condition: self.release_condition,
       importance: i64::from(self.importance),
       hits: self.hits,
       last_hit_at: self.last_hit_at,
@@ -233,6 +237,7 @@ impl Store {
   ) -> Held<Memory> {
     written_type(&body.kind)?;
     text("text", &body.text, TEXT_MOST)?;
+    conditions(body.recall_condition.as_deref(), body.release_condition.as_deref())?;
     given("actorName", &body.actor_name)?;
     if let Some(key) = &body.key {
       super::key("key", key)?;
@@ -270,8 +275,8 @@ impl Store {
     };
     let id: i64 = sqlx::query_scalar(
       "INSERT INTO memories (brain_id, key, type, text, layer_id, position, status, lineage_id, valid_from, \
-       importance, actor_name, labels, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, 0, $8, $9, $10, $11, $12) \
-       RETURNING id",
+       recall_condition, release_condition, importance, actor_name, labels, created_at) \
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 0, $8, $9, $10, $11, $12, $13, $14) RETURNING id",
     )
     .bind(brain_id)
     .bind(&body.key)
@@ -281,6 +286,8 @@ impl Store {
     .bind(position)
     .bind(status.name())
     .bind(body.valid_from.unwrap_or(at))
+    .bind(&body.recall_condition)
+    .bind(&body.release_condition)
     .bind(importance)
     .bind(&body.actor_name)
     .bind(Json(&body.labels))
@@ -317,6 +324,12 @@ impl Store {
     given("actorName", &body.actor_name)?;
     if let Some(words) = &body.text {
       text("text", words, TEXT_MOST)?;
+    }
+    if let Some(Some(words)) = &body.recall_condition {
+      text("recallCondition", words, super::CONDITION_MOST)?;
+    }
+    if let Some(Some(words)) = &body.release_condition {
+      text("releaseCondition", words, super::CONDITION_MOST)?;
     }
     if let Some(kind) = &body.kind {
       written_type(kind)?;
@@ -361,6 +374,8 @@ impl Store {
       }
     };
     let valid_from = body.valid_from.unwrap_or(at);
+    let recall_condition = body.recall_condition.clone().unwrap_or_else(|| old.recall_condition.clone());
+    let release_condition = body.release_condition.clone().unwrap_or_else(|| old.release_condition.clone());
     sqlx::query("UPDATE memories SET status = 'superseded', valid_to = $2 WHERE id = $1")
       .bind(id)
       .bind(valid_from)
@@ -368,8 +383,10 @@ impl Store {
       .await?;
     let new_id: i64 = sqlx::query_scalar(
       "INSERT INTO memories (brain_id, key, type, text, layer_id, position, status, lineage_id, valid_from, \
-       importance, hits, hit_times, last_hit_at, last_confirmed_at, strength, actor_name, labels, created_at) \
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18) RETURNING id",
+       recall_condition, release_condition, importance, hits, hit_times, last_hit_at, last_confirmed_at, \
+       strength, actor_name, labels, created_at) \
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20) \
+       RETURNING id",
     )
     .bind(brain_id)
     .bind(&old.key)
@@ -380,6 +397,8 @@ impl Store {
     .bind(status.name())
     .bind(old.lineage_id)
     .bind(valid_from)
+    .bind(&recall_condition)
+    .bind(&release_condition)
     .bind(importance.unwrap_or(old.importance))
     .bind(old.hits)
     .bind(&old.hit_times)
@@ -498,6 +517,20 @@ impl Store {
     let last_confirmed_at = merged.iter().filter_map(|row| row.last_confirmed_at).min();
     let strength = merged.iter().map(|row| row.strength).fold(1.0_f64, f64::max);
     let labels = body.labels.clone().unwrap_or_default();
+    let recall_condition = match &body.recall_condition {
+      Some(words) => {
+        text("recallCondition", words, super::CONDITION_MOST)?;
+        Some(words.clone())
+      }
+      None => shared(&merged, |row| row.recall_condition.as_deref()),
+    };
+    let release_condition = match &body.release_condition {
+      Some(words) => {
+        text("releaseCondition", words, super::CONDITION_MOST)?;
+        Some(words.clone())
+      }
+      None => shared(&merged, |row| row.release_condition.as_deref()),
+    };
     // The merged rows leave the live set first, so a key one of them held is free for the new row.
     sqlx::query("UPDATE memories SET status = 'superseded', valid_to = $2 WHERE id = ANY($1)")
       .bind(&ids)
@@ -506,8 +539,10 @@ impl Store {
       .await?;
     let new_id: i64 = sqlx::query_scalar(
       "INSERT INTO memories (brain_id, key, type, text, layer_id, position, status, lineage_id, valid_from, \
-       importance, hits, hit_times, last_hit_at, last_confirmed_at, strength, actor_name, labels, created_at) \
-       VALUES ($1, $2, $3, $4, $5, $6, 'active', 0, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) RETURNING id",
+       recall_condition, release_condition, importance, hits, hit_times, last_hit_at, last_confirmed_at, \
+       strength, actor_name, labels, created_at) \
+       VALUES ($1, $2, $3, $4, $5, $6, 'active', 0, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18) \
+       RETURNING id",
     )
     .bind(brain_id)
     .bind(&body.key)
@@ -516,6 +551,8 @@ impl Store {
     .bind(body.layer_id)
     .bind(position)
     .bind(valid_from)
+    .bind(&recall_condition)
+    .bind(&release_condition)
     .bind(importance)
     .bind(hits)
     .bind(&hit_times)
@@ -574,6 +611,8 @@ impl Store {
           subjects: None,
           importance: None,
           valid_from: Some(at),
+          recall_condition: None,
+          release_condition: None,
           actor_name: body.actor_name.clone(),
           labels: None,
         };
@@ -638,8 +677,9 @@ impl Store {
         .await?;
     let new_id: i64 = sqlx::query_scalar(
       "INSERT INTO memories (brain_id, key, type, text, layer_id, position, status, lineage_id, valid_from, \
-       importance, hits, hit_times, last_hit_at, last_confirmed_at, strength, consolidated_at, actor_name, labels, \
-       created_at) VALUES ($1, $2, $3, $4, $5, $6, 'active', $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, \
+       recall_condition, release_condition, importance, hits, hit_times, last_hit_at, last_confirmed_at, \
+       strength, consolidated_at, actor_name, labels, created_at) \
+       VALUES ($1, $2, $3, $4, $5, $6, 'active', $7, $8, $10, $11, $9, $12, $13, $14, $15, $16, $17, $18, $19, \
        $8) RETURNING id",
     )
     .bind(brain_id)
@@ -651,6 +691,8 @@ impl Store {
     .bind(closed.lineage_id)
     .bind(at)
     .bind(closed.importance)
+    .bind(&closed.recall_condition)
+    .bind(&closed.release_condition)
     .bind(closed.hits)
     .bind(&closed.hit_times)
     .bind(closed.last_hit_at)
@@ -917,6 +959,7 @@ pub(crate) struct Filter {
   superseded_by: Option<Vec<i64>>,
   label: Option<String>,
   words: Option<String>,
+  situation: Option<String>,
 }
 
 /// The ids a comma-separated list names, or why one does not read.
@@ -957,6 +1000,7 @@ impl Filter {
       superseded_by: ids_listed("supersededBy", query.superseded_by.as_deref())?,
       label: query.label.clone(),
       words: query.q.clone(),
+      situation: query.situation.clone(),
     })
   }
 
@@ -1007,6 +1051,30 @@ impl Filter {
     if let Some(words) = &self.words {
       sql.push(" AND text ILIKE ").push_bind(holding(words));
     }
+    if let Some(words) = &self.situation {
+      sql.push(" AND recall_condition ILIKE ").push_bind(holding(words));
+    }
+  }
+}
+
+/// The conditions given, each not blank and a condition's length where one is given.
+fn conditions(recall: Option<&str>, release: Option<&str>) -> Held<()> {
+  if let Some(words) = recall {
+    text("recallCondition", words, super::CONDITION_MOST)?;
+  }
+  if let Some(words) = release {
+    text("releaseCondition", words, super::CONDITION_MOST)?;
+  }
+  Ok(())
+}
+
+/// The one condition every one of these rows carries, where they all carry the same one.
+fn shared(rows: &[MemoryRow], of: impl Fn(&MemoryRow) -> Option<&str>) -> Option<String> {
+  let first = of(rows.first()?)?;
+  if rows.iter().all(|row| of(row) == Some(first)) {
+    Some(first.to_owned())
+  } else {
+    None
   }
 }
 

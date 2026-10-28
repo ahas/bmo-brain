@@ -210,6 +210,9 @@ pub(crate) fn text(field: &str, value: &str, most: usize) -> Held<()> {
 /// The most characters a row's text holds.
 pub const TEXT_MOST: usize = 64_000;
 
+/// The most characters one of a memory's conditions holds.
+pub const CONDITION_MOST: usize = 1_000;
+
 /// A comma-separated list as its items, blanks left out.
 pub(crate) fn listed(value: Option<&str>) -> Vec<String> {
   value

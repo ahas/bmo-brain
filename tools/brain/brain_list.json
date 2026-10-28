@@ -60,6 +60,13 @@
       ],
       "description": "Words the text holds."
     },
+    "situation": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Words the recall condition holds: the memories a situation calls for, as your turn's words would bring them out."
+    },
     "limit": {
       "type": [
         "integer",

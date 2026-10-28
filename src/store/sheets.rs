@@ -338,6 +338,8 @@ impl Store {
                 subjects: vec![],
                 importance: Some(sheet.importance.into()),
                 valid_from: Some(fact.valid_from.unwrap_or(sheet.valid_from)),
+                recall_condition: sheet.recall_condition.clone(),
+                release_condition: sheet.release_condition.clone(),
                 status: Some(status),
                 actor_name: SPLITTER.to_owned(),
                 labels,

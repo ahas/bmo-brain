@@ -130,6 +130,26 @@ async fn the_server_lists_exactly_the_plugins_tools() {
   for tool in listed["result"]["tools"].as_array().unwrap() {
     assert_eq!(tool["inputSchema"]["type"], "object", "{}", tool["name"]);
   }
+  let schema_of = |name: &str| -> String {
+    listed["result"]["tools"]
+      .as_array()
+      .unwrap()
+      .iter()
+      .find(|tool| tool["name"] == name)
+      .unwrap()["inputSchema"]
+      .to_string()
+  };
+  for name in ["brain_memory_write", "brain_memory_version", "brain_learn"] {
+    let schema = schema_of(name);
+    assert!(
+      schema.contains("recallCondition") && schema.contains("releaseCondition"),
+      "{name} takes neither condition: {schema}"
+    );
+  }
+  assert!(
+    schema_of("brain_memories_list").contains("situation"),
+    "the list is not narrowed by a situation"
+  );
   server.stop().await;
 }
 
@@ -159,6 +179,24 @@ async fn a_call_reaches_the_brain_and_a_refusal_comes_back_as_a_tool_error() {
   assert_eq!(moved["structuredContent"]["status"], "done");
   let listed = server.call("brain_memories_list", json!({ "brainId": brain })).await;
   assert_eq!(listed["structuredContent"]["items"][0]["id"], json!(id));
+
+  let conditioned = server
+    .call(
+      "brain_memory_write",
+      json!({
+        "brainId": brain, "type": "promise", "text": "Paint the back fence.", "actorName": "writer-a",
+        "recallCondition": "the fence comes up", "releaseCondition": "the fence is painted",
+      }),
+    )
+    .await;
+  assert_eq!(conditioned["structuredContent"]["recallCondition"], json!("the fence comes up"));
+  let called_for = server
+    .call("brain_memories_list", json!({ "brainId": brain, "situation": "fence comes up" }))
+    .await;
+  assert_eq!(
+    called_for["structuredContent"]["items"][0]["releaseCondition"],
+    json!("the fence is painted")
+  );
 
   let missing = server.call("brain_memory_read", json!({ "brainId": brain, "memoryId": id + 9 })).await;
   assert_eq!(missing["isError"], json!(true));

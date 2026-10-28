@@ -210,6 +210,29 @@ async fn the_executable_writes_an_episode_and_a_learning_into_the_agents_brain()
     .unwrap();
   assert_eq!(listed.items.len(), 1);
 
+  // A memory written with the two situations, and the list narrowed by one of them.
+  let conditioned = called(
+    &served,
+    "brain_learn",
+    json!({ "type": "promise", "text": "Paint the back fence.", "source": "own", "subjects": [{"type": "person", "key": "1"}], "recallCondition": "the fence comes up", "releaseCondition": "the fence is painted" }),
+    "agent-a",
+    "7",
+  );
+  assert_eq!(conditioned["isError"], json!(false), "{conditioned}");
+  let found = called(
+    &served,
+    "brain_list",
+    json!({ "type": "promise", "situation": "fence comes up" }),
+    "agent-a",
+    "7",
+  );
+  let memories = found["structuredContent"]["memories"].as_array().unwrap();
+  assert_eq!(memories.len(), 1, "{found}");
+  assert_eq!(
+    (memories[0]["recallCondition"].as_str(), memories[0]["releaseCondition"].as_str()),
+    (Some("the fence comes up"), Some("the fence is painted"))
+  );
+
   let unknown = called(&served, "brain_episode", json!({ "text": "x", "speaker": "1" }), "agent-none", "7");
   assert_eq!(unknown["isError"], json!(true), "{unknown}");
   assert!(unknown["content"][0]["text"].as_str().unwrap().contains("no brain"));

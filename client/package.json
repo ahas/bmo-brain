@@ -1,6 +1,6 @@
 {
   "name": "bmo-brain-console",
-  "version": "0.1.0-rev.30",
+  "version": "0.1.0-rev.31",
   "description": "The brain's screen, built as the browser module a console loads by the brain's manifest.",
   "license": "MIT",
   "private": true,

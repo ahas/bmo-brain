@@ -36,7 +36,7 @@ plugin」). The binary declares no noun, so the platform's `bmo` hands it no com
 | console | `[console]` | the console bundle (「The console bundle」), where the brain serves one: `token`, the console's bearer token, which reaches what the screen uses; `bundle`, the folder the build of `client/` wrote the module, its stylesheet and its words into, the release's `console` where none is given; `calls`, the other services the screen calls through the console, each by the service name its own manifest gives it, which the manifest names under `calls`, none where none is given |
 | database | `database` | the address of the brain's own PostgreSQL database, which holds its tables and nothing else |
 | data root | `data_root` | the data root whose `env/brain.env` the brain's tool reads the service's address and token from; the `tool-env` verb writes it |
-| rules | `[rules]` | the numbers the brain reads by (`docs/design.md`), each with a default: `budget_tokens`, `weight_relevance`, `weight_importance`, `weight_recency`, `subject_bonus`, `subject_cap`, `core_fact_cap` (the most facts of one speaker's sheet the core of a recall carries, 8), `decay`, `hit_times_kept`, `same_session_ms`, `strength_gain`, `previous_value_days`, `consolidation_threshold` |
+| rules | `[rules]` | the numbers the brain reads by (`docs/design.md`), each with a default: `budget_tokens`, `weight_relevance`, `weight_importance`, `weight_recency`, `subject_bonus`, `subject_cap`, `core_fact_cap` (the most facts of one speaker's sheet the core of a recall carries, 8), `decay`, `hit_times_kept`, `same_session_ms`, `strength_gain`, `previous_value_days`, `condition_share` (the share of a condition's words a turn holds before it matches, 0.5), `consolidation_threshold` |
 
 Deployed, the file stands under the data root as `env/brain.toml`, and each release links to it as
 `brain.toml`. The service runs as the user unit `deploy/bmo-brain.service`, the repository's one service: a
@@ -57,8 +57,8 @@ answers ready and 1 otherwise, saying why on its error stream.
   route names no other order, and is paged by `after`, the last `id` seen, the page continuing past that
   member in the order the list stands in, and `limit` (50 where none is given, at most 500).
 - **Times** are epoch milliseconds. **Ids** are signed 64-bit integers the brain assigns.
-- **Strings.** `text` of a memory is not blank and at most 64000 characters. Anything outside is answered 400
-  `bad-request`.
+- **Strings.** `text` of a memory is not blank and at most 64000 characters, and a `recallCondition` or
+  `releaseCondition` not blank and at most 1000. Anything outside is answered 400 `bad-request`.
 
 ## Health
 
@@ -145,10 +145,16 @@ A layer is a heading in the brain's table of contents: `id`, `brainId`, `name` (
 One row is one memory in one version: `id`, `brainId`, `key` (the caller's identifier, or null; unique among
 the live rows of a brain; 1 to 200 characters with no control character and no whitespace, whether written or
 injected), `type`, `text`, `layerId` (or null), `position`, `subjects` (each `id`, `type`,
-`key`), `status`, `lineageId`, `supersededBy` (or null), `validFrom`, `validTo` (or null), `importance` (1
+`key`), `status`, `lineageId`, `supersededBy` (or null), `validFrom`, `validTo` (or null), `recallCondition`
+(or null), `releaseCondition` (or null), `importance` (1
 to 10), `hits`, `lastHitAt`, `lastConfirmedAt`, `strength` (the storage strength), `retrievalStrength`
 (computed from the hits as the reading answers), `consolidatedAt`, `actorName`, `reason` (why its status was
 moved, as the mover said, or null), `labels` and `createdAt`.
+
+`recallCondition` is the situation in which the memory is needed and `releaseCondition` the situation that ends
+it, each the writer's words and null where it carries none (`docs/design.md`, 「Recall」). Both are set by a
+first version, a version, a merge and a learning, the version's taken from the version it supersedes where it
+gives none; no route changes either on a row that stands.
 
 `type` is the writer's word; the reserved ones are `episode`, `fact`, `rumor`, `situation`, `rule`, `name`,
 `persona`, `lore` and `knowledge` (`docs/design.md`, 「Types」). `sheet` is no type: a first version, a
@@ -166,13 +172,13 @@ moves a caller's word may make:
 
 | Route | Does | Answers |
 |---|---|---|
-| `GET /memories` | lists by `type` and `status` (each one value or several, comma-separated), `excludeTypes` (comma-separated), `layerId`, `unfiled` (true for the rows in no layer), `subjectId`, `key`, `lineageId`, `ids` (comma-separated), `supersededBy` (comma-separated: the rows superseded by these), `label` (`key` or `key=value`) and `q` (words the text holds), in the order `order` names | 200, a page |
-| `POST /memories` | writes a first version: `type`, `text`, `actorName` required; `key`, `layerId`, `position`, `subjectIds`, `subjects` (each `type` and `key`, made where none stands), `importance` (5 where none), `validFrom` (now where none), `status` (`active` where none, or `pending`), `labels` | 201, the memory; 409 `conflict` where a live row holds the key |
+| `GET /memories` | lists by `type` and `status` (each one value or several, comma-separated), `excludeTypes` (comma-separated), `layerId`, `unfiled` (true for the rows in no layer), `subjectId`, `key`, `lineageId`, `ids` (comma-separated), `supersededBy` (comma-separated: the rows superseded by these), `label` (`key` or `key=value`), `q` (words the text holds) and `situation` (words the `recallCondition` holds), in the order `order` names | 200, a page |
+| `POST /memories` | writes a first version: `type`, `text`, `actorName` required; `key`, `layerId`, `position`, `subjectIds`, `subjects` (each `type` and `key`, made where none stands), `importance` (5 where none), `validFrom` (now where none), `status` (`active` where none, or `pending`), `recallCondition`, `releaseCondition`, `labels` | 201, the memory; 409 `conflict` where a live row holds the key |
 | `GET /memories/{memoryId}` | reads one | 200; 404 |
 | `PATCH /memories/{memoryId}` | moves its status: `status`, `actorName`, `at` (when it stopped holding, now where none), `reason` (kept on the row moved), `text` (for a move to `done`: the words it ended on, written as a new version that is then moved, in one transaction) | 200, the row moved; 400 for `text` on another move; 404; 409 for a move the table does not allow |
 | `POST /memories/{memoryId}/restorations` | restores a closed lineage: the row named is the newest of a `done` or `invalidated` lineage; `actorName` required and `text` (the closed row's where none); a new `active` version is written in the lineage, and the closed row stays as it was | 201, the new version; 404; 409 where the row is not the newest of its lineage, is not `done` or `invalidated`, or a live row holds its key |
-| `POST /memories/{memoryId}/versions` | writes a new version over a live one: `actorName` required; `text`, `type`, `layerId`, `position`, `subjectIds` or `subjects` (replacing the subjects whole), `importance`, `validFrom`, `labels`, each taken from the old version where not given | 201, the new version; the old is `superseded` with `validTo` the new one's `validFrom`; 409 over a row that is not live |
-| `POST /merges` | writes one row over several: `memoryIds` (two or more live rows), `type`, `text`, `actorName` required; `key`, `layerId`, `position`, `subjectIds` or `subjects` (the union of the merged rows' subjects where none is given), `importance` (the highest merged where none), `validFrom` (now where none), `labels`; each merged row becomes `superseded` pointing at the new one | 201, the new row; 400; 404; 409 for a row that is not live |
+| `POST /memories/{memoryId}/versions` | writes a new version over a live one: `actorName` required; `text`, `type`, `layerId`, `position`, `subjectIds` or `subjects` (replacing the subjects whole), `importance`, `validFrom`, `recallCondition`, `releaseCondition` (a null clears one), `labels`, each taken from the old version where not given | 201, the new version; the old is `superseded` with `validTo` the new one's `validFrom`; 409 over a row that is not live |
+| `POST /merges` | writes one row over several: `memoryIds` (two or more live rows), `type`, `text`, `actorName` required; `key`, `layerId`, `position`, `subjectIds` or `subjects` (the union of the merged rows' subjects where none is given), `importance` (the highest merged where none), `validFrom` (now where none), `recallCondition` and `releaseCondition` (the one the merged rows share where none is given), `labels`; each merged row becomes `superseded` pointing at the new one | 201, the new row; 400; 404; 409 for a row that is not live |
 | `GET /lineages/{lineageId}` | every version of a lineage, oldest first | 200, a list; 404 |
 | `POST /hits` | records a hand-out: `memoryIds`, `actorName`, `sessionKey` (which marks the rows for that session), `at` | 201, `recordedCount` |
 | `POST /confirmations` | records confirmations: `memoryIds`, `actorName`, `at`; each row's storage strength rises by the gap since its last confirmation, nothing within the same session | 201, `recordedCount` |
@@ -191,7 +197,8 @@ memory starts at strength 1 with no hits.
 `POST /recall` takes the turn: `room` (a subject by `type` and `key`), `speakers` (subjects), `words`,
 `sessionKey`, `sessionOpenedAt`, `budgetTokens` (the brain's own where none is given) and `record` (true
 where none is given). It answers `block`, the text the turn is handed; `chosen`, each `memoryId`, `type`,
-`part` (`core` or `searched`), `score`, `marked` and `tokenCount`; `tokenCount` and `budgetTokens`.
+`part` (`core` or `searched`), `score`, `marked` and `tokenCount`; `tokenCount` and `budgetTokens`; and
+`released`, the ids of the rows this recall ended.
 
 - **The core** is the room's active `situation` memories and the head of the sheet of everyone who spoke:
   the first facts `GET /subjects/{subjectId}/sheet` renders for each speaker with the turn's room as
@@ -204,6 +211,16 @@ where none is given). It answers `block`, the text the turn is handed; `chosen`,
   names, scored by relevance, importance and retrieval strength under the brain's weights, at most the
   subject cap of rows per subject, no near-double of a row already in, under the budget. A `persona` or
   `episode` row, a `pending` row, and a row written after `sessionOpenedAt` are never in it.
+- **A row's `recallCondition` is words a turn may say.** Where the turn's words hold at least the rules'
+  `condition_share` of a row's `recallCondition`, that situation is said and the row is carried: it is a
+  candidate of the searched part and its relevance is 1, the whole a relevance reaches, so it enters the block
+  unless the budget or a subject's cap has filled it. A row whose condition the turn does not say, or which
+  carries none, is reached by its words and its subjects as before.
+- **A `releaseCondition` the turn holds ends the row.** Where at least the rules' `condition_share` of a live
+  `active` row's `releaseCondition` is among the turn's words, that situation has come true: the row is never
+  handed out, and the recall moves it to `invalidated` with `validTo` the moment and the condition as its
+  `reason`, publishing `memory.moved`, in the recall's own transaction. `released` names every row it ended,
+  and the release stands whether or not `record` is set.
 - **A row handed to the session before** in the same version is marked: its line carries its id and no
   words. With `record` true, the rows handed out are hit and marked for `sessionKey`.
 - **A line** is `- [#<id> <type> since <date>] <text>`, a `rumor` prefixed `heard:`, and a row whose
@@ -220,7 +237,7 @@ material and its mechanics.
 | Route | Does | Answers |
 |---|---|---|
 | `POST /similar` | `text`, `subjects` (each `type` and `key`), `limit` (10 where none, at most 50): the live memories most like the candidate, about one of its subjects or holding its words, neither an `episode` nor a `persona`, scored by the share of the candidate's words they hold and a shared subject | 200, a list |
-| `POST /learnings` | a learning applied whole in one transaction: `type`, `text`, `subjects`, `importance`, `source` (`own`, `owner`, `told`, `inferred`), `confirms` (ids confirmed), `strengthens` (an id given a new version with the text), `replaces` (ids invalidated, unless the source is heard), `grounds` (episode ids linked as subjects of type `episode`), `validFrom` (when it began holding; now where none), `key`, `layerId`, `actorName`, `labels` | 201: `confirmedCount`, `invalidatedIds`, `written` (the version written, or null where the learning only confirms), `versioned`; 400 for a ground that is no episode; 409 where `strengthens` names a row that is not live |
+| `POST /learnings` | a learning applied whole in one transaction: `type`, `text`, `subjects`, `importance`, `source` (`own`, `owner`, `told`, `inferred`), `confirms` (ids confirmed), `strengthens` (an id given a new version with the text), `replaces` (ids invalidated, unless the source is heard), `grounds` (episode ids linked as subjects of type `episode`), `validFrom` (when it began holding; now where none), `key`, `layerId`, `recallCondition`, `releaseCondition`, `actorName`, `labels` | 201: `confirmedCount`, `invalidatedIds`, `written` (the version written, or null where the learning only confirms), `versioned`; 400 for a ground that is no episode; 409 where `strengthens` names a row that is not live |
 | `GET /unconsolidated` | the active `episode` rows not yet consolidated, most important first; `limit` (60 where none, at most 500) | 200, a list |
 | `POST /consolidated` | `episodeIds`: marks them consolidated | 200, `recordedCount` |
 
@@ -245,7 +262,8 @@ takes the base layer alone; a named layer that does not stand is 404.
 | `POST /injections` | reads the brain file in the body (`application/vnd.sqlite3`) into the brain: a layer is reused by its name, a subject by its type and key, a live row whose key a live row of the brain holds supersedes it unless it is the same, every other live row is added; nothing is overwritten | 201, `subjectsAdded`, `layersAdded`, `memoriesAdded`, `memoriesSuperseded`; 400 for a body that is no brain file, of another shape, or holding a live row whose key is no key or whose type is `sheet`; nothing of such a file is read in |
 
 The file is a SQLite database of the tables `brain_file` (`shape`, `exported_at`, `name`), `subjects`,
-`layers`, `memories` and `memory_subjects`, its ids local to the file; this brain writes and reads shape 1.
+`layers`, `memories` and `memory_subjects`, its ids local to the file; this brain writes shape 2 and reads
+shapes 1 and 2, a shape-1 file's rows carrying no condition.
 
 ## The console bundle
 
@@ -296,8 +314,8 @@ person is a subject」).
   a date standing first in it, is the fact's `validFrom`; the date after `confirmed` its `lastConfirmedAt`.
   The bracket is taken off the text, except where its date is a span (`<date>~<date>`), which the text keeps
   as `[<date>~<date>]` ahead of its words. Where no date is read, the fact's `validFrom` is the sheet's.
-- **Each fact carries the sheet's** subjects, layer, importance, status (`active` or `pending`) and labels,
-  with the labels `splitFrom` (the sheet's id), `section` (the words of the nearest heading above it, where
+- **Each fact carries the sheet's** subjects, layer, importance, status (`active` or `pending`), the two
+  conditions and labels, with the labels `splitFrom` (the sheet's id), `section` (the words of the nearest heading above it, where
   one stands) and `prefix` (the bracket as it stood, where one did); its `actorName` is `migration`.
 - **The sheet is then moved to `done`** with the reason `split into facts`, in the same transaction as its
   facts, so a sheet is split whole or not at all, and a sheet already split, being `done`, is not read again.
