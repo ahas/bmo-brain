@@ -1177,7 +1177,10 @@ async fn a_memory_carries_the_situation_that_recalls_it_and_the_one_that_ends_it
   );
 
   // A version fills a condition a row carried none of, and the row it replaced stands as it was.
-  let bare = client.memory_add(brain, &memory("fact", "The bins are collected on Tuesday.")).await.unwrap();
+  let bare = client
+    .memory_add(brain, &memory("fact", "The bins are collected on Tuesday."))
+    .await
+    .unwrap();
   let bare_id = bare.id;
   assert_eq!((bare.recall_condition, bare.release_condition), (None, None));
   let filled = client
