@@ -154,7 +154,8 @@ moved, as the mover said, or null), `labels` and `createdAt`.
 `recallCondition` is the situation in which the memory is needed and `releaseCondition` the situation that ends
 it, each the writer's words and null where it carries none (`docs/design.md`, 「Recall」). Both are set by a
 first version, a version, a merge and a learning, the version's taken from the version it supersedes where it
-gives none; no route changes either on a row that stands.
+gives none; no route changes either on a row that stands. Both are optional: a memory that carries neither is
+permanent, reached by its words and its subjects as every memory was.
 
 `type` is the writer's word; the reserved ones are `episode`, `fact`, `rumor`, `situation`, `rule`, `name`,
 `persona`, `lore` and `knowledge` (`docs/design.md`, 「Types」). `sheet` is no type: a first version, a

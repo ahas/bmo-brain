@@ -1176,6 +1176,33 @@ async fn a_memory_carries_the_situation_that_recalls_it_and_the_one_that_ends_it
     (MemoryStatus::Superseded, Some(recall))
   );
 
+  // A version fills a condition a row carried none of, and the row it replaced stands as it was.
+  let bare = client.memory_add(brain, &memory("fact", "The bins are collected on Tuesday.")).await.unwrap();
+  let bare_id = bare.id;
+  assert_eq!((bare.recall_condition, bare.release_condition), (None, None));
+  let filled = client
+    .memory_version(
+      brain,
+      bare_id,
+      &MemoryVersion {
+        recall_condition: Some(Some("the bins come up".to_owned())),
+        release_condition: Some(Some("the bins are collected".to_owned())),
+        actor_name: "writer-b".to_owned(),
+        ..MemoryVersion::default()
+      },
+    )
+    .await
+    .unwrap();
+  assert_eq!(
+    (filled.recall_condition.as_deref(), filled.release_condition.as_deref()),
+    (Some("the bins come up"), Some("the bins are collected"))
+  );
+  let stood = client.memory(brain, bare_id).await.unwrap();
+  assert_eq!(
+    (stood.status, stood.recall_condition, stood.release_condition),
+    (MemoryStatus::Superseded, None, None)
+  );
+
   // A condition is cleared by a version that says null, and the other stands.
   let cleared = client
     .memory_version(

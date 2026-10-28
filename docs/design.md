@@ -99,6 +99,9 @@ One row is one thing the agent remembers, in one version.
 | `labels` | the caller's own metadata, a map of strings |
 | `createdAt` | when this version was written |
 
+The two conditions are optional. A memory that carries neither is a permanent one: no situation has to be
+said for it to come to mind, and nothing but a person's act or a correction ends it.
+
 ### Types
 
 `type` is a word the writer writes freely. A few are reserved because code depends on their meaning;
