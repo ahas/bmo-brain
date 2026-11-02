@@ -1,7 +1,8 @@
 # The brain's tool: what a chat agent writes to and reads from its brain in a turn (docs/boundary-api.md, 「Its
 # tool」), each entry one call of a brain route through the brain's client. The tool finds the brain through the
 # data root's env file, and the agent's brain by the turn's agent. The crate's own test holds every entry here to
-# the executable answering it.
+# the executable answering it. Every entry is unbounded: a call waits for the brain's answer however long it
+# takes.
 
 [tool]
 name = "brain"
@@ -20,6 +21,7 @@ description = "Keep what was just said as an episode of your brain, its text in 
 input = "brain_episode.json"
 hints = { idempotent = false }
 capabilities = ["room.chat"]
+unbounded = true
 
 [[entry]]
 namespace = "bmo"
@@ -29,6 +31,7 @@ description = "The live memories most like a candidate fact: read these and judg
 input = "brain_similar.json"
 hints = { read_only = true }
 capabilities = ["room.chat"]
+unbounded = true
 
 [[entry]]
 namespace = "bmo"
@@ -38,6 +41,7 @@ description = "Apply a learning whole, one fact to a call, its text in English: 
 input = "brain_learn.json"
 hints = { idempotent = false }
 capabilities = ["room.chat"]
+unbounded = true
 
 [[entry]]
 namespace = "bmo"
@@ -47,6 +51,7 @@ description = "Move a memory's status: done for a promise kept, invalidated for 
 input = "brain_move.json"
 hints = { idempotent = true }
 capabilities = ["room.chat"]
+unbounded = true
 
 [[entry]]
 namespace = "bmo"
@@ -56,6 +61,7 @@ description = "Your brain's memories by type, status, subject, key, words, or th
 input = "brain_list.json"
 hints = { read_only = true }
 capabilities = ["room.chat"]
+unbounded = true
 
 [[entry]]
 namespace = "bmo"
@@ -65,6 +71,7 @@ description = "The episodes not yet consolidated, most important first, for a co
 input = "brain_unconsolidated.json"
 hints = { read_only = true }
 capabilities = ["room.chat"]
+unbounded = true
 
 [[entry]]
 namespace = "bmo"
@@ -74,6 +81,7 @@ description = "Mark episodes consolidated after writing what they come to."
 input = "brain_consolidated.json"
 hints = { idempotent = true }
 capabilities = ["room.chat"]
+unbounded = true
 
 [[entry]]
 namespace = "bmo"
@@ -83,3 +91,4 @@ description = "Tell the brain this session folds or is handed off: its marks cle
 input = "brain_fold.json"
 hints = { idempotent = true }
 capabilities = ["room.chat"]
+unbounded = true

@@ -11,7 +11,7 @@ use axum::http::{HeaderMap, header};
 use axum::response::sse::{Event as Sent, KeepAlive, Sse};
 use axum::response::{IntoResponse, Response};
 use bmo_brain_client::{Event, EventsQuery};
-use futures_util::stream;
+use futures_util::{StreamExt, stream};
 use tokio::sync::watch;
 
 use super::{Answer, Brain, Query};
@@ -58,6 +58,7 @@ pub(super) async fn events(
     .get(header::ACCEPT)
     .and_then(|value| value.to_str().ok())
     .is_some_and(|accepted| accepted.contains("application/json"));
+  let stopping = brain.stopping;
   let store = brain.store;
   if paged {
     let limit = limit(query.limit)?;
@@ -91,5 +92,7 @@ pub(super) async fn events(
       let _ = tokio::time::timeout(LOOK_AGAIN, reading.moved.changed()).await;
     }
   });
+  // The stream ends with the service's stop, so the shutdown waits for nothing that never ends.
+  let events = events.take_until(stopping.heard());
   Ok(Sse::new(events).keep_alive(KeepAlive::new().interval(KEEP_OPEN)).into_response())
 }

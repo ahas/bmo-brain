@@ -44,8 +44,10 @@ deployment restarts it, waits on its health command, `bmo-brain --config <deploy
 and rolls back where it does not come up ready. Before its flip it waits for quiet (`testbed.toml`, `quiet`): the
 receiver's `quiet` command, run by its deployed path, says whether a chat turn or a research run stands under way
 that the restart would cut (the receiver's `docs/boundary-api.md`, 「The service and its commands」). The health command asks the listen address (an unspecified
-host asked at the loopback one) with the token, waits at most five seconds, and ends 0 where the service
-answers ready and 1 otherwise, saying why on its error stream.
+host asked at the loopback one) with the token, waits for the answer however long it takes, and ends 0 where
+the service answers ready and 1 where it answers otherwise or its connection is refused or breaks, saying why on
+its error stream. A stop (SIGTERM or an interrupt) ends every open event stream and lets the calls under way
+finish, and the service then ends; the unit waits for that and never escalates the stop to a kill.
 
 ## Common rules
 
@@ -76,7 +78,8 @@ events as a page instead.
   members.
 - **Resuming:** `Last-Event-ID` or `after`. The brain keeps seven days of events; a resume from before the
   oldest it keeps is answered 410 `gone`, and the reader reads the collections again.
-- **Keeping the stream open:** a comment line every fifteen seconds.
+- **Keeping the stream open:** a comment line every fifteen seconds. The stream ends when the service is
+  stopped, and the reader resumes from its last event once the service answers again.
 
 | Kind | When | `data` |
 |---|---|---|
@@ -343,6 +346,8 @@ host's call protocol states.
   (`PATCH …/memories/{memoryId}`), `brain_list` (`GET …/memories`), `brain_unconsolidated`
   (`GET …/unconsolidated`), `brain_consolidated` (`POST …/consolidated`) and `brain_fold`
   (`POST …/folds`, the session key the record's `BMO_RUN_NAME`). It writes as `agent-session`.
+- **A call waits for the brain's answer** however long it takes: each entry is unbounded to the tool host, so
+  no timeout ends it, only the brain's answer, a refused or broken connection, or its caller going away.
 - **A deployment places it** in `tools/brain/.placed/` inside the release: the executable, the manifest and
   the schemas; and once the release stays up, registers that folder with the tool host as the service's own
   tool, so no hand touches the registry.

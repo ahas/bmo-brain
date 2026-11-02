@@ -11,11 +11,12 @@ use std::str::FromStr;
 use std::sync::atomic::{AtomicU32, Ordering};
 
 use bmo_brain::api::console::Console;
-use bmo_brain::api::{Brain, router};
+use bmo_brain::api::{Brain, Stopping, router};
 use bmo_brain::store::{MIGRATOR, Store};
 use bmo_brain_client::BrainClient;
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
 use sqlx::{ConnectOptions, Connection, Executor, PgConnection};
+use tokio::sync::watch;
 use tokio::task::JoinHandle;
 
 /// The token the served brain takes.
@@ -120,6 +121,7 @@ pub struct Served {
   pub client: BrainClient,
   pub base: String,
   serving: JoinHandle<()>,
+  stop: watch::Sender<bool>,
 }
 
 impl Served {
@@ -158,10 +160,12 @@ impl Served {
         calls,
       },
     };
+    let (stop, stopping) = Stopping::new();
     let brain = Brain {
       store: store.clone(),
       token: TOKEN.to_owned(),
       console: Some(console),
+      stopping,
     };
     let serving = tokio::spawn(async move {
       axum::serve(listener, router(brain)).await.unwrap();
@@ -173,7 +177,13 @@ impl Served {
       client,
       base,
       serving,
+      stop,
     }
+  }
+
+  /// The service's stop raised, as a SIGTERM raises it.
+  pub fn stop(&self) {
+    self.stop.send_replace(true);
   }
 
   /// A client presenting another token.

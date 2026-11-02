@@ -14,18 +14,40 @@ use axum::response::{IntoResponse, Response};
 use axum::{Json, Router};
 use bmo_brain_client::{ErrorCode, Health, Role, WireError};
 use serde::de::DeserializeOwned;
+use tokio::sync::watch;
 
 use crate::store::{Fault, Store};
 
 use self::console::{Console, Reach, SCREEN_ROLE};
 
-/// What the routes stand on: the store, the service's token, and the console the brain serves a bundle to,
-/// where it serves one.
+/// What the routes stand on: the store, the service's token, the console the brain serves a bundle to, where it
+/// serves one, and the service's stop as its open streams hear it.
 #[derive(Debug, Clone)]
 pub struct Brain {
   pub store: Store,
   pub token: String,
   pub console: Option<Console>,
+  pub stopping: Stopping,
+}
+
+/// The service's stop as an open stream hears it: raised once, when the service is asked to end, so a stream
+/// that would otherwise never end lets the service's shutdown finish.
+#[derive(Debug, Clone)]
+pub struct Stopping(watch::Receiver<bool>);
+
+impl Stopping {
+  /// The sender that raises the stop, and the stop the streams hear.
+  pub fn new() -> (watch::Sender<bool>, Self) {
+    let (raise, heard) = watch::channel(false);
+    (raise, Self(heard))
+  }
+
+  /// Ends once the stop is raised, and never where its sender is gone without raising it.
+  pub async fn heard(mut self) {
+    if self.0.wait_for(|raised| *raised).await.is_err() {
+      std::future::pending::<()>().await;
+    }
+  }
 }
 
 /// Whose token a call carries.

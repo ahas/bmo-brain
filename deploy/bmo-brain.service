@@ -13,7 +13,9 @@ WorkingDirectory=%h/.local/share/bmo-brain/deploy
 ExecStart=%h/.local/share/bmo-brain/deploy/bin/bmo-brain --config %h/.local/share/bmo-brain/deploy/brain.toml serve
 Restart=always
 RestartSec=2
-TimeoutStopSec=30
+# A stop ends the event streams and lets the calls under way finish, and the unit waits for the service to end
+# however long that takes; it is never escalated to a kill.
+TimeoutStopSec=infinity
 
 [Install]
 WantedBy=default.target

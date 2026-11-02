@@ -8,9 +8,9 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 use bmo_brain::api::console::{Console, bundle_beside_binary};
-use bmo_brain::api::{Brain, router};
+use bmo_brain::api::{Brain, Stopping, router};
 use bmo_brain::clock;
-use bmo_brain::config::{Config, HEALTH_PATIENCE};
+use bmo_brain::config::Config;
 use bmo_brain::mcp::BrainServer;
 use bmo_brain::openapi::openapi_json;
 use bmo_brain::store::Store;
@@ -99,13 +99,18 @@ async fn serve(config: &Config) -> Result<(), String> {
     let folder = console.bundle.clone().or_else(bundle_beside_binary).unwrap_or_default();
     Console::over(console.token.clone(), &folder, console.calls.clone())
   });
+  let (raise, stopping) = Stopping::new();
   let brain = Brain {
     store,
     token: config.token.clone(),
     console,
+    stopping,
   };
   let served = axum::serve(listener, router(brain))
-    .with_graceful_shutdown(stopped())
+    .with_graceful_shutdown(async move {
+      stopped().await;
+      let _ = raise.send(true);
+    })
     .await
     .map_err(|why| why.to_string());
   clock.abort();
@@ -130,7 +135,6 @@ async fn health(config: &Config) -> Result<(), String> {
 fn reqwest_client() -> Result<bmo_brain_client::HttpClient, String> {
   bmo_brain_client::HttpClient::builder()
     .no_proxy()
-    .timeout(HEALTH_PATIENCE)
     .build()
     .map_err(|why| format!("no HTTP client: {why}"))
 }

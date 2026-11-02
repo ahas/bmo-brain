@@ -2,7 +2,6 @@
 //! names, read once at start and held for the process's life.
 
 use std::path::{Path, PathBuf};
-use std::time::Duration;
 
 use bmo_brain_client::Rules;
 use serde::Deserialize;
@@ -40,9 +39,6 @@ pub struct ConsoleConfig {
   #[serde(default)]
   pub calls: Vec<String>,
 }
-
-/// How long the health command waits on one answer.
-pub const HEALTH_PATIENCE: Duration = Duration::from_secs(5);
 
 impl Config {
   /// The configuration a file holds, or why it could not be read.

@@ -6,7 +6,7 @@ use std::io::Write as _;
 use std::process::{Command, Stdio};
 use std::str::FromStr;
 
-use bmo_brain::api::{Brain, router};
+use bmo_brain::api::{Brain, Stopping, router};
 use bmo_brain::store::{MIGRATOR, Store};
 use bmo_brain_client::{BrainClient, MemoriesQuery, NewBrain};
 use brain_tool::{ACTOR, ENTRIES};
@@ -82,6 +82,7 @@ impl Served {
       store,
       token: TOKEN.to_owned(),
       console: None,
+      stopping: Stopping::new().1,
     };
     let serving = tokio::spawn(async move {
       axum::serve(listener, router(brain)).await.unwrap();

@@ -105,6 +105,27 @@ async fn the_stream_hands_over_each_event_with_its_kind_and_number() {
 }
 
 #[tokio::test]
+async fn the_stream_ends_when_the_service_stops() {
+  let served = Served::new().await;
+  served.client.brain_add(&brain("agent-a")).await.unwrap();
+  let answer = reqwest::Client::new()
+    .get(format!("{}/events?after=0", served.base))
+    .bearer_auth(TOKEN)
+    .send()
+    .await
+    .unwrap();
+  let mut bytes = answer.bytes_stream();
+  let mut read = String::new();
+  while !read.contains("\n\n") {
+    read.push_str(&String::from_utf8_lossy(&bytes.next().await.unwrap().unwrap()));
+  }
+  served.stop();
+  while let Some(chunk) = bytes.next().await {
+    chunk.unwrap();
+  }
+}
+
+#[tokio::test]
 async fn every_route_takes_the_token_and_a_route_no_one_serves_is_no_route() {
   let served = Served::new().await;
   assert_eq!(refused(served.with_token("wrong").health().await), (401, "unauthorized".into()));
