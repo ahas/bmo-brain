@@ -5,8 +5,6 @@
 //! which the server makes in a fraction of the time a migration takes. A copy is dropped when its test is
 //! done, and the template and copies a binary left behind are dropped by the next binary to make a template.
 
-#![allow(dead_code)]
-
 use std::str::FromStr;
 use std::sync::atomic::{AtomicU32, Ordering};
 

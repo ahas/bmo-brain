@@ -3,7 +3,7 @@
 //! type `sheet`, the head of it recall's core carries (docs/boundary-api.md, 「Recall」), and the split of the
 //! sheet rows a store still holds live, run through the binary.
 
-mod support;
+use crate::support;
 
 use std::path::PathBuf;
 use std::process::Output;

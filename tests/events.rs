@@ -1,7 +1,7 @@
 //! The events stream and page, the token, the routes no one serves, and health (docs/boundary-api.md,
 //! 「Common rules」, 「Health」 and 「Events」).
 
-mod support;
+use crate::support;
 
 use std::time::Duration;
 

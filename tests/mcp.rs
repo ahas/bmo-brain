@@ -2,7 +2,7 @@
 //! lists exactly the plugin's twenty-one tools, and each call reaches the served brain through its client. The
 //! command runs as its own process, spoken to over its pipes, and is taken down before each test ends.
 
-mod support;
+use crate::support;
 
 use std::process::Stdio;
 use std::time::Duration;

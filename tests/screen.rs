@@ -3,7 +3,7 @@
 //! orders, the tallies, a move's reason and its closing words, a restoration, a subject's name, and how far
 //! the console's token reaches.
 
-mod support;
+use crate::support;
 
 use bmo_brain_client::{
   BrainClient, MemoriesQuery, MemoryMove, MemoryStatus, MemoryVersion, NewBrain, NewLayer, NewMemory,

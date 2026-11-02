@@ -2,7 +2,7 @@
 //! made and found, subjects and layers, memories written, versioned and moved, hits and confirmations, the
 //! types, recall, the fold, the persona and the brain file.
 
-mod support;
+use crate::support;
 
 use bmo_brain_client::{
   BrainClient, BrainsQuery, Confirmations, ExportQuery, Fold, Hits, LayersQuery, MemoriesQuery,

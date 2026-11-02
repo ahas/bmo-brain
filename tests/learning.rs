@@ -2,7 +2,7 @@
 //! the likes of a candidate, a learning applied whole by its judgement and source, and the consolidation's
 //! reads and marks with the due signal in recall.
 
-mod support;
+use crate::support;
 
 use bmo_brain_client::{
   BrainClient, Consolidated, Learning, MemoryStatus, NewBrain, NewMemory, RecallAsk, SimilarAsk, Source,
