@@ -10,13 +10,13 @@ edition = "2024"
 license = "MIT"
 
 [workspace.dependencies]
-axum = { version = "0.8.4", default-features = false, features = ["http1", "json", "matched-path", "query", "tokio"] }
+axum = { version = "0.8.9", features = ["macros", "multipart", "ws"] }
 bmo-brain-client = { path = "crates/client" }
 chrono = { version = "0.4.45", default-features = false, features = ["std"] }
 clap = { version = "4.5.40", features = ["derive", "env"] }
 futures-util = "0.3.34"
 regex = "1.12"
-reqwest = { version = "0.13.5", default-features = false, features = ["json", "query"] }
+reqwest = { version = "0.13.5", features = ["json", "query", "stream"] }
 rmcp = { version = "3.5.0", default-features = false, features = ["server", "transport-io"] }
 rusqlite = { version = "0.32.1", features = ["bundled"] }
 rust-ini = "0.21"
@@ -31,7 +31,7 @@ sqlx = { version = "0.8.6", default-features = false, features = [
   "postgres",
   "runtime-tokio",
 ] }
-tokio = { version = "1.47.0", features = ["macros", "rt", "rt-multi-thread", "net", "time", "signal", "sync"] }
+tokio = { version = "1.53.3", features = ["fs", "io-std", "io-util", "macros", "net", "process", "rt", "rt-multi-thread", "signal", "sync", "test-util", "time"] }
 toml = { version = "0.8.23", default-features = false, features = ["parse"] }
 
 [package]
@@ -71,18 +71,18 @@ serde_json.workspace = true
 sha2.workspace = true
 # The service's database and its migrations.
 sqlx.workspace = true
-tokio = { workspace = true, features = ["io-std"] }
+tokio.workspace = true
 # The configuration file.
 toml.workspace = true
 
 [dev-dependencies]
 # Routes asked by hand, the event stream among them.
-reqwest = { workspace = true, features = ["stream"] }
+reqwest.workspace = true
 # The personal-data forms the repository's check reads.
 regex.workspace = true
 # The service's unit file, read in its INI shape by the repository's checks.
 rust-ini.workspace = true
-tokio = { workspace = true, features = ["io-util", "process"] }
+tokio.workspace = true
 
 [[test]]
 name = "main"
