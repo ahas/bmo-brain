@@ -36,7 +36,7 @@ plugin」). The binary declares no noun, so the platform's `bmo` hands it no com
 | console | `[console]` | the console bundle (「The console bundle」), where the brain serves one: `token`, the console's bearer token, which reaches what the screen uses; `bundle`, the folder the build of `client/` wrote the module, its stylesheet and its words into, the release's `console` where none is given; `calls`, the other services the screen calls through the console, each by the service name its own manifest gives it, which the manifest names under `calls`, none where none is given |
 | database | `database` | the address of the brain's own PostgreSQL database, which holds its tables and nothing else |
 | data root | `data_root` | the data root whose `env/brain.env` the brain's tool reads the service's address and token from; the `tool-env` verb writes it |
-| rules | `[rules]` | the numbers the brain reads by (`docs/design.md`), each with a default: `budget_tokens`, `max_associative_strength` (the most a cue gives the rows linked to it, less the log of its fan, 1.6), `mmr_lambda` (the weight recall's selection gives relevance against overlap with the rows already in, 0.7), `subject_cap`, `core_fact_cap` (the most facts of one speaker's sheet the core of a recall carries, 8), `hit_times_kept` (the most use moments a memory keeps, 64), `same_session_ms` (an hour; read by no rule), `previous_value_days`, `condition_share` (the share of a condition's words a turn holds before it matches, 0.5), `consolidation_threshold` |
+| rules | `[rules]` | the numbers the brain reads by (`docs/design.md`), each with a default: `budget_tokens`, `mmr_lambda` (the weight recall's selection gives relevance against overlap with the rows already in, 0.7), `subject_cap`, `core_fact_cap` (the most facts of one speaker's sheet the core of a recall carries, 8), `hit_times_kept` (the most use moments a memory keeps, 64), `same_session_ms` (an hour; read by no rule), `previous_value_days`, `condition_share` (the share of a condition's words a turn holds before it matches, 0.5), `consolidation_threshold` |
 
 Deployed, the file stands under the data root as `env/brain.toml`, and each release links to it as
 `brain.toml`. The service runs as the user unit `deploy/bmo-brain.service`, the repository's one service: a
@@ -213,15 +213,16 @@ where none is given). It answers `block`, the text the turn is handed; `chosen`,
 - **Every line of either part keeps the budget,** a marked one as well: a line that would carry the block
   past `budgetTokens` is left out.
 - **The searched part** is the active rows holding one of the turn's stems or about a subject the turn
-  names, ordered by relevance (what the turn's cues spread to them), then importance, then the latest use,
+  names, ordered by relevance (each cue they match giving ln(N / fan) over the number of cues, N the brain's
+  live memories and fan the live memories the cue reaches), then importance, then the latest use,
   and chosen by Maximal Marginal Relevance between that relevance and the stem overlap with the rows already
   in, at most the subject cap of rows per subject, under the budget (`docs/design.md`, 「Recall」). A
   `persona` or `episode` row, a `pending` row, and a row written after `sessionOpenedAt` are never in it. A
   choice's `score` is its relevance, a core row's as well.
 - **A row's `recallCondition` is words a turn may say.** Where the turn's words hold at least the rules'
   `condition_share` of a row's `recallCondition`, that situation is said and the row is carried: it is a
-  candidate of the searched part and its relevance is `max_associative_strength`, the most a cue set gives, so
-  it enters the block unless the budget or a subject's cap has filled it. A row whose condition the turn does
+  candidate of the searched part and its relevance is ln N for the N live memories of the brain, the most a cue
+  set gives, so it enters the block unless the budget or a subject's cap has filled it. A row whose condition the turn does
   not say, or which carries none, is reached by its stems and its subjects.
 - **A `releaseCondition` the turn holds ends the row.** Where at least the rules' `condition_share` of a live
   `active` row's `releaseCondition` is among the turn's words, that situation has come true: the row is never

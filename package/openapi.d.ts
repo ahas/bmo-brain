@@ -1107,12 +1107,6 @@ export interface components {
             hit_times_kept: number;
             /**
              * Format: double
-             * @description The most relevance `S` a cue gives a memory linked to it, less the log of its fan.
-             * @default 1.6
-             */
-            max_associative_strength: number;
-            /**
-             * Format: double
              * @description The weight `λ` recall's selection gives a row's relevance against its overlap with the rows already in.
              * @default 0.7
              */

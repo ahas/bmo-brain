@@ -1553,12 +1553,6 @@
             "format": "int64",
             "type": "integer"
           },
-          "max_associative_strength": {
-            "default": 1.6,
-            "description": "The most relevance `S` a cue gives a memory linked to it, less the log of its fan.",
-            "format": "double",
-            "type": "number"
-          },
           "mmr_lambda": {
             "default": 0.7,
             "description": "The weight `λ` recall's selection gives a row's relevance against its overlap with the rows already in.",
@@ -1586,7 +1580,6 @@
         },
         "required": [
           "budget_tokens",
-          "max_associative_strength",
           "mmr_lambda",
           "subject_cap",
           "core_fact_cap",

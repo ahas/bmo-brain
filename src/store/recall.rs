@@ -9,7 +9,7 @@ use bmo_brain_client::{
 use sqlx::PgConnection;
 
 use super::brains::{brain_of, event_scope, given};
-use super::rules::{Rules, tokens};
+use super::rules::tokens;
 use super::sheets::sheet_rows;
 use super::versions::{MEMORY_COLUMNS, MemoryRow};
 use super::words::{index_words, overlap, stems};
@@ -51,10 +51,12 @@ async fn subject_id(conn: &mut PgConnection, brain_id: i64, named: &SubjectKey) 
 }
 
 /// A turn's cues and how many live memories of the brain each is linked to (docs/design.md, 「Recall」): the
-/// subjects it names that stand and the stems its words hold, read once for a recall or a similar ask.
+/// subjects it names that stand and the stems its words hold, read once for a recall or a similar ask, with
+/// the number of the brain's live memories.
 pub(crate) struct Cues {
   subjects: BTreeMap<i64, i64>,
   stems: BTreeMap<String, i64>,
+  live: i64,
 }
 
 impl Cues {
@@ -87,10 +89,23 @@ impl Cues {
     .fetch_all(&mut *conn)
     .await?;
     by_stem.extend(fans);
+    let live: i64 = sqlx::query_scalar(
+      "SELECT COUNT(*) FROM memories WHERE brain_id = $1 AND status IN ('active', 'pending')",
+    )
+    .bind(brain_id)
+    .fetch_one(&mut *conn)
+    .await?;
     Ok(Self {
       subjects: by_subject,
       stems: by_stem,
+      live,
     })
+  }
+
+  /// The most a cue set gives a row: the log of the brain's live memories, as though every cue reached that
+  /// row alone.
+  pub(crate) fn most(&self) -> f64 {
+    (self.live.max(1) as f64).ln()
   }
 
   /// The fans of the cues a memory about these subjects and holding these stems is linked to.
@@ -109,17 +124,18 @@ impl Cues {
     self.linked(subjects, stems).next().is_some()
   }
 
-  /// The relevance of such a memory: each cue linked to it gives its share of the attention times the most
-  /// associative strength less the log of its fan.
-  pub(crate) fn relevance(&self, rules: &Rules, subjects: &[i64], stems: &BTreeSet<String>) -> f64 {
+  /// The relevance of such a memory: each cue linked to it gives its share of the attention times the log of
+  /// the brain's live memories over its fan, never below zero.
+  pub(crate) fn relevance(&self, subjects: &[i64], stems: &BTreeSet<String>) -> f64 {
     let count = self.subjects.len() + self.stems.len();
     if count == 0 {
       return 0.0;
     }
     let share = 1.0 / count as f64;
+    let live = self.live.max(1);
     self
       .linked(subjects, stems)
-      .map(|fan| share * (rules.max_associative_strength - (fan.max(1) as f64).ln()))
+      .map(|fan| share * (live as f64 / fan.clamp(1, live) as f64).ln())
       .sum()
   }
 }
@@ -156,9 +172,9 @@ impl Store {
       .is_some_and(|condition| holds(condition, asked, rules.condition_share));
     let subjects: Vec<i64> = memory.subjects.iter().map(|subject| subject.id).collect();
     let (relevance, reached) = if said {
-      (rules.max_associative_strength, true)
+      (cues.most(), true)
     } else {
-      (cues.relevance(rules, &subjects, &stems), cues.reaches(&subjects, &stems))
+      (cues.relevance(&subjects, &stems), cues.reaches(&subjects, &stems))
     };
     Weighed {
       memory,

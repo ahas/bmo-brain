@@ -700,8 +700,6 @@ pub struct Injected {
 pub struct Rules {
   /// The tokens a recall block holds where the ask names no budget.
   pub budget_tokens: i64,
-  /// The most relevance `S` a cue gives a memory linked to it, less the log of its fan.
-  pub max_associative_strength: f64,
   /// The weight `λ` recall's selection gives a row's relevance against its overlap with the rows already in.
   pub mmr_lambda: f64,
   /// The most rows one subject fills in the searched part of a block.
@@ -725,7 +723,6 @@ impl Default for Rules {
   fn default() -> Self {
     Self {
       budget_tokens: 1_800,
-      max_associative_strength: 1.6,
       mmr_lambda: 0.7,
       subject_cap: 4,
       core_fact_cap: 8,

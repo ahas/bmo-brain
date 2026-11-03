@@ -127,14 +127,55 @@ async fn a_subject_few_rows_share_outranks_one_many_share() {
   let chosen = searched(&recall);
   assert_eq!(chosen.first(), Some(&alone.id), "{:?}", recall.chosen);
   let rules = Rules::default();
-  // Two cues: the rare subject's fan is one, the common one's ten.
+  // Two cues among eleven live rows: the rare subject's fan is one, the common one's ten.
   let alone_score = recall.chosen.iter().find(|c| c.memory_id == alone.id).unwrap().score;
-  assert!((alone_score - rules.max_associative_strength / 2.0).abs() < 1e-9, "{alone_score}");
+  assert!((alone_score - 11_f64.ln() / 2.0).abs() < 1e-9, "{alone_score}");
   let common_score = recall.chosen.iter().find(|c| c.memory_id != alone.id).unwrap().score;
-  let expected = (rules.max_associative_strength - 10_f64.ln()) / 2.0;
+  let expected = (11.0_f64 / 10.0).ln() / 2.0;
   assert!((common_score - expected).abs() < 1e-9, "{common_score} against {expected}");
-  // The common subject's rows stand though their relevance is below zero, no more than the cap of them.
+  // The common subject's rows stand too, no more than the cap of them.
   assert_eq!(chosen.len() - 1, rules.subject_cap as usize, "{:?}", recall.chosen);
+}
+
+#[tokio::test]
+async fn a_row_matching_two_cues_outranks_one_matching_one_of_them_at_hundreds_of_rows_a_cue() {
+  let served = Served::new().await;
+  let client = &served.client;
+  let brain = brain_of(client).await;
+  // Six hundred live rows: three hundred about home, two hundred about the desktop, a hundred about neither.
+  for (stem, count) in [("Home", 300), ("Desktop", 200), ("Other", 100)] {
+    sqlx::query(
+      "INSERT INTO memories (brain_id, type, text, status, lineage_id, valid_from, importance, actor_name, \
+       labels, created_at) SELECT $1, 'note', $2 || ' note ' || n || '.', 'active', 0, 1, 5, 'writer-a', '{}', 1 \
+       FROM generate_series(1, $3) AS n",
+    )
+    .bind(brain)
+    .bind(stem)
+    .bind(count)
+    .execute(&served.store.pool)
+    .await
+    .unwrap();
+  }
+  let both = client
+    .memory_add(brain, &memory("The home desktop sleeps at night.", 3, &[]))
+    .await
+    .unwrap();
+  let one = client
+    .memory_add(brain, &memory("Home is where the garden grows.", 10, &[]))
+    .await
+    .unwrap();
+  let recall = client.recall(brain, &ask(&[], "home desktop", None)).await.unwrap();
+  let chosen = searched(&recall);
+  assert_eq!(chosen.first(), Some(&both.id), "{:?}", recall.chosen);
+  // Each cue gives half the log of the live rows over its fan: 602 rows, home in 302, desktop in 201. The row
+  // matching both stands above every row matching one, the best of which match the rarer desktop alone.
+  let live = 602.0_f64;
+  let home = (live / 302.0).ln() / 2.0;
+  let desktop = (live / 201.0).ln() / 2.0;
+  assert!((recall.chosen[0].score - (home + desktop)).abs() < 1e-9, "{:?}", recall.chosen[0]);
+  assert!((recall.chosen[1].score - desktop).abs() < 1e-9, "{:?}", recall.chosen[1]);
+  assert!(recall.chosen.iter().skip(1).all(|c| c.score < home + desktop && c.score >= 0.0));
+  let _ = one;
 }
 
 #[tokio::test]

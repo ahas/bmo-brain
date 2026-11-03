@@ -221,7 +221,7 @@ The brain records how a memory is used and lets nothing fade by itself.
 - **Use orders, it never excludes.** Recall puts the row used last first among equally relevant and equally
   important rows (「Recall」); a reading of the screen orders by it where asked.
 - **The numbers are settings,** with placeholders until the owner's own conversation logs have fitted them:
-  the importance threshold of consolidation, recall's most associative strength and its selection's balance,
+  the importance threshold of consolidation, recall's selection's balance,
   the per-subject cap, the core's cap of facts per speaker, the share of a condition's words a turn holds
   before the condition matches, the token budget and the most use moments a row keeps. The brain reads them
   from its configuration and names each in its health answer.
@@ -256,12 +256,15 @@ a block and a list of what it chose.
       relevance_i = Σ_j  W_j · (S − ln fan_j)
 
   over the cues j the row is linked to, where W_j = 1 / J for the J cues the turn carries, fan_j is the
-  number of live memories of the brain linked to cue j, each counted once, and S is
-  `max_associative_strength`. A cue few memories share points at them strongly; one many share points
-  weakly, and below zero past e^S of them. Relevance goes one hop, from a cue to the memories linked to it.
+  number of live memories of the brain linked to cue j, each counted once, and S = ln N, N being the number of
+  live memories in the brain at the recall. Each matched cue so gives (1 / J) · ln(N / fan_j), its inverse
+  document frequency, never below zero: a cue few memories share points at them strongly, one nearly every
+  memory shares points at them hardly at all, and a row matching more of the turn's cues stands above one
+  matching fewer of them. Relevance goes one hop, from a cue to the memories linked to it.
 - **A situation is words.** A memory's `recallCondition` says when it is needed, and a turn says it where the
   turn's words hold at least the share of the condition's words the rules name: that row is a candidate though
-  neither its own words nor its subjects name it, and its relevance is the most a cue set gives, S.
+  neither its own words nor its subjects name it, and its relevance is the most a cue set gives, ln N, as
+  though every cue were linked to that row alone.
 - **The order** of the candidates is relevance, highest first; between equal relevances importance, highest
   first; then the latest use, a row never used after the used ones (「Use」). Nothing is normalised or
   weighed against anything else.
