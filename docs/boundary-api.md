@@ -36,7 +36,7 @@ plugin」). The binary declares no noun, so the platform's `bmo` hands it no com
 | console | `[console]` | the console bundle (「The console bundle」), where the brain serves one: `token`, the console's bearer token, which reaches what the screen uses; `bundle`, the folder the build of `client/` wrote the module, its stylesheet and its words into, the release's `console` where none is given; `calls`, the other services the screen calls through the console, each by the service name its own manifest gives it, which the manifest names under `calls`, none where none is given |
 | database | `database` | the address of the brain's own PostgreSQL database, which holds its tables and nothing else |
 | data root | `data_root` | the data root whose `env/brain.env` the brain's tool reads the service's address and token from; the `tool-env` verb writes it |
-| rules | `[rules]` | the numbers the brain reads by (`docs/design.md`), each with a default: `budget_tokens`, `mmr_lambda` (the weight recall's selection gives relevance against overlap with the rows already in, 0.7), `subject_cap`, `core_fact_cap` (the most facts of one speaker's sheet the core of a recall carries, 8), `hit_times_kept` (the most use moments a memory keeps, 64), `same_session_ms` (an hour; read by no rule), `previous_value_days`, `condition_share` (the share of a condition's words a turn holds before it matches, 0.5), `consolidation_threshold` |
+| rules | `[rules]` | the numbers the brain reads by (`docs/design.md`), each with a default: `budget_tokens`, `bm25_k1` (how far a matched stem's weight saturates with a row's length, 1.2), `bm25_b` (how much a row's length relative to the brain's mean weighs on a matched stem, 0.75), `mmr_lambda` (the weight recall's selection gives relevance against overlap with the rows already in, 0.7), `subject_cap`, `core_fact_cap` (the most facts of one speaker's sheet the core of a recall carries, 8), `hit_times_kept` (the most use moments a memory keeps, 64), `same_session_ms` (an hour; read by no rule), `previous_value_days`, `condition_share` (the share of a condition's words a turn holds before it matches, 0.5), `consolidation_threshold` |
 
 Deployed, the file stands under the data root as `env/brain.toml`, and each release links to it as
 `brain.toml`. The service runs as the user unit `deploy/bmo-brain.service`, the repository's one service: a
@@ -214,7 +214,8 @@ where none is given). It answers `block`, the text the turn is handed; `chosen`,
   past `budgetTokens` is left out.
 - **The searched part** is the active rows holding one of the turn's stems or about a subject the turn
   names, ordered by relevance (each cue they match giving ln(N / fan) over the number of cues, N the brain's
-  live memories and fan the live memories the cue reaches), then importance, then the latest use,
+  live memories and fan the live memories the cue reaches, a stem's share weighed down in a row longer than
+  the brain's mean by BM25's length term), then importance, then the latest use,
   and chosen by Maximal Marginal Relevance between that relevance and the stem overlap with the rows already
   in, at most the subject cap of rows per subject, under the budget (`docs/design.md`, 「Recall」). A
   `persona` or `episode` row, a `pending` row, and a row written after `sessionOpenedAt` are never in it. A

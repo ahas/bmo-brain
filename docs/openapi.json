@@ -1523,6 +1523,18 @@
         "additionalProperties": false,
         "description": "The rules, key by key as the configuration writes them.",
         "properties": {
+          "bm25_b": {
+            "default": 0.75,
+            "description": "BM25's `b`: how much a row's length relative to the brain's mean weighs on a matched stem.",
+            "format": "double",
+            "type": "number"
+          },
+          "bm25_k1": {
+            "default": 1.2,
+            "description": "BM25's `k1`: how far a matched stem's weight saturates with a row's length in recall's relevance.",
+            "format": "double",
+            "type": "number"
+          },
           "budget_tokens": {
             "default": 1800,
             "description": "The tokens a recall block holds where the ask names no budget.",
@@ -1580,6 +1592,8 @@
         },
         "required": [
           "budget_tokens",
+          "bm25_k1",
+          "bm25_b",
           "mmr_lambda",
           "subject_cap",
           "core_fact_cap",

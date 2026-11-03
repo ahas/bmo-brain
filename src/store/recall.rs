@@ -9,7 +9,7 @@ use bmo_brain_client::{
 use sqlx::PgConnection;
 
 use super::brains::{brain_of, event_scope, given};
-use super::rules::tokens;
+use super::rules::{Rules, tokens};
 use super::sheets::sheet_rows;
 use super::versions::{MEMORY_COLUMNS, MemoryRow};
 use super::words::{index_words, overlap, stems};
@@ -52,11 +52,12 @@ async fn subject_id(conn: &mut PgConnection, brain_id: i64, named: &SubjectKey) 
 
 /// A turn's cues and how many live memories of the brain each is linked to (docs/design.md, 「Recall」): the
 /// subjects it names that stand and the stems its words hold, read once for a recall or a similar ask, with
-/// the number of the brain's live memories.
+/// the number of the brain's live memories and their mean number of stems.
 pub(crate) struct Cues {
   subjects: BTreeMap<i64, i64>,
   stems: BTreeMap<String, i64>,
   live: i64,
+  mean_length: f64,
 }
 
 impl Cues {
@@ -89,8 +90,9 @@ impl Cues {
     .fetch_all(&mut *conn)
     .await?;
     by_stem.extend(fans);
-    let live: i64 = sqlx::query_scalar(
-      "SELECT COUNT(*) FROM memories WHERE brain_id = $1 AND status IN ('active', 'pending')",
+    let (live, mean_length): (i64, f64) = sqlx::query_as(
+      "SELECT COUNT(*), COALESCE(AVG(COALESCE(cardinality(words), 0)), 0)::float8 FROM memories \
+       WHERE brain_id = $1 AND status IN ('active', 'pending')",
     )
     .bind(brain_id)
     .fetch_one(&mut *conn)
@@ -99,6 +101,7 @@ impl Cues {
       subjects: by_subject,
       stems: by_stem,
       live,
+      mean_length,
     })
   }
 
@@ -108,35 +111,37 @@ impl Cues {
     (self.live.max(1) as f64).ln()
   }
 
-  /// The fans of the cues a memory about these subjects and holding these stems is linked to.
-  fn linked<'a>(
-    &'a self,
-    subjects: &'a [i64],
-    stems: &'a BTreeSet<String>,
-  ) -> impl Iterator<Item = i64> + 'a {
-    let by_subject = subjects.iter().filter_map(|id| self.subjects.get(id).copied());
-    let by_stem = stems.iter().filter_map(|stem| self.stems.get(stem).copied());
-    by_subject.chain(by_stem)
+  /// The fans of the subject cues a memory about these subjects is linked to.
+  fn subject_fans<'a>(&'a self, subjects: &'a [i64]) -> impl Iterator<Item = i64> + 'a {
+    subjects.iter().filter_map(|id| self.subjects.get(id).copied())
+  }
+
+  /// The fans of the stem cues a memory holding these stems is linked to.
+  fn stem_fans<'a>(&'a self, stems: &'a BTreeSet<String>) -> impl Iterator<Item = i64> + 'a {
+    stems.iter().filter_map(|stem| self.stems.get(stem).copied())
   }
 
   /// Whether any cue reaches such a memory.
   pub(crate) fn reaches(&self, subjects: &[i64], stems: &BTreeSet<String>) -> bool {
-    self.linked(subjects, stems).next().is_some()
+    self.subject_fans(subjects).next().is_some() || self.stem_fans(stems).next().is_some()
   }
 
   /// The relevance of such a memory: each cue linked to it gives its share of the attention times the log of
-  /// the brain's live memories over its fan, never below zero.
-  pub(crate) fn relevance(&self, subjects: &[i64], stems: &BTreeSet<String>) -> f64 {
+  /// the brain's live memories over its fan, never below zero; a stem's weighed by BM25's length term for a
+  /// row of this many stems against the brain's mean.
+  pub(crate) fn relevance(&self, rules: &Rules, subjects: &[i64], stems: &BTreeSet<String>) -> f64 {
     let count = self.subjects.len() + self.stems.len();
     if count == 0 {
       return 0.0;
     }
     let share = 1.0 / count as f64;
     let live = self.live.max(1);
-    self
-      .linked(subjects, stems)
-      .map(|fan| share * (live as f64 / fan.clamp(1, live) as f64).ln())
-      .sum()
+    let weight = |fan: i64| share * (live as f64 / fan.clamp(1, live) as f64).ln();
+    let relative = if self.mean_length > 0.0 { stems.len() as f64 / self.mean_length } else { 1.0 };
+    let length =
+      (rules.bm25_k1 + 1.0) / (1.0 + rules.bm25_k1 * (1.0 - rules.bm25_b + rules.bm25_b * relative));
+    self.subject_fans(subjects).map(weight).sum::<f64>()
+      + self.stem_fans(stems).map(|fan| weight(fan) * length).sum::<f64>()
   }
 }
 
@@ -174,7 +179,7 @@ impl Store {
     let (relevance, reached) = if said {
       (cues.most(), true)
     } else {
-      (cues.relevance(&subjects, &stems), cues.reaches(&subjects, &stems))
+      (cues.relevance(rules, &subjects, &stems), cues.reaches(&subjects, &stems))
     };
     Weighed {
       memory,

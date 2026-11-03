@@ -700,6 +700,10 @@ pub struct Injected {
 pub struct Rules {
   /// The tokens a recall block holds where the ask names no budget.
   pub budget_tokens: i64,
+  /// BM25's `k1`: how far a matched stem's weight saturates with a row's length in recall's relevance.
+  pub bm25_k1: f64,
+  /// BM25's `b`: how much a row's length relative to the brain's mean weighs on a matched stem.
+  pub bm25_b: f64,
   /// The weight `λ` recall's selection gives a row's relevance against its overlap with the rows already in.
   pub mmr_lambda: f64,
   /// The most rows one subject fills in the searched part of a block.
@@ -723,6 +727,8 @@ impl Default for Rules {
   fn default() -> Self {
     Self {
       budget_tokens: 1_800,
+      bm25_k1: 1.2,
+      bm25_b: 0.75,
       mmr_lambda: 0.7,
       subject_cap: 4,
       core_fact_cap: 8,

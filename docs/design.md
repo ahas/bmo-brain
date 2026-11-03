@@ -221,7 +221,8 @@ The brain records how a memory is used and lets nothing fade by itself.
 - **Use orders, it never excludes.** Recall puts the row used last first among equally relevant and equally
   important rows (「Recall」); a reading of the screen orders by it where asked.
 - **The numbers are settings,** with placeholders until the owner's own conversation logs have fitted them:
-  the importance threshold of consolidation, recall's selection's balance,
+  the importance threshold of consolidation, recall's length weighting (BM25's standard k1 and b) and its
+  selection's balance,
   the per-subject cap, the core's cap of facts per speaker, the share of a condition's words a turn holds
   before the condition matches, the token budget and the most use moments a row keeps. The brain reads them
   from its configuration and names each in its health answer.
@@ -261,6 +262,17 @@ a block and a list of what it chose.
   document frequency, never below zero: a cue few memories share points at them strongly, one nearly every
   memory shares points at them hardly at all, and a row matching more of the turn's cues stands above one
   matching fewer of them. Relevance goes one hop, from a cue to the memories linked to it.
+- **A stem weighs less in a long row,** after BM25's term weight with the term frequency taken as one
+  (Robertson and Zaragoza 2009). A matched stem cue gives
+
+      (1 / J) · ln(N / fan_j) · (k1 + 1) / (1 + k1 · (1 − b + b · len_i / avg_len))
+
+  where len_i is the number of the row's stems and avg_len the mean of that number over the brain's live
+  memories at the recall, k1 being `bm25_k1` and b `bm25_b`. A row of average length gives a stem its plain
+  inverse document frequency; a long row, which holds many common stems by its length alone, gives each less,
+  and a short one more, so a short precise row is not outranked by a long one that happens to hold more of the
+  turn's common words. A matched subject cue gives (1 / J) · ln(N / fan_j) with no length term, a subject link
+  being no word of the text.
 - **A situation is words.** A memory's `recallCondition` says when it is needed, and a turn says it where the
   turn's words hold at least the share of the condition's words the rules name: that row is a candidate though
   neither its own words nor its subjects name it, and its relevance is the most a cue set gives, ln N, as

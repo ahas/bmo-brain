@@ -81,7 +81,9 @@ impl Store {
       .filter_map(|memory| {
         let mine = stems(&memory.text);
         let subjects: Vec<i64> = memory.subjects.iter().map(|subject| subject.id).collect();
-        cues.reaches(&subjects, &mine).then(|| (cues.relevance(&subjects, &mine), memory))
+        cues
+          .reaches(&subjects, &mine)
+          .then(|| (cues.relevance(&self.rules, &subjects, &mine), memory))
       })
       .collect();
     scored

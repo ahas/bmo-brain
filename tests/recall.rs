@@ -142,11 +142,12 @@ async fn a_row_matching_two_cues_outranks_one_matching_one_of_them_at_hundreds_o
   let served = Served::new().await;
   let client = &served.client;
   let brain = brain_of(client).await;
-  // Six hundred live rows: three hundred about home, two hundred about the desktop, a hundred about neither.
-  for (stem, count) in [("Home", 300), ("Desktop", 200), ("Other", 100)] {
+  // Six hundred live rows: three hundred about home, two hundred about the desktop, a hundred about neither,
+  // every row of the brain four stems long, so no row's length weighs on its stems.
+  for (stem, count) in [("Home", 300), ("Desktop", 200), ("Spare", 100)] {
     sqlx::query(
       "INSERT INTO memories (brain_id, type, text, status, lineage_id, valid_from, importance, actor_name, \
-       labels, created_at) SELECT $1, 'note', $2 || ' note ' || n || '.', 'active', 0, 1, 5, 'writer-a', '{}', 1 \
+       labels, created_at) SELECT $1, 'note', $2 || ' note filler words.', 'active', 0, 1, 5, 'writer-a', '{}', 1 \
        FROM generate_series(1, $3) AS n",
     )
     .bind(brain)
@@ -157,11 +158,11 @@ async fn a_row_matching_two_cues_outranks_one_matching_one_of_them_at_hundreds_o
     .unwrap();
   }
   let both = client
-    .memory_add(brain, &memory("The home desktop sleeps at night.", 3, &[]))
+    .memory_add(brain, &memory("The home desktop sleeps nightly.", 3, &[]))
     .await
     .unwrap();
   let one = client
-    .memory_add(brain, &memory("Home is where the garden grows.", 10, &[]))
+    .memory_add(brain, &memory("Home is where the garden grows tall.", 10, &[]))
     .await
     .unwrap();
   let recall = client.recall(brain, &ask(&[], "home desktop", None)).await.unwrap();
@@ -176,6 +177,47 @@ async fn a_row_matching_two_cues_outranks_one_matching_one_of_them_at_hundreds_o
   assert!((recall.chosen[1].score - desktop).abs() < 1e-9, "{:?}", recall.chosen[1]);
   assert!(recall.chosen.iter().skip(1).all(|c| c.score < home + desktop && c.score >= 0.0));
   let _ = one;
+}
+
+#[tokio::test]
+async fn a_short_row_matching_two_cues_outranks_a_long_one_matching_three_common_ones() {
+  let served = Served::new().await;
+  let client = &served.client;
+  let brain = brain_of(client).await;
+  // Six hundred rows of ten stems or so, each holding one of three common words, two hundred a word.
+  sqlx::query(
+    "INSERT INTO memories (brain_id, type, text, status, lineage_id, valid_from, importance, actor_name, labels, \
+     created_at) SELECT $1, 'note', 'Filler row ' || n || ' alpha bravo charlie delta echo foxtrot ' || \
+     (ARRAY['home', 'pc', 'rule'])[n % 3 + 1] || '.', 'active', 0, 1, 5, 'writer-a', '{}', 1 \
+     FROM generate_series(1, 600) AS n",
+  )
+  .bind(brain)
+  .execute(&served.store.pool)
+  .await
+  .unwrap();
+  // A document of a hundred and fifty topic words that holds all three, and a short rule that holds two.
+  let topics: Vec<String> = (0..150).map(|n| format!("topic{n:03}")).collect();
+  let long = client
+    .memory_add(brain, &memory(&format!("{} home pc rule.", topics.join(" ")), 5, &[]))
+    .await
+    .unwrap();
+  let short = client.memory_add(brain, &memory("Home pc reboots.", 5, &[])).await.unwrap();
+  let recall = client.recall(brain, &ask(&[], "home pc rule", None)).await.unwrap();
+  let chosen = searched(&recall);
+  assert_eq!(chosen.first(), Some(&short.id), "{:?}", recall.chosen);
+  let score_of = |id: i64| recall.chosen.iter().find(|c| c.memory_id == id).map(|c| c.score);
+  if let Some(long_score) = score_of(long.id) {
+    assert!(long_score < score_of(short.id).unwrap(), "{:?}", recall.chosen);
+  }
+  // The short row's relevance: two of three cues, each ln(602 / 202), weighed by BM25's length term for three
+  // stems against the brain's mean, 591 rows of ten stems, nine of nine, the document's 153 and the rule's 3.
+  let rules = Rules::default();
+  let mean = (591.0 * 10.0 + 9.0 * 9.0 + 153.0 + 3.0) / 602.0;
+  let length =
+    (rules.bm25_k1 + 1.0) / (1.0 + rules.bm25_k1 * (1.0 - rules.bm25_b + rules.bm25_b * 3.0 / mean));
+  let expected = 2.0 * (602.0_f64 / 202.0).ln() * length / 3.0;
+  let short_score = score_of(short.id).unwrap();
+  assert!((short_score - expected).abs() < 1e-9, "{short_score} against {expected}");
 }
 
 #[tokio::test]

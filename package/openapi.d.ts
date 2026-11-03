@@ -1075,6 +1075,18 @@ export interface components {
         /** @description The rules, key by key as the configuration writes them. */
         Rules: {
             /**
+             * Format: double
+             * @description BM25's `b`: how much a row's length relative to the brain's mean weighs on a matched stem.
+             * @default 0.75
+             */
+            bm25_b: number;
+            /**
+             * Format: double
+             * @description BM25's `k1`: how far a matched stem's weight saturates with a row's length in recall's relevance.
+             * @default 1.2
+             */
+            bm25_k1: number;
+            /**
              * Format: int64
              * @description The tokens a recall block holds where the ask names no budget.
              * @default 1800
