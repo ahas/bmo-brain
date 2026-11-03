@@ -1,6 +1,5 @@
 //! A brain's memories, each row one version (docs/design.md, 「Memories」, 「Versions」, 「Writing」 and
-//! 「Strength and decay」): listed, written, superseded, moved, hit, confirmed and read, each presentation a
-//! trace.
+//! 「Strength and decay」): listed, written, superseded, moved, hit and confirmed.
 
 use std::collections::BTreeMap;
 
@@ -14,7 +13,6 @@ use sqlx::{FromRow, PgConnection, Postgres, QueryBuilder};
 use super::brains::{brain_of, event_scope, given, layer_of, subject_found_or_made, subjects_of};
 use super::rules::Reckoning as _;
 use super::sheets::{SHEET, written_type};
-use super::traces::{TraceKind, standing, traces_by_row};
 use super::{Fault, Held, Store, TEXT_MOST, holding, limit, listed, now, page, publish, text};
 
 /// The types code depends on the meaning of.
@@ -22,8 +20,8 @@ pub const RESERVED_TYPES: [&str; 9] =
   ["episode", "fact", "rumor", "situation", "rule", "name", "persona", "lore", "knowledge"];
 
 pub(crate) const MEMORY_COLUMNS: &str = "id, brain_id, key, type, text, layer_id, position, status, lineage_id, \
-  superseded_by, valid_from, valid_to, recall_condition, release_condition, importance, hits, \
-  last_hit_at, last_confirmed_at, consolidated_at, actor_name, reason, labels, created_at";
+  superseded_by, valid_from, valid_to, recall_condition, release_condition, importance, hits, hit_times, \
+  last_hit_at, last_confirmed_at, strength, consolidated_at, actor_name, reason, labels, created_at";
 
 #[derive(FromRow)]
 pub(crate) struct MemoryRow {
@@ -44,8 +42,10 @@ pub(crate) struct MemoryRow {
   pub release_condition: Option<String>,
   pub importance: i16,
   pub hits: i64,
+  pub hit_times: Vec<i64>,
   pub last_hit_at: Option<i64>,
   pub last_confirmed_at: Option<i64>,
+  pub strength: f64,
   pub consolidated_at: Option<i64>,
   pub actor_name: String,
   pub reason: Option<String>,
@@ -59,11 +59,7 @@ impl MemoryRow {
       .ok_or_else(|| Fault::Failed(format!("Row {} holds no known status: {}.", self.id, self.status)))
   }
 
-  pub(crate) fn member(
-    self,
-    subjects: Vec<SubjectRef>,
-    (activation, stability): (Option<f64>, Option<f64>),
-  ) -> Held<Memory> {
+  pub(crate) fn member(self, subjects: Vec<SubjectRef>, retrieval_strength: f64) -> Held<Memory> {
     let status = self.status()?;
     Ok(Memory {
       id: self.id,
@@ -85,8 +81,8 @@ impl MemoryRow {
       hits: self.hits,
       last_hit_at: self.last_hit_at,
       last_confirmed_at: self.last_confirmed_at,
-      stability,
-      activation,
+      strength: self.strength,
+      retrieval_strength,
       consolidated_at: self.consolidated_at,
       actor_name: self.actor_name,
       reason: self.reason,
@@ -129,47 +125,19 @@ pub(crate) async fn subjects_by_row(
 }
 
 impl Store {
-  /// Rows as members, each with its subjects, and its activation and stability as of now on its brain's
-  /// psychological clock.
+  /// Rows as members, each with its subjects and its retrieval strength as of now.
   pub(crate) async fn members(&self, conn: &mut PgConnection, rows: Vec<MemoryRow>) -> Held<Vec<Memory>> {
     let ids: Vec<i64> = rows.iter().map(|row| row.id).collect();
     let mut subjects = subjects_by_row(conn, &ids).await?;
-    let mut traces = traces_by_row(conn, &ids).await?;
-    let mut brains: Vec<i64> = rows.iter().map(|row| row.brain_id).collect();
-    brains.sort_unstable();
-    brains.dedup();
-    let moments = self.reading_moments(conn, &brains, now()).await?;
+    let at = now();
     rows
       .into_iter()
       .map(|row| {
+        let strength = self.rules.retrieval_strength(&row.hit_times, at);
         let mine = subjects.remove(&row.id).unwrap_or_default();
-        let laid = traces.remove(&row.id).unwrap_or_default();
-        let moment = moments.get(&row.brain_id).copied().unwrap_or_default();
-        row.member(mine, standing(&self.rules, &laid, moment))
+        row.member(mine, strength)
       })
       .collect()
-  }
-
-  /// The row among these most active now on its brain's clock, the lowest id among equals.
-  async fn most_active(&self, conn: &mut PgConnection, brain_id: i64, ids: &[i64]) -> Held<i64> {
-    let traces = traces_by_row(conn, ids).await?;
-    let moment = self
-      .reading_moments(conn, &[brain_id], now())
-      .await?
-      .get(&brain_id)
-      .copied()
-      .unwrap_or(0.0);
-    let mut most: Option<(f64, i64)> = None;
-    for id in ids {
-      let laid = traces.get(id).map_or(&[][..], Vec::as_slice);
-      let activation = self.rules.activation(laid, moment).unwrap_or(f64::NEG_INFINITY);
-      if most.is_none_or(|(best, _)| activation > best) {
-        most = Some((activation, *id));
-      }
-    }
-    most
-      .map(|(_, id)| id)
-      .ok_or_else(|| Fault::BadRequest("memoryIds names no memory.".to_owned()))
   }
 
   pub(crate) async fn row_of(
@@ -193,19 +161,13 @@ impl Store {
     Ok(self.members(conn, vec![row]).await?.remove(0))
   }
 
-  /// A page of a brain's memories, under the filters and in the order the query names. A read by key,
-  /// subject, type or words lays a read trace on each live row it answers, unless the query says not to.
+  /// A page of a brain's memories, under the filters and in the order the query names.
   pub async fn memories(&self, brain_id: i64, query: &MemoriesQuery) -> Held<Page<Memory>> {
     let limit = limit(query.limit)?;
     let filter = Filter::of(query)?;
     let (field, descending) = order(query.order.as_deref())?;
-    let mut conn = self.begin().await?;
+    let mut conn = self.connection().await?;
     brain_of(&mut conn, brain_id).await?;
-    let reading = query.record.unwrap_or(true) && filter.is_explicit();
-    let at = now();
-    if reading {
-      self.tick(&mut conn, brain_id, at).await?;
-    }
     let mut sql =
       QueryBuilder::<Postgres>::new(format!("SELECT {MEMORY_COLUMNS} FROM memories WHERE brain_id = "));
     sql.push_bind(brain_id);
@@ -233,18 +195,7 @@ impl Store {
     }
     sql.push(" LIMIT ").push_bind(limit + 1);
     let rows: Vec<MemoryRow> = sql.build_query_as().fetch_all(&mut *conn).await?;
-    if reading {
-      let live: Vec<i64> = rows
-        .iter()
-        .take(usize::try_from(limit).unwrap_or(usize::MAX))
-        .filter(|row| row.status().is_ok_and(MemoryStatus::is_live))
-        .map(|row| row.id)
-        .collect();
-      self.lay(&mut conn, brain_id, &live, TraceKind::Read, None, at).await?;
-    }
-    let members = self.members(&mut conn, rows).await?;
-    self.commit(conn).await?;
-    Ok(page(members, limit))
+    Ok(page(self.members(&mut conn, rows).await?, limit))
   }
 
   /// One memory.
@@ -300,7 +251,6 @@ impl Store {
       )));
     }
     brain_of(&mut *tx, brain_id).await?;
-    self.tick(&mut *tx, brain_id, at).await?;
     if let Some(layer) = body.layer_id {
       layer_of(&mut *tx, brain_id, layer).await?;
     }
@@ -349,7 +299,6 @@ impl Store {
       .execute(&mut *tx)
       .await?;
     link_subjects(&mut *tx, id, &subject_ids).await?;
-    self.lay_written(&mut *tx, brain_id, id, importance, at).await?;
     let memory = self.member_of(&mut *tx, brain_id, id).await?;
     publish(&mut *tx, "memory.written", Some(&event_scope(brain_id)), &memory).await?;
     Ok(memory)
@@ -386,7 +335,6 @@ impl Store {
       written_type(kind)?;
     }
     let importance = body.importance.map(Some).map(importance).transpose()?;
-    self.tick(&mut *tx, brain_id, at).await?;
     let old = self.row_of(&mut *tx, brain_id, id, true).await?;
     let status = old.status()?;
     if !status.is_live() {
@@ -433,12 +381,12 @@ impl Store {
       .bind(valid_from)
       .execute(&mut *tx)
       .await?;
-    let new_importance = importance.unwrap_or(old.importance);
     let new_id: i64 = sqlx::query_scalar(
       "INSERT INTO memories (brain_id, key, type, text, layer_id, position, status, lineage_id, valid_from, \
-       recall_condition, release_condition, importance, hits, last_hit_at, last_confirmed_at, actor_name, \
-       labels, created_at) \
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18) RETURNING id",
+       recall_condition, release_condition, importance, hits, hit_times, last_hit_at, last_confirmed_at, \
+       strength, actor_name, labels, created_at) \
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20) \
+       RETURNING id",
     )
     .bind(brain_id)
     .bind(&old.key)
@@ -451,10 +399,12 @@ impl Store {
     .bind(valid_from)
     .bind(&recall_condition)
     .bind(&release_condition)
-    .bind(new_importance)
+    .bind(importance.unwrap_or(old.importance))
     .bind(old.hits)
+    .bind(&old.hit_times)
     .bind(old.last_hit_at)
     .bind(old.last_confirmed_at)
+    .bind(old.strength)
     .bind(&body.actor_name)
     .bind(Json(body.labels.as_ref().unwrap_or(&old.labels.0)))
     .bind(at)
@@ -466,7 +416,6 @@ impl Store {
       .execute(&mut *tx)
       .await?;
     link_subjects(&mut *tx, new_id, &subject_ids).await?;
-    self.carry_traces(&mut *tx, id, new_id, new_importance).await?;
     let superseded = self.member_of(&mut *tx, brain_id, id).await?;
     publish(&mut *tx, "memory.moved", Some(&event_scope(brain_id)), &superseded).await?;
     let memory = self.member_of(&mut *tx, brain_id, new_id).await?;
@@ -504,7 +453,6 @@ impl Store {
       return Err(Fault::BadRequest("memoryIds names fewer than two memories.".to_owned()));
     }
     brain_of(&mut *tx, brain_id).await?;
-    self.tick(&mut *tx, brain_id, at).await?;
     if let Some(layer) = body.layer_id {
       layer_of(&mut *tx, brain_id, layer).await?;
     }
@@ -562,11 +510,12 @@ impl Store {
       None => next_position(&mut *tx, brain_id, body.layer_id).await?,
     };
     let valid_from = body.valid_from.unwrap_or(at);
-    let hits = merged.iter().map(|row| row.hits).max().unwrap_or(0);
+    let most_hit = merged.iter().max_by_key(|row| row.hits);
+    let hits = most_hit.map_or(0, |row| row.hits);
+    let hit_times = most_hit.map(|row| row.hit_times.clone()).unwrap_or_default();
     let last_hit_at = merged.iter().filter_map(|row| row.last_hit_at).max();
     let last_confirmed_at = merged.iter().filter_map(|row| row.last_confirmed_at).min();
-    // The new row carries the traces of the merged row most active now, the lowest id among equals.
-    let strongest = self.most_active(&mut *tx, brain_id, &ids).await?;
+    let strength = merged.iter().map(|row| row.strength).fold(1.0_f64, f64::max);
     let labels = body.labels.clone().unwrap_or_default();
     let recall_condition = match &body.recall_condition {
       Some(words) => {
@@ -590,9 +539,10 @@ impl Store {
       .await?;
     let new_id: i64 = sqlx::query_scalar(
       "INSERT INTO memories (brain_id, key, type, text, layer_id, position, status, lineage_id, valid_from, \
-       recall_condition, release_condition, importance, hits, last_hit_at, last_confirmed_at, actor_name, \
-       labels, created_at) \
-       VALUES ($1, $2, $3, $4, $5, $6, 'active', 0, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) RETURNING id",
+       recall_condition, release_condition, importance, hits, hit_times, last_hit_at, last_confirmed_at, \
+       strength, actor_name, labels, created_at) \
+       VALUES ($1, $2, $3, $4, $5, $6, 'active', 0, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18) \
+       RETURNING id",
     )
     .bind(brain_id)
     .bind(&body.key)
@@ -605,8 +555,10 @@ impl Store {
     .bind(&release_condition)
     .bind(importance)
     .bind(hits)
+    .bind(&hit_times)
     .bind(last_hit_at)
     .bind(last_confirmed_at)
+    .bind(strength)
     .bind(&body.actor_name)
     .bind(Json(&labels))
     .bind(at)
@@ -622,7 +574,6 @@ impl Store {
       .execute(&mut *tx)
       .await?;
     link_subjects(&mut *tx, new_id, &subject_ids).await?;
-    self.carry_traces(&mut *tx, strongest, new_id, importance).await?;
     for id in &ids {
       let superseded = self.member_of(&mut *tx, brain_id, *id).await?;
       publish(&mut *tx, "memory.moved", Some(&event_scope(brain_id)), &superseded).await?;
@@ -682,8 +633,6 @@ impl Store {
     }
     let at = now();
     let mut tx = self.begin().await?;
-    brain_of(&mut tx, brain_id).await?;
-    self.tick(&mut tx, brain_id, at).await?;
     let closed = self.row_of(&mut tx, brain_id, id, true).await?;
     if closed.kind == SHEET {
       return Err(Fault::Conflict(format!(
@@ -728,10 +677,10 @@ impl Store {
         .await?;
     let new_id: i64 = sqlx::query_scalar(
       "INSERT INTO memories (brain_id, key, type, text, layer_id, position, status, lineage_id, valid_from, \
-       recall_condition, release_condition, importance, hits, last_hit_at, last_confirmed_at, consolidated_at, \
-       actor_name, labels, created_at) \
-       VALUES ($1, $2, $3, $4, $5, $6, 'active', $7, $8, $10, $11, $9, $12, $13, $14, $15, $16, $17, $8) \
-       RETURNING id",
+       recall_condition, release_condition, importance, hits, hit_times, last_hit_at, last_confirmed_at, \
+       strength, consolidated_at, actor_name, labels, created_at) \
+       VALUES ($1, $2, $3, $4, $5, $6, 'active', $7, $8, $10, $11, $9, $12, $13, $14, $15, $16, $17, $18, $19, \
+       $8) RETURNING id",
     )
     .bind(brain_id)
     .bind(&closed.key)
@@ -745,15 +694,16 @@ impl Store {
     .bind(&closed.recall_condition)
     .bind(&closed.release_condition)
     .bind(closed.hits)
+    .bind(&closed.hit_times)
     .bind(closed.last_hit_at)
     .bind(closed.last_confirmed_at)
+    .bind(closed.strength)
     .bind(closed.consolidated_at)
     .bind(&body.actor_name)
     .bind(&closed.labels)
     .fetch_one(&mut *tx)
     .await?;
     link_subjects(&mut tx, new_id, &subject_ids).await?;
-    self.carry_traces(&mut tx, id, new_id, closed.importance).await?;
     let memory = self.member_of(&mut tx, brain_id, new_id).await?;
     publish(&mut tx, "memory.written", Some(&event_scope(brain_id)), &memory).await?;
     self.commit(tx).await?;
@@ -772,8 +722,6 @@ impl Store {
     if let Some(reason) = &body.reason {
       text("reason", reason, REASON_MOST)?;
     }
-    brain_of(&mut *tx, brain_id).await?;
-    self.tick(&mut *tx, brain_id, now()).await?;
     let row = self.row_of(&mut *tx, brain_id, id, true).await?;
     let was = row.status()?;
     if was == body.status {
@@ -804,8 +752,7 @@ impl Store {
     Ok(memory)
   }
 
-  /// Rows the agent reports it used: each row hit with a used trace, and marked for the session where one is
-  /// named.
+  /// A reading's hand-out recorded: each row hit, and marked for the session where one is named.
   pub async fn hits_record(&self, brain_id: i64, body: &Hits) -> Held<i64> {
     given("actorName", &body.actor_name)?;
     if body.memory_ids.is_empty() {
@@ -814,42 +761,37 @@ impl Store {
     let at = body.at.unwrap_or_else(now);
     let mut tx = self.begin().await?;
     brain_of(&mut tx, brain_id).await?;
-    let count = self
-      .hit(&mut tx, brain_id, &body.memory_ids, TraceKind::Used, body.session_key.as_deref(), at)
-      .await?;
+    let count = self.hit(&mut tx, brain_id, &body.memory_ids, body.session_key.as_deref(), at).await?;
     self.commit(tx).await?;
     Ok(count)
   }
 
-  /// The rows hit at `at` with a trace of `kind`, marked for `session` where one is named; how many rows the
-  /// ids reached.
+  /// The rows hit at `at`, marked for `session` where one is named; how many rows the ids reached.
   pub(crate) async fn hit(
     &self,
     conn: &mut PgConnection,
     brain_id: i64,
     memory_ids: &[i64],
-    kind: TraceKind,
     session: Option<&str>,
     at: i64,
   ) -> Held<i64> {
-    if let Some(session) = session {
-      given("sessionKey", session)?;
-    }
     let mut ids = memory_ids.to_vec();
     ids.sort_unstable();
     ids.dedup();
-    self.tick(&mut *conn, brain_id, at).await?;
+    let kept = self.rules.hit_times_kept.max(1);
     let hit: Vec<i64> = sqlx::query_scalar(
-      "UPDATE memories SET hits = hits + 1, last_hit_at = GREATEST(last_hit_at, $3) \
+      "UPDATE memories SET hits = hits + 1, last_hit_at = $3, \
+       hit_times = (array_append(hit_times, $3))[GREATEST(1, array_length(hit_times, 1) + 2 - $4):] \
        WHERE brain_id = $1 AND id = ANY($2) RETURNING id",
     )
     .bind(brain_id)
     .bind(&ids)
     .bind(at)
+    .bind(kept)
     .fetch_all(&mut *conn)
     .await?;
-    self.lay(&mut *conn, brain_id, &hit, kind, session, at).await?;
     if let Some(session) = session {
+      given("sessionKey", session)?;
       sqlx::query(
         "INSERT INTO handouts (brain_id, session_key, memory_id, at) \
          SELECT $1, $2, id, $4 FROM UNNEST($3::bigint[]) AS id ON CONFLICT DO NOTHING",
@@ -864,7 +806,7 @@ impl Store {
     Ok(hit.len() as i64)
   }
 
-  /// Confirmations recorded: a confirmed trace laid on each row, and its moment set.
+  /// Confirmations recorded: each row's storage strength raised by the gap since its last, and its moment set.
   pub async fn confirmations_record(&self, brain_id: i64, body: &Confirmations) -> Held<i64> {
     given("actorName", &body.actor_name)?;
     if body.memory_ids.is_empty() {
@@ -872,46 +814,42 @@ impl Store {
     }
     let mut tx = self.begin().await?;
     let count = self
-      .confirm_in(
-        &mut tx,
-        brain_id,
-        &body.memory_ids,
-        body.session_key.as_deref(),
-        body.at.unwrap_or_else(now),
-      )
+      .confirm_in(&mut tx, brain_id, &body.memory_ids, body.at.unwrap_or_else(now))
       .await?;
     self.commit(tx).await?;
     Ok(count)
   }
 
-  /// Confirmations recorded, within a transaction: a confirmed trace laid on each row, kept with the session
-  /// where one is named, and its moment set; how many rows the ids reached.
+  /// Confirmations recorded, within a transaction: each row's storage strength raised by the gap since its
+  /// last, and its moment set; how many rows the ids reached.
   pub(crate) async fn confirm_in(
     &self,
     tx: &mut PgConnection,
     brain_id: i64,
     memory_ids: &[i64],
-    session: Option<&str>,
     at: i64,
   ) -> Held<i64> {
-    if let Some(session) = session {
-      given("sessionKey", session)?;
-    }
     brain_of(&mut *tx, brain_id).await?;
-    self.tick(&mut *tx, brain_id, at).await?;
     let mut ids = memory_ids.to_vec();
     ids.sort_unstable();
     ids.dedup();
-    let confirmed: Vec<i64> = sqlx::query_scalar(
-      "UPDATE memories SET last_confirmed_at = $3 WHERE brain_id = $1 AND id = ANY($2) RETURNING id",
+    let rows: Vec<(i64, i64, Option<i64>)> = sqlx::query_as(
+      "SELECT id, created_at, last_confirmed_at FROM memories WHERE brain_id = $1 AND id = ANY($2) FOR UPDATE",
     )
     .bind(brain_id)
     .bind(&ids)
-    .bind(at)
     .fetch_all(&mut *tx)
     .await?;
-    self.lay(&mut *tx, brain_id, &confirmed, TraceKind::Confirmed, session, at).await?;
-    Ok(confirmed.len() as i64)
+    for (id, created_at, last) in &rows {
+      let gained = self.rules.strength_gained(last.unwrap_or(*created_at), at);
+      sqlx::query("UPDATE memories SET strength = strength + $2, last_confirmed_at = $3 WHERE id = $1")
+        .bind(id)
+        .bind(gained)
+        .bind(at)
+        .execute(&mut *tx)
+        .await?;
+    }
+    Ok(rows.len() as i64)
   }
 
   /// The types in use in a brain, with the count of live memories each, the reserved ones first: a type whose
@@ -1040,15 +978,6 @@ fn ids_listed(field: &str, value: Option<&str>) -> Held<Option<Vec<i64>>> {
 }
 
 impl Filter {
-  /// Whether the list is an explicit read: by key, subject, type or words.
-  pub(crate) fn is_explicit(&self) -> bool {
-    self.key.is_some()
-      || self.subject_id.is_some()
-      || !self.kinds.is_empty()
-      || self.words.is_some()
-      || self.situation.is_some()
-  }
-
   /// The filters a memory list's query names.
   pub(crate) fn of(query: &MemoriesQuery) -> Held<Self> {
     let statuses = listed(query.status.as_deref())

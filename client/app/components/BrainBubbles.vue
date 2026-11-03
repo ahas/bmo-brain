@@ -1,6 +1,6 @@
 <template>
   <!-- The bubble chart (docs/design.md, 「The screen」): one bubble per type or per layer, placed across by
-       the group's mean importance and up by its mean activation, sized by its count, so the
+       the group's mean importance and up by its mean retrieval strength, sized by its count, so the
        important memories that are cooling stand at the lower right. A bubble narrows the list to its
        group; a table shows the same figures. -->
   <div class="flex min-h-0 flex-1 flex-col">
@@ -31,8 +31,8 @@
             <td class="py-1"><span class="me-2 inline-block size-2 rounded-full" :style="{ background: group.colour }" />{{ group.name }}</td>
             <td class="py-1 text-end tabular-nums">{{ group.count }}</td>
             <td class="py-1 text-end tabular-nums">{{ group.importance.toFixed(1) }}</td>
-            <td class="py-1 text-end tabular-nums">{{ activationText(group.retrieval) }}</td>
-            <td class="py-1 text-end tabular-nums">{{ stabilityText(t, group.strength) }}</td>
+            <td class="py-1 text-end tabular-nums">{{ group.retrieval.toFixed(2) }}</td>
+            <td class="py-1 text-end tabular-nums">{{ group.strength.toFixed(2) }}</td>
           </tr>
         </tbody>
       </table>
@@ -44,7 +44,7 @@
         <g v-for="group in placed" :key="group.key" class="cursor-pointer" @click="narrow(group.key)">
           <circle :cx="group.x" :cy="group.y" :r="group.r" :fill="group.colour" fill-opacity="0.55" :stroke="group.colour" class="transition-all duration-300 motion-reduce:transition-none" />
           <text :x="group.x" :y="group.y + 4" text-anchor="middle" class="pointer-events-none fill-(--ui-text-highlighted) text-[11px]">{{ group.name }}</text>
-          <title>{{ group.name }} · {{ group.count }} · {{ group.importance.toFixed(1) }} · {{ activationText(group.retrieval) }}</title>
+          <title>{{ group.name }} · {{ group.count }} · {{ group.importance.toFixed(1) }} · {{ group.retrieval.toFixed(2) }}</title>
         </g>
       </svg>
     </div>
@@ -57,7 +57,6 @@ import BrainHeading from "./BrainHeading.vue";
 import * as api from "../domain/brain-api";
 import { groupColour } from "../domain/brain-colour";
 import { typeName } from "../domain/brain-names";
-import { activationText, stabilityText } from "../domain/brain-standing";
 
 import type { Layer, MemoryFilter, Tally } from "../domain/brain-api";
 import type { Heading } from "../domain/brain-heading";
@@ -107,8 +106,8 @@ const groups = computed(() =>
       name,
       count: tally.count,
       importance: tally.importance,
-      retrieval: tally.activation ?? null,
-      strength: tally.stability ?? null,
+      retrieval: tally.retrievalStrength,
+      strength: tally.strength,
       colour: groupColour(name)
     };
   })
@@ -116,14 +115,14 @@ const groups = computed(() =>
 
 const placed = computed(() => {
   const most = Math.max(1, ...groups.value.map((group) => group.count));
-  const retrievals = groups.value.flatMap((group) => (group.retrieval === null ? [] : [group.retrieval]));
+  const retrievals = groups.value.map((group) => group.retrieval);
   const low = Math.min(0, ...retrievals);
   const high = Math.max(low + 1, ...retrievals);
 
   return groups.value.map((group) => ({
     ...group,
     x: PAD + ROOM + ((group.importance - 1) / 9) * (WIDTH - 2 * (PAD + ROOM)),
-    y: HEIGHT - PAD - ROOM - (((group.retrieval ?? low) - low) / (high - low)) * (HEIGHT - 2 * (PAD + ROOM)),
+    y: HEIGHT - PAD - ROOM - ((group.retrieval - low) / (high - low)) * (HEIGHT - 2 * (PAD + ROOM)),
     r: 8 + Math.sqrt(group.count / most) * 40
   }));
 });

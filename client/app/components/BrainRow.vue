@@ -122,7 +122,7 @@
           </dd>
           <dt>{{ t("brain.field.use") }}</dt>
           <dd class="tabular-nums">
-            {{ t("brain.label.use", { hits: memory.hits, strength: stabilityText(t, memory.stability), retrieval: activationText(memory.activation), importance: memory.importance }) }}
+            {{ t("brain.label.use", { hits: memory.hits, strength: memory.strength.toFixed(2), retrieval: memory.retrievalStrength.toFixed(2), importance: memory.importance }) }}
             <template v-if="memory.lastHitAt"> · {{ t("brain.label.last_hit") }} {{ stamp(memory.lastHitAt) }}</template>
             <template v-if="memory.lastConfirmedAt"> · {{ t("brain.label.last_confirmed") }} {{ stamp(memory.lastConfirmedAt) }}</template>
           </dd>
@@ -178,7 +178,6 @@ import BrainText from "./BrainText.vue";
 import * as api from "../domain/brain-api";
 import { subjectTypeName, typeName } from "../domain/brain-names";
 import { faultKey, useEnglishWords } from "../domain/brain-reading";
-import { activationText, stabilityText } from "../domain/brain-standing";
 
 import type { Layer, Memory, MemoryStatus } from "../domain/brain-api";
 

@@ -251,11 +251,10 @@ pub struct Memory {
   pub hits: i64,
   pub last_hit_at: Option<i64>,
   pub last_confirmed_at: Option<i64>,
-  /// How long the memory lasts as it stands: the psychological days until its activation falls to the
-  /// threshold if no trace is laid; zero where it stands below already, null where it never falls.
-  pub stability: Option<f64>,
-  /// Its activation as the reading answers, reckoned from its traces; null where it has no trace.
-  pub activation: Option<f64>,
+  /// The storage strength, raised by spaced confirmations alone.
+  pub strength: f64,
+  /// The retrieval strength, computed from the hits as the reading answers.
+  pub retrieval_strength: f64,
   pub consolidated_at: Option<i64>,
   /// Who wrote this version.
   pub actor_name: String,
@@ -449,10 +448,6 @@ pub struct MemoriesQuery {
   /// Words the recall condition holds, in any case: the rows a situation calls for.
   #[serde(skip_serializing_if = "Option::is_none")]
   pub situation: Option<String>,
-  /// Whether a read by key, subject, type or words lays a read trace on each live row it answers; true
-  /// where none is given.
-  #[serde(skip_serializing_if = "Option::is_none")]
-  pub record: Option<bool>,
   /// The field the list is ordered by: `id`, `position`, `validFrom`, `importance` or `hits`, descending
   /// with a leading `-`; `id` where none is given.
   #[serde(skip_serializing_if = "Option::is_none")]
@@ -525,15 +520,15 @@ pub struct Tally {
   pub count: i64,
   /// The group's mean importance.
   pub importance: f64,
-  /// The group's mean stability, in psychological days, over the rows that have one; null where none has.
-  pub stability: Option<f64>,
-  /// The group's mean activation, as of the reading, over the rows that have one; null where none has.
-  pub activation: Option<f64>,
+  /// The group's mean storage strength.
+  pub strength: f64,
+  /// The group's mean retrieval strength, as of the reading.
+  pub retrieval_strength: f64,
   /// The latest `validFrom` among the group's rows.
   pub latest_valid_from: i64,
 }
 
-/// Memories the agent reports it used, or a reading handed out.
+/// A reading that handed memories out.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Hits {
@@ -551,9 +546,6 @@ pub struct Hits {
 #[serde(rename_all = "camelCase")]
 pub struct Confirmations {
   pub memory_ids: Vec<i64>,
-  /// The session the confirmation was made in, kept on each confirmed trace.
-  #[serde(default, skip_serializing_if = "Option::is_none")]
-  pub session_key: Option<String>,
   pub actor_name: String,
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub at: Option<i64>,
@@ -719,20 +711,14 @@ pub struct Rules {
   /// The most facts of one speaker's sheet the core of a block carries; the rest reach a turn only through
   /// the searched part.
   pub core_fact_cap: i64,
-  /// The decay intercept `a`: the decay of a trace laid while the memory has no activation.
-  pub decay_intercept: f64,
-  /// The decay scale `c`: how much a trace's decay grows with the activation at its laying.
-  pub decay_scale: f64,
-  /// The noise `s` of the recall probability.
-  pub noise: f64,
-  /// The threshold `τ`: the activation at which a memory comes to mind half the time.
-  pub threshold: f64,
-  /// The share `h` of a gap between sessions that counts on the psychological clock.
-  pub between_sessions: f64,
-  /// How many traces a memory keeps, its newest and its written one among them.
+  /// The exponent the time since each hit is raised to, negated, in the retrieval strength.
+  pub decay: f64,
+  /// How many hits a row keeps for its retrieval strength.
   pub hit_times_kept: i64,
-  /// The longest gap between two calls on a brain that counts whole on its psychological clock.
+  /// Confirmations closer than this to the last add nothing to the storage strength.
   pub same_session_ms: i64,
+  /// What a spaced confirmation adds to the storage strength, per logarithm of the gap in days.
+  pub strength_gain: f64,
   /// For how long after a version was superseded a reading says what the previous value was.
   pub previous_value_days: i64,
   /// The share of a condition's words the turn must hold for the condition to match it.
@@ -751,13 +737,10 @@ impl Default for Rules {
       subject_bonus: 0.5,
       subject_cap: 4,
       core_fact_cap: 8,
-      decay_intercept: 0.167,
-      decay_scale: 0.232,
-      noise: 0.252,
-      threshold: -0.669,
-      between_sessions: 0.031,
+      decay: 0.5,
       hit_times_kept: 64,
       same_session_ms: 60 * 60 * 1_000,
+      strength_gain: 1.0,
       previous_value_days: 30,
       condition_share: 0.5,
       consolidation_threshold: 150,
@@ -823,9 +806,6 @@ pub struct Learning {
   pub key: Option<String>,
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub layer_id: Option<i64>,
-  /// The session the learning was made in, kept on the traces of the memories it confirms.
-  #[serde(default, skip_serializing_if = "Option::is_none")]
-  pub session_key: Option<String>,
   pub actor_name: String,
   #[serde(default)]
   pub labels: Labels,

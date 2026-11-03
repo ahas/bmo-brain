@@ -12,9 +12,8 @@ use super::versions::{MEMORY_COLUMNS, MemoryRow, link_subjects};
 use super::{Fault, Held, Store, now, publish};
 
 /// The version of the file's shape, written in every file and checked on every read; a shape-1 file holds no
-/// memory condition, its rows carrying none, and a file before shape 3 holds a storage strength, which is not
-/// read.
-pub const SHAPE: i64 = 3;
+/// memory condition, its rows carrying none.
+pub const SHAPE: i64 = 2;
 
 /// The oldest shape this brain still reads.
 const OLDEST_SHAPE: i64 = 1;
@@ -26,7 +25,7 @@ CREATE TABLE layers (id INTEGER PRIMARY KEY, name TEXT NOT NULL, description TEX
 CREATE TABLE memories (id INTEGER PRIMARY KEY, key TEXT, type TEXT NOT NULL, text TEXT NOT NULL, layer_id INTEGER, \
   position INTEGER NOT NULL, status TEXT NOT NULL, lineage_id INTEGER NOT NULL, superseded_by INTEGER, \
   valid_from INTEGER NOT NULL, valid_to INTEGER, importance INTEGER NOT NULL, hits INTEGER NOT NULL, \
-  last_hit_at INTEGER, last_confirmed_at INTEGER, actor_name TEXT NOT NULL, \
+  last_hit_at INTEGER, last_confirmed_at INTEGER, strength REAL NOT NULL, actor_name TEXT NOT NULL, \
   labels TEXT NOT NULL, recall_condition TEXT, release_condition TEXT, created_at INTEGER NOT NULL);
 CREATE TABLE memory_subjects (memory_id INTEGER NOT NULL, subject_id INTEGER NOT NULL, PRIMARY KEY (memory_id, subject_id));
 ";
@@ -152,9 +151,10 @@ impl Store {
           file
             .execute(
               "INSERT INTO memories (id, key, type, text, layer_id, position, status, lineage_id, superseded_by, \
-               valid_from, valid_to, importance, hits, last_hit_at, last_confirmed_at, actor_name, labels, \
+               valid_from, valid_to, importance, hits, last_hit_at, last_confirmed_at, strength, actor_name, labels, \
                recall_condition, release_condition, created_at) \
-               VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20)",
+               VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, \
+               ?21)",
               params![
                 row.id,
                 row.key,
@@ -171,6 +171,7 @@ impl Store {
                 row.hits,
                 row.last_hit_at,
                 row.last_confirmed_at,
+                row.strength,
                 row.actor_name,
                 labels,
                 row.recall_condition,
@@ -298,7 +299,6 @@ impl Store {
     let at = now();
     let mut tx = self.begin().await?;
     brain_of(&mut tx, brain_id).await?;
-    self.tick(&mut tx, brain_id, at).await?;
     let mut injected = Injected {
       subjects_added: 0,
       layers_added: 0,
@@ -353,7 +353,6 @@ impl Store {
       let subject_ids: Vec<i64> =
         memory.subject_ids.iter().filter_map(|id| subject_map.get(id).copied()).collect();
       let labels = Json(&memory.labels);
-      let importance = memory.importance.clamp(1, 10) as i16;
       let holder: Option<MemoryRow> = match &memory.key {
         Some(key) => {
           sqlx::query_as(&format!(
@@ -383,9 +382,10 @@ impl Store {
             .await?;
           let new_id: i64 = sqlx::query_scalar(
             "INSERT INTO memories (brain_id, key, type, text, layer_id, position, status, lineage_id, valid_from, \
-             recall_condition, release_condition, importance, hits, last_hit_at, last_confirmed_at, actor_name, \
-             labels, created_at) \
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18) RETURNING id",
+             recall_condition, release_condition, importance, hits, hit_times, last_hit_at, last_confirmed_at, \
+             strength, actor_name, labels, created_at) \
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, \
+             $20) RETURNING id",
           )
           .bind(brain_id)
           .bind(&old.key)
@@ -398,10 +398,12 @@ impl Store {
           .bind(at)
           .bind(&memory.recall_condition)
           .bind(&memory.release_condition)
-          .bind(importance)
+          .bind(memory.importance.clamp(1, 10) as i16)
           .bind(old.hits)
+          .bind(&old.hit_times)
           .bind(old.last_hit_at)
           .bind(old.last_confirmed_at)
+          .bind(old.strength)
           .bind(&memory.actor_name)
           .bind(labels)
           .bind(at)
@@ -413,7 +415,6 @@ impl Store {
             .execute(&mut *tx)
             .await?;
           link_subjects(&mut tx, new_id, &subject_ids).await?;
-          self.carry_traces(&mut tx, old.id, new_id, importance).await?;
           injected.memories_superseded += 1;
         }
         None => {
@@ -432,7 +433,7 @@ impl Store {
           .bind(memory.valid_from)
           .bind(&memory.recall_condition)
           .bind(&memory.release_condition)
-          .bind(importance)
+          .bind(memory.importance.clamp(1, 10) as i16)
           .bind(&memory.actor_name)
           .bind(labels)
           .bind(at)
@@ -443,7 +444,6 @@ impl Store {
             .execute(&mut *tx)
             .await?;
           link_subjects(&mut tx, id, &subject_ids).await?;
-          self.lay_written(&mut tx, brain_id, id, importance, at).await?;
           injected.memories_added += 1;
         }
       }

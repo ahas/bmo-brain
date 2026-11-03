@@ -11,7 +11,6 @@ use sqlx::PgConnection;
 use super::brains::{brain_of, event_scope, given};
 use super::rules::tokens;
 use super::sheets::sheet_rows;
-use super::traces::TraceKind;
 use super::versions::{MEMORY_COLUMNS, MemoryRow};
 use super::{Fault, Held, Store, now, publish};
 
@@ -71,7 +70,6 @@ impl Store {
     let at = now();
     let mut tx = self.begin().await?;
     brain_of(&mut tx, brain_id).await?;
-    self.tick(&mut tx, brain_id, at).await?;
     let room = match &ask.room {
       Some(room) => subject_id(&mut tx, brain_id, room).await?,
       None => None,
@@ -166,15 +164,14 @@ impl Store {
       .collect();
     let (rel_lo, rel_hi) = span(scored.iter().map(|c| c.relevance));
     let (imp_lo, imp_hi) = span(scored.iter().map(|c| c.memory.importance as f64));
-    let (rec_lo, rec_hi) = span(scored.iter().filter_map(|c| c.memory.activation));
+    let (rec_lo, rec_hi) = span(scored.iter().map(|c| c.memory.retrieval_strength));
     let rules = &self.rules;
     let mut ranked: Vec<(f64, Candidate)> = scored
       .drain(..)
       .map(|c| {
-        let activation = c.memory.activation.unwrap_or(rec_lo);
         let score = rules.weight_relevance * norm(c.relevance, rel_lo, rel_hi)
           + rules.weight_importance * norm(c.memory.importance as f64, imp_lo, imp_hi)
-          + rules.weight_recency * norm(activation, rec_lo, rec_hi);
+          + rules.weight_recency * norm(c.memory.retrieval_strength, rec_lo, rec_hi);
         (score, c)
       })
       .collect();
@@ -266,9 +263,7 @@ impl Store {
     if ask.record.unwrap_or(true) {
       let handed: Vec<i64> = chosen.iter().filter(|c| !c.marked).map(|c| c.memory_id).collect();
       if !handed.is_empty() {
-        self
-          .hit(&mut tx, brain_id, &handed, TraceKind::Handed, ask.session_key.as_deref(), at)
-          .await?;
+        self.hit(&mut tx, brain_id, &handed, ask.session_key.as_deref(), at).await?;
       }
     }
     let unconsolidated_importance = self.unconsolidated_importance(&mut tx, brain_id).await?;

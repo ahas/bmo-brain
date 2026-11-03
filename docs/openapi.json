@@ -154,13 +154,6 @@
               "type": "integer"
             },
             "type": "array"
-          },
-          "sessionKey": {
-            "description": "The session the confirmation was made in, kept on each confirmed trace.",
-            "type": [
-              "string",
-              "null"
-            ]
           }
         },
         "required": [
@@ -380,7 +373,7 @@
         "type": "object"
       },
       "Hits": {
-        "description": "Memories the agent reports it used, or a reading handed out.",
+        "description": "A reading that handed memories out.",
         "properties": {
           "actorName": {
             "type": "string"
@@ -629,13 +622,6 @@
             },
             "type": "array"
           },
-          "sessionKey": {
-            "description": "The session the learning was made in, kept on the traces of the memories it confirms.",
-            "type": [
-              "string",
-              "null"
-            ]
-          },
           "source": {
             "$ref": "#/components/schemas/Source"
           },
@@ -685,14 +671,6 @@
       "Memory": {
         "description": "One memory in one version.",
         "properties": {
-          "activation": {
-            "description": "Its activation as the reading answers, reckoned from its traces; null where it has no trace.",
-            "format": "double",
-            "type": [
-              "number",
-              "null"
-            ]
-          },
           "actorName": {
             "description": "Who wrote this version.",
             "type": "string"
@@ -793,16 +771,18 @@
               "null"
             ]
           },
-          "stability": {
-            "description": "How long the memory lasts as it stands: the psychological days until its activation falls to the\nthreshold if no trace is laid; zero where it stands below already, null where it never falls.",
+          "retrievalStrength": {
+            "description": "The retrieval strength, computed from the hits as the reading answers.",
             "format": "double",
-            "type": [
-              "number",
-              "null"
-            ]
+            "type": "number"
           },
           "status": {
             "$ref": "#/components/schemas/MemoryStatus"
+          },
+          "strength": {
+            "description": "The storage strength, raised by spaced confirmations alone.",
+            "format": "double",
+            "type": "number"
           },
           "subjects": {
             "items": {
@@ -856,8 +836,8 @@
           "hits",
           "lastHitAt",
           "lastConfirmedAt",
-          "stability",
-          "activation",
+          "strength",
+          "retrievalStrength",
           "consolidatedAt",
           "actorName",
           "reason",
@@ -1553,12 +1533,6 @@
         "additionalProperties": false,
         "description": "The rules, key by key as the configuration writes them.",
         "properties": {
-          "between_sessions": {
-            "default": 0.031,
-            "description": "The share `h` of a gap between sessions that counts on the psychological clock.",
-            "format": "double",
-            "type": "number"
-          },
           "budget_tokens": {
             "default": 1800,
             "description": "The tokens a recall block holds where the ask names no budget.",
@@ -1583,29 +1557,17 @@
             "format": "int64",
             "type": "integer"
           },
-          "decay_intercept": {
-            "default": 0.167,
-            "description": "The decay intercept `a`: the decay of a trace laid while the memory has no activation.",
-            "format": "double",
-            "type": "number"
-          },
-          "decay_scale": {
-            "default": 0.232,
-            "description": "The decay scale `c`: how much a trace's decay grows with the activation at its laying.",
+          "decay": {
+            "default": 0.5,
+            "description": "The exponent the time since each hit is raised to, negated, in the retrieval strength.",
             "format": "double",
             "type": "number"
           },
           "hit_times_kept": {
             "default": 64,
-            "description": "How many traces a memory keeps, its newest and its written one among them.",
+            "description": "How many hits a row keeps for its retrieval strength.",
             "format": "int64",
             "type": "integer"
-          },
-          "noise": {
-            "default": 0.252,
-            "description": "The noise `s` of the recall probability.",
-            "format": "double",
-            "type": "number"
           },
           "previous_value_days": {
             "default": 30,
@@ -1615,9 +1577,15 @@
           },
           "same_session_ms": {
             "default": 3600000,
-            "description": "The longest gap between two calls on a brain that counts whole on its psychological clock.",
+            "description": "Confirmations closer than this to the last add nothing to the storage strength.",
             "format": "int64",
             "type": "integer"
+          },
+          "strength_gain": {
+            "default": 1.0,
+            "description": "What a spaced confirmation adds to the storage strength, per logarithm of the gap in days.",
+            "format": "double",
+            "type": "number"
           },
           "subject_bonus": {
             "default": 0.5,
@@ -1630,12 +1598,6 @@
             "description": "The most rows one subject fills in the searched part of a block.",
             "format": "int64",
             "type": "integer"
-          },
-          "threshold": {
-            "default": -0.669,
-            "description": "The threshold `τ`: the activation at which a memory comes to mind half the time.",
-            "format": "double",
-            "type": "number"
           },
           "weight_importance": {
             "default": 1.0,
@@ -1664,13 +1626,10 @@
           "subject_bonus",
           "subject_cap",
           "core_fact_cap",
-          "decay_intercept",
-          "decay_scale",
-          "noise",
-          "threshold",
-          "between_sessions",
+          "decay",
           "hit_times_kept",
           "same_session_ms",
+          "strength_gain",
           "previous_value_days",
           "condition_share",
           "consolidation_threshold"
@@ -1848,14 +1807,6 @@
       "Tally": {
         "description": "One group of a tally.",
         "properties": {
-          "activation": {
-            "description": "The group's mean activation, as of the reading, over the rows that have one; null where none has.",
-            "format": "double",
-            "type": [
-              "number",
-              "null"
-            ]
-          },
           "count": {
             "format": "int64",
             "type": "integer"
@@ -1877,21 +1828,23 @@
             "format": "int64",
             "type": "integer"
           },
-          "stability": {
-            "description": "The group's mean stability, in psychological days, over the rows that have one; null where none has.",
+          "retrievalStrength": {
+            "description": "The group's mean retrieval strength, as of the reading.",
             "format": "double",
-            "type": [
-              "number",
-              "null"
-            ]
+            "type": "number"
+          },
+          "strength": {
+            "description": "The group's mean storage strength.",
+            "format": "double",
+            "type": "number"
           }
         },
         "required": [
           "group",
           "count",
           "importance",
-          "stability",
-          "activation",
+          "strength",
+          "retrievalStrength",
           "latestValidFrom"
         ],
         "type": "object"
@@ -2243,7 +2196,7 @@
             "$ref": "#/components/responses/NotFound"
           }
         },
-        "summary": "Record confirmations: a confirmed trace laid on each row, and its moment set.",
+        "summary": "Record confirmations: each row's storage strength raised by the gap since its last.",
         "tags": [
           "brain-memories"
         ],
@@ -2491,7 +2444,7 @@
             "$ref": "#/components/responses/NotFound"
           }
         },
-        "summary": "Record the rows the agent used: each hit with a used trace and marked for the session named.",
+        "summary": "Record a hand-out: each row hit, and marked for the session named.",
         "tags": [
           "brain-memories"
         ],
@@ -3104,19 +3057,6 @@
             }
           },
           {
-            "description": "Whether a read by key, subject, type or words lays a read trace on each live row it answers; true\nwhere none is given.",
-            "in": "query",
-            "name": "record",
-            "required": false,
-            "schema": {
-              "description": "Whether a read by key, subject, type or words lays a read trace on each live row it answers; true\nwhere none is given.",
-              "type": [
-                "boolean",
-                "null"
-              ]
-            }
-          },
-          {
             "description": "Words the recall condition holds, in any case: the rows a situation calls for.",
             "in": "query",
             "name": "situation",
@@ -3341,7 +3281,7 @@
             "$ref": "#/components/responses/NotFound"
           }
         },
-        "summary": "One memory in one version, with its subjects, its activation and its stability.",
+        "summary": "One memory in one version, with its subjects and strengths.",
         "tags": [
           "brain-memories"
         ],
@@ -5265,13 +5205,6 @@
               "null"
             ]
           },
-          "record": {
-            "description": "Whether a read by key, subject, type or words lays a read trace on each live row it answers; true\nwhere none is given.",
-            "type": [
-              "boolean",
-              "null"
-            ]
-          },
           "situation": {
             "description": "Words the recall condition holds, in any case: the rows a situation calls for.",
             "type": [
@@ -5448,7 +5381,7 @@
       "route": "POST /brains/{brainId}/memories"
     },
     {
-      "description": "One memory in one version, with its subjects, its activation and its stability.",
+      "description": "One memory in one version, with its subjects and strengths.",
       "input": {
         "description": "One memory of a brain, by their ids.",
         "properties": {
@@ -5763,7 +5696,7 @@
       "route": "PATCH /brains/{brainId}/memories/{memoryId}"
     },
     {
-      "description": "Record the rows the agent used: each hit with a used trace and marked for the session named.",
+      "description": "Record a hand-out: each row hit, and marked for the session named.",
       "input": {
         "description": "A brain and what a route of it takes.",
         "properties": {
@@ -5810,7 +5743,7 @@
       "route": "POST /brains/{brainId}/hits"
     },
     {
-      "description": "Record confirmations: a confirmed trace laid on each row, and its moment set.",
+      "description": "Record confirmations: each row's storage strength raised by the gap since its last.",
       "input": {
         "description": "A brain and what a route of it takes.",
         "properties": {
@@ -5834,13 +5767,6 @@
               "type": "integer"
             },
             "type": "array"
-          },
-          "sessionKey": {
-            "description": "The session the confirmation was made in, kept on each confirmed trace.",
-            "type": [
-              "string",
-              "null"
-            ]
           }
         },
         "required": [
@@ -6060,13 +5986,6 @@
               "type": "integer"
             },
             "type": "array"
-          },
-          "sessionKey": {
-            "description": "The session the learning was made in, kept on the traces of the memories it confirms.",
-            "type": [
-              "string",
-              "null"
-            ]
           },
           "source": {
             "$ref": "#/components/schemas/Source"

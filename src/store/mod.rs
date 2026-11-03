@@ -10,7 +10,6 @@ pub mod recall;
 pub mod rules;
 pub mod sheets;
 pub mod tallies;
-pub mod traces;
 pub mod versions;
 
 use std::time::{SystemTime, UNIX_EPOCH};

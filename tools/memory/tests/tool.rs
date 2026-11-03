@@ -447,7 +447,7 @@ fn row(id: i64, lineage: i64, kind: &str, text: &str, status: &str, brain: i64) 
     "validFrom": 0, "validTo": null,
     "recallCondition": null, "releaseCondition": null,
     "importance": 5, "hits": 0, "lastHitAt": null, "lastConfirmedAt": null,
-    "stability": 0.0, "activation": 0.0, "consolidatedAt": null,
+    "strength": 1.0, "retrievalStrength": 0.0, "consolidatedAt": null,
     "actorName": "agent-session", "reason": null, "labels": {}, "createdAt": 0
   })
 }

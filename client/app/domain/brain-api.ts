@@ -103,9 +103,6 @@ export interface MemoryFilter {
   q?: string;
 }
 
-// The screen reads a person's view of the brain, never the agent's own reading, so its lists lay no read trace.
-const UNRECORDED = { record: false };
-
 export function memoryPage(
   brainId: number,
   filter: MemoryFilter,
@@ -114,12 +111,12 @@ export function memoryPage(
   limit = 50
 ): Promise<Page<Memory>> {
   return $fetch<Page<Memory>>(under(brainId, "/memories"), {
-    query: asked({ ...filter, ...UNRECORDED, order, after, limit })
+    query: asked({ ...filter, order, after, limit })
   });
 }
 
 export function memoriesNamed(brainId: number, filter: MemoryFilter): Promise<Memory[]> {
-  return whole<Memory>(under(brainId, "/memories"), { ...filter, ...UNRECORDED });
+  return whole<Memory>(under(brainId, "/memories"), { ...filter });
 }
 
 export function tallies(brainId: number, by: TallyBy, filter: MemoryFilter): Promise<Tally[]> {

@@ -144,11 +144,6 @@ pub fn agent_of(session: &Session) -> Result<String, String> {
     .ok_or_else(|| format!("the call names no agent: neither {AGENT_VARIABLE} nor the record's holder"))
 }
 
-/// The session's run name, the key its hand-outs, confirmations and fold are kept under, where it has one.
-pub fn run_name(session: &Session) -> Option<String> {
-  session.variables.get("BMO_RUN_NAME").cloned().filter(|name| !name.is_empty())
-}
-
 /// The turn's room, where the turn has one.
 pub fn room_of(session: &Session) -> Option<String> {
   session.variables.get(CHAT_VARIABLE).cloned().filter(|room| !room.is_empty())
@@ -355,7 +350,6 @@ pub async fn answer(handed: Handed) -> Result<Answer, String> {
             release_condition: string(arguments, "releaseCondition"),
             key: string(arguments, "key"),
             layer_id: None,
-            session_key: run_name(session),
             actor_name: ACTOR.to_owned(),
             labels: Default::default(),
           },
@@ -466,7 +460,7 @@ pub async fn answer(handed: Handed) -> Result<Answer, String> {
       .await
       .map(|recorded| json!({ "recordedCount": recorded.recorded_count })),
     "brain_fold" => {
-      let session_key = run_name(&handed.session).unwrap_or_else(|| agent.clone());
+      let session_key = handed.session.variables.get("BMO_RUN_NAME").cloned().unwrap_or_else(|| agent.clone());
       client
         .fold(brain, &Fold { session_key })
         .await

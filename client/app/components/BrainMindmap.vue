@@ -65,7 +65,7 @@ async function read(): Promise<void> {
   try {
     const live = await api.memoriesNamed(props.brainId, { ...props.filter, subjectId: props.subjectId });
 
-    memories.value = live.sort((a, b) => (b.activation ?? -Infinity) - (a.activation ?? -Infinity) || b.importance - a.importance);
+    memories.value = live.sort((a, b) => b.retrievalStrength - a.retrievalStrength || b.importance - a.importance);
   } catch (error) {
     island.fail(error, t("brain.error.read"));
   }

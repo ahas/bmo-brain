@@ -11,4 +11,3 @@ mod openapi;
 mod repository;
 mod screen;
 mod sheets;
-mod traces;
