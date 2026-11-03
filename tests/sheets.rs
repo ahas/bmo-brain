@@ -433,6 +433,7 @@ async fn no_write_takes_the_type_sheet() {
     release_condition: None,
     key: None,
     layer_id: None,
+    session_key: None,
     actor_name: "writer-a".to_owned(),
     labels: labels(&[]),
   };
@@ -497,6 +498,7 @@ async fn a_learning_is_dated_where_it_names_when_it_began() {
         release_condition: None,
         key: None,
         layer_id: None,
+        session_key: None,
         actor_name: "writer-a".to_owned(),
         labels: labels(&[]),
       },

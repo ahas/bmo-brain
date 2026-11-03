@@ -359,12 +359,13 @@ async fn a_memory_is_versioned_never_edited_and_its_key_moves_with_the_live_vers
 }
 
 #[tokio::test]
-async fn hits_raise_retrieval_strength_and_spaced_confirmations_raise_storage_strength() {
+async fn hits_and_confirmations_lay_traces_that_raise_the_activation() {
   let served = Served::new().await;
   let client = &served.client;
   let brain = brain_of(client, "agent-a").await;
   let row = client.memory_add(brain, &memory("fact", "A fact")).await.unwrap();
-  assert_eq!((row.hits, row.retrieval_strength), (0, 0.0));
+  assert_eq!(row.hits, 0);
+  let written = row.activation.expect("a written row has its written trace");
   let recorded = client
     .hits_record(
       brain,
@@ -380,37 +381,26 @@ async fn hits_raise_retrieval_strength_and_spaced_confirmations_raise_storage_st
   assert_eq!(recorded.recorded_count, 1);
   let hit = client.memory(brain, row.id).await.unwrap();
   assert_eq!(hit.hits, 1);
-  assert!(hit.last_hit_at.is_some() && hit.retrieval_strength > 0.0);
-  let day = 86_400_000;
-  let written = hit.created_at;
-  let soon = client
+  assert!(hit.last_hit_at.is_some());
+  let used = hit.activation.unwrap();
+  assert!(used > written, "{used} > {written}");
+  let confirmed = client
     .confirmations_record(
       brain,
       &Confirmations {
         memory_ids: vec![row.id],
+        session_key: Some("session-a".to_owned()),
         actor_name: "writer-a".to_owned(),
-        at: Some(written + 1_000),
+        at: None,
       },
     )
     .await
     .unwrap();
-  assert_eq!(soon.recorded_count, 1);
-  let unmoved = client.memory(brain, row.id).await.unwrap();
-  assert_eq!(unmoved.strength, 1.0);
-  client
-    .confirmations_record(
-      brain,
-      &Confirmations {
-        memory_ids: vec![row.id],
-        actor_name: "writer-a".to_owned(),
-        at: Some(written + 10 * day),
-      },
-    )
-    .await
-    .unwrap();
+  assert_eq!(confirmed.recorded_count, 1);
   let stronger = client.memory(brain, row.id).await.unwrap();
-  assert!(stronger.strength > 1.0, "{}", stronger.strength);
-  assert_eq!(stronger.last_confirmed_at, Some(written + 10 * day));
+  assert!(stronger.activation.unwrap() > used, "{:?}", stronger.activation);
+  assert!(stronger.last_confirmed_at.is_some());
+  assert!(stronger.stability.unwrap() > 0.0, "{:?}", stronger.stability);
 }
 
 #[tokio::test]

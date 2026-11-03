@@ -217,6 +217,52 @@ impl Drop for Served {
   }
 }
 
+/// An empty database of the test's own, migrated by the migrations up to and including `through`, for a test
+/// that reads what a later migration makes of the rows it writes; dropped when the guard goes.
+pub struct Bare {
+  pub name: String,
+}
+
+impl Bare {
+  pub async fn through(through: i64) -> Bare {
+    let name = format!("{COPY}{}_{}", std::process::id(), COPIES.fetch_add(1, Ordering::SeqCst));
+    let mut admin = server().await;
+    admin
+      .execute(
+        format!(
+          "CREATE DATABASE \"{name}\" TEMPLATE template0 ENCODING 'UTF8' LC_COLLATE 'C' LC_CTYPE 'C'"
+        )
+        .as_str(),
+      )
+      .await
+      .unwrap();
+    admin.close().await.unwrap();
+    let bare = Bare { name };
+    let mut db = bare.connect().await;
+    let early = sqlx::migrate::Migrator {
+      migrations: std::borrow::Cow::Owned(
+        MIGRATOR.iter().filter(|migration| migration.version <= through).cloned().collect(),
+      ),
+      ignore_missing: false,
+      locking: true,
+      no_tx: false,
+    };
+    early.run(&mut db).await.unwrap();
+    db.close().await.unwrap();
+    bare
+  }
+
+  pub async fn connect(&self) -> PgConnection {
+    PgConnection::connect_with(&options(&self.name)).await.unwrap()
+  }
+}
+
+impl Drop for Bare {
+  fn drop(&mut self) {
+    drop_copy(std::mem::take(&mut self.name));
+  }
+}
+
 /// The failure a call came to: its status and code.
 pub fn refused<T: std::fmt::Debug>(answer: bmo_brain_client::Answer<T>) -> (u16, String) {
   match answer {

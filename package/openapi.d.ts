@@ -49,7 +49,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Record confirmations: each row's storage strength raised by the gap since its last. */
+        /** Record confirmations: a confirmed trace laid on each row, and its moment set. */
         post: operations["recordConfirmations"];
         delete?: never;
         options?: never;
@@ -117,7 +117,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Record a hand-out: each row hit, and marked for the session named. */
+        /** Record the rows the agent used: each hit with a used trace and marked for the session named. */
         post: operations["recordHits"];
         delete?: never;
         options?: never;
@@ -237,7 +237,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** One memory in one version, with its subjects and strengths. */
+        /** One memory in one version, with its subjects, its activation and its stability. */
         get: operations["readBrainMemory"];
         put?: never;
         post?: never;
@@ -584,6 +584,8 @@ export interface components {
             /** Format: int64 */
             at?: number | null;
             memoryIds: number[];
+            /** @description The session the confirmation was made in, kept on each confirmed trace. */
+            sessionKey?: string | null;
         };
         /** @description The console bundle's manifest, in the shape bmo-ui's `console-manifest` module states. */
         ConsoleManifest: {
@@ -663,7 +665,7 @@ export interface components {
             rules: components["schemas"]["Rules"];
             version: string;
         };
-        /** @description A reading that handed memories out. */
+        /** @description Memories the agent reports it used, or a reading handed out. */
         Hits: {
             actorName: string;
             /** Format: int64 */
@@ -752,6 +754,8 @@ export interface components {
              * @default []
              */
             replaces: number[];
+            /** @description The session the learning was made in, kept on the traces of the memories it confirms. */
+            sessionKey?: string | null;
             source: components["schemas"]["Source"];
             /**
              * Format: int64
@@ -770,6 +774,11 @@ export interface components {
         };
         /** @description One memory in one version. */
         Memory: {
+            /**
+             * Format: double
+             * @description Its activation as the reading answers, reckoned from its traces; null where it has no trace.
+             */
+            activation: number | null;
             /** @description Who wrote this version. */
             actorName: string;
             /** Format: int64 */
@@ -825,15 +834,11 @@ export interface components {
             releaseCondition: string | null;
             /**
              * Format: double
-             * @description The retrieval strength, computed from the hits as the reading answers.
+             * @description How long the memory lasts as it stands: the psychological days until its activation falls to the
+             *     threshold if no trace is laid; zero where it stands below already, null where it never falls.
              */
-            retrievalStrength: number;
+            stability: number | null;
             status: components["schemas"]["MemoryStatus"];
-            /**
-             * Format: double
-             * @description The storage strength, raised by spaced confirmations alone.
-             */
-            strength: number;
             subjects: components["schemas"]["SubjectRef"][];
             /** Format: int64 */
             supersededBy: number | null;
@@ -1079,6 +1084,12 @@ export interface components {
         /** @description The rules, key by key as the configuration writes them. */
         Rules: {
             /**
+             * Format: double
+             * @description The share `h` of a gap between sessions that counts on the psychological clock.
+             * @default 0.031
+             */
+            between_sessions: number;
+            /**
              * Format: int64
              * @description The tokens a recall block holds where the ask names no budget.
              * @default 1800
@@ -1105,16 +1116,28 @@ export interface components {
             core_fact_cap: number;
             /**
              * Format: double
-             * @description The exponent the time since each hit is raised to, negated, in the retrieval strength.
-             * @default 0.5
+             * @description The decay intercept `a`: the decay of a trace laid while the memory has no activation.
+             * @default 0.167
              */
-            decay: number;
+            decay_intercept: number;
+            /**
+             * Format: double
+             * @description The decay scale `c`: how much a trace's decay grows with the activation at its laying.
+             * @default 0.232
+             */
+            decay_scale: number;
             /**
              * Format: int64
-             * @description How many hits a row keeps for its retrieval strength.
+             * @description How many traces a memory keeps, its newest and its written one among them.
              * @default 64
              */
             hit_times_kept: number;
+            /**
+             * Format: double
+             * @description The noise `s` of the recall probability.
+             * @default 0.252
+             */
+            noise: number;
             /**
              * Format: int64
              * @description For how long after a version was superseded a reading says what the previous value was.
@@ -1123,16 +1146,10 @@ export interface components {
             previous_value_days: number;
             /**
              * Format: int64
-             * @description Confirmations closer than this to the last add nothing to the storage strength.
+             * @description The longest gap between two calls on a brain that counts whole on its psychological clock.
              * @default 3600000
              */
             same_session_ms: number;
-            /**
-             * Format: double
-             * @description What a spaced confirmation adds to the storage strength, per logarithm of the gap in days.
-             * @default 1
-             */
-            strength_gain: number;
             /**
              * Format: double
              * @description What a memory of a subject the turn names adds to its relevance.
@@ -1145,6 +1162,12 @@ export interface components {
              * @default 4
              */
             subject_cap: number;
+            /**
+             * Format: double
+             * @description The threshold `τ`: the activation at which a memory comes to mind half the time.
+             * @default -0.669
+             */
+            threshold: number;
             /**
              * Format: double
              * @description The weight of a memory's importance in the recall score.
@@ -1220,6 +1243,11 @@ export interface components {
         };
         /** @description One group of a tally. */
         Tally: {
+            /**
+             * Format: double
+             * @description The group's mean activation, as of the reading, over the rows that have one; null where none has.
+             */
+            activation: number | null;
             /** Format: int64 */
             count: number;
             /**
@@ -1239,14 +1267,9 @@ export interface components {
             latestValidFrom: number;
             /**
              * Format: double
-             * @description The group's mean retrieval strength, as of the reading.
+             * @description The group's mean stability, in psychological days, over the rows that have one; null where none has.
              */
-            retrievalStrength: number;
-            /**
-             * Format: double
-             * @description The group's mean storage strength.
-             */
-            strength: number;
+            stability: number | null;
         };
         /**
          * @description What memories are grouped by in a tally.
@@ -1845,6 +1868,11 @@ export interface operations {
                 order?: string | null;
                 /** @description Words the text holds, in any case. */
                 q?: string | null;
+                /**
+                 * @description Whether a read by key, subject, type or words lays a read trace on each live row it answers; true
+                 *     where none is given.
+                 */
+                record?: boolean | null;
                 /** @description Words the recall condition holds, in any case: the rows a situation calls for. */
                 situation?: string | null;
                 /** @description One status, or several, comma-separated. */

@@ -52,6 +52,7 @@ fn learning(kind: &str, text: &str, source: Source) -> Learning {
     release_condition: None,
     key: None,
     layer_id: None,
+    session_key: None,
     actor_name: "agent-session".to_owned(),
     labels: labels(&[]),
   }

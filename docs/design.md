@@ -24,7 +24,7 @@ reads about a person is a sheet kept apart: a person's standing sheet is rendere
   brain's tools; the discipline of a turn is a text the brain ships and the agent's system prompt carries. The brain supplies the
   judgement's material, the live memories like a candidate, and does the judgement's mechanics: a confirmation,
   a version, a closed fact, a new row, in one call. The brain runs no model and calls no unit.
-- **Per turn it hands out a short block,** chosen by relevance, importance and strength under a token
+- **Per turn it hands out a short block,** chosen by relevance, importance and activation under a token
   budget, never the whole store, and never anything that goes into a system prompt. The persona is the one
   exception: it is rendered on demand as the same bytes every time, so a prompt built on it keeps its cache.
 
@@ -92,9 +92,10 @@ One row is one thing the agent remembers, in one version.
 | `recallCondition` | the situation in which it is needed, in words, or null (「Recall」) |
 | `releaseCondition` | the situation that ends it, in words, or null (「Recall」) |
 | `importance` | the writer's weight at the time of writing, 1 to 10 |
-| `hits`, `lastHitAt` | how often, and when last, a reading handed it out |
+| `hits`, `lastHitAt` | how often, and when last, a reading handed it out or the agent reported it used |
 | `lastConfirmedAt` | when the memory was last confirmed by a source apart from the reading |
-| `strength` | its storage strength, raised only by spaced confirmations (「Strength and decay」) |
+| `activation` | how readily it comes to mind now, reckoned from its traces (「Strength and decay」) |
+| `stability` | how long it lasts as it stands: the psychological days until its activation falls to the threshold (「Strength and decay」) |
 | `actorName` | who wrote this version: the agent's session, a tool, a person at the screen |
 | `labels` | the caller's own metadata, a map of strings |
 | `createdAt` | when this version was written |
@@ -139,8 +140,8 @@ a subject」), never a row, and a write that names `sheet` as its type is refuse
 - **A merge is one new row written over several.** Rows about the same thing, each a lineage of its own,
   are folded into one: the new row starts a lineage, and every merged row becomes `superseded` with its
   `supersededBy` naming the new row and its `validTo` the new row's `validFrom`. The new row takes the most
-  hits, the earliest confirmation and the highest strength among them, so a reading does not forget what
-  the pieces had earned. Nothing is deleted: each merged row stays in its own lineage, pointing at the row
+  hits and the earliest confirmation among them, and the traces of the one most active at the merge, so a
+  reading does not forget what the pieces had earned. Nothing is deleted: each merged row stays in its own lineage, pointing at the row
   that stands for it now.
 - **A fact that stopped holding is invalidated:** `status` `invalidated`, `validTo` the moment it stopped.
   Nothing points at a replacement. A promise kept or an errand finished is `done`, with `validTo` the moment
@@ -157,7 +158,10 @@ a subject」), never a row, and a write that names `sheet` as its type is refuse
 - **No row is deleted.** Letting a brain go, by its owner, is the one removal, and it removes the brain
   whole.
   Within a brain, hiding is a status.
-- **Reading never changes a row's words or status.** A reading records a hit; only a contradiction, a
+- **A version carries its traces.** A new version, a restoration and a row an injection supersedes carry
+  every trace of the version they follow (「Strength and decay」), the written trace's salience taken from the
+  new version's importance, so a correction does not make a memory new to the mind.
+- **Reading never changes a row's words or status.** A reading lays a trace; only a contradiction, a
   confirmation, a correction or a person's act writes a version.
 
 ## Writing
@@ -170,7 +174,8 @@ the brain's tools. It writes in two moments.
   is. Episodes are the material consolidation reads and are never consolidated away.
 - **The write judgement for every fact.** Before a fact is written, the agent asks the brain for the live
   memories of the same subjects most like it, at most ten, and judges the candidate as one of four: a
-  duplicate (nothing is written; the existing row's `lastConfirmedAt` and strength move), a strengthening (a
+  duplicate (nothing is written; the existing row is confirmed: a confirmed trace is laid and its
+  `lastConfirmedAt` moves), a strengthening (a
   new version of the existing lineage with the fuller text), a contradiction (the old row is closed and the new
   one written, 「Versions」) or new (a first version). The judgement is the agent's; the brain applies it whole
   in one call, so a judgement is never half applied.
@@ -209,22 +214,58 @@ takes the episodes with the highest importance first.
 
 ## Strength and decay
 
-Two strengths stand on every memory, after the distinction between how well something is stored and how
-easily it comes to mind.
+How readily a memory comes to mind is its activation, after ACT-R's account of declarative memory with the
+spacing model of Pavlik and Anderson (2003, 2005), as Khajah, Lindsey and Mozer (2014) restate it. Nothing a
+write sets stands for it: it is reckoned at reading time from the memory's traces.
 
-- **Storage strength** is the `strength` column. It rises only on a confirmation spaced from the last one:
-  a confirmation within the same session adds nothing; the longer the gap, the more it adds. It never
-  falls.
-- **Retrieval strength** is not stored: it is computed at reading time from the row's hit history, as the
-  logarithm of the sum over its hits of the time since each hit raised to a negative power, so a memory
-  handed out often and recently comes to mind easily and one not read for long fades.
-- **A weak memory is not removed.** Its retrieval strength drops it out of the automatic block; an explicit
-  read by key, subject, type or words still answers it, and a hit there revives it.
-- **The numbers are settings,** with placeholders until the owner's own conversation logs have fitted them:
-  the importance threshold of consolidation, the decay exponent, the spacing curve of storage strength, the
+- **A trace is one presentation of the memory.** One is laid when the memory is written (`written`, its
+  first encoding), when recall hands it to a turn (`handed`), when the agent reports it used (`used`), when a
+  source apart from the reading confirms it (`confirmed`), and when an explicit read by key, subject, type or
+  words answers it (`read`). A trace keeps its real moment, its moment on the brain's psychological clock,
+  its decay, its salience, its kind, and the session it was laid for where the call names one. A memory keeps
+  at most `hit_times_kept` traces: its written trace and the newest of the rest.
+- **Activation.** At the psychological moment t, a memory's activation is
+
+      m(t) = ln( Σ_k  b_k · age_k ^ (−d_k) )
+
+  over the traces laid by t, where age_k is t less the trace's moment in psychological seconds (one second
+  at the least), b_k the trace's salience and d_k its decay. A memory with no trace has no activation.
+- **A trace's decay is set by the activation at its laying:** d_k = c · e^(m_{k−1}) + a, where m_{k−1} is the
+  memory's activation at the moment trace k is laid, from the traces laid before it; the first trace's decay
+  is a. A presentation while the memory is still active decays fast and a spaced one slowly, so spacing,
+  not repetition alone, is what makes a memory last.
+- **Salience.** The written trace's salience is the memory's importance over five; every later trace's is
+  one, whatever its kind, every presentation counting as one encoding. The kind is kept for the calibration
+  of these numbers on the brain's own logs, never weighed.
+- **The psychological clock.** Each brain keeps one clock, which only runs forward. Every call that touches
+  the brain, a recall, a write, a move, a hit, a confirmation or an explicit read, advances it by the real
+  time since the brain's previous call: whole where that gap is at most `same_session_ms`, and h times
+  itself, h being `between_sessions`, where it is longer, since forgetting runs slowly between sessions. A
+  trace keeps the clock's moment at its laying, so its age is a subtraction. A moment a caller names that
+  is earlier than the clock's latest call is placed behind it by the same rule, and a reading reads at the
+  clock's moment for now, never earlier than its latest call.
+- **The recall probability and the threshold.** The model gives a memory of activation m the probability
+
+      p(m) = 1 / (1 + e^((τ − m) / s))
+
+  of coming to mind, τ being the threshold, where the chance is even, and s the noise. A memory below τ is
+  one the model holds more likely forgotten than recalled.
+- **Stability** is how long a memory lasts as it stands: the psychological time, in days, from now until its
+  activation falls to τ if no trace is laid meanwhile, found numerically, the activation only falling as
+  time passes. It is zero where the activation is below τ already, and none where it stays above τ beyond
+  any span reckoned. Every reading answers a memory's activation and its stability.
+- **A weak memory is not removed.** Its low activation drops it down the automatic block; an explicit read
+  by key, subject, type or words still answers it, and the read trace it lays revives it.
+- **What the calibration reads.** A trace of kind `used` or `confirmed` is joined to the hand-out that
+  preceded it as: the newest `handed` trace of the same memory with the same session key whose real moment is
+  not later than its own. A version carries the traces of the one it follows, so the join holds across a
+  correction; the hand-outs it reaches are the ones the trace cap kept.
+- **The numbers are settings.** The model's are `decay_intercept` (a), `decay_scale` (c), `noise` (s),
+  `threshold` (τ) and `between_sessions` (h), each defaulting to the value Pavlik and Anderson (2003) fitted:
+  0.167, 0.232, 0.252, −0.669 and 0.031. Beside them stand the importance threshold of consolidation, the
   weights of the recall score, the per-subject cap, the core's cap of facts per speaker, the share of a
-  condition's words a turn holds before the condition matches, and the token budget.
-  The brain reads them from its configuration and names each in its health answer.
+  condition's words a turn holds before the condition matches, the token budget, `same_session_ms` and
+  `hit_times_kept`. The brain reads them from its configuration and names each in its health answer.
 
 ## Recall
 
@@ -245,7 +286,7 @@ a block and a list of what it chose.
   none. A person's sheet can hold hundreds of facts and a turn has room for a few; the rest of a speaker's
   facts reach a turn only through the searched part, scored and capped as any other row is.
 - **The score** is a weighted sum of relevance to the turn's words, importance and recency, recency being
-  the retrieval strength computed from the row's hits (「Strength and decay」), each normalised; a memory of a
+  the activation reckoned from the row's traces (「Strength and decay」), each normalised; a memory of a
   subject the turn names scores higher; no subject fills more than its cap of
   three or four rows; a diversity pass keeps the block from being one topic.
 - **A situation is words.** A memory's `recallCondition` says when it is needed, and a turn says it where the
@@ -267,7 +308,8 @@ a block and a list of what it chose.
   brain keeps, per session key, which versions it has handed out, answers the mark in place of the text, and
   clears the marks when the caller reports the fold.
 - **A `rumor` is handed out as heard,** marked so in the block. A `pending` row is never handed out.
-- **Every hand-out is a hit** on the rows chosen, which the brain records itself.
+- **Every hand-out is a hit** on the rows chosen, which the brain records itself as a `handed` trace kept
+  with the session's key.
 
 The caller that selects a turn's reference asks recall and decides what of it the turn is handed; the block
 is the brain's offer, the caller's is the last word.
@@ -403,7 +445,8 @@ console bundle contract and served by the brain itself (`docs/boundary-api.md`, 
   default, or any one status, or all), type (every type but `episode` by default), layer, subject, key, label
   and words, each status and type with its count. They are ordered newest first by `validFrom`, or by
   importance or hits; a layer's memories by their position. The filters, the view and the memory open stand
-  in the address, so an address handed on opens the same row.
+  in the address, so an address handed on opens the same row. The screen's lists are a person's view of the
+  brain, not the agent's reading, so they lay no trace (「Strength and decay」).
 - **Names in the reader's language.** A type, a subject's type and a status are shown by their names in the
   language pack, a type the pack does not name by its own word; no code, enum word or JSON stands in the
   screen.
@@ -412,8 +455,8 @@ console bundle contract and served by the brain itself (`docs/boundary-api.md`, 
   timeline, as labelled icon buttons at its end. It has no tabs: its sections stand one under another, the
   text, the moves, then the fields: the type, the key, the layer and position, the subjects as chips, the
   grounds (the `episode` subjects and a learning's source), the status with its span, the version history
-  (which version it is, the versions before and after it, the row that superseded it), the use (hits, both
-  strengths, the importance), the moment of its consolidation, its writer and its labels. A superseded
+  (which version it is, the versions before and after it, the row that superseded it), the use (hits, the
+  activation, the stability, the importance), the moment of its consolidation, its writer and its labels. A superseded
   version opens under a band leading to the live one.
 - **Moves.** Only the moves the status table allows stand as buttons: an `active` row is done or
   invalidated, a `pending` row is approved to `active`, done or invalidated, a `done` or `invalidated`
@@ -424,7 +467,7 @@ console bundle contract and served by the brain itself (`docs/boundary-api.md`, 
   is saved as a new version. An edit is made over the version read: where another writer wrote a version in
   between, the brain refuses it with a conflict, and the screen shows the new version and keeps the words
   being written. A closed version, an episode's text, the fields the brain sets (ids, lineage, `validTo`,
-  hits, strengths, the moments) and a subject's type and key and a layer's name are not editable. Layers
+  hits, the activation and the stability, the moments) and a subject's type and key and a layer's name are not editable. Layers
   are added and their descriptions and positions changed, and subjects' descriptions changed, in place.
 - **Teaching.** A person teaches through the write judgement: the screen shows the live memories most like
   the words to teach, at most ten, the person judges them as a duplicate, a strengthening, a contradiction or
@@ -461,10 +504,10 @@ console bundle contract and served by the brain itself (`docs/boundary-api.md`, 
   reach it as lines, and the episodes a conclusion rests on stand under the axis at their moments. A point
   opens the version with the words it changed from the one before.
 - **A bubble chart:** one bubble per type or per layer, its horizontal place the group's mean importance,
-  its vertical place the mean retrieval strength and its size its count of memories under the filters, so the
+  its vertical place the mean activation and its size its count of memories under the filters, so the
   important memories that are cooling stand at the lower right. A bubble narrows the list to its group, and a table
   shows the same figures.
-- **A mind map:** one subject at the centre, its memories under the filters around it coloured by layer, the strongest
+- **A mind map:** one subject at the centre, its memories under the filters around it coloured by layer, the most active
   first and the rest folded into one count, and the other subjects those memories reach outside them. A
   memory opens its row; an outer subject comes to the centre.
 - **Live.** The screen reads the brain's event stream narrowed to the brain it shows, and reads again the

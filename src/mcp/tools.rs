@@ -247,7 +247,7 @@ pub fn tools() -> Vec<BrainTool> {
     ),
     tool(
       "brain_memory_read",
-      "One memory in one version, with its subjects and strengths.",
+      "One memory in one version, with its subjects, its activation and its stability.",
       "GET /brains/{brainId}/memories/{memoryId}",
       |client,
        BrainMemoryId {
@@ -285,13 +285,13 @@ pub fn tools() -> Vec<BrainTool> {
     ),
     tool(
       "brain_hits",
-      "Record a hand-out: each row hit, and marked for the session named.",
+      "Record the rows the agent used: each hit with a used trace and marked for the session named.",
       "POST /brains/{brainId}/hits",
       |client, Within { brain_id, body }: Within<Hits>| async move { client.hits_record(brain_id, &body).await },
     ),
     tool(
       "brain_confirmations",
-      "Record confirmations: each row's storage strength raised by the gap since its last.",
+      "Record confirmations: a confirmed trace laid on each row, and its moment set.",
       "POST /brains/{brainId}/confirmations",
       |client, Within { brain_id, body }: Within<Confirmations>| async move {
         client.confirmations_record(brain_id, &body).await

@@ -114,6 +114,7 @@ impl Store {
     let at = now();
     let mut tx = self.begin().await?;
     brain_of(&mut tx, brain_id).await?;
+    self.tick(&mut tx, brain_id, at).await?;
     let heard = body.source.is_heard();
     let mut learned = Learned {
       confirmed_count: 0,
@@ -125,7 +126,8 @@ impl Store {
     confirms.sort_unstable();
     confirms.dedup();
     if !confirms.is_empty() {
-      learned.confirmed_count = self.confirm_in(&mut tx, brain_id, &confirms, at).await?;
+      learned.confirmed_count =
+        self.confirm_in(&mut tx, brain_id, &confirms, body.session_key.as_deref(), at).await?;
     }
     let text = body.text.trim();
     let only_confirms =
