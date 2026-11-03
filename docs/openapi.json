@@ -319,7 +319,7 @@
             "type": "string"
           },
           "lacking": {
-            "description": "The live rows holding none.",
+            "description": "The live rows holding none, not counting those the model refused.",
             "format": "int64",
             "type": "integer"
           },
@@ -330,8 +330,22 @@
               "null"
             ]
           },
+          "maxTokens": {
+            "description": "Where a text is cut, by the brain's conservative count of its tokens.",
+            "format": "int64",
+            "type": "integer"
+          },
           "model": {
             "type": "string"
+          },
+          "queryInstruction": {
+            "description": "The instruction a query is embedded after; empty where none is.",
+            "type": "string"
+          },
+          "rejected": {
+            "description": "The live rows the model refused even cut to its fewest tokens, passed over until the model changes.",
+            "format": "int64",
+            "type": "integer"
           },
           "vectorAsks": {
             "description": "The asks since the service started that searched with vectors.",
@@ -362,6 +376,9 @@
           "batch",
           "vectorised",
           "lacking",
+          "rejected",
+          "maxTokens",
+          "queryInstruction",
           "vectorAsks",
           "wordAsks",
           "vectorSkipped",

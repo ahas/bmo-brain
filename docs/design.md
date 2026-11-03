@@ -368,8 +368,18 @@ A memory is also searched by its meaning, as a vector its text is embedded into,
   embeddings route at the address the configuration names, with the bearer key its key file holds, under the
   model name it names (`[embedding]`). Where the configuration names none, nothing is embedded and every search
   is by words alone.
-- **What is embedded:** a row's text, with its recall condition after it where it carries one, cut to its first
-  512 tokens as the brain reckons tokens.
+- **What is embedded:** a row's text as it stands, with its recall condition after it where it carries one;
+  a query's words after the model's instruction for a search, `Instruct: <query_instruction>` and `Query:`, the
+  instruction its training was given, which the configuration may leave empty.
+- **Cut short of the engine's context:** a text is cut where a conservative count reaches `max_tokens`, held
+  under the engine's context: a CJK or Hangul character counts as a token, any other three characters as one.
+  The count is the brain's own and never asks the engine, so it holds whatever context the engine is started
+  with.
+- **A text the engine refuses does not hold the rest back.** Where the gateway refuses a batch as too large,
+  its texts are embedded one by one; a text still refused is tried again cut to half as many tokens, down to
+  64, and one refused even then is recorded as one the model does not embed, counted in the health answer and
+  passed over until the model changes, where the gateway takes a text of two letters; where it refuses that too,
+  the gateway refuses every ask, as while the model is out of its table, and nothing is recorded.
 - **Every write is embedded after it:** a new row or version wakes the brain's embedder, which embeds the live
   rows lacking a vector of the current model in batches, the configuration's batch at a time, and keeps each
   vector beside its row. While the gateway refuses or does not answer, it tries again after a pause. A row with
@@ -381,7 +391,8 @@ A memory is also searched by its meaning, as a vector its text is embedded into,
 - **A model is one space:** a vector is kept under the model that made it, and a search reads only the current
   model's. A change of model leaves the new model's vectors empty until the embedder has filled every live row,
   and the other models' vectors are deleted once it has.
-- **A query is embedded once an ask:** a recall's turn words, a similar ask's text, a memory list's words.
+- **A query is embedded once an ask:** a recall's turn words, a similar ask's text, a memory list's words, cut
+  as a row's text is, the instruction counted in.
   Where the gateway does not answer, the ask is answered by words alone and counted as skipped; the health
   answer carries how many asks used vectors, how many words alone, and how many were skipped.
 

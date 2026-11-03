@@ -138,8 +138,14 @@ pub struct EmbeddingHealth {
   pub batch: i64,
   /// The live rows holding a vector of the model.
   pub vectorised: i64,
-  /// The live rows holding none.
+  /// The live rows holding none, not counting those the model refused.
   pub lacking: i64,
+  /// The live rows the model refused even cut to its fewest tokens, passed over until the model changes.
+  pub rejected: i64,
+  /// Where a text is cut, by the brain's conservative count of its tokens.
+  pub max_tokens: i64,
+  /// The instruction a query is embedded after; empty where none is.
+  pub query_instruction: String,
   /// The asks since the service started that searched with vectors.
   pub vector_asks: i64,
   /// The asks since the service started that searched by words alone.

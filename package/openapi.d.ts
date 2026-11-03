@@ -689,12 +689,24 @@ export interface components {
             keyFile: string;
             /**
              * Format: int64
-             * @description The live rows holding none.
+             * @description The live rows holding none, not counting those the model refused.
              */
             lacking: number;
             /** @description Why the last ask of the gateway failed, or null. */
             lastError: string | null;
+            /**
+             * Format: int64
+             * @description Where a text is cut, by the brain's conservative count of its tokens.
+             */
+            maxTokens: number;
             model: string;
+            /** @description The instruction a query is embedded after; empty where none is. */
+            queryInstruction: string;
+            /**
+             * Format: int64
+             * @description The live rows the model refused even cut to its fewest tokens, passed over until the model changes.
+             */
+            rejected: number;
             /**
              * Format: int64
              * @description The asks since the service started that searched with vectors.

@@ -52,6 +52,11 @@ fn embedded(text: &str) -> Vec<f32> {
 struct Gate {
   down: Arc<AtomicBool>,
   asks: Arc<AtomicUsize>,
+  /// The most characters of a text the stand-in takes, none where zero; it refuses a batch holding a longer one,
+  /// and always refuses a text that says `unembeddable`, as an engine refuses a text past its context.
+  limit: Arc<AtomicUsize>,
+  /// Every text it was handed, in order.
+  seen: Arc<std::sync::Mutex<Vec<String>>>,
 }
 
 async fn embeddings(
@@ -68,6 +73,14 @@ async fn embeddings(
     return (StatusCode::UNAUTHORIZED, Json(json!({ "error": "unauthorized" })));
   }
   let texts: Vec<String> = serde_json::from_value(ask["input"].clone()).unwrap_or_default();
+  gate.seen.lock().unwrap().extend(texts.iter().cloned());
+  let limit = gate.limit.load(Ordering::SeqCst);
+  if texts
+    .iter()
+    .any(|text| text.contains("unembeddable") || (limit > 0 && text.chars().count() > limit))
+  {
+    return (StatusCode::BAD_REQUEST, Json(json!({ "error": "the input exceeds the context size" })));
+  }
   let data: Vec<Value> = texts
     .iter()
     .enumerate()
@@ -96,6 +109,8 @@ impl Gateway {
     let gate = Gate {
       down: Arc::new(AtomicBool::new(false)),
       asks: Arc::new(AtomicUsize::new(0)),
+      limit: Arc::new(AtomicUsize::new(0)),
+      seen: Arc::new(std::sync::Mutex::new(Vec::new())),
     };
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let base = format!("http://{}", listener.local_addr().unwrap());
@@ -118,6 +133,9 @@ impl Gateway {
       model: model.to_owned(),
       dims: DIMS,
       batch: 2,
+      max_tokens: 480,
+      // The stand-in reads every word of a text, so the tests embed queries bare unless one asks otherwise.
+      query_instruction: String::new(),
     }
   }
 }
@@ -340,4 +358,98 @@ async fn a_change_of_model_embeds_every_row_again_and_lets_the_old_vectors_go() 
   assert_eq!(changed.embed_backlog().await, Ok(2));
   assert_eq!(vectors_of(&changed, "model-b").await, [one.id, two.id]);
   assert!(vectors_of(&changed, "model-a").await.is_empty());
+}
+
+#[test]
+fn a_text_is_cut_by_a_conservative_count_of_its_tokens() {
+  use bmo_brain::store::vectors::{cut, estimated_tokens, query_text};
+  assert_eq!(estimated_tokens("\u{c548}\u{b155}\u{d558}\u{c138}\u{c694}"), 5.0);
+  assert_eq!(estimated_tokens("abcdef"), 2.0);
+  assert_eq!(estimated_tokens("\u{6f22}\u{5b57}\u{304b}\u{306a}"), 4.0);
+  assert_eq!(cut("\u{ac00}\u{b098}\u{b2e4}\u{b77c}\u{b9c8}", 3.0), "\u{ac00}\u{b098}\u{b2e4}");
+  assert_eq!(cut("abcdefghi", 2.0), "abcdef");
+  assert_eq!(cut("ab\u{ac00}\u{b098}", 2.0), "ab\u{ac00}");
+  assert_eq!(cut("short", 480.0), "short");
+  // A Korean text of 600 syllables is cut at 480 of them, under an engine's 512.
+  let long = "\u{ac00}".repeat(600);
+  assert_eq!(cut(&long, 480.0).chars().count(), 480);
+  // A query's words are cut so the instruction and the words together stay within the count.
+  let asked = query_text(&long, "Given a question, retrieve memories that answer it", 480.0);
+  assert!(
+    asked.starts_with("Instruct: Given a question, retrieve memories that answer it\nQuery:"),
+    "{asked}"
+  );
+  assert!(estimated_tokens(&asked) <= 480.0, "{}", estimated_tokens(&asked));
+  assert_eq!(query_text("my car", "", 480.0), "my car");
+}
+
+#[tokio::test]
+async fn a_refused_batch_is_embedded_one_by_one_cut_shorter_and_a_text_refused_even_then_is_recorded() {
+  let gateway = Gateway::new().await;
+  // The stand-in takes texts of 200 characters at most: a text of 300 is taken once cut to 64 tokens.
+  gateway.gate.limit.store(200, Ordering::SeqCst);
+  let served = Served::embedding(gateway.config("stand-in")).await;
+  let client = &served.client;
+  let brain = brain_of(client).await;
+  let short = client.memory_add(brain, &memory("The dog sleeps.")).await.unwrap();
+  let long = client.memory_add(brain, &memory(&"garden ".repeat(43))).await.unwrap();
+  let refused = client.memory_add(brain, &memory("An unembeddable row.")).await.unwrap();
+  let after = client.memory_add(brain, &memory("The car is red.")).await.unwrap();
+  assert_eq!(served.store.embed_backlog().await, Ok(3));
+  assert_eq!(vectors_of(&served.store, "stand-in").await, [short.id, long.id, after.id]);
+  let health = client.health().await.unwrap().embedding.unwrap();
+  assert_eq!((health.vectorised, health.lacking, health.rejected), (3, 0, 1));
+  // The long text went out whole, then cut at 240, 120 and 64 tokens, the last of 192 characters taken.
+  let seen = gateway.gate.seen.lock().unwrap().clone();
+  let long_sent: Vec<usize> = seen
+    .iter()
+    .filter(|text| text.starts_with("garden"))
+    .map(|text| text.chars().count())
+    .collect();
+  assert_eq!(long_sent.last(), Some(&192), "{long_sent:?}");
+  // The refused row is passed over from then on: nothing more is asked of the gateway for it.
+  let asked = gateway.gate.asks.load(Ordering::SeqCst);
+  assert_eq!(served.store.embed_backlog().await, Ok(0));
+  assert_eq!(gateway.gate.asks.load(Ordering::SeqCst), asked);
+  let _ = refused;
+}
+
+#[tokio::test]
+async fn a_query_is_embedded_after_the_models_instruction() {
+  let gateway = Gateway::new().await;
+  let mut config = gateway.config("stand-in");
+  config.query_instruction = "Given a question, retrieve memories that answer it".to_owned();
+  let served = Served::embedding(config).await;
+  let client = &served.client;
+  let brain = brain_of(client).await;
+  client.memory_add(brain, &memory("The automobile is parked outside.")).await.unwrap();
+  served.store.embed_backlog().await.unwrap();
+  recall(client, brain, "where is my car").await;
+  let seen = gateway.gate.seen.lock().unwrap().clone();
+  assert_eq!(
+    seen.first().map(String::as_str),
+    Some("The automobile is parked outside."),
+    "a row goes raw"
+  );
+  assert_eq!(
+    seen.last().map(String::as_str),
+    Some("Instruct: Given a question, retrieve memories that answer it\nQuery:where is my car")
+  );
+}
+
+#[tokio::test]
+async fn a_gateway_that_refuses_every_ask_records_no_row_as_refused() {
+  let gateway = Gateway::new().await;
+  let served = Served::embedding(gateway.config("stand-in")).await;
+  let client = &served.client;
+  let brain = brain_of(client).await;
+  client.memory_add(brain, &memory("The dog sleeps.")).await.unwrap();
+  // Every text of more than one character refused, as a gateway refuses a model out of its table.
+  gateway.gate.limit.store(1, Ordering::SeqCst);
+  assert!(served.store.embed_backlog().await.is_err());
+  let health = client.health().await.unwrap().embedding.unwrap();
+  assert_eq!((health.vectorised, health.lacking, health.rejected), (0, 1, 0));
+  // Once it takes texts again, the row is embedded.
+  gateway.gate.limit.store(0, Ordering::SeqCst);
+  assert_eq!(served.store.embed_backlog().await, Ok(1));
 }

@@ -14,14 +14,16 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::{Notify, watch};
 use tokio::task::JoinHandle;
 
-use super::rules::tokens;
 use super::{Held, Store, now};
 
 /// How long the embedder waits before it asks the gateway again after an ask failed.
 const RETRY_PAUSE: Duration = Duration::from_secs(30);
 
-/// The most tokens of a text that are embedded.
-const TOKENS_EMBEDDED: i64 = 512;
+/// The text the gateway is asked to embed before a refused text is recorded as the model's to refuse.
+const PROBE: &str = "ok";
+
+/// The fewest tokens a refused text is cut to before it is recorded as one the model does not embed.
+const TOKENS_LEAST: f64 = 64.0;
 
 /// The embedding model's settings (docs/boundary-api.md, 「Configuration」).
 #[derive(Clone, Debug, Deserialize)]
@@ -40,6 +42,20 @@ pub struct EmbeddingConfig {
   /// The most texts one ask carries.
   #[serde(default = "default_batch")]
   pub batch: usize,
+  /// Where a text is cut, by the conservative count of `estimated_tokens`, held under the engine's context.
+  #[serde(default = "default_max_tokens")]
+  pub max_tokens: usize,
+  /// The instruction a query is embedded after; none where it is empty.
+  #[serde(default = "default_query_instruction")]
+  pub query_instruction: String,
+}
+
+fn default_max_tokens() -> usize {
+  480
+}
+
+fn default_query_instruction() -> String {
+  "Given a question, retrieve memories that answer it".to_owned()
 }
 
 fn default_model() -> String {
@@ -125,13 +141,14 @@ impl Vectors {
     }
   }
 
-  /// The texts embedded by the gateway, in their order, or why not.
-  async fn embed(&self, texts: &[String]) -> Result<Vec<Vec<f32>>, String> {
+  /// The texts embedded by the gateway, in their order, or why not: refused, where the gateway answered that
+  /// the ask is not one it takes, or down otherwise.
+  async fn embed(&self, texts: &[String]) -> Result<Vec<Vec<f32>>, GatewayFault> {
     let (Some(config), Some(http)) = (&self.config, &self.http) else {
-      return Err("no embedding model is named".to_owned());
+      return Err(GatewayFault::Down("no embedding model is named".to_owned()));
     };
     let key = std::fs::read_to_string(&config.key_file)
-      .map_err(|why| format!("{}: {why}", config.key_file.display()))?;
+      .map_err(|why| GatewayFault::Down(format!("{}: {why}", config.key_file.display())))?;
     let address = format!("{}/v1/embeddings", config.address.trim_end_matches('/'));
     let answer = http
       .post(&address)
@@ -142,26 +159,105 @@ impl Vectors {
       })
       .send()
       .await
-      .map_err(|why| format!("{address}: {why}"))?;
+      .map_err(|why| GatewayFault::Down(format!("{address}: {why}")))?;
     let status = answer.status();
-    if !status.is_success() {
-      return Err(format!("{address} answered {status}"));
+    if status.as_u16() == 400 {
+      return Err(GatewayFault::Refused(format!("{address} answered {status}")));
     }
-    let mut answered: EmbeddingAnswer = answer.json().await.map_err(|why| format!("{address}: {why}"))?;
+    if !status.is_success() {
+      return Err(GatewayFault::Down(format!("{address} answered {status}")));
+    }
+    let mut answered: EmbeddingAnswer =
+      answer.json().await.map_err(|why| GatewayFault::Down(format!("{address}: {why}")))?;
     answered.data.sort_by_key(|datum| datum.index);
     if answered.data.len() != texts.len() {
-      return Err(format!("{address} answered {} vectors for {} texts", answered.data.len(), texts.len()));
+      return Err(GatewayFault::Down(format!(
+        "{address} answered {} vectors for {} texts",
+        answered.data.len(),
+        texts.len()
+      )));
     }
     let vectors: Vec<Vec<f32>> = answered.data.into_iter().map(|datum| datum.embedding).collect();
     if let Some(wrong) = vectors.iter().find(|vector| vector.len() != config.dims) {
-      return Err(format!(
+      return Err(GatewayFault::Down(format!(
         "{address} answered {} dimensions; the configuration names {}",
         wrong.len(),
         config.dims
-      ));
+      )));
     }
     Ok(vectors)
   }
+
+  /// One text embedded, cut to half as many tokens each time the gateway refuses it, down to the fewest: its
+  /// vector, none where it was refused even then, or why the gateway did not answer.
+  async fn embed_one(&self, text: &str, most: f64) -> Result<Option<Vec<f32>>, String> {
+    let mut budget = most;
+    loop {
+      match self.embed(&[cut(text, budget)]).await {
+        Ok(mut vectors) => return Ok(vectors.pop()),
+        Err(GatewayFault::Refused(_)) if budget > TOKENS_LEAST => budget = (budget / 2.0).max(TOKENS_LEAST),
+        // Refused even at the fewest tokens: the text is the model's to refuse only where the gateway takes a
+        // text of two letters, else the gateway itself refuses every ask, as while the model is out of its table.
+        Err(GatewayFault::Refused(why)) => {
+          return match self.embed(&[PROBE.to_owned()]).await {
+            Ok(_) => Ok(None),
+            Err(_) => Err(format!("{why}, and it refuses a text of two letters too")),
+          };
+        }
+        Err(GatewayFault::Down(why)) => return Err(why),
+      }
+    }
+  }
+}
+
+/// Why the gateway gave no vectors.
+enum GatewayFault {
+  /// It answered that the ask is not one it takes: a text too long for the engine's context among them.
+  Refused(String),
+  /// It did not answer, or answered otherwise than with the vectors.
+  Down(String),
+}
+
+impl GatewayFault {
+  fn said(self) -> String {
+    match self {
+      Self::Refused(why) | Self::Down(why) => why,
+    }
+  }
+}
+
+/// A conservative count of a text's tokens, never asking the engine: a CJK or Hangul character counts as one
+/// token, any other three characters as one.
+pub fn estimated_tokens(text: &str) -> f64 {
+  text.chars().map(thirds).sum::<u64>() as f64 / 3.0
+}
+
+/// A character's share of the count in thirds of a token, so the count adds up exactly.
+fn thirds(c: char) -> u64 {
+  if is_cjk(c) { 3 } else { 1 }
+}
+
+/// Whether a character is of the CJK scripts or Hangul, each about a token of its own.
+fn is_cjk(c: char) -> bool {
+  matches!(c as u32,
+    0x1100..=0x11FF | 0x2E80..=0x2FDF | 0x3000..=0x303F | 0x3040..=0x30FF | 0x3100..=0x31FF | 0x3200..=0x9FFF
+    | 0xA960..=0xA97F | 0xAC00..=0xD7FF | 0xF900..=0xFAFF | 0xFE30..=0xFE4F | 0xFF00..=0xFFEF
+    | 0x20000..=0x3FFFF)
+}
+
+/// A text cut where the conservative count reaches `budget` tokens; the whole text where it stays under.
+pub fn cut(text: &str, budget: f64) -> String {
+  let most = (budget * 3.0).floor().max(0.0) as u64;
+  let mut spent = 0;
+  let mut kept = String::new();
+  for c in text.chars() {
+    spent += thirds(c);
+    if spent > most {
+      break;
+    }
+    kept.push(c);
+  }
+  kept
 }
 
 #[derive(Serialize)]
@@ -192,18 +288,23 @@ fn dot(a: &[f32], b: &[f32]) -> f32 {
   a.iter().zip(b).map(|(x, y)| x * y).sum()
 }
 
-/// What of a row is embedded: its text, with its recall condition after it, cut to the tokens embedded.
-pub(crate) fn embedded_text(text: &str, recall_condition: Option<&str>) -> String {
-  let whole = match recall_condition {
+/// What of a row is embedded, before it is cut: its text, with its recall condition after it.
+pub(crate) fn row_text(text: &str, recall_condition: Option<&str>) -> String {
+  match recall_condition {
     Some(condition) => format!("{text}\n{condition}"),
     None => text.to_owned(),
-  };
-  let most = usize::try_from(TOKENS_EMBEDDED * 3).unwrap_or(usize::MAX);
-  if tokens(&whole) <= TOKENS_EMBEDDED {
-    whole
-  } else {
-    whole.chars().take(most).collect()
   }
+}
+
+/// What of a query is embedded: its words after the model's instruction where one is named, the words cut so the
+/// whole stays within `budget` tokens by the conservative count.
+pub fn query_text(words: &str, instruction: &str, budget: f64) -> String {
+  if instruction.trim().is_empty() {
+    return cut(words, budget);
+  }
+  let head = format!("Instruct: {}\nQuery:", instruction.trim());
+  let left = (budget - estimated_tokens(&head)).max(0.0);
+  format!("{head}{}", cut(words, left))
 }
 
 /// A query embedded for one ask: its unit vector, where the model answered.
@@ -241,10 +342,12 @@ impl Store {
       return Ok(0);
     };
     let mut embedded = 0;
+    let most = config.max_tokens as f64;
     loop {
       let lacking: Vec<(i64, i64, String, Option<String>)> = sqlx::query_as(
         "SELECT m.id, m.brain_id, m.text, m.recall_condition FROM memories m WHERE m.status IN ('active', 'pending') \
          AND NOT EXISTS (SELECT 1 FROM memory_vectors v WHERE v.memory_id = m.id AND v.model = $1) \
+         AND NOT EXISTS (SELECT 1 FROM memory_vector_rejections r WHERE r.memory_id = m.id AND r.model = $1) \
          ORDER BY m.id LIMIT $2",
       )
       .bind(&config.model)
@@ -253,20 +356,37 @@ impl Store {
       .await
       .map_err(|why| why.to_string())?;
       if lacking.is_empty() {
-        sqlx::query("DELETE FROM memory_vectors WHERE model <> $1")
-          .bind(&config.model)
-          .execute(&self.pool)
-          .await
-          .map_err(|why| why.to_string())?;
+        for table in ["memory_vectors", "memory_vector_rejections"] {
+          sqlx::query(&format!("DELETE FROM {table} WHERE model <> $1"))
+            .bind(&config.model)
+            .execute(&self.pool)
+            .await
+            .map_err(|why| why.to_string())?;
+        }
         return Ok(embedded);
       }
       let texts: Vec<String> = lacking
         .iter()
-        .map(|(_, _, text, condition)| embedded_text(text, condition.as_deref()))
+        .map(|(_, _, text, condition)| cut(&row_text(text, condition.as_deref()), most))
         .collect();
-      let vectors = match self.vectors.embed(&texts).await {
-        Ok(vectors) => vectors,
-        Err(why) => {
+      // A batch the gateway refuses is embedded one text at a time, each cut shorter while it is refused; a text
+      // refused even at the fewest tokens is recorded as one the model does not embed.
+      let vectors: Vec<Option<Vec<f32>>> = match self.vectors.embed(&texts).await {
+        Ok(vectors) => vectors.into_iter().map(Some).collect(),
+        Err(GatewayFault::Refused(_)) => {
+          let mut each = Vec::with_capacity(lacking.len());
+          for (_, _, text, condition) in &lacking {
+            match self.vectors.embed_one(&row_text(text, condition.as_deref()), most).await {
+              Ok(vector) => each.push(vector),
+              Err(why) => {
+                self.vectors.failed(&why);
+                return Err(why);
+              }
+            }
+          }
+          each
+        }
+        Err(GatewayFault::Down(why)) => {
           self.vectors.failed(&why);
           return Err(why);
         }
@@ -274,6 +394,19 @@ impl Store {
       self.vectors.answered();
       let at = now();
       for ((memory_id, brain_id, _, _), vector) in lacking.iter().zip(&vectors) {
+        let Some(vector) = vector else {
+          sqlx::query(
+            "INSERT INTO memory_vector_rejections (memory_id, model, rejected_at) VALUES ($1, $2, $3) \
+             ON CONFLICT (memory_id, model) DO NOTHING",
+          )
+          .bind(memory_id)
+          .bind(&config.model)
+          .bind(at)
+          .execute(&self.pool)
+          .await
+          .map_err(|why| why.to_string())?;
+          continue;
+        };
         sqlx::query(
           "INSERT INTO memory_vectors (memory_id, model, dims, vector, embedded_at) VALUES ($1, $2, $3, $4, $5) \
            ON CONFLICT (memory_id, model) DO UPDATE SET dims = $3, vector = $4, embedded_at = $5",
@@ -313,7 +446,11 @@ impl Store {
       vectors.word_asks.fetch_add(1, Ordering::Relaxed);
       return None;
     }
-    match vectors.embed(&[embedded_text(words, None)]).await {
+    let Some(config) = &vectors.config else {
+      return None;
+    };
+    let text = query_text(words, &config.query_instruction, config.max_tokens as f64);
+    match vectors.embed(&[text]).await {
       Ok(mut answered) => {
         vectors.answered();
         match answered.pop().as_deref().and_then(unit) {
@@ -327,8 +464,8 @@ impl Store {
           }
         }
       }
-      Err(why) => {
-        vectors.failed(&why);
+      Err(fault) => {
+        vectors.failed(&fault.said());
         vectors.skipped.fetch_add(1, Ordering::Relaxed);
         vectors.word_asks.fetch_add(1, Ordering::Relaxed);
         None
@@ -365,12 +502,21 @@ impl Store {
     let counts: Result<(i64, i64), sqlx::Error> = sqlx::query_as(
       "SELECT COUNT(*) FILTER (WHERE EXISTS (SELECT 1 FROM memory_vectors v WHERE v.memory_id = m.id \
        AND v.model = $1)), COUNT(*) FILTER (WHERE NOT EXISTS (SELECT 1 FROM memory_vectors v \
-       WHERE v.memory_id = m.id AND v.model = $1)) FROM memories m WHERE m.status IN ('active', 'pending')",
+       WHERE v.memory_id = m.id AND v.model = $1) AND NOT EXISTS (SELECT 1 FROM memory_vector_rejections r \
+       WHERE r.memory_id = m.id AND r.model = $1)) FROM memories m WHERE m.status IN ('active', 'pending')",
     )
     .bind(&config.model)
     .fetch_one(&self.pool)
     .await;
     let (vectorised, lacking) = counts.unwrap_or_default();
+    let rejected: i64 = sqlx::query_scalar(
+      "SELECT COUNT(*) FROM memory_vector_rejections r JOIN memories m ON m.id = r.memory_id \
+       WHERE r.model = $1 AND m.status IN ('active', 'pending')",
+    )
+    .bind(&config.model)
+    .fetch_one(&self.pool)
+    .await
+    .unwrap_or_default();
     let vectors = &self.vectors;
     Some(EmbeddingHealth {
       address: config.address.clone(),
@@ -380,6 +526,9 @@ impl Store {
       batch: i64::try_from(config.batch).unwrap_or(i64::MAX),
       vectorised,
       lacking,
+      rejected,
+      max_tokens: i64::try_from(config.max_tokens).unwrap_or(i64::MAX),
+      query_instruction: config.query_instruction.clone(),
       vector_asks: vectors.vector_asks.load(Ordering::Relaxed),
       word_asks: vectors.word_asks.load(Ordering::Relaxed),
       vector_skipped: vectors.skipped.load(Ordering::Relaxed),
