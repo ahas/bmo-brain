@@ -8,6 +8,7 @@ use bmo_brain_client::{
 use sqlx::PgConnection;
 
 use super::brains::{brain_of, given};
+use super::misses::Asked;
 use super::recall::Cues;
 use super::sheets::written_type;
 use super::versions::{HELD_AT, MEMORY_COLUMNS, MemoryRow};
@@ -55,6 +56,8 @@ impl Store {
     subject_ids.sort_unstable();
     subject_ids.dedup();
     if asked.is_empty() && subject_ids.is_empty() {
+      self.count_ask(&mut conn, brain_id, Asked::Similar, &ask.text, false).await?;
+      self.commit(conn).await?;
       return Ok(vec![]);
     }
     index_words(&mut conn, brain_id).await?;
@@ -77,7 +80,6 @@ impl Store {
     .await?;
     let members = self.members(&mut conn, rows).await?;
     let cues = Cues::read(&mut conn, brain_id, &subject_ids, &asked).await?;
-    self.commit(conn).await?;
     let mut scored: Vec<(f64, Memory)> = members
       .into_iter()
       .filter_map(|memory| {
@@ -90,7 +92,12 @@ impl Store {
       .collect();
     scored
       .sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal).then(b.1.id.cmp(&a.1.id)));
-    Ok(scored.into_iter().take(limit as usize).map(|(_, memory)| memory).collect())
+    let found: Vec<Memory> = scored.into_iter().take(limit as usize).map(|(_, memory)| memory).collect();
+    self
+      .count_ask(&mut conn, brain_id, Asked::Similar, &ask.text, !found.is_empty())
+      .await?;
+    self.commit(conn).await?;
+    Ok(found)
   }
 
   /// A learning applied whole: the memories it confirms confirmed; the one it strengthens given a new

@@ -119,6 +119,9 @@ pub struct Health {
   pub version: String,
   /// The numbers the brain reads by.
   pub rules: crate::brains::Rules,
+  /// Each asked brain's count of its asks by words and of its misses.
+  #[serde(default)]
+  pub searches: Vec<crate::brains::SearchCount>,
 }
 
 /// One event: its number, its kind, when it happened and the member it is about.

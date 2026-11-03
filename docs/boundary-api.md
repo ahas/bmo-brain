@@ -36,7 +36,7 @@ plugin」). The binary declares no noun, so the platform's `bmo` hands it no com
 | console | `[console]` | the console bundle (「The console bundle」), where the brain serves one: `token`, the console's bearer token, which reaches what the screen uses; `bundle`, the folder the build of `client/` wrote the module, its stylesheet and its words into, the release's `console` where none is given; `calls`, the other services the screen calls through the console, each by the service name its own manifest gives it, which the manifest names under `calls`, none where none is given |
 | database | `database` | the address of the brain's own PostgreSQL database, which holds its tables and nothing else |
 | data root | `data_root` | the data root whose `env/brain.env` the brain's tool reads the service's address and token from; the `tool-env` verb writes it |
-| rules | `[rules]` | the numbers the brain reads by (`docs/design.md`), each with a default: `budget_tokens`, `bm25_k1` (how far a matched stem's weight saturates with a row's length, 1.2), `bm25_b` (how much a row's length relative to the brain's mean weighs on a matched stem, 0.75), `mmr_lambda` (the weight recall's selection gives relevance against overlap with the rows already in, 0.7), `subject_cap`, `core_fact_cap` (the most facts of one speaker's sheet the core of a recall carries, 8), `hit_times_kept` (the most use moments a memory keeps, 64), `same_session_ms` (the span of one session, an hour: the window around a tag in the consolidation order), `tag_importance` (the importance at which an unconsolidated episode tags its room's episodes around it, 8), `previous_value_days`, `condition_share` (the share of a condition's words a turn holds before it matches, 0.5), `consolidation_threshold` |
+| rules | `[rules]` | the numbers the brain reads by (`docs/design.md`), each with a default: `budget_tokens`, `bm25_k1` (how far a matched stem's weight saturates with a row's length, 1.2), `bm25_b` (how much a row's length relative to the brain's mean weighs on a matched stem, 0.75), `mmr_lambda` (the weight recall's selection gives relevance against overlap with the rows already in, 0.7), `subject_cap`, `core_fact_cap` (the most facts of one speaker's sheet the core of a recall carries, 8), `hit_times_kept` (the most use moments a memory keeps, 64), `same_session_ms` (the span of one session, an hour: the window around a tag in the consolidation order), `tag_importance` (the importance at which an unconsolidated episode tags its room's episodes around it, 8), `misses_kept` (the most misses of its searches by words a brain keeps, the newest, 5000), `previous_value_days`, `condition_share` (the share of a condition's words a turn holds before it matches, 0.5), `consolidation_threshold` |
 
 Deployed, the file stands under the data root as `env/brain.toml`, and each release links to it as
 `brain.toml`. The service runs as the user unit `deploy/bmo-brain.service`, the repository's one service: a
@@ -64,8 +64,10 @@ finish, and the service then ends; the unit waits for that and never escalates t
 
 ## Health
 
-`GET /health` answers `ready`, `reason` (null when ready), `version` and `rules`, the numbers the brain
-reads by. The service is ready where its database answers.
+`GET /health` answers `ready`, `reason` (null when ready), `version`, `rules`, the numbers the brain
+reads by, and `searches`, each brain's count of its asks by words: `brainId`, `asks` and `misses`
+(`docs/design.md`, 「What the brain counts」), for every brain that has been asked. The service is ready where its
+database answers.
 
 ## Events
 
@@ -260,6 +262,16 @@ kept in the row's labels. The recall answer carries `unconsolidatedImportance`, 
 the unconsolidated episodes, and `consolidationDue`, whether it has reached the brain's threshold.
 
 The skill ships the discipline a chat agent's system prompt carries, `skills/brain-harness/every-turn.md`.
+
+### Misses
+
+A similar ask with words, and the first page of a memory list by `q` that records uses, is an ask by words: it
+counts as an ask of the brain, and where it answers no row as a miss, kept as a row (`docs/design.md`, 「What the
+brain counts」). An ask with no words counts as neither.
+
+| Route | Does | Answers |
+|---|---|---|
+| `GET /misses` | the brain's kept misses, newest first, paged by `after` (the last `id` seen) and `limit`: each `id`, `brainId`, `at`, `route` (`similar` or `memories`), `words` (as asked) and `stems` (the stems they became) | 200, a page; 404 |
 
 ### Persona
 

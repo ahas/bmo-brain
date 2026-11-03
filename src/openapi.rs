@@ -12,8 +12,8 @@ use bmo_brain_client::{
   Recorded, SheetQuery, Subject, SubjectChange, SubjectsQuery, TypeCount, WireError,
 };
 use bmo_brain_client::{
-  ConsoleManifest, ConsoleWords, Consolidated, ConsolidationState, Learned, Learning, Restoration,
-  SimilarAsk, TalliesQuery, Tally, UnconsolidatedEpisode, UnconsolidatedQuery,
+  ConsoleManifest, ConsoleWords, Consolidated, ConsolidationState, Learned, Learning, MissesQuery,
+  Restoration, SearchMiss, SimilarAsk, TalliesQuery, Tally, UnconsolidatedEpisode, UnconsolidatedQuery,
 };
 use schemars::generate::{SchemaGenerator, SchemaSettings};
 use schemars::{JsonSchema, Schema};
@@ -609,6 +609,22 @@ fn brain_routes(g: &mut SchemaGenerator) -> Vec<Route> {
       body: body::<Consolidated>(g),
       raw_body: None,
       answers: vec![(200, json_answer::<Recorded>(g))],
+      codes: vec![BadRequest, NotFound],
+    },
+    Route {
+      method: "get",
+      path: "/brains/{brainId}/misses",
+      id: "listMisses",
+      tag: "writing",
+      summary: "The brain's kept misses of its asks by words, newest first.",
+      parameters: {
+        let mut parameters = brain(g);
+        parameters.extend(query::<MissesQuery>(g));
+        parameters
+      },
+      body: None,
+      raw_body: None,
+      answers: vec![(200, json_answer::<Page<SearchMiss>>(g))],
       codes: vec![BadRequest, NotFound],
     },
     Route {

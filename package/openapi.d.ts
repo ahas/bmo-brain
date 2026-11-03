@@ -316,6 +316,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/brains/{brainId}/misses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The brain's kept misses of its asks by words, newest first. */
+        get: operations["listMisses"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/brains/{brainId}/persona": {
         parameters: {
             query?: never;
@@ -698,6 +715,11 @@ export interface components {
             reason: string | null;
             /** @description The numbers the brain reads by. */
             rules: components["schemas"]["Rules"];
+            /**
+             * @description Each asked brain's count of its asks by words and of its misses.
+             * @default []
+             */
+            searches: components["schemas"]["SearchCount"][];
             version: string;
         };
         /** @description A reading that handed memories out. */
@@ -1169,6 +1191,12 @@ export interface components {
              */
             hit_times_kept: number;
             /**
+             * Format: int64
+             * @description The most misses of its searches by words a brain keeps, the newest.
+             * @default 5000
+             */
+            misses_kept: number;
+            /**
              * Format: double
              * @description The weight `λ` recall's selection gives a row's relevance against its overlap with the rows already in.
              * @default 0.7
@@ -1198,6 +1226,36 @@ export interface components {
              * @default 8
              */
             tag_importance: number;
+        };
+        /** @description A brain's count of its asks by words and of those that found nothing. */
+        SearchCount: {
+            /** Format: int64 */
+            asks: number;
+            /** Format: int64 */
+            brainId: number;
+            /** Format: int64 */
+            misses: number;
+        };
+        /** @description An ask by words that answered no row. */
+        SearchMiss: {
+            /** Format: int64 */
+            at: number;
+            /** Format: int64 */
+            brainId: number;
+            /** Format: int64 */
+            id: number;
+            /** @description Which ask it was: `similar` or `memories`. */
+            route: string;
+            /** @description The stems the words became. */
+            stems: string[];
+            /** @description The words as asked. */
+            words: string;
+        };
+        /** @description One page of a list, oldest first. */
+        SearchMissPage: {
+            items: components["schemas"]["SearchMiss"][];
+            /** @description Whether anything stands past the last item. */
+            more: boolean;
         };
         /** @description A candidate memory, whose likes the write judgement reads. */
         SimilarAsk: {
@@ -2246,6 +2304,36 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+        };
+    };
+    listMisses: {
+        parameters: {
+            query?: {
+                /** @description The last id seen; the page continues past it, older. */
+                after?: number | null;
+                limit?: number | null;
+            };
+            header?: never;
+            path: {
+                brainId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchMissPage"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
         };
     };
     renderPersona: {

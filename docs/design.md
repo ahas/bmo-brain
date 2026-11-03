@@ -352,6 +352,20 @@ a block and a list of what it chose.
 The caller that selects a turn's reference asks recall and decides what of it the turn is handed; the block
 is the brain's offer, the caller's is the last word.
 
+## What the brain counts
+
+The brain counts how often a search by words finds nothing, so whether a search by meaning is worth adding is
+judged on the brain's own record.
+
+- **An ask by words is a similar ask** (the candidate's text) **or an explicit read by words** (a memory list
+  by `q`, its first page, recording uses). Each one counts as an ask of its brain, and one that answers no row
+  counts as a miss too; an ask with no words at all counts as neither.
+- **A miss is kept as a row of its brain:** the moment, the words as asked, the stems they became
+  (「Recall」), and which ask it was. A brain keeps its newest misses, at most `misses_kept` of them; the counts
+  of asks and misses are kept whole.
+- **The record is read, never acted on:** the misses are listed newest first, and the health answer carries
+  each brain's asks and misses. Nothing the brain hands out changes by them.
+
 ## Persona and lore
 
 - **The persona is memories of type `persona`,** each a piece in a layer, ordered by layer position and
@@ -423,7 +437,8 @@ Nothing but its event window. Every member a caller reads or writes stands insid
 `episode` row; a reference piece is a memory of a reference type in a layer; a room's rule is a `rule`
 memory; a wait or a reminder is the wait tool's, outside the brain (「What the brain acts on by itself」); a
 session's loaded documents and its handoff note are the agency's session records. No row is held under a
-caller's opaque scope, and no table stands beside the brains' own.
+caller's opaque scope, and no table stands beside the brains' own: a brain's count of its searches and the
+misses it keeps (「What the brain counts」) are its own, let go with it.
 
 ## The screen
 

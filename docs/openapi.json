@@ -391,6 +391,14 @@
             "$ref": "#/components/schemas/Rules",
             "description": "The numbers the brain reads by."
           },
+          "searches": {
+            "default": [],
+            "description": "Each asked brain's count of its asks by words and of its misses.",
+            "items": {
+              "$ref": "#/components/schemas/SearchCount"
+            },
+            "type": "array"
+          },
           "version": {
             "type": "string"
           }
@@ -399,7 +407,8 @@
           "ready",
           "reason",
           "version",
-          "rules"
+          "rules",
+          "searches"
         ],
         "type": "object"
       },
@@ -1621,6 +1630,12 @@
             "format": "int64",
             "type": "integer"
           },
+          "misses_kept": {
+            "default": 5000,
+            "description": "The most misses of its searches by words a brain keeps, the newest.",
+            "format": "int64",
+            "type": "integer"
+          },
           "mmr_lambda": {
             "default": 0.7,
             "description": "The weight `λ` recall's selection gives a row's relevance against its overlap with the rows already in.",
@@ -1661,10 +1676,95 @@
           "core_fact_cap",
           "hit_times_kept",
           "same_session_ms",
+          "misses_kept",
           "previous_value_days",
           "condition_share",
           "tag_importance",
           "consolidation_threshold"
+        ],
+        "type": "object"
+      },
+      "SearchCount": {
+        "description": "A brain's count of its asks by words and of those that found nothing.",
+        "properties": {
+          "asks": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "brainId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "misses": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "brainId",
+          "asks",
+          "misses"
+        ],
+        "type": "object"
+      },
+      "SearchMiss": {
+        "description": "An ask by words that answered no row.",
+        "properties": {
+          "at": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "brainId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "route": {
+            "description": "Which ask it was: `similar` or `memories`.",
+            "type": "string"
+          },
+          "stems": {
+            "description": "The stems the words became.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "words": {
+            "description": "The words as asked.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "brainId",
+          "at",
+          "route",
+          "words",
+          "stems"
+        ],
+        "type": "object"
+      },
+      "SearchMissPage": {
+        "description": "One page of a list, oldest first.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SearchMiss"
+            },
+            "type": "array"
+          },
+          "more": {
+            "description": "Whether anything stands past the last item.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "items",
+          "more"
         ],
         "type": "object"
       },
@@ -3911,6 +4011,83 @@
           "forbidden",
           "not-found",
           "conflict"
+        ],
+        "x-console": "closed"
+      }
+    },
+    "/brains/{brainId}/misses": {
+      "get": {
+        "operationId": "listMisses",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "brainId",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "The last id seen; the page continues past it, older.",
+            "in": "query",
+            "name": "after",
+            "required": false,
+            "schema": {
+              "description": "The last id seen; the page continues past it, older.",
+              "format": "int64",
+              "type": [
+                "integer",
+                "null"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int64",
+              "type": [
+                "integer",
+                "null"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchMissPage"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "summary": "The brain's kept misses of its asks by words, newest first.",
+        "tags": [
+          "writing"
+        ],
+        "x-codes": [
+          "bad-request",
+          "unauthorized",
+          "forbidden",
+          "not-found"
         ],
         "x-console": "closed"
       }

@@ -11,6 +11,7 @@ use sqlx::types::Json;
 use sqlx::{FromRow, PgConnection, Postgres, QueryBuilder};
 
 use super::brains::{brain_of, event_scope, given, layer_of, subject_found_or_made, subjects_of};
+use super::misses::Asked;
 use super::sheets::{SHEET, written_type};
 use super::{Fault, Held, Store, TEXT_MOST, holding, limit, listed, now, page, publish, text};
 
@@ -231,6 +232,14 @@ impl Store {
       }
     }
     let members = self.members(&mut conn, rows).await?;
+    // A first page by words that records uses is an ask by words: counted, and kept as a miss where it found
+    // nothing.
+    if let Some(words) = &query.q
+      && query.after.is_none()
+      && query.record.unwrap_or(true)
+    {
+      self.count_ask(&mut conn, brain_id, Asked::Memories, words, !members.is_empty()).await?;
+    }
     self.commit(conn).await?;
     Ok(page(members, limit))
   }

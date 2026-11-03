@@ -7,6 +7,7 @@ pub mod consolidation;
 pub mod events;
 pub mod files;
 pub mod learning;
+pub mod misses;
 pub mod recall;
 pub mod rules;
 pub mod sheets;

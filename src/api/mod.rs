@@ -230,11 +230,13 @@ async fn no_route() -> ApiError {
 
 async fn health(State(brain): State<Brain>) -> Json<Health> {
   let reason = brain.store.unready().await;
+  let searches = if reason.is_none() { brain.store.search_counts().await } else { Vec::new() };
   Json(Health {
     ready: reason.is_none(),
     reason,
     version: env!("CARGO_PKG_VERSION").to_owned(),
     rules: brain.store.rules.clone(),
+    searches,
   })
 }
 

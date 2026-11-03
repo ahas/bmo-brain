@@ -9,6 +9,7 @@ mod events;
 mod history;
 mod learning;
 mod mcp;
+mod misses;
 mod openapi;
 mod recall;
 mod repository;

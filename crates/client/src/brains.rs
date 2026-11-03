@@ -737,6 +737,8 @@ pub struct Rules {
   pub hit_times_kept: i64,
   /// The span of one session, in milliseconds: the window around a tag in the consolidation order.
   pub same_session_ms: i64,
+  /// The most misses of its searches by words a brain keeps, the newest.
+  pub misses_kept: i64,
   /// For how long after a version was superseded a reading says what the previous value was.
   pub previous_value_days: i64,
   /// The share of a condition's words the turn must hold for the condition to match it.
@@ -758,6 +760,7 @@ impl Default for Rules {
       core_fact_cap: 8,
       hit_times_kept: 64,
       same_session_ms: 60 * 60 * 1_000,
+      misses_kept: 5_000,
       previous_value_days: 30,
       condition_share: 0.5,
       tag_importance: 8,
@@ -880,6 +883,41 @@ pub struct UnconsolidatedEpisode {
   pub need: f64,
   /// The tag it is read out after, or null where it stands at its own place.
   pub tagged_by: Option<i64>,
+}
+
+/// An ask by words that answered no row.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchMiss {
+  pub id: i64,
+  pub brain_id: i64,
+  pub at: i64,
+  /// Which ask it was: `similar` or `memories`.
+  pub route: String,
+  /// The words as asked.
+  pub words: String,
+  /// The stems the words became.
+  pub stems: Vec<String>,
+}
+
+/// Which of a brain's misses to read.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct MissesQuery {
+  /// The last id seen; the page continues past it, older.
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub after: Option<i64>,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub limit: Option<i64>,
+}
+
+/// A brain's count of its asks by words and of those that found nothing.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchCount {
+  pub brain_id: i64,
+  pub asks: i64,
+  pub misses: i64,
 }
 
 /// Whether a consolidation is due, as a recall says it, read alone.

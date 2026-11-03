@@ -10,9 +10,9 @@ use axum::routing::{get, post};
 use bmo_brain_client::{
   Brain as BrainMember, BrainsQuery, Confirmations, Consolidated, ConsolidationState, ExportQuery, Fold,
   Folded, Hits, Injected, Layer, LayerChange, LayersQuery, Learned, Learning, MemoriesQuery, Memory,
-  MemoryMerge, MemoryMove, MemoryVersion, NewBrain, NewLayer, NewMemory, NewSubject, Page, PersonaQuery,
-  Recall, RecallAsk, Recorded, Restoration, SheetQuery, SimilarAsk, Subject, SubjectChange, SubjectsQuery,
-  TalliesQuery, Tally, TypeCount, UnconsolidatedEpisode, UnconsolidatedQuery,
+  MemoryMerge, MemoryMove, MemoryVersion, MissesQuery, NewBrain, NewLayer, NewMemory, NewSubject, Page,
+  PersonaQuery, Recall, RecallAsk, Recorded, Restoration, SearchMiss, SheetQuery, SimilarAsk, Subject,
+  SubjectChange, SubjectsQuery, TalliesQuery, Tally, TypeCount, UnconsolidatedEpisode, UnconsolidatedQuery,
 };
 
 use super::{Answer, Body, Brain, Key, Query};
@@ -237,6 +237,14 @@ async fn consolidation(State(brain): State<Brain>, Key(id): Key<i64>) -> Answer<
   Ok(Json(brain.store.consolidation(id).await?))
 }
 
+async fn misses(
+  State(brain): State<Brain>,
+  Key(id): Key<i64>,
+  Query(query): Query<MissesQuery>,
+) -> Answer<Json<Page<SearchMiss>>> {
+  Ok(Json(brain.store.misses(id, &query).await?))
+}
+
 async fn consolidated(
   State(brain): State<Brain>,
   Key(id): Key<i64>,
@@ -315,6 +323,7 @@ pub fn routes() -> Router<Brain> {
     .route("/brains/{brainId}/unconsolidated", get(unconsolidated))
     .route("/brains/{brainId}/consolidation", get(consolidation))
     .route("/brains/{brainId}/consolidated", post(consolidated))
+    .route("/brains/{brainId}/misses", get(misses))
     .route("/brains/{brainId}/persona", get(persona))
     .route("/brains/{brainId}/export", get(export))
     .route("/brains/{brainId}/injections", post(inject))

@@ -8,7 +8,7 @@ use bmo_brain::openapi::{openapi, openapi_json};
 const ROOT: &str = env!("CARGO_MANIFEST_DIR");
 
 /// The routes docs/boundary-api.md states, by method and path.
-const ROUTES: [&str; 41] = [
+const ROUTES: [&str; 42] = [
   "get /health",
   "get /events",
   "get /discipline",
@@ -44,6 +44,7 @@ const ROUTES: [&str; 41] = [
   "get /brains/{brainId}/unconsolidated",
   "get /brains/{brainId}/consolidation",
   "post /brains/{brainId}/consolidated",
+  "get /brains/{brainId}/misses",
   "get /brains/{brainId}/persona",
   "get /brains/{brainId}/export",
   "post /brains/{brainId}/injections",
