@@ -357,6 +357,17 @@ host's call protocol states.
   (`PATCH …/memories/{memoryId}`), `brain_list` (`GET …/memories`), `brain_unconsolidated`
   (`GET …/unconsolidated`), `brain_consolidated` (`POST …/consolidated`) and `brain_fold`
   (`POST …/folds`, the session key the record's `BMO_RUN_NAME`). It writes as `agent-session`.
+- **Its fold is keyed by the turn's run, not the session.** `brain_fold` reports under the record's
+  `BMO_RUN_NAME`, the run's name, which the agency gives every turn of a chat session afresh
+  (`chat:<room>:<moment>`), while the marks a recall keeps are cleared by the key the receiver reports a fold
+  under, the agency's id of the session (the receiver's `docs/boundary-api.md`, 「The brain」). No part of the
+  record carries that id: its variables are the data root, the turn's (`BMO_TURN_AGENT`, `BMO_TURN_BEGAN`,
+  `BMO_TURN_CHAT`, `BMO_TURN_VIA`, `BMO_TURN_PRIVILEGED`, `BMO_TURN_MESSAGES`), the run's (`BMO_RUN_NAME`,
+  `BMO_TASK_LOCKED`, `BMO_WORK_ORDER_STEP`) and the line's, and its labels name the line, the checkout, the
+  archive, the agent's place, the role and the supervisor a double stands for, the place outliving every fold.
+  A fold keyed by the session needs the agency to hand that id in a variable of the record, `BMO_SESSION_ID`,
+  the agency's id of the session the turn runs in; the tool's fold clears only the marks kept under its own
+  turn's run name, and no other call of the tool sends a session key.
 - **A call waits for the brain's answer** however long it takes: each entry is unbounded to the tool host, so
   no timeout ends it, only the brain's answer, a refused or broken connection, or its caller going away.
 - **A deployment places it** in `tools/brain/.placed/` inside the release: the executable, the manifest and
