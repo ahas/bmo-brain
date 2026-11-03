@@ -248,13 +248,11 @@ pub struct Memory {
   pub release_condition: Option<String>,
   /// The writer's weight at the time of writing, 1 to 10.
   pub importance: i64,
-  pub hits: i64,
-  pub last_hit_at: Option<i64>,
+  /// How often it was used: handed out, reported used, confirmed or read explicitly.
+  pub use_count: i64,
+  /// Its latest use; null where it was never used.
+  pub last_used_at: Option<i64>,
   pub last_confirmed_at: Option<i64>,
-  /// The storage strength, raised by spaced confirmations alone.
-  pub strength: f64,
-  /// The retrieval strength, computed from the hits as the reading answers.
-  pub retrieval_strength: f64,
   pub consolidated_at: Option<i64>,
   /// Who wrote this version.
   pub actor_name: String,
@@ -448,7 +446,11 @@ pub struct MemoriesQuery {
   /// Words the recall condition holds, in any case: the rows a situation calls for.
   #[serde(skip_serializing_if = "Option::is_none")]
   pub situation: Option<String>,
-  /// The field the list is ordered by: `id`, `position`, `validFrom`, `importance` or `hits`, descending
+  /// Whether a read by key, subject, type or words records a use of each live row it answers; true where none
+  /// is given.
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub record: Option<bool>,
+  /// The field the list is ordered by: `id`, `position`, `validFrom`, `importance` or `useCount`, descending
   /// with a leading `-`; `id` where none is given.
   #[serde(skip_serializing_if = "Option::is_none")]
   pub order: Option<String>,
@@ -520,10 +522,10 @@ pub struct Tally {
   pub count: i64,
   /// The group's mean importance.
   pub importance: f64,
-  /// The group's mean storage strength.
-  pub strength: f64,
-  /// The group's mean retrieval strength, as of the reading.
-  pub retrieval_strength: f64,
+  /// The group's mean use count.
+  pub use_count: f64,
+  /// The latest use among the group's rows; null where none was used.
+  pub last_used_at: Option<i64>,
   /// The latest `validFrom` among the group's rows.
   pub latest_valid_from: i64,
 }
@@ -591,7 +593,7 @@ pub struct RecallAsk {
   /// The brain's own budget where none is given.
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub budget_tokens: Option<i64>,
-  /// Whether the hand-out is recorded as hits and marks; true where none is given.
+  /// Whether the hand-out is recorded as uses and marks; true where none is given.
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub record: Option<bool>,
 }
@@ -702,8 +704,6 @@ pub struct Rules {
   pub weight_relevance: f64,
   /// The weight of a memory's importance in the recall score.
   pub weight_importance: f64,
-  /// The weight of a memory's retrieval strength in the recall score.
-  pub weight_recency: f64,
   /// What a memory of a subject the turn names adds to its relevance.
   pub subject_bonus: f64,
   /// The most rows one subject fills in the searched part of a block.
@@ -711,14 +711,10 @@ pub struct Rules {
   /// The most facts of one speaker's sheet the core of a block carries; the rest reach a turn only through
   /// the searched part.
   pub core_fact_cap: i64,
-  /// The exponent the time since each hit is raised to, negated, in the retrieval strength.
-  pub decay: f64,
-  /// How many hits a row keeps for its retrieval strength.
+  /// How many moments of use a row keeps, its newest.
   pub hit_times_kept: i64,
-  /// Confirmations closer than this to the last add nothing to the storage strength.
+  /// The span of one session, in milliseconds; read by no rule.
   pub same_session_ms: i64,
-  /// What a spaced confirmation adds to the storage strength, per logarithm of the gap in days.
-  pub strength_gain: f64,
   /// For how long after a version was superseded a reading says what the previous value was.
   pub previous_value_days: i64,
   /// The share of a condition's words the turn must hold for the condition to match it.
@@ -733,14 +729,11 @@ impl Default for Rules {
       budget_tokens: 1_800,
       weight_relevance: 1.0,
       weight_importance: 1.0,
-      weight_recency: 1.0,
       subject_bonus: 0.5,
       subject_cap: 4,
       core_fact_cap: 8,
-      decay: 0.5,
       hit_times_kept: 64,
       same_session_ms: 60 * 60 * 1_000,
-      strength_gain: 1.0,
       previous_value_days: 30,
       condition_share: 0.5,
       consolidation_threshold: 150,

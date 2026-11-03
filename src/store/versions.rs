@@ -1,5 +1,5 @@
 //! A brain's memories, each row one version (docs/design.md, 「Memories」, 「Versions」, 「Writing」 and
-//! 「Strength and decay」): listed, written, superseded, moved, hit and confirmed.
+//! 「Use」): listed, written, superseded, moved, used and confirmed.
 
 use std::collections::BTreeMap;
 
@@ -11,7 +11,6 @@ use sqlx::types::Json;
 use sqlx::{FromRow, PgConnection, Postgres, QueryBuilder};
 
 use super::brains::{brain_of, event_scope, given, layer_of, subject_found_or_made, subjects_of};
-use super::rules::Reckoning as _;
 use super::sheets::{SHEET, written_type};
 use super::{Fault, Held, Store, TEXT_MOST, holding, limit, listed, now, page, publish, text};
 
@@ -21,7 +20,7 @@ pub const RESERVED_TYPES: [&str; 9] =
 
 pub(crate) const MEMORY_COLUMNS: &str = "id, brain_id, key, type, text, layer_id, position, status, lineage_id, \
   superseded_by, valid_from, valid_to, recall_condition, release_condition, importance, hits, hit_times, \
-  last_hit_at, last_confirmed_at, strength, consolidated_at, actor_name, reason, labels, created_at";
+  last_hit_at, last_confirmed_at, consolidated_at, actor_name, reason, labels, created_at";
 
 #[derive(FromRow)]
 pub(crate) struct MemoryRow {
@@ -45,7 +44,6 @@ pub(crate) struct MemoryRow {
   pub hit_times: Vec<i64>,
   pub last_hit_at: Option<i64>,
   pub last_confirmed_at: Option<i64>,
-  pub strength: f64,
   pub consolidated_at: Option<i64>,
   pub actor_name: String,
   pub reason: Option<String>,
@@ -59,7 +57,7 @@ impl MemoryRow {
       .ok_or_else(|| Fault::Failed(format!("Row {} holds no known status: {}.", self.id, self.status)))
   }
 
-  pub(crate) fn member(self, subjects: Vec<SubjectRef>, retrieval_strength: f64) -> Held<Memory> {
+  pub(crate) fn member(self, subjects: Vec<SubjectRef>) -> Held<Memory> {
     let status = self.status()?;
     Ok(Memory {
       id: self.id,
@@ -78,11 +76,9 @@ impl MemoryRow {
       recall_condition: self.recall_condition,
       release_condition: self.release_condition,
       importance: i64::from(self.importance),
-      hits: self.hits,
-      last_hit_at: self.last_hit_at,
+      use_count: self.hits,
+      last_used_at: self.last_hit_at,
       last_confirmed_at: self.last_confirmed_at,
-      strength: self.strength,
-      retrieval_strength,
       consolidated_at: self.consolidated_at,
       actor_name: self.actor_name,
       reason: self.reason,
@@ -125,17 +121,15 @@ pub(crate) async fn subjects_by_row(
 }
 
 impl Store {
-  /// Rows as members, each with its subjects and its retrieval strength as of now.
+  /// Rows as members, each with its subjects.
   pub(crate) async fn members(&self, conn: &mut PgConnection, rows: Vec<MemoryRow>) -> Held<Vec<Memory>> {
     let ids: Vec<i64> = rows.iter().map(|row| row.id).collect();
     let mut subjects = subjects_by_row(conn, &ids).await?;
-    let at = now();
     rows
       .into_iter()
       .map(|row| {
-        let strength = self.rules.retrieval_strength(&row.hit_times, at);
         let mine = subjects.remove(&row.id).unwrap_or_default();
-        row.member(mine, strength)
+        row.member(mine)
       })
       .collect()
   }
@@ -161,12 +155,13 @@ impl Store {
     Ok(self.members(conn, vec![row]).await?.remove(0))
   }
 
-  /// A page of a brain's memories, under the filters and in the order the query names.
+  /// A page of a brain's memories, under the filters and in the order the query names. A read by key,
+  /// subject, type or words records a use of each live row it answers, unless the query says not to.
   pub async fn memories(&self, brain_id: i64, query: &MemoriesQuery) -> Held<Page<Memory>> {
     let limit = limit(query.limit)?;
     let filter = Filter::of(query)?;
     let (field, descending) = order(query.order.as_deref())?;
-    let mut conn = self.connection().await?;
+    let mut conn = self.begin().await?;
     brain_of(&mut conn, brain_id).await?;
     let mut sql =
       QueryBuilder::<Postgres>::new(format!("SELECT {MEMORY_COLUMNS} FROM memories WHERE brain_id = "));
@@ -194,8 +189,36 @@ impl Store {
       sql.push(format!(" ORDER BY {field} {direction}, id {direction}"));
     }
     sql.push(" LIMIT ").push_bind(limit + 1);
-    let rows: Vec<MemoryRow> = sql.build_query_as().fetch_all(&mut *conn).await?;
-    Ok(page(self.members(&mut conn, rows).await?, limit))
+    let mut rows: Vec<MemoryRow> = sql.build_query_as().fetch_all(&mut *conn).await?;
+    if query.record.unwrap_or(true) && filter.is_explicit() {
+      let live: Vec<i64> = rows
+        .iter()
+        .take(usize::try_from(limit).unwrap_or(usize::MAX))
+        .filter(|row| row.status().is_ok_and(MemoryStatus::is_live))
+        .map(|row| row.id)
+        .collect();
+      if !live.is_empty() {
+        let at = now();
+        self.hit(&mut conn, brain_id, &live, None, at).await?;
+        // The page answers the rows as the read left them, in the order it read them.
+        let used: Vec<MemoryRow> = sqlx::query_as(&format!(
+          "SELECT {MEMORY_COLUMNS} FROM memories WHERE brain_id = $1 AND id = ANY($2)"
+        ))
+        .bind(brain_id)
+        .bind(&live)
+        .fetch_all(&mut *conn)
+        .await?;
+        let mut by_id: BTreeMap<i64, MemoryRow> = used.into_iter().map(|row| (row.id, row)).collect();
+        for row in rows.iter_mut() {
+          if let Some(used) = by_id.remove(&row.id) {
+            *row = used;
+          }
+        }
+      }
+    }
+    let members = self.members(&mut conn, rows).await?;
+    self.commit(conn).await?;
+    Ok(page(members, limit))
   }
 
   /// One memory.
@@ -384,9 +407,8 @@ impl Store {
     let new_id: i64 = sqlx::query_scalar(
       "INSERT INTO memories (brain_id, key, type, text, layer_id, position, status, lineage_id, valid_from, \
        recall_condition, release_condition, importance, hits, hit_times, last_hit_at, last_confirmed_at, \
-       strength, actor_name, labels, created_at) \
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20) \
-       RETURNING id",
+       actor_name, labels, created_at) \
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19) RETURNING id",
     )
     .bind(brain_id)
     .bind(&old.key)
@@ -404,7 +426,6 @@ impl Store {
     .bind(&old.hit_times)
     .bind(old.last_hit_at)
     .bind(old.last_confirmed_at)
-    .bind(old.strength)
     .bind(&body.actor_name)
     .bind(Json(body.labels.as_ref().unwrap_or(&old.labels.0)))
     .bind(at)
@@ -515,7 +536,6 @@ impl Store {
     let hit_times = most_hit.map(|row| row.hit_times.clone()).unwrap_or_default();
     let last_hit_at = merged.iter().filter_map(|row| row.last_hit_at).max();
     let last_confirmed_at = merged.iter().filter_map(|row| row.last_confirmed_at).min();
-    let strength = merged.iter().map(|row| row.strength).fold(1.0_f64, f64::max);
     let labels = body.labels.clone().unwrap_or_default();
     let recall_condition = match &body.recall_condition {
       Some(words) => {
@@ -540,8 +560,8 @@ impl Store {
     let new_id: i64 = sqlx::query_scalar(
       "INSERT INTO memories (brain_id, key, type, text, layer_id, position, status, lineage_id, valid_from, \
        recall_condition, release_condition, importance, hits, hit_times, last_hit_at, last_confirmed_at, \
-       strength, actor_name, labels, created_at) \
-       VALUES ($1, $2, $3, $4, $5, $6, 'active', 0, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18) \
+       actor_name, labels, created_at) \
+       VALUES ($1, $2, $3, $4, $5, $6, 'active', 0, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17) \
        RETURNING id",
     )
     .bind(brain_id)
@@ -558,7 +578,6 @@ impl Store {
     .bind(&hit_times)
     .bind(last_hit_at)
     .bind(last_confirmed_at)
-    .bind(strength)
     .bind(&body.actor_name)
     .bind(Json(&labels))
     .bind(at)
@@ -678,9 +697,9 @@ impl Store {
     let new_id: i64 = sqlx::query_scalar(
       "INSERT INTO memories (brain_id, key, type, text, layer_id, position, status, lineage_id, valid_from, \
        recall_condition, release_condition, importance, hits, hit_times, last_hit_at, last_confirmed_at, \
-       strength, consolidated_at, actor_name, labels, created_at) \
-       VALUES ($1, $2, $3, $4, $5, $6, 'active', $7, $8, $10, $11, $9, $12, $13, $14, $15, $16, $17, $18, $19, \
-       $8) RETURNING id",
+       consolidated_at, actor_name, labels, created_at) \
+       VALUES ($1, $2, $3, $4, $5, $6, 'active', $7, $8, $10, $11, $9, $12, $13, $14, $15, $16, $17, $18, $8) \
+       RETURNING id",
     )
     .bind(brain_id)
     .bind(&closed.key)
@@ -697,7 +716,6 @@ impl Store {
     .bind(&closed.hit_times)
     .bind(closed.last_hit_at)
     .bind(closed.last_confirmed_at)
-    .bind(closed.strength)
     .bind(closed.consolidated_at)
     .bind(&body.actor_name)
     .bind(&closed.labels)
@@ -752,7 +770,8 @@ impl Store {
     Ok(memory)
   }
 
-  /// A reading's hand-out recorded: each row hit, and marked for the session where one is named.
+  /// A hand-out, or the rows the agent used, recorded: a use of each row, and each marked for the session where
+  /// one is named.
   pub async fn hits_record(&self, brain_id: i64, body: &Hits) -> Held<i64> {
     given("actorName", &body.actor_name)?;
     if body.memory_ids.is_empty() {
@@ -766,7 +785,8 @@ impl Store {
     Ok(count)
   }
 
-  /// The rows hit at `at`, marked for `session` where one is named; how many rows the ids reached.
+  /// A use of each row recorded at `at`, its moment kept among its newest, and each marked for `session` where
+  /// one is named; how many rows the ids reached.
   pub(crate) async fn hit(
     &self,
     conn: &mut PgConnection,
@@ -806,7 +826,7 @@ impl Store {
     Ok(hit.len() as i64)
   }
 
-  /// Confirmations recorded: each row's storage strength raised by the gap since its last, and its moment set.
+  /// Confirmations recorded: a use of each row, and its moment of confirmation set.
   pub async fn confirmations_record(&self, brain_id: i64, body: &Confirmations) -> Held<i64> {
     given("actorName", &body.actor_name)?;
     if body.memory_ids.is_empty() {
@@ -820,8 +840,8 @@ impl Store {
     Ok(count)
   }
 
-  /// Confirmations recorded, within a transaction: each row's storage strength raised by the gap since its
-  /// last, and its moment set; how many rows the ids reached.
+  /// Confirmations recorded, within a transaction: a use of each row, and its moment of confirmation set; how
+  /// many rows the ids reached.
   pub(crate) async fn confirm_in(
     &self,
     tx: &mut PgConnection,
@@ -830,26 +850,14 @@ impl Store {
     at: i64,
   ) -> Held<i64> {
     brain_of(&mut *tx, brain_id).await?;
-    let mut ids = memory_ids.to_vec();
-    ids.sort_unstable();
-    ids.dedup();
-    let rows: Vec<(i64, i64, Option<i64>)> = sqlx::query_as(
-      "SELECT id, created_at, last_confirmed_at FROM memories WHERE brain_id = $1 AND id = ANY($2) FOR UPDATE",
-    )
-    .bind(brain_id)
-    .bind(&ids)
-    .fetch_all(&mut *tx)
-    .await?;
-    for (id, created_at, last) in &rows {
-      let gained = self.rules.strength_gained(last.unwrap_or(*created_at), at);
-      sqlx::query("UPDATE memories SET strength = strength + $2, last_confirmed_at = $3 WHERE id = $1")
-        .bind(id)
-        .bind(gained)
-        .bind(at)
-        .execute(&mut *tx)
-        .await?;
-    }
-    Ok(rows.len() as i64)
+    let confirmed = self.hit(&mut *tx, brain_id, memory_ids, None, at).await?;
+    sqlx::query("UPDATE memories SET last_confirmed_at = $3 WHERE brain_id = $1 AND id = ANY($2)")
+      .bind(brain_id)
+      .bind(memory_ids)
+      .bind(at)
+      .execute(&mut *tx)
+      .await?;
+    Ok(confirmed)
   }
 
   /// The types in use in a brain, with the count of live memories each, the reserved ones first: a type whose
@@ -978,6 +986,15 @@ fn ids_listed(field: &str, value: Option<&str>) -> Held<Option<Vec<i64>>> {
 }
 
 impl Filter {
+  /// Whether the list is an explicit read: by key, subject, type or words.
+  pub(crate) fn is_explicit(&self) -> bool {
+    self.key.is_some()
+      || self.subject_id.is_some()
+      || !self.kinds.is_empty()
+      || self.words.is_some()
+      || self.situation.is_some()
+  }
+
   /// The filters a memory list's query names.
   pub(crate) fn of(query: &MemoriesQuery) -> Held<Self> {
     let statuses = listed(query.status.as_deref())
@@ -1090,10 +1107,10 @@ fn order(asked: Option<&str>) -> Held<(&'static str, bool)> {
     "position" => "position",
     "validFrom" => "valid_from",
     "importance" => "importance",
-    "hits" => "hits",
+    "useCount" => "hits",
     _ => {
       return Err(Fault::BadRequest(format!(
-        "order is {asked:?}; it is id, position, validFrom, importance or hits, descending with a leading -."
+        "order is {asked:?}; it is id, position, validFrom, importance or useCount, descending with a leading -."
       )));
     }
   };

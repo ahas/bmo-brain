@@ -374,7 +374,7 @@ async fn a_tally_counts_the_rows_of_each_group_under_the_lists_filters() {
   assert_eq!(by_subject[0].count, 2);
   assert!(by_subject[0].group.is_some());
   assert_eq!((by_subject[1].group.clone(), by_subject[1].count), (None, 1));
-  assert!(by_subject.iter().all(|tally| tally.strength == 1.0 && tally.retrieval_strength == 0.0));
+  assert!(by_subject.iter().all(|tally| tally.use_count == 0.0 && tally.last_used_at.is_none()));
 }
 
 #[tokio::test]

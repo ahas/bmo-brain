@@ -164,21 +164,21 @@ impl Store {
       .collect();
     let (rel_lo, rel_hi) = span(scored.iter().map(|c| c.relevance));
     let (imp_lo, imp_hi) = span(scored.iter().map(|c| c.memory.importance as f64));
-    let (rec_lo, rec_hi) = span(scored.iter().map(|c| c.memory.retrieval_strength));
     let rules = &self.rules;
     let mut ranked: Vec<(f64, Candidate)> = scored
       .drain(..)
       .map(|c| {
         let score = rules.weight_relevance * norm(c.relevance, rel_lo, rel_hi)
-          + rules.weight_importance * norm(c.memory.importance as f64, imp_lo, imp_hi)
-          + rules.weight_recency * norm(c.memory.retrieval_strength, rec_lo, rec_hi);
+          + rules.weight_importance * norm(c.memory.importance as f64, imp_lo, imp_hi);
         (score, c)
       })
       .collect();
+    // Of rows that score the same, the one used last goes first, a row never used after the used ones.
     ranked.sort_by(|a, b| {
       b.0
         .partial_cmp(&a.0)
         .unwrap_or(std::cmp::Ordering::Equal)
+        .then(b.1.memory.last_used_at.cmp(&a.1.memory.last_used_at))
         .then(a.1.memory.id.cmp(&b.1.memory.id))
     });
 

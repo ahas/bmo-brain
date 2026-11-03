@@ -446,8 +446,8 @@ fn row(id: i64, lineage: i64, kind: &str, text: &str, status: &str, brain: i64) 
     "status": status, "lineageId": lineage, "supersededBy": null,
     "validFrom": 0, "validTo": null,
     "recallCondition": null, "releaseCondition": null,
-    "importance": 5, "hits": 0, "lastHitAt": null, "lastConfirmedAt": null,
-    "strength": 1.0, "retrievalStrength": 0.0, "consolidatedAt": null,
+    "importance": 5, "useCount": 0, "lastUsedAt": null, "lastConfirmedAt": null,
+    "consolidatedAt": null,
     "actorName": "agent-session", "reason": null, "labels": {}, "createdAt": 0
   })
 }

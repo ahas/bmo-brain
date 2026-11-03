@@ -49,7 +49,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Record confirmations: each row's storage strength raised by the gap since its last. */
+        /** Record confirmations: a use of each row, and its moment of confirmation set. */
         post: operations["recordConfirmations"];
         delete?: never;
         options?: never;
@@ -117,7 +117,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Record a hand-out: each row hit, and marked for the session named. */
+        /** Record a hand-out or the rows used: a use of each, marked for the session named. */
         post: operations["recordHits"];
         delete?: never;
         options?: never;
@@ -237,7 +237,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** One memory in one version, with its subjects and strengths. */
+        /** One memory in one version, with its subjects and its use. */
         get: operations["readBrainMemory"];
         put?: never;
         post?: never;
@@ -779,8 +779,6 @@ export interface components {
             /** Format: int64 */
             createdAt: number;
             /** Format: int64 */
-            hits: number;
-            /** Format: int64 */
             id: number;
             /**
              * Format: int64
@@ -794,8 +792,11 @@ export interface components {
             };
             /** Format: int64 */
             lastConfirmedAt: number | null;
-            /** Format: int64 */
-            lastHitAt: number | null;
+            /**
+             * Format: int64
+             * @description Its latest use; null where it was never used.
+             */
+            lastUsedAt: number | null;
             /** Format: int64 */
             layerId: number | null;
             /**
@@ -823,23 +824,18 @@ export interface components {
              * @default null
              */
             releaseCondition: string | null;
-            /**
-             * Format: double
-             * @description The retrieval strength, computed from the hits as the reading answers.
-             */
-            retrievalStrength: number;
             status: components["schemas"]["MemoryStatus"];
-            /**
-             * Format: double
-             * @description The storage strength, raised by spaced confirmations alone.
-             */
-            strength: number;
             subjects: components["schemas"]["SubjectRef"][];
             /** Format: int64 */
             supersededBy: number | null;
             text: string;
             /** @description What the row is; the reserved types are stated in the design. */
             type: string;
+            /**
+             * Format: int64
+             * @description How often it was used: handed out, reported used, confirmed or read explicitly.
+             */
+            useCount: number;
             /** Format: int64 */
             validFrom: number;
             /** Format: int64 */
@@ -1021,7 +1017,7 @@ export interface components {
              * @description The brain's own budget where none is given.
              */
             budgetTokens?: number | null;
-            /** @description Whether the hand-out is recorded as hits and marks; true where none is given. */
+            /** @description Whether the hand-out is recorded as uses and marks; true where none is given. */
             record?: boolean | null;
             /** @description The room the turn is in. */
             room?: components["schemas"]["SubjectKey"] | null;
@@ -1104,14 +1100,8 @@ export interface components {
              */
             core_fact_cap: number;
             /**
-             * Format: double
-             * @description The exponent the time since each hit is raised to, negated, in the retrieval strength.
-             * @default 0.5
-             */
-            decay: number;
-            /**
              * Format: int64
-             * @description How many hits a row keeps for its retrieval strength.
+             * @description How many moments of use a row keeps, its newest.
              * @default 64
              */
             hit_times_kept: number;
@@ -1123,16 +1113,10 @@ export interface components {
             previous_value_days: number;
             /**
              * Format: int64
-             * @description Confirmations closer than this to the last add nothing to the storage strength.
+             * @description The span of one session, in milliseconds; read by no rule.
              * @default 3600000
              */
             same_session_ms: number;
-            /**
-             * Format: double
-             * @description What a spaced confirmation adds to the storage strength, per logarithm of the gap in days.
-             * @default 1
-             */
-            strength_gain: number;
             /**
              * Format: double
              * @description What a memory of a subject the turn names adds to its relevance.
@@ -1151,12 +1135,6 @@ export interface components {
              * @default 1
              */
             weight_importance: number;
-            /**
-             * Format: double
-             * @description The weight of a memory's retrieval strength in the recall score.
-             * @default 1
-             */
-            weight_recency: number;
             /**
              * Format: double
              * @description The weight of a memory's relevance to the turn's words in the recall score.
@@ -1234,19 +1212,19 @@ export interface components {
             importance: number;
             /**
              * Format: int64
+             * @description The latest use among the group's rows; null where none was used.
+             */
+            lastUsedAt: number | null;
+            /**
+             * Format: int64
              * @description The latest `validFrom` among the group's rows.
              */
             latestValidFrom: number;
             /**
              * Format: double
-             * @description The group's mean retrieval strength, as of the reading.
+             * @description The group's mean use count.
              */
-            retrievalStrength: number;
-            /**
-             * Format: double
-             * @description The group's mean storage strength.
-             */
-            strength: number;
+            useCount: number;
         };
         /**
          * @description What memories are grouped by in a tally.
@@ -1839,12 +1817,17 @@ export interface operations {
                 limit?: number | null;
                 lineageId?: number | null;
                 /**
-                 * @description The field the list is ordered by: `id`, `position`, `validFrom`, `importance` or `hits`, descending
+                 * @description The field the list is ordered by: `id`, `position`, `validFrom`, `importance` or `useCount`, descending
                  *     with a leading `-`; `id` where none is given.
                  */
                 order?: string | null;
                 /** @description Words the text holds, in any case. */
                 q?: string | null;
+                /**
+                 * @description Whether a read by key, subject, type or words records a use of each live row it answers; true where none
+                 *     is given.
+                 */
+                record?: boolean | null;
                 /** @description Words the recall condition holds, in any case: the rows a situation calls for. */
                 situation?: string | null;
                 /** @description One status, or several, comma-separated. */

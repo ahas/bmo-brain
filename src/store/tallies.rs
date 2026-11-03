@@ -1,6 +1,6 @@
 //! A brain's memories counted by group (docs/boundary-api.md, 「Memories」): how many stand in each status,
-//! type, layer or subject under the memory list's filters, and how important, how strong and how warm they
-//! are on average.
+//! type, layer or subject under the memory list's filters, how important and how used they are on average,
+//! and when one was used last.
 
 use std::collections::BTreeMap;
 
@@ -8,17 +8,16 @@ use bmo_brain_client::{MemoriesQuery, TalliesQuery, Tally, TallyBy};
 use sqlx::{FromRow, Postgres, QueryBuilder};
 
 use super::brains::brain_of;
-use super::rules::Reckoning as _;
 use super::versions::Filter;
-use super::{Held, Store, now};
+use super::{Held, Store};
 
 #[derive(FromRow)]
 struct Counted {
   grouped: Option<String>,
   importance: i16,
-  strength: f64,
+  hits: i64,
+  last_hit_at: Option<i64>,
   valid_from: i64,
-  hit_times: Vec<i64>,
 }
 
 /// What a group gathers as its rows are read.
@@ -26,8 +25,8 @@ struct Counted {
 struct Sums {
   count: i64,
   importance: f64,
-  strength: f64,
-  retrieval_strength: f64,
+  uses: f64,
+  last_used_at: Option<i64>,
   latest_valid_from: i64,
 }
 
@@ -58,21 +57,20 @@ impl Store {
       TallyBy::Subject => ("ms.subject_id::text", " LEFT JOIN memory_subjects ms ON ms.memory_id = m.id"),
     };
     let mut sql = QueryBuilder::<Postgres>::new(format!(
-      "SELECT {grouped} AS grouped, m.importance, m.strength, m.valid_from, m.hit_times \
+      "SELECT {grouped} AS grouped, m.importance, m.hits, m.last_hit_at, m.valid_from \
        FROM (SELECT * FROM memories WHERE brain_id = "
     ));
     sql.push_bind(brain_id);
     filter.push(&mut sql);
     sql.push(format!(") m{joined}"));
     let rows: Vec<Counted> = sql.build_query_as().fetch_all(&mut *conn).await?;
-    let at = now();
     let mut groups: BTreeMap<Option<String>, Sums> = BTreeMap::new();
     for row in rows {
       let sums = groups.entry(row.grouped).or_default();
       sums.count += 1;
       sums.importance += f64::from(row.importance);
-      sums.strength += row.strength;
-      sums.retrieval_strength += self.rules.retrieval_strength(&row.hit_times, at);
+      sums.uses += row.hits as f64;
+      sums.last_used_at = sums.last_used_at.max(row.last_hit_at);
       sums.latest_valid_from = sums.latest_valid_from.max(row.valid_from);
     }
     let mut tallies: Vec<Tally> = groups
@@ -83,8 +81,8 @@ impl Store {
           group,
           count: sums.count,
           importance: sums.importance / count,
-          strength: sums.strength / count,
-          retrieval_strength: sums.retrieval_strength / count,
+          use_count: sums.uses / count,
+          last_used_at: sums.last_used_at,
           latest_valid_from: sums.latest_valid_from,
         }
       })

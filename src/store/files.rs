@@ -12,8 +12,9 @@ use super::versions::{MEMORY_COLUMNS, MemoryRow, link_subjects};
 use super::{Fault, Held, Store, now, publish};
 
 /// The version of the file's shape, written in every file and checked on every read; a shape-1 file holds no
-/// memory condition, its rows carrying none.
-pub const SHAPE: i64 = 2;
+/// memory condition, its rows carrying none, and a file of shape 1 or 2 holds a storage strength, which is not
+/// read.
+pub const SHAPE: i64 = 3;
 
 /// The oldest shape this brain still reads.
 const OLDEST_SHAPE: i64 = 1;
@@ -25,7 +26,7 @@ CREATE TABLE layers (id INTEGER PRIMARY KEY, name TEXT NOT NULL, description TEX
 CREATE TABLE memories (id INTEGER PRIMARY KEY, key TEXT, type TEXT NOT NULL, text TEXT NOT NULL, layer_id INTEGER, \
   position INTEGER NOT NULL, status TEXT NOT NULL, lineage_id INTEGER NOT NULL, superseded_by INTEGER, \
   valid_from INTEGER NOT NULL, valid_to INTEGER, importance INTEGER NOT NULL, hits INTEGER NOT NULL, \
-  last_hit_at INTEGER, last_confirmed_at INTEGER, strength REAL NOT NULL, actor_name TEXT NOT NULL, \
+  last_hit_at INTEGER, last_confirmed_at INTEGER, actor_name TEXT NOT NULL, \
   labels TEXT NOT NULL, recall_condition TEXT, release_condition TEXT, created_at INTEGER NOT NULL);
 CREATE TABLE memory_subjects (memory_id INTEGER NOT NULL, subject_id INTEGER NOT NULL, PRIMARY KEY (memory_id, subject_id));
 ";
@@ -151,10 +152,9 @@ impl Store {
           file
             .execute(
               "INSERT INTO memories (id, key, type, text, layer_id, position, status, lineage_id, superseded_by, \
-               valid_from, valid_to, importance, hits, last_hit_at, last_confirmed_at, strength, actor_name, labels, \
+               valid_from, valid_to, importance, hits, last_hit_at, last_confirmed_at, actor_name, labels, \
                recall_condition, release_condition, created_at) \
-               VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, \
-               ?21)",
+               VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20)",
               params![
                 row.id,
                 row.key,
@@ -171,7 +171,6 @@ impl Store {
                 row.hits,
                 row.last_hit_at,
                 row.last_confirmed_at,
-                row.strength,
                 row.actor_name,
                 labels,
                 row.recall_condition,
@@ -383,9 +382,9 @@ impl Store {
           let new_id: i64 = sqlx::query_scalar(
             "INSERT INTO memories (brain_id, key, type, text, layer_id, position, status, lineage_id, valid_from, \
              recall_condition, release_condition, importance, hits, hit_times, last_hit_at, last_confirmed_at, \
-             strength, actor_name, labels, created_at) \
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, \
-             $20) RETURNING id",
+             actor_name, labels, created_at) \
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19) \
+             RETURNING id",
           )
           .bind(brain_id)
           .bind(&old.key)
@@ -403,7 +402,6 @@ impl Store {
           .bind(&old.hit_times)
           .bind(old.last_hit_at)
           .bind(old.last_confirmed_at)
-          .bind(old.strength)
           .bind(&memory.actor_name)
           .bind(labels)
           .bind(at)

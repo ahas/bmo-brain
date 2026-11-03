@@ -690,10 +690,6 @@
             "format": "int64",
             "type": "integer"
           },
-          "hits": {
-            "format": "int64",
-            "type": "integer"
-          },
           "id": {
             "format": "int64",
             "type": "integer"
@@ -723,7 +719,8 @@
               "null"
             ]
           },
-          "lastHitAt": {
+          "lastUsedAt": {
+            "description": "Its latest use; null where it was never used.",
             "format": "int64",
             "type": [
               "integer",
@@ -771,18 +768,8 @@
               "null"
             ]
           },
-          "retrievalStrength": {
-            "description": "The retrieval strength, computed from the hits as the reading answers.",
-            "format": "double",
-            "type": "number"
-          },
           "status": {
             "$ref": "#/components/schemas/MemoryStatus"
-          },
-          "strength": {
-            "description": "The storage strength, raised by spaced confirmations alone.",
-            "format": "double",
-            "type": "number"
           },
           "subjects": {
             "items": {
@@ -803,6 +790,11 @@
           "type": {
             "description": "What the row is; the reserved types are stated in the design.",
             "type": "string"
+          },
+          "useCount": {
+            "description": "How often it was used: handed out, reported used, confirmed or read explicitly.",
+            "format": "int64",
+            "type": "integer"
           },
           "validFrom": {
             "format": "int64",
@@ -833,11 +825,9 @@
           "recallCondition",
           "releaseCondition",
           "importance",
-          "hits",
-          "lastHitAt",
+          "useCount",
+          "lastUsedAt",
           "lastConfirmedAt",
-          "strength",
-          "retrievalStrength",
           "consolidatedAt",
           "actorName",
           "reason",
@@ -1375,7 +1365,7 @@
             ]
           },
           "record": {
-            "description": "Whether the hand-out is recorded as hits and marks; true where none is given.",
+            "description": "Whether the hand-out is recorded as uses and marks; true where none is given.",
             "type": [
               "boolean",
               "null"
@@ -1557,15 +1547,9 @@
             "format": "int64",
             "type": "integer"
           },
-          "decay": {
-            "default": 0.5,
-            "description": "The exponent the time since each hit is raised to, negated, in the retrieval strength.",
-            "format": "double",
-            "type": "number"
-          },
           "hit_times_kept": {
             "default": 64,
-            "description": "How many hits a row keeps for its retrieval strength.",
+            "description": "How many moments of use a row keeps, its newest.",
             "format": "int64",
             "type": "integer"
           },
@@ -1577,15 +1561,9 @@
           },
           "same_session_ms": {
             "default": 3600000,
-            "description": "Confirmations closer than this to the last add nothing to the storage strength.",
+            "description": "The span of one session, in milliseconds; read by no rule.",
             "format": "int64",
             "type": "integer"
-          },
-          "strength_gain": {
-            "default": 1.0,
-            "description": "What a spaced confirmation adds to the storage strength, per logarithm of the gap in days.",
-            "format": "double",
-            "type": "number"
           },
           "subject_bonus": {
             "default": 0.5,
@@ -1605,12 +1583,6 @@
             "format": "double",
             "type": "number"
           },
-          "weight_recency": {
-            "default": 1.0,
-            "description": "The weight of a memory's retrieval strength in the recall score.",
-            "format": "double",
-            "type": "number"
-          },
           "weight_relevance": {
             "default": 1.0,
             "description": "The weight of a memory's relevance to the turn's words in the recall score.",
@@ -1622,14 +1594,11 @@
           "budget_tokens",
           "weight_relevance",
           "weight_importance",
-          "weight_recency",
           "subject_bonus",
           "subject_cap",
           "core_fact_cap",
-          "decay",
           "hit_times_kept",
           "same_session_ms",
-          "strength_gain",
           "previous_value_days",
           "condition_share",
           "consolidation_threshold"
@@ -1823,18 +1792,21 @@
             "format": "double",
             "type": "number"
           },
+          "lastUsedAt": {
+            "description": "The latest use among the group's rows; null where none was used.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
           "latestValidFrom": {
             "description": "The latest `validFrom` among the group's rows.",
             "format": "int64",
             "type": "integer"
           },
-          "retrievalStrength": {
-            "description": "The group's mean retrieval strength, as of the reading.",
-            "format": "double",
-            "type": "number"
-          },
-          "strength": {
-            "description": "The group's mean storage strength.",
+          "useCount": {
+            "description": "The group's mean use count.",
             "format": "double",
             "type": "number"
           }
@@ -1843,8 +1815,8 @@
           "group",
           "count",
           "importance",
-          "strength",
-          "retrievalStrength",
+          "useCount",
+          "lastUsedAt",
           "latestValidFrom"
         ],
         "type": "object"
@@ -2196,7 +2168,7 @@
             "$ref": "#/components/responses/NotFound"
           }
         },
-        "summary": "Record confirmations: each row's storage strength raised by the gap since its last.",
+        "summary": "Record confirmations: a use of each row, and its moment of confirmation set.",
         "tags": [
           "brain-memories"
         ],
@@ -2444,7 +2416,7 @@
             "$ref": "#/components/responses/NotFound"
           }
         },
-        "summary": "Record a hand-out: each row hit, and marked for the session named.",
+        "summary": "Record a hand-out or the rows used: a use of each, marked for the session named.",
         "tags": [
           "brain-memories"
         ],
@@ -3031,12 +3003,12 @@
             }
           },
           {
-            "description": "The field the list is ordered by: `id`, `position`, `validFrom`, `importance` or `hits`, descending\nwith a leading `-`; `id` where none is given.",
+            "description": "The field the list is ordered by: `id`, `position`, `validFrom`, `importance` or `useCount`, descending\nwith a leading `-`; `id` where none is given.",
             "in": "query",
             "name": "order",
             "required": false,
             "schema": {
-              "description": "The field the list is ordered by: `id`, `position`, `validFrom`, `importance` or `hits`, descending\nwith a leading `-`; `id` where none is given.",
+              "description": "The field the list is ordered by: `id`, `position`, `validFrom`, `importance` or `useCount`, descending\nwith a leading `-`; `id` where none is given.",
               "type": [
                 "string",
                 "null"
@@ -3052,6 +3024,19 @@
               "description": "Words the text holds, in any case.",
               "type": [
                 "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "Whether a read by key, subject, type or words records a use of each live row it answers; true where none\nis given.",
+            "in": "query",
+            "name": "record",
+            "required": false,
+            "schema": {
+              "description": "Whether a read by key, subject, type or words records a use of each live row it answers; true where none\nis given.",
+              "type": [
+                "boolean",
                 "null"
               ]
             }
@@ -3281,7 +3266,7 @@
             "$ref": "#/components/responses/NotFound"
           }
         },
-        "summary": "One memory in one version, with its subjects and strengths.",
+        "summary": "One memory in one version, with its subjects and its use.",
         "tags": [
           "brain-memories"
         ],
@@ -5192,7 +5177,7 @@
             ]
           },
           "order": {
-            "description": "The field the list is ordered by: `id`, `position`, `validFrom`, `importance` or `hits`, descending\nwith a leading `-`; `id` where none is given.",
+            "description": "The field the list is ordered by: `id`, `position`, `validFrom`, `importance` or `useCount`, descending\nwith a leading `-`; `id` where none is given.",
             "type": [
               "string",
               "null"
@@ -5202,6 +5187,13 @@
             "description": "Words the text holds, in any case.",
             "type": [
               "string",
+              "null"
+            ]
+          },
+          "record": {
+            "description": "Whether a read by key, subject, type or words records a use of each live row it answers; true where none\nis given.",
+            "type": [
+              "boolean",
               "null"
             ]
           },
@@ -5381,7 +5373,7 @@
       "route": "POST /brains/{brainId}/memories"
     },
     {
-      "description": "One memory in one version, with its subjects and strengths.",
+      "description": "One memory in one version, with its subjects and its use.",
       "input": {
         "description": "One memory of a brain, by their ids.",
         "properties": {
@@ -5696,7 +5688,7 @@
       "route": "PATCH /brains/{brainId}/memories/{memoryId}"
     },
     {
-      "description": "Record a hand-out: each row hit, and marked for the session named.",
+      "description": "Record a hand-out or the rows used: a use of each, marked for the session named.",
       "input": {
         "description": "A brain and what a route of it takes.",
         "properties": {
@@ -5743,7 +5735,7 @@
       "route": "POST /brains/{brainId}/hits"
     },
     {
-      "description": "Record confirmations: each row's storage strength raised by the gap since its last.",
+      "description": "Record confirmations: a use of each row, and its moment of confirmation set.",
       "input": {
         "description": "A brain and what a route of it takes.",
         "properties": {
@@ -5824,7 +5816,7 @@
             ]
           },
           "record": {
-            "description": "Whether the hand-out is recorded as hits and marks; true where none is given.",
+            "description": "Whether the hand-out is recorded as uses and marks; true where none is given.",
             "type": [
               "boolean",
               "null"

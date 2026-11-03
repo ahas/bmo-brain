@@ -122,8 +122,8 @@
           </dd>
           <dt>{{ t("brain.field.use") }}</dt>
           <dd class="tabular-nums">
-            {{ t("brain.label.use", { hits: memory.hits, strength: memory.strength.toFixed(2), retrieval: memory.retrievalStrength.toFixed(2), importance: memory.importance }) }}
-            <template v-if="memory.lastHitAt"> · {{ t("brain.label.last_hit") }} {{ stamp(memory.lastHitAt) }}</template>
+            {{ t("brain.label.use", { uses: memory.useCount, importance: memory.importance }) }}
+            <template v-if="memory.lastUsedAt"> · {{ t("brain.label.last_hit") }} {{ stamp(memory.lastUsedAt) }}</template>
             <template v-if="memory.lastConfirmedAt"> · {{ t("brain.label.last_confirmed") }} {{ stamp(memory.lastConfirmedAt) }}</template>
           </dd>
           <template v-if="memory.consolidatedAt">

@@ -359,12 +359,12 @@ async fn a_memory_is_versioned_never_edited_and_its_key_moves_with_the_live_vers
 }
 
 #[tokio::test]
-async fn hits_raise_retrieval_strength_and_spaced_confirmations_raise_storage_strength() {
+async fn hits_and_confirmations_record_a_use_and_nothing_else() {
   let served = Served::new().await;
   let client = &served.client;
   let brain = brain_of(client, "agent-a").await;
   let row = client.memory_add(brain, &memory("fact", "A fact")).await.unwrap();
-  assert_eq!((row.hits, row.retrieval_strength), (0, 0.0));
+  assert_eq!((row.use_count, row.last_used_at), (0, None));
   let recorded = client
     .hits_record(
       brain,
@@ -379,25 +379,11 @@ async fn hits_raise_retrieval_strength_and_spaced_confirmations_raise_storage_st
     .unwrap();
   assert_eq!(recorded.recorded_count, 1);
   let hit = client.memory(brain, row.id).await.unwrap();
-  assert_eq!(hit.hits, 1);
-  assert!(hit.last_hit_at.is_some() && hit.retrieval_strength > 0.0);
+  assert_eq!(hit.use_count, 1);
+  assert!(hit.last_used_at.is_some());
   let day = 86_400_000;
   let written = hit.created_at;
-  let soon = client
-    .confirmations_record(
-      brain,
-      &Confirmations {
-        memory_ids: vec![row.id],
-        actor_name: "writer-a".to_owned(),
-        at: Some(written + 1_000),
-      },
-    )
-    .await
-    .unwrap();
-  assert_eq!(soon.recorded_count, 1);
-  let unmoved = client.memory(brain, row.id).await.unwrap();
-  assert_eq!(unmoved.strength, 1.0);
-  client
+  let confirmed = client
     .confirmations_record(
       brain,
       &Confirmations {
@@ -408,9 +394,12 @@ async fn hits_raise_retrieval_strength_and_spaced_confirmations_raise_storage_st
     )
     .await
     .unwrap();
-  let stronger = client.memory(brain, row.id).await.unwrap();
-  assert!(stronger.strength > 1.0, "{}", stronger.strength);
-  assert_eq!(stronger.last_confirmed_at, Some(written + 10 * day));
+  assert_eq!(confirmed.recorded_count, 1);
+  let after = client.memory(brain, row.id).await.unwrap();
+  assert_eq!(after.use_count, 2);
+  assert_eq!(after.last_used_at, Some(written + 10 * day));
+  assert_eq!(after.last_confirmed_at, Some(written + 10 * day));
+  assert_eq!((after.text.as_str(), after.status), (row.text.as_str(), row.status));
 }
 
 #[tokio::test]
@@ -971,7 +960,7 @@ async fn a_merge_writes_one_row_over_several_and_supersedes_each() {
   assert_eq!(merged.lineage_id, merged.id);
   assert_eq!(merged.status, MemoryStatus::Active);
   assert_eq!(merged.importance, 7);
-  assert_eq!(merged.hits, 1);
+  assert_eq!(merged.use_count, 1);
   assert_eq!(merged.subjects.len(), 2);
   assert_eq!(merged.key.as_deref(), Some("north"));
   for id in [one.id, two.id] {

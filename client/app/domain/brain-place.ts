@@ -16,7 +16,7 @@ export type StatusChoice = (typeof STATUS_CHOICES)[number];
 export const EVERY_TYPE_BUT_EPISODES = "-episode";
 export const EVERY_TYPE = "*";
 
-export const ORDERS = ["-validFrom", "validFrom", "-importance", "-hits", "position"] as const;
+export const ORDERS = ["-validFrom", "validFrom", "-importance", "-useCount", "position"] as const;
 export type Order = (typeof ORDERS)[number];
 
 export interface Place {
