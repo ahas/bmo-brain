@@ -297,6 +297,7 @@ pub async fn answer(handed: Handed) -> Result<Answer, String> {
             text,
             subjects: subjects(arguments, "subjects"),
             limit: integer(arguments, "limit"),
+            as_of: None,
           },
         )
         .await

@@ -85,9 +85,11 @@ One row is one thing the agent remembers, in one version.
 | `text` | the memory itself, as it is handed out |
 | `layerId` | the layer it stands in, or null |
 | `subjects` | the subjects it is about, any number |
-| `status` | `active`, `pending`, `done`, `superseded` or `invalidated` (「Versions」) |
+| `status` | `active`, `pending`, `done`, `superseded`, `invalidated` or `retracted` (「Versions」) |
 | `lineageId` | the id of the first version in this row's line; a first version's own id |
 | `supersededBy` | the id of the version that replaced this one, or null |
+| `supersedes` | the ids of the rows this version replaced, none for a first version |
+| `supersededAt` | when this row stopped being current: the moment of the version, merge or move that closed it; null while it is current |
 | `validFrom`, `validTo` | the span the memory holds for; `validTo` null while it holds |
 | `recallCondition` | the situation in which it is needed, in words, or null (「Recall」) |
 | `releaseCondition` | the situation that ends it, in words, or null (「Recall」) |
@@ -132,21 +134,36 @@ a subject」), never a row, and a write that names `sheet` as its type is refuse
   them and takes the old version's where it gives none, and a merge carries them, while no route changes either
   on a row that stands.
 - **A correction is a new row in the same lineage.** The old row's `supersededBy` names the new one, its
-  `status` becomes `superseded` and its `validTo` the new row's `validFrom`. The new row carries the lineage
-  id. A reading hands out the newest row of a lineage that is `active`, and says for a row whose predecessor
+  `status` becomes `superseded`, its `validTo` the new row's `validFrom` and its `supersededAt` the moment the
+  new row was written. The new row carries the lineage id and names the row it replaced in `supersedes`. A reading hands out the newest row of a lineage that is `active`, and says for a row whose predecessor
   was superseded in the last thirty days what the previous value was and until when.
 - **A merge is one new row written over several.** Rows about the same thing, each a lineage of its own,
   are folded into one: the new row starts a lineage, and every merged row becomes `superseded` with its
-  `supersededBy` naming the new row and its `validTo` the new row's `validFrom`. The new row takes the use of
+  `supersededBy` naming the new row, its `validTo` the new row's `validFrom` and its `supersededAt` the moment
+  of the merge. The new row takes the use of
   the most used among them and the earliest confirmation, so a reading does not forget what the pieces had
   earned. Nothing is deleted: each merged row stays in its own lineage, pointing at the row
   that stands for it now.
 - **A fact that stopped holding is invalidated:** `status` `invalidated`, `validTo` the moment it stopped.
   Nothing points at a replacement. A promise kept or an errand finished is `done`, with `validTo` the moment
   it was done and the text it ended on as a new version where the writer gives one. Whoever moves a row may
-  say why, and the reason stays on the row it moved.
+  say why, and the reason stays on the row it moved. A row moved to a closed status records the moment of the
+  move as its `supersededAt`.
+- **A statement the speaker takes back is retracted** ("I take that back", "no, I said it wrong"): `status`
+  `retracted`, which means it was never so, where `invalidated` means it held and stopped. Its `validTo` is
+  the moment of the retraction. Where the speaker says what they meant instead, the retraction writes that
+  as a new version and the retracted row's `supersededBy` names it, so the new row's previous value is read as
+  retracted rather than as a value that held until a date. A retracted row is not restored.
+- **A row written later may hold an earlier span.** A write whose `validFrom` is earlier than the `validFrom`
+  of the live row it would replace, the live row holding its key or the row a learning would close, does not
+  replace it: the new row is written already superseded by the live row, its `validTo` the live row's
+  `validFrom`, in the live row's lineage, with the reason `earlier-than-live`, and the live row stays
+  current. Told in the wrong order, the past takes its place behind the present.
+- **The past is read as it stood.** A reading as of a moment answers the rows that held then: those whose span
+  covers it, `validFrom` at or before it and `validTo` after it, or, with no `validTo`, not closed before it by
+  their `supersededAt`, whatever their status now; a retracted row never held and is never answered.
 - **A closed lineage is restored by a new version,** never by reopening the closed row: the newest version
-  of a `done` or `invalidated` lineage is followed by a new `active` version in the same lineage, its text
+  of a `done` or `invalidated` lineage (never a `retracted` one) is followed by a new `active` version in the same lineage, its text
   the closed one's or the restorer's, and the closed row stays as it was, a record of the span it held for.
   A lineage that holds a live version already has nothing to restore.
 - **`pending` is one thing only:** a memory waiting for a person's approval. The agent never parks a
@@ -318,8 +335,9 @@ a block and a list of what it chose.
   not handed out, and recall moves it to `invalidated` with the moment and the condition as its reason, in the
   same transaction as the rest of the recall, whether or not the row would have been carried. The answer names
   each row it released.
-- **Only live rows, with their span.** A row goes out with the dates it holds for; a row whose predecessor
-  was superseded lately goes out with one line saying what the previous value was and until when.
+- **Only live rows, with their span.** A row goes out with the dates it holds for, since its `validFrom` and,
+  where it has one, until its `validTo`; a row whose predecessor was superseded lately goes out with one line
+  saying what the previous value was and until when, or that the previous value was retracted.
 - **What this session already knows is left out.** A memory written after the session opened is not handed
   back to that session: the session saw the conversation it came from. Once the session is folded or handed
   off, the row may attach again.

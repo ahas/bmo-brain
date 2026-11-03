@@ -95,6 +95,7 @@ async fn the_likes_of_a_candidate_are_the_live_rows_about_its_subjects_or_holdin
         text: "The member's garden has tomatoes".to_owned(),
         subjects: vec![person.clone()],
         limit: None,
+        as_of: None,
       },
     )
     .await
@@ -109,6 +110,7 @@ async fn the_likes_of_a_candidate_are_the_live_rows_about_its_subjects_or_holdin
         text: String::new(),
         subjects: vec![],
         limit: None,
+        as_of: None,
       },
     )
     .await
@@ -122,7 +124,8 @@ async fn the_likes_of_a_candidate_are_the_live_rows_about_its_subjects_or_holdin
           &SimilarAsk {
             text: "x".to_owned(),
             subjects: vec![],
-            limit: Some(0)
+            limit: Some(0),
+            as_of: None,
           }
         )
         .await

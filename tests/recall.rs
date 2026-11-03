@@ -98,6 +98,7 @@ async fn a_word_reaches_a_row_by_its_stem_and_a_stop_word_reaches_none() {
         text: "Is the kiln firing yet?".to_owned(),
         subjects: vec![],
         limit: None,
+        as_of: None,
       },
     )
     .await

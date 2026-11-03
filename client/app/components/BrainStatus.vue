@@ -17,6 +17,7 @@ const color = computed(() => {
     case "pending":
       return "warning" as const;
     case "invalidated":
+    case "retracted":
       return "error" as const;
     case "done":
       return "info" as const;

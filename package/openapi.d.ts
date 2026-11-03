@@ -826,8 +826,19 @@ export interface components {
             releaseCondition: string | null;
             status: components["schemas"]["MemoryStatus"];
             subjects: components["schemas"]["SubjectRef"][];
+            /**
+             * Format: int64
+             * @description When it stopped being current: the moment of the version, merge or move that closed it; null while current.
+             * @default null
+             */
+            supersededAt: number | null;
             /** Format: int64 */
             supersededBy: number | null;
+            /**
+             * @description The rows this version replaced; none for a first version.
+             * @default []
+             */
+            supersedes: number[];
             text: string;
             /** @description What the row is; the reserved types are stated in the design. */
             type: string;
@@ -879,13 +890,16 @@ export interface components {
             actorName: string;
             /**
              * Format: int64
-             * @description When it stopped holding, for `done` and `invalidated`; now where none is given.
+             * @description When it stopped holding, for `done`, `invalidated` and `retracted`; now where none is given.
              */
             at?: number | null;
             /** @description Why it moves, kept on the row moved. */
             reason?: string | null;
             status: components["schemas"]["MemoryStatus"];
-            /** @description For a move to `done`: the words it ended on, written as a new version that is then moved. */
+            /**
+             * @description For a move to `done`: the words it ended on, written as a new version that is then moved. For a move to
+             *     `retracted`: what the speaker meant instead, written as a new active version the retracted row points at.
+             */
             text?: string | null;
         };
         /** @description One page of a list, oldest first. */
@@ -895,7 +909,7 @@ export interface components {
             more: boolean;
         };
         /** @description The state of one version of a memory. */
-        MemoryStatus: "active" | "pending" | "done" | "superseded" | "invalidated";
+        MemoryStatus: "active" | "pending" | "done" | "superseded" | "invalidated" | "retracted";
         /** @description A new version of a memory, superseding the version it is written over: only the fields given differ. */
         MemoryVersion: {
             actorName: string;
@@ -1152,6 +1166,11 @@ export interface components {
         SimilarAsk: {
             /**
              * Format: int64
+             * @description A moment: the rows that held then, in place of the live ones.
+             */
+            asOf?: number | null;
+            /**
+             * Format: int64
              * @description Ten where none is given, at most fifty.
              */
             limit?: number | null;
@@ -1324,8 +1343,19 @@ export interface components {
             releaseCondition: string | null;
             status: components["schemas"]["MemoryStatus"];
             subjects: components["schemas"]["SubjectRef"][];
+            /**
+             * Format: int64
+             * @description When it stopped being current: the moment of the version, merge or move that closed it; null while current.
+             * @default null
+             */
+            supersededAt: number | null;
             /** Format: int64 */
             supersededBy: number | null;
+            /**
+             * @description The rows this version replaced; none for a first version.
+             * @default []
+             */
+            supersedes: number[];
             /**
              * Format: int64
              * @description The tag it is read out after, or null where it stands at its own place.
@@ -1908,6 +1938,11 @@ export interface operations {
         parameters: {
             query?: {
                 after?: number | null;
+                /**
+                 * @description A moment: the rows that held then, whatever their status now, in place of the filters' own; never a
+                 *     retracted row.
+                 */
+                asOf?: number | null;
                 /** @description Types left out, comma-separated. */
                 excludeTypes?: string | null;
                 /** @description The rows these ids name, comma-separated. */

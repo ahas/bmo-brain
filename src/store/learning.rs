@@ -10,7 +10,7 @@ use sqlx::PgConnection;
 use super::brains::{brain_of, given};
 use super::recall::Cues;
 use super::sheets::written_type;
-use super::versions::{MEMORY_COLUMNS, MemoryRow};
+use super::versions::{HELD_AT, MEMORY_COLUMNS, MemoryRow};
 use super::words::{index_words, stems};
 use super::{Fault, Held, Store, now};
 
@@ -59,8 +59,13 @@ impl Store {
     }
     index_words(&mut conn, brain_id).await?;
     let cue_stems: Vec<String> = asked.iter().cloned().collect();
+    // The live rows, or those that held at the moment asked for.
+    let held = match ask.as_of {
+      Some(at) => HELD_AT.replace("$AT", &at.to_string()),
+      None => "status = 'active'".to_owned(),
+    };
     let rows: Vec<MemoryRow> = sqlx::query_as(&format!(
-      "SELECT {MEMORY_COLUMNS} FROM memories WHERE brain_id = $1 AND status = 'active' AND NOT (type = ANY($2)) \
+      "SELECT {MEMORY_COLUMNS} FROM memories WHERE brain_id = $1 AND {held} AND NOT (type = ANY($2)) \
        AND (words && $3 OR id IN (SELECT memory_id FROM memory_subjects WHERE subject_id = ANY($4))) \
        ORDER BY id DESC LIMIT 500"
     ))
@@ -144,7 +149,31 @@ impl Store {
         .unwrap_or_else(|_| "unknown".to_owned()),
     );
 
-    if let Some(id) = body.strengthens {
+    // A learning that began earlier than every live row it would close closes none: it is written behind the
+    // one of them that began first (docs/design.md, 「Versions」).
+    let began = body.valid_from.unwrap_or(at);
+    let closing: Vec<i64> = match body.strengthens {
+      Some(id) => vec![id],
+      None if !heard => body.replaces.clone(),
+      None => vec![],
+    };
+    let mut behind: Option<i64> = None;
+    if !closing.is_empty() {
+      let spans: Vec<(i64, i64)> = sqlx::query_as(
+        "SELECT id, valid_from FROM memories WHERE brain_id = $1 AND id = ANY($2) \
+         AND status IN ('active', 'pending') ORDER BY valid_from, id",
+      )
+      .bind(brain_id)
+      .bind(&closing)
+      .fetch_all(&mut *tx)
+      .await?;
+      let all_live = spans.len() == closing.iter().collect::<std::collections::BTreeSet<_>>().len();
+      if all_live && spans.iter().all(|(_, since)| began < *since) {
+        behind = spans.first().map(|(id, _)| *id);
+      }
+    }
+
+    if let Some(id) = body.strengthens.filter(|_| behind.is_none()) {
       let memory = self
         .version_in(
           &mut tx,
@@ -173,7 +202,7 @@ impl Store {
       return Ok(learned);
     }
 
-    if !heard {
+    if !heard && behind.is_none() {
       let mut replaces = body.replaces.clone();
       replaces.sort_unstable();
       replaces.dedup();
@@ -198,7 +227,7 @@ impl Store {
       }
     }
     let memory = self
-      .add_in(
+      .write_in(
         &mut tx,
         brain_id,
         &NewMemory {
@@ -218,6 +247,7 @@ impl Store {
           labels,
         },
         at,
+        behind,
       )
       .await?;
     learned.written = Some(memory);

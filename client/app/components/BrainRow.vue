@@ -71,6 +71,7 @@
           <UButton v-if="live && memory.id === live.id" size="sm" color="neutral" variant="outline" icon="i-material-symbols-thumb-up-outline" :label="t('brain.action.confirm')" :loading="busy" @click="confirm" />
           <UButton v-if="isLive" size="sm" color="neutral" variant="outline" icon="i-material-symbols-task-alt" :label="t('brain.action.done')" @click="askMove('done')" />
           <UButton v-if="isLive" size="sm" color="error" variant="outline" icon="i-material-symbols-block" :label="t('brain.action.invalidate')" @click="askMove('invalidated')" />
+          <UButton v-if="isLive" size="sm" color="error" variant="outline" icon="i-material-symbols-undo" :label="t('brain.action.retract')" @click="askMove('retracted')" />
           <UButton v-if="restorable" size="sm" color="neutral" variant="outline" icon="i-material-symbols-undo" :label="t('brain.action.restore')" :loading="busy" @click="restore" />
         </div>
 
@@ -142,7 +143,7 @@
       </div>
     </div>
 
-    <UModal v-model:open="moving" :title="moveTo === 'done' ? t('brain.action.done') : t('brain.action.invalidate')">
+    <UModal v-model:open="moving" :title="moveLabel">
       <template #body>
         <div class="flex flex-col gap-3">
           <UFormField :label="t('brain.field.reason')" :help="t('brain.hint.reason')">
@@ -164,7 +165,7 @@
       <template #footer>
         <div class="flex w-full justify-end gap-2">
           <UButton color="neutral" variant="ghost" :label="t('common.action.cancel')" @click="moving = false" />
-          <UButton :color="moveTo === 'done' ? 'primary' : 'error'" :label="moveTo === 'done' ? t('brain.action.done') : t('brain.action.invalidate')" :loading="busy || endedWords.busy.value || reasonWords.busy.value" @click="move(moveTo)" />
+          <UButton :color="moveTo === 'done' ? 'primary' : 'error'" :label="moveLabel" :loading="busy || endedWords.busy.value || reasonWords.busy.value" @click="move(moveTo)" />
         </div>
       </template>
     </UModal>
@@ -356,6 +357,19 @@ async function saveEdit(): Promise<void> {
     busy.value = false;
   }
 }
+
+// The move asked for, by its action's name: a row is done, invalidated (it held and stopped) or retracted (it
+// was never so).
+const moveLabel = computed(() => {
+  switch (moveTo.value) {
+    case "done":
+      return t("brain.action.done");
+    case "retracted":
+      return t("brain.action.retract");
+    default:
+      return t("brain.action.invalidate");
+  }
+});
 
 function askMove(status: MemoryStatus): void {
   moveTo.value = status;

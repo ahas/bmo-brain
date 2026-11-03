@@ -167,13 +167,21 @@ pub enum MemoryStatus {
   Done,
   /// A later version replaced it.
   Superseded,
-  /// It stopped holding.
+  /// It held and stopped holding.
   Invalidated,
+  /// The speaker took it back: it was never so.
+  Retracted,
 }
 
 impl MemoryStatus {
-  pub const ALL: [MemoryStatus; 5] =
-    [Self::Active, Self::Pending, Self::Done, Self::Superseded, Self::Invalidated];
+  pub const ALL: [MemoryStatus; 6] = [
+    Self::Active,
+    Self::Pending,
+    Self::Done,
+    Self::Superseded,
+    Self::Invalidated,
+    Self::Retracted,
+  ];
 
   /// The status as it crosses the wire.
   pub fn name(self) -> &'static str {
@@ -183,6 +191,7 @@ impl MemoryStatus {
       Self::Done => "done",
       Self::Superseded => "superseded",
       Self::Invalidated => "invalidated",
+      Self::Retracted => "retracted",
     }
   }
 
@@ -192,13 +201,15 @@ impl MemoryStatus {
   }
 
   /// Whether a move may make this status a row's next one by a caller's word: `active` from `pending`,
-  /// `done` and `invalidated` from `active` or `pending`. `superseded` is only ever set by a new version.
+  /// `done`, `invalidated` and `retracted` from `active` or `pending`. `superseded` is only ever set by a new
+  /// version.
   pub fn may_move_to(self, next: Self) -> bool {
     matches!(
       (self, next),
       (Self::Pending, Self::Active)
         | (Self::Active | Self::Pending, Self::Done)
         | (Self::Active | Self::Pending, Self::Invalidated)
+        | (Self::Active | Self::Pending, Self::Retracted)
     )
   }
 
@@ -238,6 +249,12 @@ pub struct Memory {
   /// The first version's id in this row's line.
   pub lineage_id: i64,
   pub superseded_by: Option<i64>,
+  /// The rows this version replaced; none for a first version.
+  #[serde(default)]
+  pub supersedes: Vec<i64>,
+  /// When it stopped being current: the moment of the version, merge or move that closed it; null while current.
+  #[serde(default)]
+  pub superseded_at: Option<i64>,
   pub valid_from: i64,
   pub valid_to: Option<i64>,
   /// The situation in which it is needed, in words, or null where it carries none.
@@ -385,14 +402,15 @@ pub struct MemoryMerge {
 #[serde(rename_all = "camelCase")]
 pub struct MemoryMove {
   pub status: MemoryStatus,
-  /// When it stopped holding, for `done` and `invalidated`; now where none is given.
+  /// When it stopped holding, for `done`, `invalidated` and `retracted`; now where none is given.
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub at: Option<i64>,
   pub actor_name: String,
   /// Why it moves, kept on the row moved.
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub reason: Option<String>,
-  /// For a move to `done`: the words it ended on, written as a new version that is then moved.
+  /// For a move to `done`: the words it ended on, written as a new version that is then moved. For a move to
+  /// `retracted`: what the speaker meant instead, written as a new active version the retracted row points at.
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub text: Option<String>,
 }
@@ -446,6 +464,10 @@ pub struct MemoriesQuery {
   /// Words the recall condition holds, in any case: the rows a situation calls for.
   #[serde(skip_serializing_if = "Option::is_none")]
   pub situation: Option<String>,
+  /// A moment: the rows that held then, whatever their status now, in place of the filters' own; never a
+  /// retracted row.
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub as_of: Option<i64>,
   /// Whether a read by key, subject, type or words records a use of each live row it answers; true where none
   /// is given.
   #[serde(skip_serializing_if = "Option::is_none")]
@@ -829,6 +851,9 @@ pub struct SimilarAsk {
   /// Ten where none is given, at most fifty.
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub limit: Option<i64>,
+  /// A moment: the rows that held then, in place of the live ones.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub as_of: Option<i64>,
 }
 
 /// Which episodes a consolidation reads.

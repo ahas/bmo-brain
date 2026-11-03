@@ -9,7 +9,7 @@ export const VIEWS = ["list", "map", "bubbles", "timeline", "book"] as const;
 export type View = (typeof VIEWS)[number];
 
 // The status choices of the toolbar: the live rows by default, each status, or every row.
-export const STATUS_CHOICES = ["live", "active", "pending", "done", "invalidated", "superseded", "all"] as const;
+export const STATUS_CHOICES = ["live", "active", "pending", "done", "invalidated", "retracted", "superseded", "all"] as const;
 export type StatusChoice = (typeof STATUS_CHOICES)[number];
 
 // Every type but episodes by default: episodes gather on every conversation and would cover the rest.

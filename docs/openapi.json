@@ -777,12 +777,30 @@
             },
             "type": "array"
           },
+          "supersededAt": {
+            "default": null,
+            "description": "When it stopped being current: the moment of the version, merge or move that closed it; null while current.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
           "supersededBy": {
             "format": "int64",
             "type": [
               "integer",
               "null"
             ]
+          },
+          "supersedes": {
+            "default": [],
+            "description": "The rows this version replaced; none for a first version.",
+            "items": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "type": "array"
           },
           "text": {
             "type": "string"
@@ -820,6 +838,8 @@
           "status",
           "lineageId",
           "supersededBy",
+          "supersedes",
+          "supersededAt",
           "validFrom",
           "validTo",
           "recallCondition",
@@ -949,7 +969,7 @@
             "type": "string"
           },
           "at": {
-            "description": "When it stopped holding, for `done` and `invalidated`; now where none is given.",
+            "description": "When it stopped holding, for `done`, `invalidated` and `retracted`; now where none is given.",
             "format": "int64",
             "type": [
               "integer",
@@ -967,7 +987,7 @@
             "$ref": "#/components/schemas/MemoryStatus"
           },
           "text": {
-            "description": "For a move to `done`: the words it ended on, written as a new version that is then moved.",
+            "description": "For a move to `done`: the words it ended on, written as a new version that is then moved. For a move to\n`retracted`: what the speaker meant instead, written as a new active version the retracted row points at.",
             "type": [
               "string",
               "null"
@@ -1025,7 +1045,12 @@
           },
           {
             "const": "invalidated",
-            "description": "It stopped holding.",
+            "description": "It held and stopped holding.",
+            "type": "string"
+          },
+          {
+            "const": "retracted",
+            "description": "The speaker took it back: it was never so.",
             "type": "string"
           }
         ]
@@ -1615,6 +1640,14 @@
       "SimilarAsk": {
         "description": "A candidate memory, whose likes the write judgement reads.",
         "properties": {
+          "asOf": {
+            "description": "A moment: the rows that held then, in place of the live ones.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
           "limit": {
             "description": "Ten where none is given, at most fifty.",
             "format": "int64",
@@ -1985,12 +2018,30 @@
             },
             "type": "array"
           },
+          "supersededAt": {
+            "default": null,
+            "description": "When it stopped being current: the moment of the version, merge or move that closed it; null while current.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
           "supersededBy": {
             "format": "int64",
             "type": [
               "integer",
               "null"
             ]
+          },
+          "supersedes": {
+            "default": [],
+            "description": "The rows this version replaced; none for a first version.",
+            "items": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "type": "array"
           },
           "taggedBy": {
             "description": "The tag it is read out after, or null where it stands at its own place.",
@@ -2036,6 +2087,8 @@
           "status",
           "lineageId",
           "supersededBy",
+          "supersedes",
+          "supersededAt",
           "validFrom",
           "validTo",
           "recallCondition",
@@ -3111,6 +3164,20 @@
             "name": "after",
             "required": false,
             "schema": {
+              "format": "int64",
+              "type": [
+                "integer",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "A moment: the rows that held then, whatever their status now, in place of the filters' own; never a\nretracted row.",
+            "in": "query",
+            "name": "asOf",
+            "required": false,
+            "schema": {
+              "description": "A moment: the rows that held then, whatever their status now, in place of the filters' own; never a\nretracted row.",
               "format": "int64",
               "type": [
                 "integer",
@@ -5326,6 +5393,14 @@
               "null"
             ]
           },
+          "asOf": {
+            "description": "A moment: the rows that held then, whatever their status now, in place of the filters' own; never a\nretracted row.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
           "brainId": {
             "format": "int64",
             "type": "integer"
@@ -5842,7 +5917,7 @@
             "type": "string"
           },
           "at": {
-            "description": "When it stopped holding, for `done` and `invalidated`; now where none is given.",
+            "description": "When it stopped holding, for `done`, `invalidated` and `retracted`; now where none is given.",
             "format": "int64",
             "type": [
               "integer",
@@ -5868,7 +5943,7 @@
             "$ref": "#/components/schemas/MemoryStatus"
           },
           "text": {
-            "description": "For a move to `done`: the words it ended on, written as a new version that is then moved.",
+            "description": "For a move to `done`: the words it ended on, written as a new version that is then moved. For a move to\n`retracted`: what the speaker meant instead, written as a new active version the retracted row points at.",
             "type": [
               "string",
               "null"
@@ -6239,6 +6314,14 @@
       "input": {
         "description": "A brain and what a route of it takes.",
         "properties": {
+          "asOf": {
+            "description": "A moment: the rows that held then, in place of the live ones.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
           "brainId": {
             "format": "int64",
             "type": "integer"

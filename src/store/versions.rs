@@ -19,8 +19,8 @@ pub const RESERVED_TYPES: [&str; 9] =
   ["episode", "fact", "rumor", "situation", "rule", "name", "persona", "lore", "knowledge"];
 
 pub(crate) const MEMORY_COLUMNS: &str = "id, brain_id, key, type, text, layer_id, position, status, lineage_id, \
-  superseded_by, valid_from, valid_to, recall_condition, release_condition, importance, hits, hit_times, \
-  last_hit_at, last_confirmed_at, consolidated_at, actor_name, reason, labels, created_at";
+  superseded_by, superseded_at, valid_from, valid_to, recall_condition, release_condition, importance, hits, \
+  hit_times, last_hit_at, last_confirmed_at, consolidated_at, actor_name, reason, labels, created_at";
 
 #[derive(FromRow)]
 pub(crate) struct MemoryRow {
@@ -35,6 +35,7 @@ pub(crate) struct MemoryRow {
   pub status: String,
   pub lineage_id: i64,
   pub superseded_by: Option<i64>,
+  pub superseded_at: Option<i64>,
   pub valid_from: i64,
   pub valid_to: Option<i64>,
   pub recall_condition: Option<String>,
@@ -57,7 +58,7 @@ impl MemoryRow {
       .ok_or_else(|| Fault::Failed(format!("Row {} holds no known status: {}.", self.id, self.status)))
   }
 
-  pub(crate) fn member(self, subjects: Vec<SubjectRef>) -> Held<Memory> {
+  pub(crate) fn member(self, subjects: Vec<SubjectRef>, supersedes: Vec<i64>) -> Held<Memory> {
     let status = self.status()?;
     Ok(Memory {
       id: self.id,
@@ -71,6 +72,8 @@ impl MemoryRow {
       status,
       lineage_id: self.lineage_id,
       superseded_by: self.superseded_by,
+      supersedes,
+      superseded_at: self.superseded_at,
       valid_from: self.valid_from,
       valid_to: self.valid_to,
       recall_condition: self.recall_condition,
@@ -121,15 +124,26 @@ pub(crate) async fn subjects_by_row(
 }
 
 impl Store {
-  /// Rows as members, each with its subjects.
+  /// Rows as members, each with its subjects and the rows it replaced.
   pub(crate) async fn members(&self, conn: &mut PgConnection, rows: Vec<MemoryRow>) -> Held<Vec<Memory>> {
     let ids: Vec<i64> = rows.iter().map(|row| row.id).collect();
     let mut subjects = subjects_by_row(conn, &ids).await?;
+    let replaced: Vec<(i64, i64)> = sqlx::query_as(
+      "SELECT superseded_by, id FROM memories WHERE superseded_by = ANY($1) ORDER BY superseded_by, id",
+    )
+    .bind(&ids)
+    .fetch_all(&mut *conn)
+    .await?;
+    let mut supersedes: BTreeMap<i64, Vec<i64>> = BTreeMap::new();
+    for (by, id) in replaced {
+      supersedes.entry(by).or_default().push(id);
+    }
     rows
       .into_iter()
       .map(|row| {
         let mine = subjects.remove(&row.id).unwrap_or_default();
-        row.member(mine)
+        let replaced = supersedes.remove(&row.id).unwrap_or_default();
+        row.member(mine, replaced)
       })
       .collect()
   }
@@ -258,6 +272,19 @@ impl Store {
     body: &NewMemory,
     at: i64,
   ) -> Held<Memory> {
+    self.write_in(tx, brain_id, body, at, None).await
+  }
+
+  /// A memory written as a first version, or, behind the live row named or the live row holding its key where
+  /// it began earlier than that row, written already superseded by it (docs/design.md, 「Versions」).
+  pub(crate) async fn write_in(
+    &self,
+    tx: &mut PgConnection,
+    brain_id: i64,
+    body: &NewMemory,
+    at: i64,
+    behind: Option<i64>,
+  ) -> Held<Memory> {
     written_type(&body.kind)?;
     text("text", &body.text, TEXT_MOST)?;
     conditions(body.recall_condition.as_deref(), body.release_condition.as_deref())?;
@@ -277,20 +304,45 @@ impl Store {
     if let Some(layer) = body.layer_id {
       layer_of(&mut *tx, brain_id, layer).await?;
     }
+    let valid_from = body.valid_from.unwrap_or(at);
+    let mut behind = behind;
     if let Some(key) = &body.key {
-      let holder: Option<i64> = sqlx::query_scalar(
-        "SELECT id FROM memories WHERE brain_id = $1 AND key = $2 AND status IN ('active', 'pending')",
+      let holder: Option<(i64, i64)> = sqlx::query_as(
+        "SELECT id, valid_from FROM memories WHERE brain_id = $1 AND key = $2 AND status IN ('active', 'pending')",
       )
       .bind(brain_id)
       .bind(key)
       .fetch_optional(&mut *tx)
       .await?;
-      if let Some(id) = holder {
-        return Err(Fault::Conflict(format!(
-          "Memory {id} holds the key {key:?}; write a version of it instead."
-        )));
+      match holder {
+        Some((id, _)) if behind == Some(id) => {}
+        Some((id, since)) if behind.is_none() && valid_from < since => behind = Some(id),
+        Some((id, _)) => {
+          return Err(Fault::Conflict(format!(
+            "Memory {id} holds the key {key:?}; write a version of it instead."
+          )));
+        }
+        None => {}
       }
     }
+    // The live row a row written behind takes its place behind: its lineage and the moment it began.
+    let live: Option<(i64, i64, i64)> = match behind {
+      Some(id) => Some(
+        sqlx::query_as(
+          "SELECT id, lineage_id, valid_from FROM memories WHERE brain_id = $1 AND id = $2 \
+           AND status IN ('active', 'pending')",
+        )
+        .bind(brain_id)
+        .bind(id)
+        .fetch_optional(&mut *tx)
+        .await?
+        .ok_or_else(|| {
+          Fault::Conflict(format!("Memory {id} is not live; nothing is written behind it."))
+        })?,
+      ),
+      None => None,
+    };
+    let status = if live.is_some() { MemoryStatus::Superseded } else { status };
     let subject_ids = resolve_subjects(&mut *tx, brain_id, &body.subject_ids, &body.subjects, at).await?;
     let position = match body.position {
       Some(position) => position,
@@ -308,7 +360,7 @@ impl Store {
     .bind(body.layer_id)
     .bind(position)
     .bind(status.name())
-    .bind(body.valid_from.unwrap_or(at))
+    .bind(valid_from)
     .bind(&body.recall_condition)
     .bind(&body.release_condition)
     .bind(importance)
@@ -317,10 +369,28 @@ impl Store {
     .bind(at)
     .fetch_one(&mut *tx)
     .await?;
-    sqlx::query("UPDATE memories SET lineage_id = id WHERE id = $1")
-      .bind(id)
-      .execute(&mut *tx)
-      .await?;
+    match live {
+      None => {
+        sqlx::query("UPDATE memories SET lineage_id = id WHERE id = $1")
+          .bind(id)
+          .execute(&mut *tx)
+          .await?;
+      }
+      Some((live_id, lineage, since)) => {
+        sqlx::query(
+          "UPDATE memories SET lineage_id = $2, superseded_by = $3, valid_to = $4, superseded_at = $5, \
+           reason = $6 WHERE id = $1",
+        )
+        .bind(id)
+        .bind(lineage)
+        .bind(live_id)
+        .bind(since)
+        .bind(at)
+        .bind(EARLIER_THAN_LIVE)
+        .execute(&mut *tx)
+        .await?;
+      }
+    }
     link_subjects(&mut *tx, id, &subject_ids).await?;
     let memory = self.member_of(&mut *tx, brain_id, id).await?;
     publish(&mut *tx, "memory.written", Some(&event_scope(brain_id)), &memory).await?;
@@ -431,9 +501,10 @@ impl Store {
     .bind(at)
     .fetch_one(&mut *tx)
     .await?;
-    sqlx::query("UPDATE memories SET superseded_by = $2 WHERE id = $1")
+    sqlx::query("UPDATE memories SET superseded_by = $2, superseded_at = $3 WHERE id = $1")
       .bind(id)
       .bind(new_id)
+      .bind(at)
       .execute(&mut *tx)
       .await?;
     link_subjects(&mut *tx, new_id, &subject_ids).await?;
@@ -587,9 +658,10 @@ impl Store {
       .bind(new_id)
       .execute(&mut *tx)
       .await?;
-    sqlx::query("UPDATE memories SET superseded_by = $2 WHERE id = ANY($1)")
+    sqlx::query("UPDATE memories SET superseded_by = $2, superseded_at = $3 WHERE id = ANY($1)")
       .bind(&ids)
       .bind(new_id)
+      .bind(at)
       .execute(&mut *tx)
       .await?;
     link_subjects(&mut *tx, new_id, &subject_ids).await?;
@@ -608,9 +680,12 @@ impl Store {
     let mut tx = self.begin().await?;
     let memory = match &body.text {
       None => self.move_in(&mut tx, brain_id, id, body).await?,
+      Some(words) if body.status == MemoryStatus::Retracted => {
+        self.retract_in(&mut tx, brain_id, id, body, words).await?
+      }
       Some(_) if body.status != MemoryStatus::Done => {
         return Err(Fault::BadRequest(format!(
-          "text is the words a move to done ends on; this move is to {}.",
+          "text is the words a move to done ends on or what a retraction meant instead; this move is to {}.",
           body.status.name()
         )));
       }
@@ -640,6 +715,47 @@ impl Store {
       }
     };
     self.commit(tx).await?;
+    Ok(memory)
+  }
+
+  /// A retraction with what the speaker meant instead: that written as a new version over the row, holding from
+  /// the row's own `validFrom`, and the row moved to `retracted`, still pointing at it; the retracted row.
+  async fn retract_in(
+    &self,
+    tx: &mut PgConnection,
+    brain_id: i64,
+    id: i64,
+    body: &MemoryMove,
+    words: &str,
+  ) -> Held<Memory> {
+    given("actorName", &body.actor_name)?;
+    if let Some(reason) = &body.reason {
+      text("reason", reason, REASON_MOST)?;
+    }
+    let old = self.row_of(&mut *tx, brain_id, id, false).await?;
+    let was = old.status()?;
+    if !was.may_move_to(MemoryStatus::Retracted) {
+      return Err(Fault::Conflict(format!(
+        "Memory {id} is {}; it does not move to retracted.",
+        was.name()
+      )));
+    }
+    let at = body.at.unwrap_or_else(now);
+    let version = MemoryVersion {
+      text: Some(words.to_owned()),
+      valid_from: Some(old.valid_from),
+      actor_name: body.actor_name.clone(),
+      ..MemoryVersion::default()
+    };
+    self.version_in(&mut *tx, brain_id, id, &version, now()).await?;
+    sqlx::query("UPDATE memories SET status = 'retracted', valid_to = $2, reason = $3 WHERE id = $1")
+      .bind(id)
+      .bind(at)
+      .bind(&body.reason)
+      .execute(&mut *tx)
+      .await?;
+    let memory = self.member_of(&mut *tx, brain_id, id).await?;
+    publish(&mut *tx, "memory.moved", Some(&event_scope(brain_id)), &memory).await?;
     Ok(memory)
   }
 
@@ -754,17 +870,21 @@ impl Store {
       )));
     }
     let at = body.at.unwrap_or_else(now);
-    let valid_to = match body.status {
-      MemoryStatus::Done | MemoryStatus::Invalidated => Some(at),
-      _ => None,
+    // A closed row holds until the moment named and stopped being current at the moment of the move.
+    let (valid_to, superseded_at) = match body.status {
+      MemoryStatus::Done | MemoryStatus::Invalidated | MemoryStatus::Retracted => (Some(at), Some(now())),
+      _ => (None, None),
     };
-    sqlx::query("UPDATE memories SET status = $2, valid_to = $3, reason = $4 WHERE id = $1")
-      .bind(id)
-      .bind(body.status.name())
-      .bind(valid_to)
-      .bind(&body.reason)
-      .execute(&mut *tx)
-      .await?;
+    sqlx::query(
+      "UPDATE memories SET status = $2, valid_to = $3, superseded_at = $4, reason = $5 WHERE id = $1",
+    )
+    .bind(id)
+    .bind(body.status.name())
+    .bind(valid_to)
+    .bind(superseded_at)
+    .bind(&body.reason)
+    .execute(&mut *tx)
+    .await?;
     let memory = self.member_of(&mut *tx, brain_id, id).await?;
     publish(&mut *tx, "memory.moved", Some(&event_scope(brain_id)), &memory).await?;
     Ok(memory)
@@ -891,6 +1011,14 @@ impl Store {
   }
 }
 
+/// The rows that held at the moment `$AT` stands for, whatever their status now: their span covers it, or,
+/// with no end to their span, nothing closed them before it; a retracted row never held.
+pub(crate) const HELD_AT: &str = "(status <> 'retracted' AND valid_from <= $AT AND CASE WHEN valid_to IS NULL \
+  THEN superseded_at IS NULL OR $AT < superseded_at ELSE $AT < valid_to END)";
+
+/// The reason a row written behind the live row it would replace carries.
+pub const EARLIER_THAN_LIVE: &str = "earlier-than-live";
+
 /// The most characters a move's reason holds.
 const REASON_MOST: usize = 2_000;
 
@@ -968,6 +1096,7 @@ pub(crate) struct Filter {
   label: Option<String>,
   words: Option<String>,
   situation: Option<String>,
+  as_of: Option<i64>,
 }
 
 /// The ids a comma-separated list names, or why one does not read.
@@ -1018,6 +1147,7 @@ impl Filter {
       label: query.label.clone(),
       words: query.q.clone(),
       situation: query.situation.clone(),
+      as_of: query.as_of,
     })
   }
 
@@ -1070,6 +1200,9 @@ impl Filter {
     }
     if let Some(words) = &self.situation {
       sql.push(" AND recall_condition ILIKE ").push_bind(holding(words));
+    }
+    if let Some(at) = self.as_of {
+      sql.push(" AND ").push(HELD_AT.replace("$AT", &at.to_string()));
     }
   }
 }

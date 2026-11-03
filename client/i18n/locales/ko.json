@@ -23,6 +23,7 @@
       "previous": "앞 버전",
       "reading": "번역",
       "restore": "다시 살리기",
+      "retract": "말 취소",
       "show_original": "원문 보기",
       "show_translation": "번역 보기",
       "similar": "비슷한 기억 찾기",
@@ -159,6 +160,7 @@
       "invalidated": "맞지 않음",
       "live": "살아 있는 기억",
       "pending": "승인 대기",
+      "retracted": "취소된 말",
       "superseded": "대체됨"
     },
     "status_name": {
@@ -166,6 +168,7 @@
       "done": "끝남",
       "invalidated": "맞지 않음",
       "pending": "승인 대기",
+      "retracted": "취소된 말",
       "superseded": "대체됨"
     },
     "teach": {

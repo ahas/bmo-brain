@@ -407,9 +407,10 @@ impl Store {
           .bind(at)
           .fetch_one(&mut *tx)
           .await?;
-          sqlx::query("UPDATE memories SET superseded_by = $2 WHERE id = $1")
+          sqlx::query("UPDATE memories SET superseded_by = $2, superseded_at = $3 WHERE id = $1")
             .bind(old.id)
             .bind(new_id)
+            .bind(at)
             .execute(&mut *tx)
             .await?;
           link_subjects(&mut tx, new_id, &subject_ids).await?;

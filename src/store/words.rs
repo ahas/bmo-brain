@@ -1,5 +1,5 @@
 //! The words recall reads by (docs/design.md, 「Recall」): a text's words lowercased, English stop words left
-//! out, each reduced to its Snowball stem; the stems of a brain's live rows kept on the rows; and the
+//! out, each reduced to its Snowball stem; the stems of a brain's rows kept on the rows; and the
 //! Jaccard overlap of two rows' stems.
 
 use std::collections::BTreeSet;
@@ -215,14 +215,14 @@ pub fn overlap(a: &BTreeSet<String>, b: &BTreeSet<String>) -> f64 {
   a.intersection(b).count() as f64 / union as f64
 }
 
-/// The stems of every live row of a brain not indexed yet, kept on the rows.
+/// The stems of every row of a brain not indexed yet, kept on the rows: the live ones a recall reaches, and the
+/// closed ones a reading as of a past moment reaches.
 pub(crate) async fn index_words(conn: &mut PgConnection, brain_id: i64) -> Held<()> {
-  let rows: Vec<(i64, String)> = sqlx::query_as(
-    "SELECT id, text FROM memories WHERE brain_id = $1 AND status IN ('active', 'pending') AND words IS NULL",
-  )
-  .bind(brain_id)
-  .fetch_all(&mut *conn)
-  .await?;
+  let rows: Vec<(i64, String)> =
+    sqlx::query_as("SELECT id, text FROM memories WHERE brain_id = $1 AND words IS NULL")
+      .bind(brain_id)
+      .fetch_all(&mut *conn)
+      .await?;
   if rows.is_empty() {
     return Ok(());
   }

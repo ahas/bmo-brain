@@ -89,7 +89,7 @@ events as a page instead.
 | `subject.created` | a subject is made | the subject |
 | `subject.changed` | a subject's description changes | the subject |
 | `layer.changed` | a layer is added or changed | the layer |
-| `memory.written` | a version of a memory is written, first or superseding | the memory |
+| `memory.written` | a version of a memory is written, first or superseding | the memory, its `supersedes` naming the rows it replaced; each replaced row's `memory.moved`, with its words and its `supersededBy`, stands just before it in the same transaction, so a reader sees the old and the new words without reading either row |
 | `memory.moved` | a memory's status moves | the memory |
 
 ## Brains
@@ -148,7 +148,9 @@ A layer is a heading in the brain's table of contents: `id`, `brainId`, `name` (
 One row is one memory in one version: `id`, `brainId`, `key` (the caller's identifier, or null; unique among
 the live rows of a brain; 1 to 200 characters with no control character and no whitespace, whether written or
 injected), `type`, `text`, `layerId` (or null), `position`, `subjects` (each `id`, `type`,
-`key`), `status`, `lineageId`, `supersededBy` (or null), `validFrom`, `validTo` (or null), `recallCondition`
+`key`), `status`, `lineageId`, `supersededBy` (or null), `supersedes` (the ids of the rows this version
+replaced), `supersededAt` (when the row stopped being current: the moment of the version, merge or move that
+closed it; null while current), `validFrom`, `validTo` (or null), `recallCondition`
 (or null), `releaseCondition` (or null), `importance` (1
 to 10), `useCount` (how often it was used: handed out, reported used, confirmed or read explicitly),
 `lastUsedAt` (its latest use, or null), `lastConfirmedAt`, `consolidatedAt`, `actorName`, `reason` (why its status was
@@ -168,19 +170,20 @@ moves a caller's word may make:
 
 | Status | Means | May move to |
 |---|---|---|
-| `active` | the memory holds | `done`, `invalidated` |
-| `pending` | it waits for a person's approval | `active`, `done`, `invalidated` |
+| `active` | the memory holds | `done`, `invalidated`, `retracted` |
+| `pending` | it waits for a person's approval | `active`, `done`, `invalidated`, `retracted` |
 | `done` | what it asked is finished | none |
 | `superseded` | a later version replaced it; set by a version alone | none |
-| `invalidated` | it stopped holding | none |
+| `invalidated` | it held and stopped holding | none |
+| `retracted` | the speaker took it back: it was never so | none |
 
 | Route | Does | Answers |
 |---|---|---|
-| `GET /memories` | lists by `type` and `status` (each one value or several, comma-separated), `excludeTypes` (comma-separated), `layerId`, `unfiled` (true for the rows in no layer), `subjectId`, `key`, `lineageId`, `ids` (comma-separated), `supersededBy` (comma-separated: the rows superseded by these), `label` (`key` or `key=value`), `q` (words the text holds) and `situation` (words the `recallCondition` holds), in the order `order` names; a list by `key`, `subjectId`, `type`, `q` or `situation` is an explicit read, which records a use of each live row of the page it answers unless `record` is false (true where none is given) | 200, a page |
-| `POST /memories` | writes a first version: `type`, `text`, `actorName` required; `key`, `layerId`, `position`, `subjectIds`, `subjects` (each `type` and `key`, made where none stands), `importance` (5 where none), `validFrom` (now where none), `status` (`active` where none, or `pending`), `recallCondition`, `releaseCondition`, `labels` | 201, the memory; 409 `conflict` where a live row holds the key |
+| `GET /memories` | lists by `type` and `status` (each one value or several, comma-separated), `excludeTypes` (comma-separated), `layerId`, `unfiled` (true for the rows in no layer), `subjectId`, `key`, `lineageId`, `ids` (comma-separated), `supersededBy` (comma-separated: the rows superseded by these), `label` (`key` or `key=value`), `q` (words the text holds), `situation` (words the `recallCondition` holds) and `asOf` (a moment: the rows that held then, `validFrom` at or before it and `validTo` after it or, with none, `supersededAt` after it or null, whatever their status now, never a `retracted` row), in the order `order` names; a list by `key`, `subjectId`, `type`, `q` or `situation` is an explicit read, which records a use of each live row of the page it answers unless `record` is false (true where none is given) | 200, a page |
+| `POST /memories` | writes a first version: `type`, `text`, `actorName` required; `key`, `layerId`, `position`, `subjectIds`, `subjects` (each `type` and `key`, made where none stands), `importance` (5 where none), `validFrom` (now where none), `status` (`active` where none, or `pending`), `recallCondition`, `releaseCondition`, `labels`; where a live row holds the key and the new `validFrom` is earlier than its own, the row is written already superseded by it in its lineage, `validTo` its `validFrom`, with the reason `earlier-than-live` | 201, the memory; 409 `conflict` where a live row holds the key and the new `validFrom` is not earlier than its own |
 | `GET /memories/{memoryId}` | reads one | 200; 404 |
-| `PATCH /memories/{memoryId}` | moves its status: `status`, `actorName`, `at` (when it stopped holding, now where none), `reason` (kept on the row moved), `text` (for a move to `done`: the words it ended on, written as a new version that is then moved, in one transaction) | 200, the row moved; 400 for `text` on another move; 404; 409 for a move the table does not allow |
-| `POST /memories/{memoryId}/restorations` | restores a closed lineage: the row named is the newest of a `done` or `invalidated` lineage; `actorName` required and `text` (the closed row's where none); a new `active` version is written in the lineage, and the closed row stays as it was | 201, the new version; 404; 409 where the row is not the newest of its lineage, is not `done` or `invalidated`, or a live row holds its key |
+| `PATCH /memories/{memoryId}` | moves its status: `status`, `actorName`, `at` (when it stopped holding, now where none), `reason` (kept on the row moved), `text` (for a move to `done`: the words it ended on, written as a new version that is then moved; for a move to `retracted`: what the speaker meant instead, written as a new active version, the row named retracted and pointing at it; each in one transaction); the row moved records the moment of the move as its `supersededAt` | 200, the row moved (for a retraction with `text`, the retracted row); 400 for `text` on another move; 404; 409 for a move the table does not allow |
+| `POST /memories/{memoryId}/restorations` | restores a closed lineage: the row named is the newest of a `done` or `invalidated` lineage, never a `retracted` one; `actorName` required and `text` (the closed row's where none); a new `active` version is written in the lineage, and the closed row stays as it was | 201, the new version; 404; 409 where the row is not the newest of its lineage, is not `done` or `invalidated`, or a live row holds its key |
 | `POST /memories/{memoryId}/versions` | writes a new version over a live one: `actorName` required; `text`, `type`, `layerId`, `position`, `subjectIds` or `subjects` (replacing the subjects whole), `importance`, `validFrom`, `recallCondition`, `releaseCondition` (a null clears one), `labels`, each taken from the old version where not given | 201, the new version; the old is `superseded` with `validTo` the new one's `validFrom`; 409 over a row that is not live |
 | `POST /merges` | writes one row over several: `memoryIds` (two or more live rows), `type`, `text`, `actorName` required; `key`, `layerId`, `position`, `subjectIds` or `subjects` (the union of the merged rows' subjects where none is given), `importance` (the highest merged where none), `validFrom` (now where none), `recallCondition` and `releaseCondition` (the one the merged rows share where none is given), `labels`; each merged row becomes `superseded` pointing at the new one | 201, the new row; 400; 404; 409 for a row that is not live |
 | `GET /lineages/{lineageId}` | every version of a lineage, oldest first | 200, a list; 404 |
@@ -232,9 +235,10 @@ where none is given). It answers `block`, the text the turn is handed; `chosen`,
   and the release stands whether or not `record` is set.
 - **A row handed to the session before** in the same version is marked: its line carries its id and no
   words. With `record` true, a use of each row handed out is recorded and it is marked for `sessionKey`.
-- **A line** is `- [#<id> <type> since <date>] <text>`, a `rumor` prefixed `heard:`, and a row whose
-  predecessor was superseded within the brain's previous-value window carries `(before, until <date>:
-  <text>)`.
+- **A line** is `- [#<id> <type> since <date>] <text>`, `until <date>` following the first date where the row
+  has a `validTo`, a `rumor` prefixed `heard:`; a row whose predecessor was superseded within the brain's
+  previous-value window carries `(before, until <date>: <text>)`, and one whose predecessor was retracted
+  within it `(before, retracted: <text>)`.
 
 `POST /folds` takes `sessionKey` and clears that session's marks, answering `clearedCount`.
 
@@ -245,8 +249,8 @@ material and its mechanics.
 
 | Route | Does | Answers |
 |---|---|---|
-| `POST /similar` | `text`, `subjects` (each `type` and `key`), `limit` (10 where none, at most 50): the live memories most like the candidate, about one of its subjects or holding one of its stems, neither an `episode` nor a `persona`, ordered by the relevance recall reckons with the candidate's stems and subjects as the cues, then by `id`, highest first | 200, a list |
-| `POST /learnings` | a learning applied whole in one transaction: `type`, `text`, `subjects`, `importance`, `source` (`own`, `owner`, `told`, `inferred`), `confirms` (ids confirmed), `strengthens` (an id given a new version with the text), `replaces` (ids invalidated, unless the source is heard), `grounds` (episode ids linked as subjects of type `episode`), `validFrom` (when it began holding; now where none), `key`, `layerId`, `recallCondition`, `releaseCondition`, `actorName`, `labels` | 201: `confirmedCount`, `invalidatedIds`, `written` (the version written, or null where the learning only confirms), `versioned`; 400 for a ground that is no episode; 409 where `strengthens` names a row that is not live |
+| `POST /similar` | `text`, `subjects` (each `type` and `key`), `limit` (10 where none, at most 50), `asOf` (a moment: the rows that held then, as `GET /memories` reads it, in place of the live ones): the live memories most like the candidate, about one of its subjects or holding one of its stems, neither an `episode` nor a `persona`, ordered by the relevance recall reckons with the candidate's stems and subjects as the cues, then by `id`, highest first | 200, a list |
+| `POST /learnings` | a learning applied whole in one transaction: `type`, `text`, `subjects`, `importance`, `source` (`own`, `owner`, `told`, `inferred`), `confirms` (ids confirmed), `strengthens` (an id given a new version with the text), `replaces` (ids invalidated, unless the source is heard), `grounds` (episode ids linked as subjects of type `episode`), `validFrom` (when it began holding; now where none), `key`, `layerId`, `recallCondition`, `releaseCondition`, `actorName`, `labels`; where the new row's `validFrom` is earlier than that of every row it would close, the one it strengthens or all it replaces, it closes none and is written already superseded by the one of them that began first, `validTo` that row's `validFrom`, with the reason `earlier-than-live` | 201: `confirmedCount`, `invalidatedIds`, `written` (the version written, or null where the learning only confirms), `versioned`; 400 for a ground that is no episode; 409 where `strengthens` names a row that is not live |
 | `GET /unconsolidated` | the active `episode` rows not yet consolidated, in priority order (`docs/design.md`, 「Consolidation」), the first `limit` of them (60 where none, at most 500); each the memory with `priority` (gain × (1 + need)), `gain` (importance × (1 + novelty), novelty one less the greatest share of the episode's stems a live row of its subjects holds), `need` and `taggedBy` (the tag it was read out after, or null) beside it | 200, a list |
 | `POST /consolidated` | `episodeIds`: marks them consolidated | 200, `recordedCount` |
 

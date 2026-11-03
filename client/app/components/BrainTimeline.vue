@@ -151,6 +151,7 @@ function colour(status: MemoryStatus): string {
     case "pending":
       return "var(--ui-warning)";
     case "invalidated":
+    case "retracted":
       return "var(--ui-error)";
     case "done":
       return "var(--ui-info)";

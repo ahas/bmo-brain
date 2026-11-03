@@ -428,7 +428,9 @@ impl Store {
       if !holds(condition, asked, self.rules.condition_share) {
         continue;
       }
-      sqlx::query("UPDATE memories SET status = 'invalidated', valid_to = $2, reason = $3 WHERE id = $1")
+      sqlx::query(
+        "UPDATE memories SET status = 'invalidated', valid_to = $2, superseded_at = $2, reason = $3 WHERE id = $1",
+      )
         .bind(row.id)
         .bind(at)
         .bind(condition)
@@ -444,22 +446,28 @@ impl Store {
   /// One memory as a line of the block: its id, its type, since when it holds, its words, and what it
   /// replaced lately; a marked one carries its mark and no words.
   async fn line(&self, conn: &mut PgConnection, memory: &Memory, marked: bool, at: i64) -> Held<String> {
-    let head = format!("- [#{} {} since {}]", memory.id, memory.kind, day(memory.valid_from));
+    let until = memory.valid_to.map(|to| format!(" until {}", day(to))).unwrap_or_default();
+    let head = format!("- [#{} {} since {}{until}]", memory.id, memory.kind, day(memory.valid_from));
     if marked {
       return Ok(format!("{head} (handed to this session already)"));
     }
     let heard = if memory.kind == "rumor" { "heard: " } else { "" };
     let mut line = format!("{head} {heard}{}", memory.text.trim());
     let window = at - self.rules.previous_value_days * 86_400_000;
-    let previous: Option<(String, i64)> = sqlx::query_as(
-      "SELECT text, valid_to FROM memories WHERE superseded_by = $1 AND valid_to >= $2 AND status = 'superseded'",
+    let previous: Option<(String, i64, String)> = sqlx::query_as(
+      "SELECT text, valid_to, status FROM memories WHERE superseded_by = $1 AND valid_to >= $2 \
+       AND status IN ('superseded', 'retracted') ORDER BY id DESC LIMIT 1",
     )
     .bind(memory.id)
     .bind(window)
     .fetch_optional(&mut *conn)
     .await?;
-    if let Some((text, until)) = previous {
-      line.push_str(&format!(" (before, until {}: {})", day(until), text.trim()));
+    match previous {
+      Some((text, _, status)) if status == MemoryStatus::Retracted.name() => {
+        line.push_str(&format!(" (before, retracted: {})", text.trim()));
+      }
+      Some((text, until, _)) => line.push_str(&format!(" (before, until {}: {})", day(until), text.trim())),
+      None => {}
     }
     Ok(line)
   }
