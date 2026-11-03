@@ -165,3 +165,53 @@ async fn a_tag_pulls_its_rooms_episodes_written_within_a_session_to_right_after_
   let first_two = client.unconsolidated(brain, &UnconsolidatedQuery { limit: Some(2) }).await.unwrap();
   assert_eq!(first_two.iter().map(|e| e.memory.id).collect::<Vec<_>>(), [tag.id, weak.id]);
 }
+
+#[tokio::test]
+async fn the_consolidation_state_reads_alone_what_a_recall_says_of_it() {
+  let served = Served::new().await;
+  let client = &served.client;
+  let brain = brain_of(client).await;
+  let threshold = bmo_brain_client::Rules::default().consolidation_threshold;
+  for importance in [9, 9, 3] {
+    client
+      .memory_add(brain, &memory("episode", "Something was said.", importance, &[]))
+      .await
+      .unwrap();
+  }
+  let state = client.consolidation(brain).await.unwrap();
+  assert_eq!(
+    (
+      state.unconsolidated_importance,
+      state.unconsolidated_count,
+      state.threshold,
+      state.consolidation_due
+    ),
+    (21, 3, threshold, false)
+  );
+  let recall = client
+    .recall(
+      brain,
+      &bmo_brain_client::RecallAsk {
+        record: Some(false),
+        ..Default::default()
+      },
+    )
+    .await
+    .unwrap();
+  assert_eq!(
+    (recall.unconsolidated_importance, recall.consolidation_due),
+    (state.unconsolidated_importance, state.consolidation_due)
+  );
+  for _ in 0..15 {
+    client.memory_add(brain, &memory("episode", "More news.", 9, &[])).await.unwrap();
+  }
+  let due = client.consolidation(brain).await.unwrap();
+  assert_eq!(
+    (due.unconsolidated_importance, due.unconsolidated_count, due.consolidation_due),
+    (156, 18, true)
+  );
+  // Reading the state records nothing: no episode was used.
+  let episodes = read(client, brain).await;
+  assert!(episodes.iter().all(|episode| episode.memory.use_count == 0));
+  assert_eq!(support::refused(client.consolidation(brain + 1).await), (404, "not-found".to_owned()));
+}

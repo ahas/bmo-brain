@@ -74,6 +74,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/brains/{brainId}/consolidation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Whether a consolidation is due, the numbers a recall answers, read alone with nothing recorded. */
+        get: operations["readConsolidation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/brains/{brainId}/export": {
         parameters: {
             query?: never;
@@ -624,6 +641,26 @@ export interface components {
         /** @description Episodes a consolidation read. */
         Consolidated: {
             episodeIds: number[];
+        };
+        /** @description Whether a consolidation is due, as a recall says it, read alone. */
+        ConsolidationState: {
+            /** @description Whether the sum has reached the threshold. */
+            consolidationDue: boolean;
+            /**
+             * Format: int64
+             * @description The sum at which a consolidation is due: the rules' consolidation threshold.
+             */
+            threshold: number;
+            /**
+             * Format: int64
+             * @description How many unconsolidated episodes the brain holds.
+             */
+            unconsolidatedCount: number;
+            /**
+             * Format: int64
+             * @description The sum of the importance of the brain's unconsolidated episodes.
+             */
+            unconsolidatedImportance: number;
         };
         /** @description One event: its number, its kind, when it happened and the member it is about. */
         Event: {
@@ -1623,6 +1660,32 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Recorded"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    readConsolidation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                brainId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConsolidationState"];
                 };
             };
             400: components["responses"]["BadRequest"];

@@ -5,11 +5,11 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 
 use crate::brains::{
-  Brain, BrainsQuery, Confirmations, Consolidated, ExportQuery, Fold, Folded, Hits, Injected, Layer,
-  LayerChange, LayersQuery, Learned, Learning, MemoriesQuery, Memory, MemoryMerge, MemoryMove,
-  MemoryVersion, NewBrain, NewLayer, NewMemory, NewSubject, PersonaQuery, Recall, RecallAsk, Recorded,
-  Restoration, SheetQuery, SimilarAsk, Subject, SubjectChange, SubjectsQuery, TalliesQuery, Tally,
-  TypeCount, UnconsolidatedEpisode, UnconsolidatedQuery,
+  Brain, BrainsQuery, Confirmations, Consolidated, ConsolidationState, ExportQuery, Fold, Folded, Hits,
+  Injected, Layer, LayerChange, LayersQuery, Learned, Learning, MemoriesQuery, Memory, MemoryMerge,
+  MemoryMove, MemoryVersion, NewBrain, NewLayer, NewMemory, NewSubject, PersonaQuery, Recall, RecallAsk,
+  Recorded, Restoration, SheetQuery, SimilarAsk, Subject, SubjectChange, SubjectsQuery, TalliesQuery,
+  Tally, TypeCount, UnconsolidatedEpisode, UnconsolidatedQuery,
 };
 use crate::wire::{ConsoleManifest, ConsoleWords, Event, EventsQuery, Health, Page, WireError};
 
@@ -349,6 +349,11 @@ impl BrainClient {
     query: &UnconsolidatedQuery,
   ) -> Answer<Vec<UnconsolidatedEpisode>> {
     Self::answered(self.get(&["brains", &brain_id.to_string(), "unconsolidated"], query)).await
+  }
+
+  /// `GET /brains/{brainId}/consolidation`
+  pub async fn consolidation(&self, brain_id: i64) -> Answer<ConsolidationState> {
+    Self::answered(self.request(Method::GET, &["brains", &brain_id.to_string(), "consolidation"])).await
   }
 
   /// `POST /brains/{brainId}/consolidated`

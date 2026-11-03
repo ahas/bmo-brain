@@ -13,7 +13,7 @@ pub use brains::{
   RecallChoice, RecallPart, Recorded, Restoration, Rules, SheetQuery, Subject, SubjectChange, SubjectKey,
   SubjectRef, SubjectsQuery, TalliesQuery, Tally, TallyBy, TypeCount,
 };
-pub use brains::{SimilarAsk, Source, UnconsolidatedEpisode, UnconsolidatedQuery};
+pub use brains::{ConsolidationState, SimilarAsk, Source, UnconsolidatedEpisode, UnconsolidatedQuery};
 pub use client::{Answer, BrainClient, ClientFailure};
 /// The HTTP client a `BrainClient` calls through, for a caller that sets its own timeout or proxy.
 pub use reqwest::Client as HttpClient;

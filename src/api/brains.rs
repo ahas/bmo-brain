@@ -8,10 +8,10 @@ use axum::http::{StatusCode, header};
 use axum::response::{IntoResponse, Json, Response};
 use axum::routing::{get, post};
 use bmo_brain_client::{
-  Brain as BrainMember, BrainsQuery, Confirmations, Consolidated, ExportQuery, Fold, Folded, Hits,
-  Injected, Layer, LayerChange, LayersQuery, Learned, Learning, MemoriesQuery, Memory, MemoryMerge,
-  MemoryMove, MemoryVersion, NewBrain, NewLayer, NewMemory, NewSubject, Page, PersonaQuery, Recall,
-  RecallAsk, Recorded, Restoration, SheetQuery, SimilarAsk, Subject, SubjectChange, SubjectsQuery,
+  Brain as BrainMember, BrainsQuery, Confirmations, Consolidated, ConsolidationState, ExportQuery, Fold,
+  Folded, Hits, Injected, Layer, LayerChange, LayersQuery, Learned, Learning, MemoriesQuery, Memory,
+  MemoryMerge, MemoryMove, MemoryVersion, NewBrain, NewLayer, NewMemory, NewSubject, Page, PersonaQuery,
+  Recall, RecallAsk, Recorded, Restoration, SheetQuery, SimilarAsk, Subject, SubjectChange, SubjectsQuery,
   TalliesQuery, Tally, TypeCount, UnconsolidatedEpisode, UnconsolidatedQuery,
 };
 
@@ -233,6 +233,10 @@ async fn unconsolidated(
   Ok(Json(brain.store.unconsolidated(id, query.limit).await?))
 }
 
+async fn consolidation(State(brain): State<Brain>, Key(id): Key<i64>) -> Answer<Json<ConsolidationState>> {
+  Ok(Json(brain.store.consolidation(id).await?))
+}
+
 async fn consolidated(
   State(brain): State<Brain>,
   Key(id): Key<i64>,
@@ -309,6 +313,7 @@ pub fn routes() -> Router<Brain> {
     .route("/brains/{brainId}/learnings", post(learn))
     .route("/brains/{brainId}/similar", post(similar))
     .route("/brains/{brainId}/unconsolidated", get(unconsolidated))
+    .route("/brains/{brainId}/consolidation", get(consolidation))
     .route("/brains/{brainId}/consolidated", post(consolidated))
     .route("/brains/{brainId}/persona", get(persona))
     .route("/brains/{brainId}/export", get(export))

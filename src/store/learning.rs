@@ -255,6 +255,28 @@ impl Store {
     Ok(learned)
   }
 
+  /// Whether a consolidation is due, as a recall says it: the same sum and threshold, read alone, nothing
+  /// recorded.
+  pub async fn consolidation(&self, brain_id: i64) -> Held<bmo_brain_client::ConsolidationState> {
+    let mut conn = self.connection().await?;
+    brain_of(&mut conn, brain_id).await?;
+    let unconsolidated_importance = self.unconsolidated_importance(&mut conn, brain_id).await?;
+    let unconsolidated_count: i64 = sqlx::query_scalar(
+      "SELECT COUNT(*) FROM memories WHERE brain_id = $1 AND type = 'episode' AND status = 'active' \
+       AND consolidated_at IS NULL",
+    )
+    .bind(brain_id)
+    .fetch_one(&mut *conn)
+    .await?;
+    let threshold = self.rules.consolidation_threshold;
+    Ok(bmo_brain_client::ConsolidationState {
+      unconsolidated_importance,
+      unconsolidated_count,
+      threshold,
+      consolidation_due: unconsolidated_importance >= threshold,
+    })
+  }
+
   /// The sum of the importance of a brain's unconsolidated episodes, read within a transaction.
   pub(crate) async fn unconsolidated_importance(
     &self,

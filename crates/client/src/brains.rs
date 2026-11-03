@@ -882,6 +882,20 @@ pub struct UnconsolidatedEpisode {
   pub tagged_by: Option<i64>,
 }
 
+/// Whether a consolidation is due, as a recall says it, read alone.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ConsolidationState {
+  /// The sum of the importance of the brain's unconsolidated episodes.
+  pub unconsolidated_importance: i64,
+  /// How many unconsolidated episodes the brain holds.
+  pub unconsolidated_count: i64,
+  /// The sum at which a consolidation is due: the rules' consolidation threshold.
+  pub threshold: i64,
+  /// Whether the sum has reached the threshold.
+  pub consolidation_due: bool,
+}
+
 /// Episodes a consolidation read.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]

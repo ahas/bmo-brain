@@ -12,8 +12,8 @@ use bmo_brain_client::{
   Recorded, SheetQuery, Subject, SubjectChange, SubjectsQuery, TypeCount, WireError,
 };
 use bmo_brain_client::{
-  ConsoleManifest, ConsoleWords, Consolidated, Learned, Learning, Restoration, SimilarAsk, TalliesQuery,
-  Tally, UnconsolidatedEpisode, UnconsolidatedQuery,
+  ConsoleManifest, ConsoleWords, Consolidated, ConsolidationState, Learned, Learning, Restoration,
+  SimilarAsk, TalliesQuery, Tally, UnconsolidatedEpisode, UnconsolidatedQuery,
 };
 use schemars::generate::{SchemaGenerator, SchemaSettings};
 use schemars::{JsonSchema, Schema};
@@ -585,6 +585,18 @@ fn brain_routes(g: &mut SchemaGenerator) -> Vec<Route> {
       body: None,
       raw_body: None,
       answers: vec![(200, json_answer::<Vec<UnconsolidatedEpisode>>(g))],
+      codes: vec![BadRequest, NotFound],
+    },
+    Route {
+      method: "get",
+      path: "/brains/{brainId}/consolidation",
+      id: "readConsolidation",
+      tag: "writing",
+      summary: "Whether a consolidation is due, the numbers a recall answers, read alone with nothing recorded.",
+      parameters: brain(g),
+      body: None,
+      raw_body: None,
+      answers: vec![(200, json_answer::<ConsolidationState>(g))],
       codes: vec![BadRequest, NotFound],
     },
     Route {

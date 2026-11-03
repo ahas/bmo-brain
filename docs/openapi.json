@@ -270,6 +270,37 @@
         ],
         "type": "object"
       },
+      "ConsolidationState": {
+        "description": "Whether a consolidation is due, as a recall says it, read alone.",
+        "properties": {
+          "consolidationDue": {
+            "description": "Whether the sum has reached the threshold.",
+            "type": "boolean"
+          },
+          "threshold": {
+            "description": "The sum at which a consolidation is due: the rules' consolidation threshold.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "unconsolidatedCount": {
+            "description": "How many unconsolidated episodes the brain holds.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "unconsolidatedImportance": {
+            "description": "The sum of the importance of the brain's unconsolidated episodes.",
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "unconsolidatedImportance",
+          "unconsolidatedCount",
+          "threshold",
+          "consolidationDue"
+        ],
+        "type": "object"
+      },
       "Event": {
         "description": "One event: its number, its kind, when it happened and the member it is about.",
         "properties": {
@@ -2485,6 +2516,57 @@
           }
         },
         "summary": "Mark episodes consolidated.",
+        "tags": [
+          "writing"
+        ],
+        "x-codes": [
+          "bad-request",
+          "unauthorized",
+          "forbidden",
+          "not-found"
+        ],
+        "x-console": "closed"
+      }
+    },
+    "/brains/{brainId}/consolidation": {
+      "get": {
+        "operationId": "readConsolidation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "brainId",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsolidationState"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "summary": "Whether a consolidation is due, the numbers a recall answers, read alone with nothing recorded.",
         "tags": [
           "writing"
         ],

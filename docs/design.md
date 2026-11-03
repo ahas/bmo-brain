@@ -219,8 +219,10 @@ takes the episodes in the brain's priority order.
   brain's threshold, and a session being folded or handed off. There is no nightly pass, no pass every N
   turns and no periodic mode: the importance trigger is what stands in for one, the hand-off trigger is the
   other mode.
-- **The brain says when it is due:** every recall answers whether the importance threshold is reached, and
-  the agent consolidates in its turn when it is, and at its fold. The brain reads the unconsolidated
+- **The brain says when it is due:** every recall answers whether the importance threshold is reached, and so
+  does a reading of the consolidation state alone, the same numbers reckoned the same way with nothing
+  recorded, for a caller that wants to know without a recall; the agent consolidates in its turn when it is,
+  and at its fold. The brain reads the unconsolidated
   episodes out in priority order and is told which it consolidated; it runs no pass of its own.
 - **Priority is the expected value of consolidating an episode,** after Mattar and Daw's (2018) value of a
   memory backup: priority = gain × (1 + need), highest first, reckoned at the reading from what the brain
