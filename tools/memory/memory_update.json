@@ -1,0 +1,32 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "memory",
+    "action"
+  ],
+  "properties": {
+    "memory": {
+      "type": "string",
+      "description": "The memory to update: its id, or its key."
+    },
+    "action": {
+      "type": "string",
+      "description": "The new version's text, in English, replacing the old version's whole."
+    },
+    "chat": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "description": "Accepted and ignored."
+    },
+    "message": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "description": "Accepted and ignored."
+    }
+  }
+}

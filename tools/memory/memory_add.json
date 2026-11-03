@@ -1,0 +1,74 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "type",
+    "action"
+  ],
+  "properties": {
+    "type": {
+      "type": "string",
+      "enum": [
+        "promise",
+        "check",
+        "followup",
+        "situation",
+        "state"
+      ],
+      "description": "The kind of row: promise, check, followup, situation or state."
+    },
+    "action": {
+      "type": "string",
+      "description": "The row's text, in English: what is promised, checked, followed up, the situation, or the state."
+    },
+    "condition": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "The situation in which the row is needed, in a few English words."
+    },
+    "slug": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "The row's key, for naming it later."
+    },
+    "global": {
+      "type": [
+        "boolean",
+        "null"
+      ],
+      "description": "Do not tie the row to the turn's room."
+    },
+    "chat": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "description": "The room to tie the row to, by its chat id, where it is not the turn's own."
+    },
+    "for": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "description": "The person the row is for, a person subject's key."
+    },
+    "by": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "description": "Accepted and ignored."
+    },
+    "message": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "description": "Accepted and ignored."
+    }
+  }
+}

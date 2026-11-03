@@ -61,7 +61,7 @@ lane = "wide"
 
 [build]
 # The service's binary, which also starts the harness plugin's MCP server, and the tool host's tool.
-binaries = ["bmo-brain", "brain-tool"]
+binaries = ["bmo-brain", "brain-tool", "memory-tool"]
 
 # The console bundle the service serves (docs/boundary-api.md, 「The console bundle」), built in the build tree,
 # where its install and Nuxt's generated project stay warm between deployments, and written into the release
@@ -121,4 +121,26 @@ phase = "after-health"
 command = '''
 set -eu
 "$HOME/.local/share/bmo-pocket/deploy/bin/bmo-pocket" put --service brain --placed --allow room.chat tools/brain/.placed
+'''
+
+# The memory tool placed in its folder's .placed/, the folder the tool host reads: the executable the
+# release's bin/ holds, its manifest and the schemas beside it.
+[[deploy.step]]
+id = "place-memory-tool"
+phase = "before-flip"
+command = '''
+set -eu
+rm -rf tools/memory/.placed
+mkdir -p tools/memory/.placed
+cp bin/memory-tool tools/memory/tool.toml tools/memory/*.json tools/memory/.placed/
+'''
+
+# The placed memory tool registered with the tool host under this service's name, carrying the room.tools
+# capability its entries ask for.
+[[deploy.step]]
+id = "register-memory-tool"
+phase = "after-health"
+command = '''
+set -eu
+"$HOME/.local/share/bmo-pocket/deploy/bin/bmo-pocket" put --service brain --placed --allow room.tools tools/memory/.placed
 '''

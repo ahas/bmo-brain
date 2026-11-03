@@ -1,0 +1,39 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "memory",
+    "why"
+  ],
+  "properties": {
+    "memory": {
+      "type": "string",
+      "description": "The memory to retire: its id, or its key."
+    },
+    "why": {
+      "type": "string",
+      "description": "Why it stopped holding, in English, kept on the row."
+    },
+    "chat": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "description": "Accepted and ignored."
+    },
+    "global": {
+      "type": [
+        "boolean",
+        "null"
+      ],
+      "description": "Accepted and ignored."
+    },
+    "message": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "description": "Accepted and ignored."
+    }
+  }
+}

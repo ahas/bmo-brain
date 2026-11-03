@@ -355,6 +355,26 @@ host's call protocol states.
 `GET /discipline` answers `text/plain`: the discipline a chat agent's system prompt carries, how it reads and
 writes its brain every turn, the same text the skill ships as `every-turn.md`.
 
+## The memory tool
+
+The tool host serves the memory tool, `tools/memory/`, to a chat agent's session: `tool.toml` declares its
+entries in the `bmo` namespace, each for a session holding the `room.tools` capability, and the executable
+`memory-tool` answers one call handed on standard input with one tool result on standard output, as the tool
+host's call protocol states.
+
+- **It reads and writes an agent's room memories** through the brain's own routes: it finds the brain and the
+  agent's brain by the same environment and turn variables the brain's own tool reads, and links a write to
+  the turn's room where the call names none.
+- **It holds no grant.** The session's `room.tools` capability is the whole of what each entry asks.
+- **Its entries,** each one call of a route through the brain's client, the row it names by the id or the key
+  the call gives and its writes made as `agent-session`: `memory_list` (`GET …/memories`), `memory_add`
+  (`POST …/memories`), `memory_update` (`POST …/memories/{memoryId}/versions`), `memory_done` and
+  `memory_candidate` (`PATCH …/memories/{memoryId}`), `memory_retire`
+  (`PATCH …/memories/{memoryId}`), and `memory_revive` (`POST …/memories/{memoryId}/restorations`).
+- **A deployment places it** in `tools/memory/.placed/` inside the release: the executable, the manifest and
+  the schemas; and once the release stays up, registers that folder with the tool host as the service's own
+  tool, so no hand touches the registry.
+
 ## The harness plugin
 
 The plugin is `brain-harness`: the MCP server `bmo-brain mcp` starts on standard input and output, and the

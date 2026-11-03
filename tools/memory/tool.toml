@@ -1,0 +1,84 @@
+# The memory tool: an agent's room memories, read and written in a turn (docs/boundary-api.md, 「The memory
+# tool」), each entry one call of a brain route through the brain's client. The tool finds the brain through the
+# data root's env file, and the agent's brain by the turn's agent. The crate's own test holds every entry here to
+# the executable answering it. Every entry is unbounded: a call waits for the brain's answer however long it
+# takes.
+
+[tool]
+name = "memory"
+protocol = 1
+language = "rust"
+build = 'cargo build --release -p memory-tool && cp "$BMO_CARGO_TARGET/release/memory-tool" "$BMO_TOOL_OUT/"'
+check = 'cargo test -p memory-tool'
+run = ["memory-tool"]
+timeout = 60
+
+[[entry]]
+namespace = "bmo"
+name = "memory_list"
+title = "List room memories"
+description = "The memories of this turn's room, one line a row: active rows unless the call asks for every status, and any room by its chat id where the call names one."
+input = "memory_list.json"
+hints = { read_only = true }
+capabilities = ["room.tools"]
+unbounded = true
+
+[[entry]]
+namespace = "bmo"
+name = "memory_add"
+title = "Keep a room memory"
+description = "Keep a promise, check, followup, situation or state about this turn's room and, where a person is named, that person."
+input = "memory_add.json"
+hints = { idempotent = false }
+capabilities = ["room.tools"]
+unbounded = true
+
+[[entry]]
+namespace = "bmo"
+name = "memory_update"
+title = "Update a memory"
+description = "Write a new version of a memory, its words replaced whole, naming it by its id or its key."
+input = "memory_update.json"
+hints = { idempotent = false }
+capabilities = ["room.tools"]
+unbounded = true
+
+[[entry]]
+namespace = "bmo"
+name = "memory_done"
+title = "Finish a memory"
+description = "Mark a memory done, with the words it ended on where the call gives them."
+input = "memory_done.json"
+hints = { idempotent = true }
+capabilities = ["room.tools"]
+unbounded = true
+
+[[entry]]
+namespace = "bmo"
+name = "memory_retire"
+title = "Retire a memory"
+description = "Mark a memory invalidated, keeping the reason it stopped holding."
+input = "memory_retire.json"
+hints = { idempotent = true }
+capabilities = ["room.tools"]
+unbounded = true
+
+[[entry]]
+namespace = "bmo"
+name = "memory_revive"
+title = "Revive a memory"
+description = "Restore a closed memory as a new active version of its lineage."
+input = "memory_revive.json"
+hints = { idempotent = false }
+capabilities = ["room.tools"]
+unbounded = true
+
+[[entry]]
+namespace = "bmo"
+name = "memory_candidate"
+title = "Mark a candidate"
+description = "Mark a memory pending, waiting for a person's approval, with the reason it is a candidate."
+input = "memory_candidate.json"
+hints = { idempotent = true }
+capabilities = ["room.tools"]
+unbounded = true

@@ -1,0 +1,42 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "type": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "promise",
+        "check",
+        "followup",
+        "situation",
+        "state",
+        null
+      ],
+      "description": "The kind of row to list: promise, check, followup, situation or state."
+    },
+    "all": {
+      "type": [
+        "boolean",
+        "null"
+      ],
+      "description": "List finished and taken-down rows too; active rows alone where false or absent."
+    },
+    "global": {
+      "type": [
+        "boolean",
+        "null"
+      ],
+      "description": "Read the rows tied to no room, instead of the turn's room."
+    },
+    "chat": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "description": "The room to read, by its chat id, where it is not the turn's own."
+    }
+  }
+}
