@@ -124,20 +124,30 @@ pub struct Served {
 
 impl Served {
   pub async fn new() -> Served {
-    Self::serving(None, vec![]).await
+    Self::serving(None, vec![], None).await
+  }
+
+  /// The service searching by meaning with the embedding model named, its vectors read in and no embedder
+  /// standing; a test stands one or fills the backlog itself.
+  pub async fn embedding(config: bmo_brain::store::vectors::EmbeddingConfig) -> Served {
+    Self::serving(None, vec![], Some(config)).await
   }
 
   /// The service serving the console bundle built into this folder, where it holds one.
   pub async fn with_bundle(folder: &std::path::Path) -> Served {
-    Self::serving(Some(folder), vec![]).await
+    Self::serving(Some(folder), vec![], None).await
   }
 
   /// The service serving the console bundle built into this folder, its screen calling the services named.
   pub async fn with_bundle_calling(folder: &std::path::Path, calls: &[&str]) -> Served {
-    Self::serving(Some(folder), calls.iter().map(|call| (*call).to_owned()).collect()).await
+    Self::serving(Some(folder), calls.iter().map(|call| (*call).to_owned()).collect(), None).await
   }
 
-  async fn serving(bundle: Option<&std::path::Path>, calls: Vec<String>) -> Served {
+  async fn serving(
+    bundle: Option<&std::path::Path>,
+    calls: Vec<String>,
+    embedding: Option<bmo_brain::store::vectors::EmbeddingConfig>,
+  ) -> Served {
     let template = template().await;
     let database = format!("{COPY}{}_{}", std::process::id(), COPIES.fetch_add(1, Ordering::SeqCst));
     let mut admin = server().await;
@@ -147,7 +157,8 @@ impl Served {
       .unwrap();
     admin.close().await.unwrap();
     let pool = PgPoolOptions::new().max_connections(8).connect_with(options(&database)).await.unwrap();
-    let store = Store::over(pool);
+    let store = Store::over(pool).embedding(embedding);
+    store.load_vectors().await.unwrap();
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let base = format!("http://{}", listener.local_addr().unwrap());
     let console = match bundle {

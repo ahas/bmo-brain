@@ -13,7 +13,8 @@ use sqlx::{FromRow, PgConnection, Postgres, QueryBuilder};
 use super::brains::{brain_of, event_scope, given, layer_of, subject_found_or_made, subjects_of};
 use super::misses::Asked;
 use super::sheets::{SHEET, written_type};
-use super::{Fault, Held, Store, TEXT_MOST, holding, limit, listed, now, page, publish, text};
+use super::vectors::fuse;
+use super::{Fault, Held, Store, TEXT_MOST, holding, limit, listed, now, publish, text};
 
 /// The types code depends on the meaning of.
 pub const RESERVED_TYPES: [&str; 9] =
@@ -176,6 +177,12 @@ impl Store {
     let limit = limit(query.limit)?;
     let filter = Filter::of(query)?;
     let (field, descending) = order(query.order.as_deref())?;
+    // A first page by words with no past moment is also searched by meaning: its words embedded before anything
+    // of the brain is held.
+    let by_meaning = match &query.q {
+      Some(words) if query.after.is_none() && query.as_of.is_none() => self.query_vector(words).await,
+      _ => None,
+    };
     let mut conn = self.begin().await?;
     brain_of(&mut conn, brain_id).await?;
     let mut sql =
@@ -205,10 +212,55 @@ impl Store {
     }
     sql.push(" LIMIT ").push_bind(limit + 1);
     let mut rows: Vec<MemoryRow> = sql.build_query_as().fetch_all(&mut *conn).await?;
+    let most = usize::try_from(limit).unwrap_or(usize::MAX);
+    let mut more = rows.len() > most;
+    rows.truncate(most);
+    // The rows nearest the words in meaning that pass every other filter, fused with the word matches by
+    // Reciprocal Rank Fusion, the page cut at its limit.
+    if let Some(meaning) = &by_meaning {
+      let kept = usize::try_from(self.rules.vector_candidates.max(0)).unwrap_or(0);
+      let near = self.nearest_live(&mut conn, brain_id, meaning, kept).await?;
+      let ids: Vec<i64> = near.iter().map(|(id, _)| *id).collect();
+      let mut others = filter.clone();
+      others.words = None;
+      let mut sql =
+        QueryBuilder::<Postgres>::new(format!("SELECT {MEMORY_COLUMNS} FROM memories WHERE brain_id = "));
+      sql.push_bind(brain_id).push(" AND id = ANY(").push_bind(ids).push(")");
+      others.push(&mut sql);
+      let found: Vec<MemoryRow> = sql.build_query_as().fetch_all(&mut *conn).await?;
+      let mut found: BTreeMap<i64, MemoryRow> = found.into_iter().map(|row| (row.id, row)).collect();
+      // The word matches stand in the list's own order, each its own rank.
+      let word_list: Vec<(i64, f64)> =
+        rows.iter().enumerate().map(|(place, row)| (row.id, -(place as f64))).collect();
+      let mut vector_list: Vec<(i64, f64)> = Vec::new();
+      for (id, cosine) in &near {
+        if vector_list.len() >= kept {
+          break;
+        }
+        if found.contains_key(id) {
+          vector_list.push((*id, *cosine));
+        }
+      }
+      let fused = fuse(&[&word_list, &vector_list], self.rules.rrf_k);
+      let mut union: Vec<MemoryRow> = rows;
+      for (id, _) in &vector_list {
+        if !word_list.iter().any(|(word, _)| word == id)
+          && let Some(row) = found.remove(id)
+        {
+          union.push(row);
+        }
+      }
+      union.sort_by(|a, b| {
+        let (x, y) = (fused.get(&a.id).copied().unwrap_or(0.0), fused.get(&b.id).copied().unwrap_or(0.0));
+        y.partial_cmp(&x).unwrap_or(std::cmp::Ordering::Equal).then(a.id.cmp(&b.id))
+      });
+      more = more || union.len() > most;
+      union.truncate(most);
+      rows = union;
+    }
     if query.record.unwrap_or(true) && filter.is_explicit() {
       let live: Vec<i64> = rows
         .iter()
-        .take(usize::try_from(limit).unwrap_or(usize::MAX))
         .filter(|row| row.status().is_ok_and(MemoryStatus::is_live))
         .map(|row| row.id)
         .collect();
@@ -241,7 +293,10 @@ impl Store {
       self.count_ask(&mut conn, brain_id, Asked::Memories, words, !members.is_empty()).await?;
     }
     self.commit(conn).await?;
-    Ok(page(members, limit))
+    Ok(Page {
+      items: members,
+      more,
+    })
   }
 
   /// One memory.
@@ -1091,6 +1146,7 @@ pub(crate) async fn link_subjects(
 }
 
 /// The filters a memory list and a tally share, read from the query and checked.
+#[derive(Clone)]
 pub(crate) struct Filter {
   kinds: Vec<String>,
   statuses: Vec<MemoryStatus>,

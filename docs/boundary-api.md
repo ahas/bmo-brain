@@ -26,7 +26,9 @@ The binary, `bmo-brain`, reads the TOML file `--config` names at start and holds
 `bmo-brain --config <file> serve` runs the migrations and answers on the listen address;
 `bmo-brain --config <file> health` asks the service the file names whether it is ready and ends;
 `bmo-brain --config <file> sheets split` splits the live `sheet` rows of the database the file names into
-facts (「Splitting sheets」). The MCP server, `bmo-brain mcp`, takes no configuration file (「The harness
+facts (「Splitting sheets」); `bmo-brain --config <file> embed` embeds every live row lacking a vector of the
+configuration's model, deletes the other models' vectors once none lacks one, prints how many it embedded, and
+ends (`docs/design.md`, 「Vectors」). The MCP server, `bmo-brain mcp`, takes no configuration file (「The harness
 plugin」). The binary declares no noun, so the platform's `bmo` hands it no command.
 
 | Setting | Key | What it is |
@@ -35,8 +37,9 @@ plugin」). The binary declares no noun, so the platform's `bmo` hands it no com
 | token | `token` | the service's bearer token, which reaches every route |
 | console | `[console]` | the console bundle (「The console bundle」), where the brain serves one: `token`, the console's bearer token, which reaches what the screen uses; `bundle`, the folder the build of `client/` wrote the module, its stylesheet and its words into, the release's `console` where none is given; `calls`, the other services the screen calls through the console, each by the service name its own manifest gives it, which the manifest names under `calls`, none where none is given |
 | database | `database` | the address of the brain's own PostgreSQL database, which holds its tables and nothing else |
+| embedding | `[embedding]` | the embedding model the brain searches by meaning with (`docs/design.md`, 「Vectors」), none where it is not named: `address`, the LLM gateway's base address, whose `/v1/embeddings` it asks; `key_file`, the file holding the gateway's bearer key, read at each ask; `model`, the model name, `embedding` where none is given; `dims`, the vectors' length, 1024; `batch`, the most texts one ask carries, 32 |
 | data root | `data_root` | the data root whose `env/brain.env` the brain's tool reads the service's address and token from; the `tool-env` verb writes it |
-| rules | `[rules]` | the numbers the brain reads by (`docs/design.md`), each with a default: `budget_tokens`, `bm25_k1` (how far a matched stem's weight saturates with a row's length, 1.2), `bm25_b` (how much a row's length relative to the brain's mean weighs on a matched stem, 0.75), `mmr_lambda` (the weight recall's selection gives relevance against overlap with the rows already in, 0.7), `subject_cap`, `core_fact_cap` (the most facts of one speaker's sheet the core of a recall carries, 8), `hit_times_kept` (the most use moments a memory keeps, 64), `same_session_ms` (the span of one session, an hour: the window around a tag in the consolidation order), `tag_importance` (the importance at which an unconsolidated episode tags its room's episodes around it, 8), `misses_kept` (the most misses of its searches by words a brain keeps, the newest, 5000), `previous_value_days`, `condition_share` (the share of a condition's words a turn holds before it matches, 0.5), `consolidation_threshold` |
+| rules | `[rules]` | the numbers the brain reads by (`docs/design.md`), each with a default: `budget_tokens`, `vector_candidates` (how many rows nearest in meaning join a search's candidates, 40), `rrf_k` (the rank offset of Reciprocal Rank Fusion, 60), `bm25_k1` (how far a matched stem's weight saturates with a row's length, 1.2), `bm25_b` (how much a row's length relative to the brain's mean weighs on a matched stem, 0.75), `mmr_lambda` (the weight recall's selection gives relevance against overlap with the rows already in, 0.7), `subject_cap`, `core_fact_cap` (the most facts of one speaker's sheet the core of a recall carries, 8), `hit_times_kept` (the most use moments a memory keeps, 64), `same_session_ms` (the span of one session, an hour: the window around a tag in the consolidation order), `tag_importance` (the importance at which an unconsolidated episode tags its room's episodes around it, 8), `misses_kept` (the most misses of its searches by words a brain keeps, the newest, 5000), `previous_value_days`, `condition_share` (the share of a condition's words a turn holds before it matches, 0.5), `consolidation_threshold` |
 
 Deployed, the file stands under the data root as `env/brain.toml`, and each release links to it as
 `brain.toml`. The service runs as the user unit `deploy/bmo-brain.service`, the repository's one service: a
@@ -66,8 +69,12 @@ finish, and the service then ends; the unit waits for that and never escalates t
 
 `GET /health` answers `ready`, `reason` (null when ready), `version`, `rules`, the numbers the brain
 reads by, and `searches`, each brain's count of its asks by words: `brainId`, `asks` and `misses`
-(`docs/design.md`, 「What the brain counts」), for every brain that has been asked. The service is ready where its
-database answers.
+(`docs/design.md`, 「What the brain counts」), for every brain that has been asked; and `embedding`, null where the
+configuration names none, else its `address`, `keyFile`, `model`, `dims` and `batch`, `vectorised` (the live rows
+holding a vector of the model), `lacking` (the live rows holding none), `vectorAsks`, `wordAsks` and
+`vectorSkipped` (the asks since the service started that searched with vectors, by words alone, and by words
+alone because the gateway did not answer) and `lastError` (why the last ask of the gateway failed, or null). The
+service is ready where its database answers.
 
 ## Events
 
@@ -181,7 +188,7 @@ moves a caller's word may make:
 
 | Route | Does | Answers |
 |---|---|---|
-| `GET /memories` | lists by `type` and `status` (each one value or several, comma-separated), `excludeTypes` (comma-separated), `layerId`, `unfiled` (true for the rows in no layer), `subjectId`, `key`, `lineageId`, `ids` (comma-separated), `supersededBy` (comma-separated: the rows superseded by these), `label` (`key` or `key=value`), `q` (words the text holds), `situation` (words the `recallCondition` holds) and `asOf` (a moment: the rows that held then, `validFrom` at or before it and `validTo` after it or, with none, `supersededAt` after it or null, whatever their status now, never a `retracted` row), in the order `order` names; a list by `key`, `subjectId`, `type`, `q` or `situation` is an explicit read, which records a use of each live row of the page it answers unless `record` is false (true where none is given) | 200, a page |
+| `GET /memories` | lists by `type` and `status` (each one value or several, comma-separated), `excludeTypes` (comma-separated), `layerId`, `unfiled` (true for the rows in no layer), `subjectId`, `key`, `lineageId`, `ids` (comma-separated), `supersededBy` (comma-separated: the rows superseded by these), `label` (`key` or `key=value`), `q` (words the text holds), `situation` (words the `recallCondition` holds; a first page by `q` with no `asOf` also takes the `vector_candidates` live rows that pass the other filters nearest the words in meaning, the two lists fused by Reciprocal Rank Fusion and the page cut at `limit`) and `asOf` (a moment: the rows that held then, `validFrom` at or before it and `validTo` after it or, with none, `supersededAt` after it or null, whatever their status now, never a `retracted` row), in the order `order` names; a list by `key`, `subjectId`, `type`, `q` or `situation` is an explicit read, which records a use of each live row of the page it answers unless `record` is false (true where none is given) | 200, a page |
 | `POST /memories` | writes a first version: `type`, `text`, `actorName` required; `key`, `layerId`, `position`, `subjectIds`, `subjects` (each `type` and `key`, made where none stands), `importance` (5 where none), `validFrom` (now where none), `status` (`active` where none, or `pending`), `recallCondition`, `releaseCondition`, `labels`; where a live row holds the key and the new `validFrom` is earlier than its own, the row is written already superseded by it in its lineage, `validTo` its `validFrom`, with the reason `earlier-than-live` | 201, the memory; 409 `conflict` where a live row holds the key and the new `validFrom` is not earlier than its own |
 | `GET /memories/{memoryId}` | reads one | 200; 404 |
 | `PATCH /memories/{memoryId}` | moves its status: `status`, `actorName`, `at` (when it stopped holding, now where none), `reason` (kept on the row moved), `text` (for a move to `done`: the words it ended on, written as a new version that is then moved; for a move to `retracted`: what the speaker meant instead, written as a new active version, the row named retracted and pointing at it; each in one transaction); the row moved records the moment of the move as its `supersededAt` | 200, the row moved (for a retraction with `text`, the retracted row); 400 for `text` on another move; 404; 409 for a move the table does not allow |
@@ -207,7 +214,9 @@ answer carries a strength, and a memory ends only by an event (`docs/design.md`,
 `POST /recall` takes the turn: `room` (a subject by `type` and `key`), `speakers` (subjects), `words`,
 `sessionKey`, `sessionOpenedAt`, `budgetTokens` (the brain's own where none is given) and `record` (true
 where none is given). It answers `block`, the text the turn is handed; `chosen`, each `memoryId`, `type`,
-`part` (`core` or `searched`), `score`, `marked` and `tokenCount`; `tokenCount` and `budgetTokens`; and
+`part` (`core` or `searched`), `score` (its relevance), `vectorSimilarity` (its cosine with the turn's words, or
+null where it was not among the nearest), `fusedScore` (its Reciprocal Rank Fusion score, null for a core row),
+`marked` and `tokenCount`; `tokenCount` and `budgetTokens`; and
 `released`, the ids of the rows this recall ended.
 
 - **The core** is the room's active `situation` memories and the head of the sheet of everyone who spoke:
@@ -218,9 +227,11 @@ where none is given). It answers `block`, the text the turn is handed; `chosen`,
 - **Every line of either part keeps the budget,** a marked one as well: a line that would carry the block
   past `budgetTokens` is left out.
 - **The searched part** is the active rows holding one of the turn's stems or about a subject the turn
-  names, ordered by relevance (each cue they match giving ln(N / fan) over the number of cues, N the brain's
+  names, ranked by relevance (each cue they match giving ln(N / fan) over the number of cues, N the brain's
   live memories and fan the live memories the cue reaches, a stem's share weighed down in a row longer than
-  the brain's mean by BM25's length term), then importance, then the latest use,
+  the brain's mean by BM25's length term), and the `vector_candidates` rows nearest the turn's words by
+  meaning, the two lists fused by Reciprocal Rank Fusion and ordered by the fused score, then importance, then
+  the latest use,
   and chosen by Maximal Marginal Relevance between that relevance and the stem overlap with the rows already
   in, at most the subject cap of rows per subject, under the budget (`docs/design.md`, 「Recall」). A
   `persona` or `episode` row, a `pending` row, and a row written after `sessionOpenedAt` are never in it. A
@@ -251,7 +262,7 @@ material and its mechanics.
 
 | Route | Does | Answers |
 |---|---|---|
-| `POST /similar` | `text`, `subjects` (each `type` and `key`), `limit` (10 where none, at most 50), `asOf` (a moment: the rows that held then, as `GET /memories` reads it, in place of the live ones): the live memories most like the candidate, about one of its subjects or holding one of its stems, neither an `episode` nor a `persona`, ordered by the relevance recall reckons with the candidate's stems and subjects as the cues, then by `id`, highest first | 200, a list |
+| `POST /similar` | `text`, `subjects` (each `type` and `key`), `limit` (10 where none, at most 50), `asOf` (a moment: the rows that held then, as `GET /memories` reads it, in place of the live ones, searched by words alone): the live memories most like the candidate, neither an `episode` nor a `persona`: those about one of its subjects or holding one of its stems, ranked by the relevance recall reckons with the candidate's stems and subjects as the cues, and the `vector_candidates` nearest its text in meaning, the two lists fused by Reciprocal Rank Fusion and ordered by the fused score, then by `id`, highest first | 200, a list |
 | `POST /learnings` | a learning applied whole in one transaction: `type`, `text`, `subjects`, `importance`, `source` (`own`, `owner`, `told`, `inferred`), `confirms` (ids confirmed), `strengthens` (an id given a new version with the text), `replaces` (ids invalidated, unless the source is heard), `grounds` (episode ids linked as subjects of type `episode`), `validFrom` (when it began holding; now where none), `key`, `layerId`, `recallCondition`, `releaseCondition`, `actorName`, `labels`; where the new row's `validFrom` is earlier than that of every row it would close, the one it strengthens or all it replaces, it closes none and is written already superseded by the one of them that began first, `validTo` that row's `validFrom`, with the reason `earlier-than-live` | 201: `confirmedCount`, `invalidatedIds`, `written` (the version written, or null where the learning only confirms), `versioned`; 400 for a ground that is no episode; 409 where `strengthens` names a row that is not live |
 | `GET /unconsolidated` | the active `episode` rows not yet consolidated, in priority order (`docs/design.md`, 「Consolidation」), the first `limit` of them (60 where none, at most 500); each the memory with `priority` (gain × (1 + need)), `gain` (importance × (1 + novelty), novelty one less the greatest share of the episode's stems a live row of its subjects holds), `need` and `taggedBy` (the tag it was read out after, or null) beside it | 200, a list |
 | `GET /consolidation` | the consolidation state, the same numbers a recall answers reckoned the same way, nothing recorded: `unconsolidatedImportance` (the sum of the importance of the unconsolidated episodes), `unconsolidatedCount` (how many they are), `threshold` (the rules' `consolidation_threshold`) and `consolidationDue` (whether the sum has reached it) | 200; 404 |

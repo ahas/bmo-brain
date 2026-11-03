@@ -11,6 +11,7 @@ use super::brains::{brain_of, given};
 use super::misses::Asked;
 use super::recall::Cues;
 use super::sheets::written_type;
+use super::vectors::fuse;
 use super::versions::{HELD_AT, MEMORY_COLUMNS, MemoryRow};
 use super::words::{index_words, stems};
 use super::{Fault, Held, Store, now};
@@ -50,12 +51,15 @@ impl Store {
       }
     };
     let asked = stems(&ask.text);
+    // The candidate's text embedded before anything of the brain is held; a reading as of a past moment is by
+    // words alone, the vectors being the live rows'.
+    let query = if ask.as_of.is_none() { self.query_vector(&ask.text).await } else { None };
     let mut conn = self.begin().await?;
     brain_of(&mut conn, brain_id).await?;
     let mut subject_ids = standing_subjects(&mut conn, brain_id, &ask.subjects).await?;
     subject_ids.sort_unstable();
     subject_ids.dedup();
-    if asked.is_empty() && subject_ids.is_empty() {
+    if asked.is_empty() && subject_ids.is_empty() && query.is_none() {
       self.count_ask(&mut conn, brain_id, Asked::Similar, &ask.text, false).await?;
       self.commit(conn).await?;
       return Ok(vec![]);
@@ -92,7 +96,47 @@ impl Store {
       .collect();
     scored
       .sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal).then(b.1.id.cmp(&a.1.id)));
-    let found: Vec<Memory> = scored.into_iter().take(limit as usize).map(|(_, memory)| memory).collect();
+    let word_list: Vec<(i64, f64)> =
+      scored.iter().map(|(relevance, memory)| (memory.id, *relevance)).collect();
+    let mut rows_by_id: std::collections::HashMap<i64, Memory> =
+      scored.into_iter().map(|(_, memory)| (memory.id, memory)).collect();
+
+    // The live rows nearest the candidate's text in meaning, fused with the word list by Reciprocal Rank Fusion.
+    let mut vector_list: Vec<(i64, f64)> = Vec::new();
+    if let Some(query) = &query {
+      let kept = usize::try_from(self.rules.vector_candidates.max(0)).unwrap_or(0);
+      let near = self.nearest_live(&mut conn, brain_id, query, kept).await?;
+      let ids: Vec<i64> = near.iter().map(|(id, _)| *id).collect();
+      let rows: Vec<MemoryRow> = sqlx::query_as(&format!(
+        "SELECT {MEMORY_COLUMNS} FROM memories WHERE brain_id = $1 AND id = ANY($2) AND status = 'active' \
+         AND NOT (type = ANY($3))"
+      ))
+      .bind(brain_id)
+      .bind(&ids)
+      .bind(UNCOMPARED.map(str::to_owned).to_vec())
+      .fetch_all(&mut *conn)
+      .await?;
+      let found = self.members(&mut conn, rows).await?;
+      let mut found: std::collections::HashMap<i64, Memory> =
+        found.into_iter().map(|memory| (memory.id, memory)).collect();
+      for (id, cosine) in near {
+        if vector_list.len() >= kept {
+          break;
+        }
+        if let Some(memory) = found.remove(&id) {
+          vector_list.push((id, cosine));
+          rows_by_id.entry(id).or_insert(memory);
+        }
+      }
+    }
+    let fused = fuse(&[&word_list, &vector_list], self.rules.rrf_k);
+    let mut ranked: Vec<(f64, Memory)> = rows_by_id
+      .into_values()
+      .map(|memory| (fused.get(&memory.id).copied().unwrap_or(0.0), memory))
+      .collect();
+    ranked
+      .sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal).then(b.1.id.cmp(&a.1.id)));
+    let found: Vec<Memory> = ranked.into_iter().take(limit as usize).map(|(_, memory)| memory).collect();
     self
       .count_ask(&mut conn, brain_id, Asked::Similar, &ask.text, !found.is_empty())
       .await?;

@@ -11,6 +11,7 @@ use sqlx::PgConnection;
 use super::brains::{brain_of, event_scope, given};
 use super::rules::{Rules, tokens};
 use super::sheets::sheet_rows;
+use super::vectors::fuse;
 use super::versions::{MEMORY_COLUMNS, MemoryRow};
 use super::words::{index_words, overlap, stems};
 use super::{Fault, Held, Store, now, publish};
@@ -152,13 +153,28 @@ struct Weighed {
   stems: BTreeSet<String>,
   relevance: f64,
   reached: bool,
+  /// Its cosine with the turn's words, where it is among the rows nearest them.
+  vector: Option<f64>,
+  /// Its Reciprocal Rank Fusion score over the word and the vector lists.
+  fused: f64,
 }
 
-/// The order of the searched part: relevance, highest first; then importance, highest first; then the latest
-/// use, a row never used after the used ones; then the id.
+/// The order of the word list: relevance, highest first; then importance, highest first; then the latest use, a
+/// row never used after the used ones; then the id.
 fn before(a: &Weighed, b: &Weighed) -> std::cmp::Ordering {
   b.relevance
     .partial_cmp(&a.relevance)
+    .unwrap_or(std::cmp::Ordering::Equal)
+    .then(b.memory.importance.cmp(&a.memory.importance))
+    .then(b.memory.last_used_at.cmp(&a.memory.last_used_at))
+    .then(a.memory.id.cmp(&b.memory.id))
+}
+
+/// The order of the searched part: the fused score, highest first; then importance, then the latest use, then
+/// the id.
+fn fused_before(a: &Weighed, b: &Weighed) -> std::cmp::Ordering {
+  b.fused
+    .partial_cmp(&a.fused)
     .unwrap_or(std::cmp::Ordering::Equal)
     .then(b.memory.importance.cmp(&a.memory.importance))
     .then(b.memory.last_used_at.cmp(&a.memory.last_used_at))
@@ -186,6 +202,8 @@ impl Store {
       stems,
       relevance,
       reached,
+      vector: None,
+      fused: 0.0,
     }
   }
 
@@ -201,6 +219,8 @@ impl Store {
       }
       None => self.rules.budget_tokens,
     };
+    // The turn's words embedded before anything of the brain is held, so the gateway's answer holds nothing up.
+    let query = self.query_vector(&ask.words).await;
     let at = now();
     let mut tx = self.begin().await?;
     brain_of(&mut tx, brain_id).await?;
@@ -288,6 +308,52 @@ impl Store {
       .filter(|weighed| weighed.reached)
       .collect();
     standing.sort_by(before);
+    let word_list: Vec<(i64, f64)> =
+      standing.iter().map(|weighed| (weighed.memory.id, weighed.relevance)).collect();
+
+    // The rows nearest the turn's words in meaning: a second ranked list, fused with the word list by
+    // Reciprocal Rank Fusion into the searched part's order.
+    let mut vector_list: Vec<(i64, f64)> = Vec::new();
+    if let Some(query) = &query {
+      let kept = usize::try_from(self.rules.vector_candidates.max(0)).unwrap_or(0);
+      let near = self.nearest_live(&mut tx, brain_id, query, kept).await?;
+      let ids: Vec<i64> = near.iter().map(|(id, _)| *id).collect();
+      let rows: Vec<MemoryRow> = sqlx::query_as(&format!(
+        "SELECT {MEMORY_COLUMNS} FROM memories WHERE brain_id = $1 AND id = ANY($2) AND status = 'active' \
+         AND NOT (type = ANY($3)) AND ($4::bigint IS NULL OR created_at <= $4)"
+      ))
+      .bind(brain_id)
+      .bind(&ids)
+      .bind(UNSEARCHED.map(str::to_owned).to_vec())
+      .bind(ask.session_opened_at)
+      .fetch_all(&mut *tx)
+      .await?;
+      let cosine: BTreeMap<i64, f64> = near.into_iter().collect();
+      let mut found = self.members(&mut tx, rows).await?;
+      found.retain(|memory| !core_ids.contains(&memory.id));
+      found.sort_by(|a, b| {
+        let (x, y) = (cosine.get(&a.id).copied().unwrap_or(0.0), cosine.get(&b.id).copied().unwrap_or(0.0));
+        y.partial_cmp(&x).unwrap_or(std::cmp::Ordering::Equal).then(a.id.cmp(&b.id))
+      });
+      found.truncate(kept);
+      for memory in found {
+        let similarity = cosine.get(&memory.id).copied();
+        vector_list.push((memory.id, similarity.unwrap_or(0.0)));
+        match standing.iter_mut().find(|weighed| weighed.memory.id == memory.id) {
+          Some(weighed) => weighed.vector = similarity,
+          None => {
+            let mut weighed = self.weigh(memory, &cues, &asked);
+            weighed.vector = similarity;
+            standing.push(weighed);
+          }
+        }
+      }
+    }
+    let fused = fuse(&[&word_list, &vector_list], self.rules.rrf_k);
+    for weighed in &mut standing {
+      weighed.fused = fused.get(&weighed.memory.id).copied().unwrap_or(0.0);
+    }
+    standing.sort_by(fused_before);
 
     // The marks: what this session was handed before, in these versions.
     let marked: BTreeSet<i64> = match &ask.session_key {
@@ -326,18 +392,20 @@ impl Store {
         kind: memory.kind.clone(),
         part: RecallPart::Core,
         score: weighed.relevance,
+        vector_similarity: weighed.vector,
+        fused_score: None,
         marked: is_marked,
         token_count: cost,
       });
       chosen_stems.push(weighed.stems);
     }
-    let (least, most) = span(standing.iter().map(|weighed| weighed.relevance));
-    let rescaled = |relevance: f64| if most > least { (relevance - least) / (most - least) } else { 1.0 };
+    let (least, most) = span(standing.iter().map(|weighed| weighed.fused));
+    let rescaled = |fused: f64| if most > least { (fused - least) / (most - least) } else { 1.0 };
     let lambda = self.rules.mmr_lambda;
     while !standing.is_empty() {
       let marginal = |weighed: &Weighed| {
         let likest = chosen_stems.iter().map(|stems| overlap(&weighed.stems, stems)).fold(0.0, f64::max);
-        lambda * rescaled(weighed.relevance) - (1.0 - lambda) * likest
+        lambda * rescaled(weighed.fused) - (1.0 - lambda) * likest
       };
       // The first of the order with the greatest marginal value: the order breaks every tie.
       let mut next = 0;
@@ -374,6 +442,8 @@ impl Store {
         kind: memory.kind.clone(),
         part: RecallPart::Searched,
         score: weighed.relevance,
+        vector_similarity: weighed.vector,
+        fused_score: Some(weighed.fused),
         marked: is_marked,
         token_count: cost,
       });

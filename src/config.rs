@@ -20,6 +20,9 @@ pub struct Config {
   /// ships no tool env.
   #[serde(default)]
   pub data_root: Option<PathBuf>,
+  /// The embedding model the brain searches by meaning with; none where it searches by words alone.
+  #[serde(default)]
+  pub embedding: Option<crate::store::vectors::EmbeddingConfig>,
   /// The console the brain serves its bundle to; none where it serves none.
   #[serde(default)]
   pub console: Option<ConsoleConfig>,

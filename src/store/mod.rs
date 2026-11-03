@@ -12,6 +12,7 @@ pub mod recall;
 pub mod rules;
 pub mod sheets;
 pub mod tallies;
+pub mod vectors;
 pub mod versions;
 pub mod words;
 
@@ -70,6 +71,7 @@ pub use rules::Rules;
 pub struct Store {
   pub pool: PgPool,
   pub rules: Rules,
+  pub vectors: std::sync::Arc<vectors::Vectors>,
   moved: watch::Sender<u64>,
 }
 
@@ -86,8 +88,15 @@ impl Store {
     Self {
       pool,
       rules: Rules::default(),
+      vectors: std::sync::Arc::new(vectors::Vectors::new(None)),
       moved: watch::Sender::new(0),
     }
+  }
+
+  /// The same store searching by meaning with the embedding model named, or by words alone where none is.
+  pub fn embedding(mut self, config: Option<vectors::EmbeddingConfig>) -> Self {
+    self.vectors = std::sync::Arc::new(vectors::Vectors::new(config));
+    self
   }
 
   /// The same store reading by these rules.
@@ -122,6 +131,7 @@ impl Store {
   pub(crate) async fn commit(&self, tx: Transaction<'static, Postgres>) -> Held<()> {
     tx.commit().await?;
     self.moved.send_modify(|count| *count = count.wrapping_add(1));
+    self.vectors.wake();
     Ok(())
   }
 

@@ -1,5 +1,6 @@
 //! The `bmo-brain` command (docs/boundary-api.md, 「Configuration」 and 「The harness plugin」): `serve` runs
-//! the migrations, stands the clock and answers the routes until it is told to stop; `health` ends 0 only
+//! the migrations, reads the vectors in, stands the clock and the embedder and answers the routes until it is
+//! told to stop; `embed` embeds every live row lacking a vector of the configuration's model; `health` ends 0 only
 //! where the service its configuration names answers ready; `mcp` serves the harness tools over MCP on
 //! standard input and output; `openapi` prints the OpenAPI document; `sheets split` splits the live sheet rows
 //! of the configuration's database into facts.
@@ -53,6 +54,9 @@ enum Verb {
     #[arg(long, value_name = "dir")]
     data_root: Option<PathBuf>,
   },
+  /// Embeds every live row lacking a vector of the configuration's model, and deletes the other models' vectors
+  /// once none lacks one.
+  Embed,
   /// The live sheet rows of the configuration's database, split into facts.
   Sheets {
     #[command(subcommand)]
@@ -88,8 +92,17 @@ async fn stopped() {
 }
 
 async fn serve(config: &Config) -> Result<(), String> {
-  let store = Store::lazy(&config.database)?.by(config.rules.clone());
+  let store = Store::lazy(&config.database)?
+    .by(config.rules.clone())
+    .embedding(config.embedding.clone());
   store.migrate().await.map_err(|why| format!("the migrations: {why}"))?;
+  // The vectors of the current model read in, then the embedder standing: it first fills every live row lacking
+  // one (docs/design.md, 「Vectors」).
+  let vectorised = store.load_vectors().await.map_err(|why| format!("the vectors: {why}"))?;
+  if store.vectors.configured() {
+    println!("bmo-brain: {vectorised} vectors read in");
+  }
+  let embedder = bmo_brain::store::vectors::stand(store.clone());
   let listener = tokio::net::TcpListener::bind(&config.listen)
     .await
     .map_err(|why| format!("{}: {why}", config.listen))?;
@@ -114,7 +127,22 @@ async fn serve(config: &Config) -> Result<(), String> {
     .await
     .map_err(|why| why.to_string());
   clock.abort();
+  embedder.abort();
   served
+}
+
+/// Every live row lacking a vector of the configuration's model embedded, the other models' vectors deleted once
+/// none lacks one; prints how many it embedded.
+async fn embed(config: &Config) -> Result<(), String> {
+  if config.embedding.is_none() {
+    return Err("the configuration names no [embedding]".to_owned());
+  }
+  let store = Store::lazy(&config.database)?
+    .by(config.rules.clone())
+    .embedding(config.embedding.clone());
+  let embedded = store.embed_backlog().await?;
+  println!("embedded {embedded}");
+  Ok(())
 }
 
 async fn health(config: &Config) -> Result<(), String> {
@@ -199,6 +227,10 @@ async fn main() -> ExitCode {
     },
     Verb::Health => match configured(config.as_ref()) {
       Ok(config) => health(&config).await,
+      Err(why) => Err(why),
+    },
+    Verb::Embed => match configured(config.as_ref()) {
+      Ok(config) => embed(&config).await,
       Err(why) => Err(why),
     },
     Verb::Mcp { brain, token } => mcp(&brain, token).await,

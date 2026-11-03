@@ -122,6 +122,32 @@ pub struct Health {
   /// Each asked brain's count of its asks by words and of its misses.
   #[serde(default)]
   pub searches: Vec<crate::brains::SearchCount>,
+  /// The embedding model and what its vectors and asks came to; null where none is named.
+  #[serde(default)]
+  pub embedding: Option<EmbeddingHealth>,
+}
+
+/// The embedding model the brain searches by meaning with, and what its vectors and asks came to.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct EmbeddingHealth {
+  pub address: String,
+  pub key_file: String,
+  pub model: String,
+  pub dims: i64,
+  pub batch: i64,
+  /// The live rows holding a vector of the model.
+  pub vectorised: i64,
+  /// The live rows holding none.
+  pub lacking: i64,
+  /// The asks since the service started that searched with vectors.
+  pub vector_asks: i64,
+  /// The asks since the service started that searched by words alone.
+  pub word_asks: i64,
+  /// The asks searched by words alone because the gateway did not answer.
+  pub vector_skipped: i64,
+  /// Why the last ask of the gateway failed, or null.
+  pub last_error: Option<String>,
 }
 
 /// One event: its number, its kind, when it happened and the member it is about.

@@ -638,7 +638,14 @@ pub struct RecallChoice {
   #[serde(rename = "type")]
   pub kind: String,
   pub part: RecallPart,
+  /// Its relevance to the turn's words.
   pub score: f64,
+  /// Its cosine with the turn's words embedded, where it was among the rows nearest them; null elsewhere.
+  #[serde(default)]
+  pub vector_similarity: Option<f64>,
+  /// Its Reciprocal Rank Fusion score over the word and the vector lists; null for a core row.
+  #[serde(default)]
+  pub fused_score: Option<f64>,
   /// Handed to this session before in this version, so the block carries its mark and not its text.
   pub marked: bool,
   pub token_count: i64,
@@ -726,6 +733,10 @@ pub struct Rules {
   pub bm25_k1: f64,
   /// BM25's `b`: how much a row's length relative to the brain's mean weighs on a matched stem.
   pub bm25_b: f64,
+  /// How many rows nearest a search's words in meaning join its candidates.
+  pub vector_candidates: i64,
+  /// The rank offset `k` of Reciprocal Rank Fusion.
+  pub rrf_k: f64,
   /// The weight `λ` recall's selection gives a row's relevance against its overlap with the rows already in.
   pub mmr_lambda: f64,
   /// The most rows one subject fills in the searched part of a block.
@@ -755,6 +766,8 @@ impl Default for Rules {
       budget_tokens: 1_800,
       bm25_k1: 1.2,
       bm25_b: 0.75,
+      vector_candidates: 40,
+      rrf_k: 60.0,
       mmr_lambda: 0.7,
       subject_cap: 4,
       core_fact_cap: 8,

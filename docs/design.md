@@ -321,10 +321,18 @@ a block and a list of what it chose.
   turn's words hold at least the share of the condition's words the rules name: that row is a candidate though
   neither its own words nor its subjects name it, and its relevance is the most a cue set gives, ln N, as
   though every cue were linked to that row alone.
-- **The order** of the candidates is relevance, highest first; between equal relevances importance, highest
+- **Rows near in meaning join the candidates** (「Vectors」): the turn's words are embedded once, and the
+  `vector_candidates` live rows of the searched types nearest to them by cosine are a second ranked list beside
+  the rows ranked by relevance. The two lists are fused by Reciprocal Rank Fusion (Cormack, Clarke and
+  Buettcher 2009): a row's fused score is the sum over the lists it stands in of 1 / (k + its rank there), k
+  being `rrf_k` and a rank counted from one and shared by the rows of equal relevance or equal cosine, so a
+  row high in both lists stands above one high in one alone, and rows a list cannot tell apart stay equal.
+  Where no vector list stands, the turn's words not embedded, the fused order is the relevance order.
+- **The order** of the candidates is the fused score, highest first; between equal scores importance, highest
   first; then the latest use, a row never used after the used ones (「Use」). Nothing is normalised or
   weighed against anything else.
-- **Selection is Maximal Marginal Relevance** (Carbonell and Goldstein 1998) over that order. The next row is
+- **Selection is Maximal Marginal Relevance** (Carbonell and Goldstein 1998) over that order, the fused score
+  standing where the relevance stands in it. The next row is
   the candidate that maximises λ · R_i − (1 − λ) · max_j Sim(i, j) over the rows already in the block, the
   core's among them, where Sim is the Jaccard overlap of the two rows' stem sets and λ is `mmr_lambda`; equal
   values go by the order. R_i is the relevance rescaled to 0 to 1 between the least and the greatest of the
@@ -351,6 +359,31 @@ a block and a list of what it chose.
 
 The caller that selects a turn's reference asks recall and decides what of it the turn is handed; the block
 is the brain's offer, the caller's is the last word.
+
+## Vectors
+
+A memory is also searched by its meaning, as a vector its text is embedded into, beside its words.
+
+- **The engine is the platform's embedding model** behind its LLM gateway, asked over the OpenAI-shaped
+  embeddings route at the address the configuration names, with the bearer key its key file holds, under the
+  model name it names (`[embedding]`). Where the configuration names none, nothing is embedded and every search
+  is by words alone.
+- **What is embedded:** a row's text, with its recall condition after it where it carries one, cut to its first
+  512 tokens as the brain reckons tokens.
+- **Every write is embedded after it:** a new row or version wakes the brain's embedder, which embeds the live
+  rows lacking a vector of the current model in batches, the configuration's batch at a time, and keeps each
+  vector beside its row. While the gateway refuses or does not answer, it tries again after a pause. A row with
+  no vector yet is searched by its words alone. At start, once the vectors are read in, the embedder fills
+  every live row lacking one; `bmo-brain embed` does the same once and ends.
+- **The vectors are searched in the process:** the vectors of the current model are read into memory at start
+  and kept as the embedder stores them; a query is compared with every vector of its brain by cosine, and a
+  row found no longer live is let go of. Nearest-neighbour search inside the database may take its place.
+- **A model is one space:** a vector is kept under the model that made it, and a search reads only the current
+  model's. A change of model leaves the new model's vectors empty until the embedder has filled every live row,
+  and the other models' vectors are deleted once it has.
+- **A query is embedded once an ask:** a recall's turn words, a similar ask's text, a memory list's words.
+  Where the gateway does not answer, the ask is answered by words alone and counted as skipped; the health
+  answer carries how many asks used vectors, how many words alone, and how many were skipped.
 
 ## What the brain counts
 

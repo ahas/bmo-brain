@@ -21,6 +21,6 @@ pub use client::{Answer, BrainClient, ClientFailure};
 /// The HTTP client a `BrainClient` calls through, for a caller that sets its own timeout or proxy.
 pub use reqwest::Client as HttpClient;
 pub use wire::{
-  ConsoleManifest, ConsoleWords, Cursor, ErrorCode, Event, EventsQuery, Health, Labels, Object, Page, Role,
-  WireError, nullable,
+  ConsoleManifest, ConsoleWords, Cursor, EmbeddingHealth, ErrorCode, Event, EventsQuery, Health, Labels,
+  Object, Page, Role, WireError, nullable,
 };

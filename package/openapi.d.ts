@@ -679,6 +679,43 @@ export interface components {
              */
             unconsolidatedImportance: number;
         };
+        /** @description The embedding model the brain searches by meaning with, and what its vectors and asks came to. */
+        EmbeddingHealth: {
+            address: string;
+            /** Format: int64 */
+            batch: number;
+            /** Format: int64 */
+            dims: number;
+            keyFile: string;
+            /**
+             * Format: int64
+             * @description The live rows holding none.
+             */
+            lacking: number;
+            /** @description Why the last ask of the gateway failed, or null. */
+            lastError: string | null;
+            model: string;
+            /**
+             * Format: int64
+             * @description The asks since the service started that searched with vectors.
+             */
+            vectorAsks: number;
+            /**
+             * Format: int64
+             * @description The asks searched by words alone because the gateway did not answer.
+             */
+            vectorSkipped: number;
+            /**
+             * Format: int64
+             * @description The live rows holding a vector of the model.
+             */
+            vectorised: number;
+            /**
+             * Format: int64
+             * @description The asks since the service started that searched by words alone.
+             */
+            wordAsks: number;
+        };
         /** @description One event: its number, its kind, when it happened and the member it is about. */
         Event: {
             /** Format: int64 */
@@ -710,6 +747,11 @@ export interface components {
         };
         /** @description Whether the service can answer. */
         Health: {
+            /**
+             * @description The embedding model and what its vectors and asks came to; null where none is named.
+             * @default null
+             */
+            embedding: components["schemas"]["EmbeddingHealth"] | null;
             ready: boolean;
             /** @description Why it is not ready, or null. */
             reason: string | null;
@@ -1111,16 +1153,31 @@ export interface components {
         };
         /** @description One memory recall chose. */
         RecallChoice: {
+            /**
+             * Format: double
+             * @description Its Reciprocal Rank Fusion score over the word and the vector lists; null for a core row.
+             * @default null
+             */
+            fusedScore: number | null;
             /** @description Handed to this session before in this version, so the block carries its mark and not its text. */
             marked: boolean;
             /** Format: int64 */
             memoryId: number;
             part: components["schemas"]["RecallPart"];
-            /** Format: double */
+            /**
+             * Format: double
+             * @description Its relevance to the turn's words.
+             */
             score: number;
             /** Format: int64 */
             tokenCount: number;
             type: string;
+            /**
+             * Format: double
+             * @description Its cosine with the turn's words embedded, where it was among the rows nearest them; null elsewhere.
+             * @default null
+             */
+            vectorSimilarity: number | null;
         };
         /** @description Which part of the block a memory was chosen for. */
         RecallPart: "core" | "searched";
@@ -1209,6 +1266,12 @@ export interface components {
              */
             previous_value_days: number;
             /**
+             * Format: double
+             * @description The rank offset `k` of Reciprocal Rank Fusion.
+             * @default 60
+             */
+            rrf_k: number;
+            /**
              * Format: int64
              * @description The span of one session, in milliseconds: the window around a tag in the consolidation order.
              * @default 3600000
@@ -1226,6 +1289,12 @@ export interface components {
              * @default 8
              */
             tag_importance: number;
+            /**
+             * Format: int64
+             * @description How many rows nearest a search's words in meaning join its candidates.
+             * @default 40
+             */
+            vector_candidates: number;
         };
         /** @description A brain's count of its asks by words and of those that found nothing. */
         SearchCount: {
