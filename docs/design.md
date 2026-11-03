@@ -208,10 +208,16 @@ takes the episodes in the brain's priority order.
 - **Priority is the expected value of consolidating an episode,** after Mattar and Daw's (2018) value of a
   memory backup: priority = gain × (1 + need), highest first, reckoned at the reading from what the brain
   holds and never stored, so no stored value changes.
-  - **Gain** = importance × (1 + novelty). Novelty is one less the greatest Jaccard overlap between the
-    episode's stems and those of a live row that is no episode and shares one of its subjects (「Recall」);
-    an episode with no subject, or whose subjects no such row shares, has novelty one. An episode whose
-    stems are exactly those of such a row gains its importance alone.
+  - **Gain** = importance × (1 + novelty). Novelty is one less the greatest share of the episode's stems
+    (「Recall」) that a live row which is no episode and shares one of its subjects holds: the stems they
+    share over the episode's stems. An episode whose words a fact of its subject already holds has novelty
+    zero and gains its importance alone, however long the fact; an episode with no subject or no stem, or
+    whose subjects no such row shares, has novelty one.
+  - **The reading is bounded by the words index.** The rows a novelty is reckoned against are read once per
+    subject for the whole reading, and only those holding at least one stem of an episode about that subject,
+    which the words index finds; a row holding none of an episode's stems contains none of them, so the bound
+    changes no novelty, and a subject linked to a great many rows costs only the rows that share its
+    episodes' words.
   - **Need** is the sum over the episode's subjects of ln(1 + the use counts of the live rows about that
     subject added up) (「Use」): an episode about what the agent keeps using is needed more. An episode with
     no subject has need zero.

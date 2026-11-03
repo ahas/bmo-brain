@@ -8,7 +8,7 @@ use bmo_brain_client::{Memory, UnconsolidatedEpisode};
 
 use super::brains::brain_of;
 use super::versions::{MEMORY_COLUMNS, MemoryRow};
-use super::words::{index_words, overlap, stems};
+use super::words::{index_words, stems};
 use super::{Fault, Held, Store};
 
 /// How many episodes a consolidation reads where the ask names no limit, and at most.
@@ -33,6 +33,14 @@ fn before(a: &Weighed, b: &Weighed) -> std::cmp::Ordering {
     .unwrap_or(std::cmp::Ordering::Equal)
     .then(b.memory.importance.cmp(&a.memory.importance))
     .then(a.memory.id.cmp(&b.memory.id))
+}
+
+/// The share of an episode's stems another row holds; nothing where the episode has no stem.
+fn contained(mine: &BTreeSet<String>, theirs: &BTreeSet<String>) -> f64 {
+  if mine.is_empty() {
+    return 0.0;
+  }
+  mine.intersection(theirs).count() as f64 / mine.len() as f64
 }
 
 /// The room subjects an episode is linked to.
@@ -70,30 +78,42 @@ impl Store {
     .fetch_all(&mut *tx)
     .await?;
     let episodes = self.members(&mut tx, rows).await?;
-    let subjects: Vec<i64> = episodes
-      .iter()
-      .flat_map(|episode| episode.subjects.iter().map(|subject| subject.id))
-      .collect::<BTreeSet<_>>()
-      .into_iter()
-      .collect();
+    let episode_stems: Vec<BTreeSet<String>> =
+      episodes.iter().map(|episode| stems(&episode.text)).collect();
+    // Each subject's episodes' stems together: the rows of that subject worth comparing hold one of them.
+    let mut asked: BTreeMap<i64, BTreeSet<String>> = BTreeMap::new();
+    for (episode, mine) in episodes.iter().zip(&episode_stems) {
+      for subject in &episode.subjects {
+        asked.entry(subject.id).or_default().extend(mine.iter().cloned());
+      }
+    }
+    let subjects: Vec<i64> = asked.keys().copied().collect();
 
-    // The live rows that are no episode about each of those subjects, with their stems, for the novelty.
-    let linked: Vec<(i64, i64, Option<Vec<String>>)> = sqlx::query_as(
-      "SELECT ms.subject_id, m.id, m.words FROM memory_subjects ms JOIN memories m ON m.id = ms.memory_id \
-       WHERE ms.subject_id = ANY($1) AND m.brain_id = $2 AND m.status IN ('active', 'pending') \
-       AND m.type <> 'episode'",
-    )
-    .bind(&subjects)
-    .bind(brain_id)
-    .fetch_all(&mut *tx)
-    .await?;
+    // The live rows that are no episode about each subject, holding one of its episodes' stems, read once a
+    // subject through the words index, for the novelty; a row holding none contains none of them.
     let mut about: BTreeMap<i64, Vec<i64>> = BTreeMap::new();
     let mut stems_of: BTreeMap<i64, BTreeSet<String>> = BTreeMap::new();
-    for (subject, memory, words) in linked {
-      about.entry(subject).or_default().push(memory);
-      stems_of
-        .entry(memory)
-        .or_insert_with(|| words.unwrap_or_default().into_iter().collect());
+    for (subject, wanted) in &asked {
+      if wanted.is_empty() {
+        continue;
+      }
+      let wanted: Vec<String> = wanted.iter().cloned().collect();
+      let linked: Vec<(i64, Option<Vec<String>>)> = sqlx::query_as(
+        "SELECT m.id, m.words FROM memory_subjects ms JOIN memories m ON m.id = ms.memory_id \
+         WHERE ms.subject_id = $1 AND m.brain_id = $2 AND m.status IN ('active', 'pending') \
+         AND m.type <> 'episode' AND m.words && $3",
+      )
+      .bind(subject)
+      .bind(brain_id)
+      .bind(&wanted)
+      .fetch_all(&mut *tx)
+      .await?;
+      for (memory, words) in linked {
+        about.entry(*subject).or_default().push(memory);
+        stems_of
+          .entry(memory)
+          .or_insert_with(|| words.unwrap_or_default().into_iter().collect());
+      }
     }
     // The use of the live rows about each subject, added up, for the need.
     let used: BTreeMap<i64, i64> = sqlx::query_as::<_, (i64, i64)>(
@@ -111,16 +131,16 @@ impl Store {
 
     let mut weighed: Vec<Weighed> = episodes
       .into_iter()
-      .map(|memory| {
-        let mine = stems(&memory.text);
-        let likest = memory
+      .zip(episode_stems)
+      .map(|(memory, mine)| {
+        let held = memory
           .subjects
           .iter()
           .flat_map(|subject| about.get(&subject.id).into_iter().flatten())
           .filter_map(|row| stems_of.get(row))
-          .map(|theirs| overlap(&mine, theirs))
+          .map(|theirs| contained(&mine, theirs))
           .fold(0.0, f64::max);
-        let gain = memory.importance as f64 * (1.0 + (1.0 - likest));
+        let gain = memory.importance as f64 * (1.0 + (1.0 - held));
         let need: f64 = memory
           .subjects
           .iter()

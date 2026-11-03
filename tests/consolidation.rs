@@ -95,13 +95,14 @@ async fn an_episode_about_what_is_used_outranks_a_more_important_one_no_one_need
 }
 
 #[tokio::test]
-async fn an_episode_its_subjects_facts_already_say_gains_its_importance_alone() {
+async fn a_short_episode_a_longer_fact_already_holds_gains_its_importance_alone() {
   let served = Served::new().await;
   let client = &served.client;
   let brain = brain_of(client).await;
   let person = subject("person", "person:a");
+  let fact = "The member collects old stamps from distant countries and keeps them in albums.";
   client
-    .memory_add(brain, &memory("fact", "The member collects stamps.", 5, std::slice::from_ref(&person)))
+    .memory_add(brain, &memory("fact", fact, 5, std::slice::from_ref(&person)))
     .await
     .unwrap();
   let said = client
@@ -110,7 +111,7 @@ async fn an_episode_its_subjects_facts_already_say_gains_its_importance_alone() 
     .unwrap();
   let order = read(client, brain).await;
   let episode = order.iter().find(|e| e.memory.id == said.id).unwrap();
-  // Its stems are the fact's: overlap one, novelty zero. The episode's own use counts in the need: none.
+  // Every stem of the short episode is in the long fact: novelty zero. Nothing about the subject was used.
   assert!(near(episode.gain, 6.0), "{episode:?}");
   assert!(near(episode.need, 0.0) && near(episode.priority, 6.0), "{episode:?}");
 }
