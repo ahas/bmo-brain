@@ -20,6 +20,7 @@ reqwest = { version = "0.13.5", features = ["json", "query", "stream"] }
 rmcp = { version = "3.5.0", default-features = false, features = ["server", "transport-io"] }
 rusqlite = { version = "0.32.1", features = ["bundled"] }
 rust-ini = "0.21"
+rust-stemmers = "1.2.0"
 schemars = "1.0.4"
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.138"
@@ -63,6 +64,8 @@ futures-util.workspace = true
 rusqlite.workspace = true
 # The MCP server.
 rmcp.workspace = true
+# The Snowball stems recall reads a turn's words and a memory's words by.
+rust-stemmers.workspace = true
 # The OpenAPI document and the tools' schemas.
 schemars.workspace = true
 serde.workspace = true

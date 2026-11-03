@@ -1,8 +1,6 @@
 //! The write judgement's material and its mechanics (docs/design.md, 「Writing」 and 「Consolidation」): the
 //! live memories like a candidate, a learning applied whole, the unconsolidated episodes and their marks.
 
-use std::collections::BTreeSet;
-
 use bmo_brain_client::{
   Labels, Learned, Learning, Memory, MemoryMove, MemoryStatus, MemoryVersion, NewMemory, SimilarAsk,
   SubjectKey,
@@ -10,8 +8,10 @@ use bmo_brain_client::{
 use sqlx::PgConnection;
 
 use super::brains::{brain_of, given};
+use super::recall::Cues;
 use super::sheets::written_type;
 use super::versions::{MEMORY_COLUMNS, MemoryRow};
+use super::words::{index_words, stems};
 use super::{Fault, Held, Store, now};
 
 /// How many likes the judgement reads where the ask names no limit, and at most.
@@ -23,15 +23,6 @@ const EPISODES_MOST: i64 = 500;
 
 /// The types a candidate is never compared against.
 const UNCOMPARED: [&str; 2] = ["episode", "persona"];
-
-/// The words of a text, lowercased: runs of letters and digits of two characters or more.
-fn words(text: &str) -> BTreeSet<String> {
-  text
-    .split(|c: char| !c.is_alphanumeric())
-    .filter(|word| word.chars().count() >= 2)
-    .map(|word| word.to_lowercase())
-    .collect()
-}
 
 /// The ids of the subjects these keys name, where they stand.
 async fn standing_subjects(conn: &mut PgConnection, brain_id: i64, named: &[SubjectKey]) -> Held<Vec<i64>> {
@@ -50,8 +41,8 @@ async fn standing_subjects(conn: &mut PgConnection, brain_id: i64, named: &[Subj
 }
 
 impl Store {
-  /// The live memories most like a candidate: about one of its subjects or holding its words, scored by the
-  /// share of the candidate's words they hold and whether they share a subject, at most the limit.
+  /// The live memories most like a candidate: about one of its subjects or holding one of its stems, ordered by
+  /// the relevance recall reckons with the candidate's stems and subjects as the cues, at most the limit.
   pub async fn similar(&self, brain_id: i64, ask: &SimilarAsk) -> Held<Vec<Memory>> {
     let limit = match ask.limit {
       None => SIMILAR,
@@ -60,49 +51,44 @@ impl Store {
         return Err(Fault::BadRequest(format!("limit is {limit}; it is 1 to {SIMILAR_MOST}.")));
       }
     };
-    let asked = words(&ask.text);
-    let mut conn = self.connection().await?;
+    let asked = stems(&ask.text);
+    let mut conn = self.begin().await?;
     brain_of(&mut conn, brain_id).await?;
-    let subject_ids = standing_subjects(&mut conn, brain_id, &ask.subjects).await?;
+    let mut subject_ids = standing_subjects(&mut conn, brain_id, &ask.subjects).await?;
+    subject_ids.sort_unstable();
+    subject_ids.dedup();
     if asked.is_empty() && subject_ids.is_empty() {
       return Ok(vec![]);
     }
-    let patterns: Vec<String> = asked.iter().map(|word| super::holding(word)).collect();
+    index_words(&mut conn, brain_id).await?;
+    let cue_stems: Vec<String> = asked.iter().cloned().collect();
     let rows: Vec<MemoryRow> = sqlx::query_as(&format!(
       "SELECT {MEMORY_COLUMNS} FROM memories WHERE brain_id = $1 AND status = 'active' AND NOT (type = ANY($2)) \
-       AND (text ILIKE ANY($3) OR id IN (SELECT memory_id FROM memory_subjects WHERE subject_id = ANY($4))) \
+       AND (words && $3 OR id IN (SELECT memory_id FROM memory_subjects WHERE subject_id = ANY($4))) \
        ORDER BY id DESC LIMIT 500"
     ))
     .bind(brain_id)
     .bind(UNCOMPARED.map(str::to_owned).to_vec())
-    .bind(&patterns)
+    .bind(&cue_stems)
     .bind(&subject_ids)
     .fetch_all(&mut *conn)
     .await?;
     let members = self.members(&mut conn, rows).await?;
+    let cues = Cues::read(&mut conn, brain_id, &subject_ids, &asked).await?;
+    self.commit(conn).await?;
     let mut scored: Vec<(f64, Memory)> = members
       .into_iter()
-      .map(|memory| {
-        let mine = words(&memory.text);
-        let overlap = if asked.is_empty() {
-          0.0
-        } else {
-          asked.iter().filter(|word| mine.contains(*word)).count() as f64 / asked.len() as f64
-        };
-        let shared = memory.subjects.iter().any(|s| subject_ids.contains(&s.id));
-        (overlap + if shared { self.rules.subject_bonus } else { 0.0 }, memory)
+      .filter_map(|memory| {
+        let mine = stems(&memory.text);
+        let subjects: Vec<i64> = memory.subjects.iter().map(|subject| subject.id).collect();
+        cues
+          .reaches(&subjects, &mine)
+          .then(|| (cues.relevance(&self.rules, &subjects, &mine), memory))
       })
       .collect();
     scored
       .sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal).then(b.1.id.cmp(&a.1.id)));
-    Ok(
-      scored
-        .into_iter()
-        .filter(|(score, _)| *score > 0.0)
-        .take(limit as usize)
-        .map(|(_, memory)| memory)
-        .collect(),
-    )
+    Ok(scored.into_iter().take(limit as usize).map(|(_, memory)| memory).collect())
   }
 
   /// A learning applied whole: the memories it confirms confirmed; the one it strengthens given a new

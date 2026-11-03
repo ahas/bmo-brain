@@ -24,7 +24,7 @@ reads about a person is a sheet kept apart: a person's standing sheet is rendere
   brain's tools; the discipline of a turn is a text the brain ships and the agent's system prompt carries. The brain supplies the
   judgement's material, the live memories like a candidate, and does the judgement's mechanics: a confirmation,
   a version, a closed fact, a new row, in one call. The brain runs no model and calls no unit.
-- **Per turn it hands out a short block,** chosen by relevance and importance under a token
+- **Per turn it hands out a short block,** chosen by relevance to the turn under a token
   budget, never the whole store, and never anything that goes into a system prompt. The persona is the one
   exception: it is rendered on demand as the same bytes every time, so a prompt built on it keeps its cache.
 
@@ -218,13 +218,13 @@ The brain records how a memory is used and lets nothing fade by itself.
 - **Nothing ends a memory but an event.** No strength, decay or threshold stands on a memory, and neither age
   nor disuse drops it from a reading or from recall: a memory ends only when its release condition comes true,
   a correction supersedes it, a merge folds it into another, or it is moved to `done` or `invalidated`.
-- **Use orders, it never excludes.** Recall breaks a tie between equally relevant and equally important rows
-  by the latest use (「Recall」); a reading of the screen orders by it where asked.
+- **Use orders, it never excludes.** Recall puts the row used last first among equally relevant and equally
+  important rows (「Recall」); a reading of the screen orders by it where asked.
 - **The numbers are settings,** with placeholders until the owner's own conversation logs have fitted them:
-  the importance threshold of consolidation, the weights of the recall score, the per-subject cap, the core's
-  cap of facts per speaker, the share of a condition's words a turn holds before the condition matches, the
-  token budget and the most use moments a row keeps. The brain reads them from its configuration and names
-  each in its health answer.
+  the importance threshold of consolidation, recall's most associative strength and its selection's balance,
+  the per-subject cap, the core's cap of facts per speaker, the share of a condition's words a turn holds
+  before the condition matches, the token budget and the most use moments a row keeps. The brain reads them
+  from its configuration and names each in its health answer.
 
 ## Recall
 
@@ -234,8 +234,8 @@ a block and a list of what it chose.
 
 - **Two parts within one budget** of about one and a half to two thousand tokens: the fixed core, the few
   memories that stand on every turn of that room (its situation rules and the head of the sheet of everyone
-  who spoke), and the searched part, chosen by score. No line of either part runs past the budget, a marked
-  one no more than another.
+  who spoke), and the searched part, chosen by relevance. No line of either part runs past the budget, a
+  marked one no more than another.
 - **No rule of the room stands in the core.** A room's rules reach a turn through selection, never by
   standing: each is a candidate of the searched part like any other row, chosen when the turn's words or
   subjects call for it, and a caller that selects a turn's reference picks among them as it picks any
@@ -244,15 +244,35 @@ a block and a list of what it chose.
   (「Rooms, people and rules」), at most the core's cap per speaker, eight where the configuration names
   none. A person's sheet can hold hundreds of facts and a turn has room for a few; the rest of a speaker's
   facts reach a turn only through the searched part, scored and capped as any other row is.
-- **The score** is a weighted sum of relevance to the turn's words and importance, each normalised; a memory
-  of a subject the turn names scores higher, and of rows that score the same the one used last goes first
-  (「Use」); no subject fills more than its cap of three or four rows; a diversity pass keeps the block from
-  being one topic.
+- **Cues.** A turn's cues are the subjects it names that stand in the brain, its room and its speakers, and
+  its words: lowercased, English stop words left out, each reduced to its Snowball stem. A memory's words are
+  indexed the same way, so a turn's word reaches every memory holding a word of the same stem, and a stop word
+  reaches none.
+- **The searched part's candidates** are the live rows a cue reaches, about a subject the turn names or
+  holding one of its stems, and the rows whose recall condition the turn says. Nothing drops a candidate for
+  its age or its disuse.
+- **Relevance** is how strongly the turn's cues point at a row, after ACT-R's spreading activation:
+
+      relevance_i = Σ_j  W_j · (S − ln fan_j)
+
+  over the cues j the row is linked to, where W_j = 1 / J for the J cues the turn carries, fan_j is the
+  number of live memories of the brain linked to cue j, each counted once, and S is
+  `max_associative_strength`. A cue few memories share points at them strongly; one many share points
+  weakly, and below zero past e^S of them. Relevance goes one hop, from a cue to the memories linked to it.
 - **A situation is words.** A memory's `recallCondition` says when it is needed, and a turn says it where the
-  turn's words hold at least the share of the condition's words the rules name: that row is carried, its
-  relevance the whole a relevance reaches, though neither its own words nor its subjects name it. A row that
-  carries no condition, or whose condition the turn does not say, is reached by its words and its subjects as it
-  was.
+  turn's words hold at least the share of the condition's words the rules name: that row is a candidate though
+  neither its own words nor its subjects name it, and its relevance is the most a cue set gives, S.
+- **The order** of the candidates is relevance, highest first; between equal relevances importance, highest
+  first; then the latest use, a row never used after the used ones (「Use」). Nothing is normalised or
+  weighed against anything else.
+- **Selection is Maximal Marginal Relevance** (Carbonell and Goldstein 1998) over that order. The next row is
+  the candidate that maximises λ · R_i − (1 − λ) · max_j Sim(i, j) over the rows already in the block, the
+  core's among them, where Sim is the Jaccard overlap of the two rows' stem sets and λ is `mmr_lambda`; equal
+  values go by the order. R_i is the relevance rescaled to 0 to 1 between the least and the greatest of the
+  candidates, for this arithmetic alone, so the two terms stand on one scale; where every candidate's is the
+  same, R_i is one. No subject fills more than its cap of rows, a line that would carry the block past the
+  budget is passed over, and the selection runs until the candidates are spent, so a near-double of a row in
+  the block comes late and is the first the budget leaves out.
 - **A release condition that comes true ends the memory.** Where the turn's words hold a row's
   `releaseCondition`, at least the share of its words the rules name, that situation has come true: the row is
   not handed out, and recall moves it to `invalidated` with the moment and the condition as its reason, in the

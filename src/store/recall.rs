@@ -9,9 +9,10 @@ use bmo_brain_client::{
 use sqlx::PgConnection;
 
 use super::brains::{brain_of, event_scope, given};
-use super::rules::tokens;
+use super::rules::{Rules, tokens};
 use super::sheets::sheet_rows;
 use super::versions::{MEMORY_COLUMNS, MemoryRow};
+use super::words::{index_words, overlap, stems};
 use super::{Fault, Held, Store, now, publish};
 
 /// The types the searched part never offers: the persona goes into a prompt by its own route, and an episode
@@ -21,7 +22,7 @@ const UNSEARCHED: [&str; 2] = ["persona", "episode"];
 /// The most candidates the searched part reads before scoring.
 const CANDIDATES_MOST: i64 = 500;
 
-/// The words of a text, lowercased, for relevance: runs of letters and digits.
+/// The words of a text, lowercased, as a condition is matched by: runs of letters and digits.
 fn words(text: &str) -> BTreeSet<String> {
   text
     .split(|c: char| !c.is_alphanumeric())
@@ -49,12 +50,124 @@ async fn subject_id(conn: &mut PgConnection, brain_id: i64, named: &SubjectKey) 
   )
 }
 
-struct Candidate {
+/// A turn's cues and how many live memories of the brain each is linked to (docs/design.md, 「Recall」): the
+/// subjects it names that stand and the stems its words hold, read once for a recall or a similar ask.
+pub(crate) struct Cues {
+  subjects: BTreeMap<i64, i64>,
+  stems: BTreeMap<String, i64>,
+}
+
+impl Cues {
+  /// The cues and their fans: for a subject the live rows about it, for a stem the live rows holding it.
+  pub(crate) async fn read(
+    conn: &mut PgConnection,
+    brain_id: i64,
+    subjects: &[i64],
+    stems: &BTreeSet<String>,
+  ) -> Held<Self> {
+    let mut by_subject: BTreeMap<i64, i64> = subjects.iter().map(|id| (*id, 0)).collect();
+    let fans: Vec<(i64, i64)> = sqlx::query_as(
+      "SELECT ms.subject_id, COUNT(*) FROM memory_subjects ms JOIN memories m ON m.id = ms.memory_id \
+       WHERE ms.subject_id = ANY($1) AND m.brain_id = $2 AND m.status IN ('active', 'pending') \
+       GROUP BY ms.subject_id",
+    )
+    .bind(subjects)
+    .bind(brain_id)
+    .fetch_all(&mut *conn)
+    .await?;
+    by_subject.extend(fans);
+    let asked: Vec<String> = stems.iter().cloned().collect();
+    let mut by_stem: BTreeMap<String, i64> = asked.iter().map(|stem| (stem.clone(), 0)).collect();
+    let fans: Vec<(String, i64)> = sqlx::query_as(
+      "SELECT stem, COUNT(*) FROM memories, UNNEST(words) AS stem WHERE brain_id = $1 \
+       AND status IN ('active', 'pending') AND words && $2 AND stem = ANY($2) GROUP BY stem",
+    )
+    .bind(brain_id)
+    .bind(&asked)
+    .fetch_all(&mut *conn)
+    .await?;
+    by_stem.extend(fans);
+    Ok(Self {
+      subjects: by_subject,
+      stems: by_stem,
+    })
+  }
+
+  /// The fans of the cues a memory about these subjects and holding these stems is linked to.
+  fn linked<'a>(
+    &'a self,
+    subjects: &'a [i64],
+    stems: &'a BTreeSet<String>,
+  ) -> impl Iterator<Item = i64> + 'a {
+    let by_subject = subjects.iter().filter_map(|id| self.subjects.get(id).copied());
+    let by_stem = stems.iter().filter_map(|stem| self.stems.get(stem).copied());
+    by_subject.chain(by_stem)
+  }
+
+  /// Whether any cue reaches such a memory.
+  pub(crate) fn reaches(&self, subjects: &[i64], stems: &BTreeSet<String>) -> bool {
+    self.linked(subjects, stems).next().is_some()
+  }
+
+  /// The relevance of such a memory: each cue linked to it gives its share of the attention times the most
+  /// associative strength less the log of its fan.
+  pub(crate) fn relevance(&self, rules: &Rules, subjects: &[i64], stems: &BTreeSet<String>) -> f64 {
+    let count = self.subjects.len() + self.stems.len();
+    if count == 0 {
+      return 0.0;
+    }
+    let share = 1.0 / count as f64;
+    self
+      .linked(subjects, stems)
+      .map(|fan| share * (rules.max_associative_strength - (fan.max(1) as f64).ln()))
+      .sum()
+  }
+}
+
+/// A row as recall weighs it: its stems, its relevance to the turn, and whether the turn says its recall
+/// condition or a cue reaches it.
+struct Weighed {
   memory: Memory,
+  stems: BTreeSet<String>,
   relevance: f64,
+  reached: bool,
+}
+
+/// The order of the searched part: relevance, highest first; then importance, highest first; then the latest
+/// use, a row never used after the used ones; then the id.
+fn before(a: &Weighed, b: &Weighed) -> std::cmp::Ordering {
+  b.relevance
+    .partial_cmp(&a.relevance)
+    .unwrap_or(std::cmp::Ordering::Equal)
+    .then(b.memory.importance.cmp(&a.memory.importance))
+    .then(b.memory.last_used_at.cmp(&a.memory.last_used_at))
+    .then(a.memory.id.cmp(&b.memory.id))
 }
 
 impl Store {
+  /// A row weighed for the turn: what the cues spread to it, the most a cue set gives where the turn says its
+  /// condition.
+  fn weigh(&self, memory: Memory, cues: &Cues, asked: &BTreeSet<String>) -> Weighed {
+    let rules = &self.rules;
+    let stems = stems(&memory.text);
+    let said = memory
+      .recall_condition
+      .as_deref()
+      .is_some_and(|condition| holds(condition, asked, rules.condition_share));
+    let subjects: Vec<i64> = memory.subjects.iter().map(|subject| subject.id).collect();
+    let (relevance, reached) = if said {
+      (rules.max_associative_strength, true)
+    } else {
+      (cues.relevance(rules, &subjects, &stems), cues.reaches(&subjects, &stems))
+    };
+    Weighed {
+      memory,
+      stems,
+      relevance,
+      reached,
+    }
+  }
+
   /// A turn's recall: the core that stands on every turn of the room, and the searched part under the budget.
   pub async fn recall(&self, brain_id: i64, ask: &RecallAsk) -> Held<Recall> {
     if let Some(session) = &ask.session_key {
@@ -80,12 +193,16 @@ impl Store {
         speakers.push(id);
       }
     }
-    let named: Vec<i64> = room.into_iter().chain(speakers.iter().copied()).collect();
+    let mut named: Vec<i64> = room.into_iter().chain(speakers.iter().copied()).collect();
+    named.sort_unstable();
+    named.dedup();
     let asked = words(&ask.words);
+    let turn_stems = stems(&ask.words);
 
     // The situations this turn holds, and with them the rows they end: a row whose release condition the turn
     // says is not handed out, and is moved to invalidated with that condition as its reason.
     let released = self.release_in(&mut tx, brain_id, &asked, at).await?;
+    index_words(&mut tx, brain_id).await?;
 
     // The core: the room's situation rules and the head of each speaker's sheet, at most the cap of their facts;
     // the room's rules and the rest are candidates of the searched part like any other row.
@@ -115,20 +232,23 @@ impl Store {
     let core = self.members(&mut tx, core).await?;
 
     // The searched part's candidates: live rows of the searched types, not of this session's own making,
-    // holding one of the turn's words in its text or its recall condition, or about a subject the turn names.
+    // holding one of the turn's stems, carrying a recall condition one of its words is in, or about a subject
+    // the turn names.
     let mut candidates: Vec<MemoryRow> = Vec::new();
-    if !asked.is_empty() || !named.is_empty() {
+    if !turn_stems.is_empty() || !asked.is_empty() || !named.is_empty() {
       let patterns: Vec<String> = asked.iter().map(|word| super::holding(word)).collect();
+      let cue_stems: Vec<String> = turn_stems.iter().cloned().collect();
       candidates = sqlx::query_as(&format!(
         "SELECT {MEMORY_COLUMNS} FROM memories WHERE brain_id = $1 AND status = 'active' \
          AND NOT (type = ANY($2)) AND ($3::bigint IS NULL OR created_at <= $3) \
-         AND (text ILIKE ANY($4) OR recall_condition ILIKE ANY($4) \
-              OR id IN (SELECT memory_id FROM memory_subjects WHERE subject_id = ANY($5))) \
-         ORDER BY last_hit_at DESC NULLS LAST, id DESC LIMIT $6"
+         AND (words && $4 OR recall_condition ILIKE ANY($5) \
+              OR id IN (SELECT memory_id FROM memory_subjects WHERE subject_id = ANY($6))) \
+         ORDER BY last_hit_at DESC NULLS LAST, id DESC LIMIT $7"
       ))
       .bind(brain_id)
       .bind(UNSEARCHED.map(str::to_owned).to_vec())
       .bind(ask.session_opened_at)
+      .bind(&cue_stems)
       .bind(&patterns)
       .bind(&named)
       .bind(CANDIDATES_MOST)
@@ -137,50 +257,16 @@ impl Store {
     }
     candidates.retain(|row| !core_ids.contains(&row.id));
     let candidates = self.members(&mut tx, candidates).await?;
-    let mut scored: Vec<Candidate> = candidates
+
+    // Each candidate's relevance, from the cues that reach it or the condition the turn says; a row neither
+    // reaches is no candidate. The candidates then stand in the searched part's order.
+    let cues = Cues::read(&mut tx, brain_id, &named, &turn_stems).await?;
+    let mut standing: Vec<Weighed> = candidates
       .into_iter()
-      .map(|memory| {
-        // A row whose recall condition the turn says is carried: its relevance is the whole a relevance
-        // reaches, though neither its words nor its subjects name it. A row without one, or whose condition
-        // the turn does not say, is scored by its words as before.
-        let mine = words(&memory.text);
-        let overlap = asked.iter().filter(|word| mine.contains(*word)).count();
-        let said = memory
-          .recall_condition
-          .as_deref()
-          .is_some_and(|condition| holds(condition, &asked, self.rules.condition_share));
-        let mut relevance = if said {
-          1.0
-        } else if asked.is_empty() {
-          0.0
-        } else {
-          overlap as f64 / asked.len() as f64
-        };
-        if memory.subjects.iter().any(|subject| named.contains(&subject.id)) {
-          relevance += self.rules.subject_bonus;
-        }
-        Candidate { memory, relevance }
-      })
+      .map(|memory| self.weigh(memory, &cues, &asked))
+      .filter(|weighed| weighed.reached)
       .collect();
-    let (rel_lo, rel_hi) = span(scored.iter().map(|c| c.relevance));
-    let (imp_lo, imp_hi) = span(scored.iter().map(|c| c.memory.importance as f64));
-    let rules = &self.rules;
-    let mut ranked: Vec<(f64, Candidate)> = scored
-      .drain(..)
-      .map(|c| {
-        let score = rules.weight_relevance * norm(c.relevance, rel_lo, rel_hi)
-          + rules.weight_importance * norm(c.memory.importance as f64, imp_lo, imp_hi);
-        (score, c)
-      })
-      .collect();
-    // Of rows that score the same, the one used last goes first, a row never used after the used ones.
-    ranked.sort_by(|a, b| {
-      b.0
-        .partial_cmp(&a.0)
-        .unwrap_or(std::cmp::Ordering::Equal)
-        .then(b.1.memory.last_used_at.cmp(&a.1.memory.last_used_at))
-        .then(a.1.memory.id.cmp(&b.1.memory.id))
-    });
+    standing.sort_by(before);
 
     // The marks: what this session was handed before, in these versions.
     let marked: BTreeSet<i64> = match &ask.session_key {
@@ -196,50 +282,63 @@ impl Store {
       None => BTreeSet::new(),
     };
 
-    // The block: the core first, then the searched part by score, under the budget, with a subject's cap and
-    // no near-double of a row already in.
+    // The block: the core first, then the searched part by Maximal Marginal Relevance over that order, under
+    // the budget and a subject's cap.
     let mut lines: Vec<String> = Vec::new();
     let mut chosen: Vec<RecallChoice> = Vec::new();
     let mut spent = 0;
     let mut per_subject: BTreeMap<i64, i64> = BTreeMap::new();
-    let mut seen_words: Vec<BTreeSet<String>> = Vec::new();
+    let mut chosen_stems: Vec<BTreeSet<String>> = Vec::new();
     for memory in core {
+      let weighed = self.weigh(memory, &cues, &asked);
+      let memory = &weighed.memory;
       let is_marked = marked.contains(&memory.id);
-      let line = self.line(&mut tx, &memory, is_marked, at).await?;
+      let line = self.line(&mut tx, memory, is_marked, at).await?;
       let cost = tokens(&line);
       if spent + cost > budget {
         continue;
       }
       spent += cost;
       lines.push(line);
-      seen_words.push(words(&memory.text));
       chosen.push(RecallChoice {
         memory_id: memory.id,
-        kind: memory.kind,
+        kind: memory.kind.clone(),
         part: RecallPart::Core,
-        score: memory.importance as f64,
+        score: weighed.relevance,
         marked: is_marked,
         token_count: cost,
       });
+      chosen_stems.push(weighed.stems);
     }
-    for (score, candidate) in ranked {
-      let memory = candidate.memory;
-      if candidate.relevance <= 0.0 {
-        continue;
+    let (least, most) = span(standing.iter().map(|weighed| weighed.relevance));
+    let rescaled = |relevance: f64| if most > least { (relevance - least) / (most - least) } else { 1.0 };
+    let lambda = self.rules.mmr_lambda;
+    while !standing.is_empty() {
+      let marginal = |weighed: &Weighed| {
+        let likest = chosen_stems.iter().map(|stems| overlap(&weighed.stems, stems)).fold(0.0, f64::max);
+        lambda * rescaled(weighed.relevance) - (1.0 - lambda) * likest
+      };
+      // The first of the order with the greatest marginal value: the order breaks every tie.
+      let mut next = 0;
+      let mut best = marginal(&standing[0]);
+      for (index, weighed) in standing.iter().enumerate().skip(1) {
+        let value = marginal(weighed);
+        if value > best {
+          next = index;
+          best = value;
+        }
       }
+      let weighed = standing.remove(next);
+      let memory = &weighed.memory;
       if memory
         .subjects
         .iter()
-        .any(|s| per_subject.get(&s.id).copied().unwrap_or(0) >= rules.subject_cap)
+        .any(|s| per_subject.get(&s.id).copied().unwrap_or(0) >= self.rules.subject_cap)
       {
         continue;
       }
-      let mine = words(&memory.text);
-      if seen_words.iter().any(|seen| near(seen, &mine)) {
-        continue;
-      }
       let is_marked = marked.contains(&memory.id);
-      let line = self.line(&mut tx, &memory, is_marked, at).await?;
+      let line = self.line(&mut tx, memory, is_marked, at).await?;
       let cost = tokens(&line);
       if spent + cost > budget {
         continue;
@@ -249,15 +348,15 @@ impl Store {
         *per_subject.entry(subject.id).or_default() += 1;
       }
       lines.push(line);
-      seen_words.push(mine);
       chosen.push(RecallChoice {
         memory_id: memory.id,
-        kind: memory.kind,
+        kind: memory.kind.clone(),
         part: RecallPart::Searched,
-        score,
+        score: weighed.relevance,
         marked: is_marked,
         token_count: cost,
       });
+      chosen_stems.push(weighed.stems);
     }
 
     if ask.record.unwrap_or(true) {
@@ -406,14 +505,6 @@ fn span(values: impl Iterator<Item = f64>) -> (f64, f64) {
   values.fold((f64::INFINITY, f64::NEG_INFINITY), |(lo, hi), v| (lo.min(v), hi.max(v)))
 }
 
-/// A value scaled into 0 to 1 between the least and the greatest; one half where they are the same.
-fn norm(value: f64, lo: f64, hi: f64) -> f64 {
-  if hi <= lo {
-    return 0.5;
-  }
-  (value - lo) / (hi - lo)
-}
-
 /// Whether the turn's words hold a condition: at least `share` of the condition's words are among them.
 fn holds(condition: &str, asked: &BTreeSet<String>, share: f64) -> bool {
   let mine = words(condition);
@@ -422,14 +513,4 @@ fn holds(condition: &str, asked: &BTreeSet<String>, share: f64) -> bool {
   }
   let held = mine.intersection(asked).count() as f64 / mine.len() as f64;
   held >= share
-}
-
-/// Whether two word sets are near-doubles: more than six tenths of the smaller is in the other.
-fn near(a: &BTreeSet<String>, b: &BTreeSet<String>) -> bool {
-  let smaller = a.len().min(b.len());
-  if smaller == 0 {
-    return false;
-  }
-  let shared = a.intersection(b).count();
-  shared as f64 / smaller as f64 > 0.6
 }

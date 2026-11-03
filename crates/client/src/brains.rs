@@ -700,12 +700,10 @@ pub struct Injected {
 pub struct Rules {
   /// The tokens a recall block holds where the ask names no budget.
   pub budget_tokens: i64,
-  /// The weight of a memory's relevance to the turn's words in the recall score.
-  pub weight_relevance: f64,
-  /// The weight of a memory's importance in the recall score.
-  pub weight_importance: f64,
-  /// What a memory of a subject the turn names adds to its relevance.
-  pub subject_bonus: f64,
+  /// The most relevance `S` a cue gives a memory linked to it, less the log of its fan.
+  pub max_associative_strength: f64,
+  /// The weight `λ` recall's selection gives a row's relevance against its overlap with the rows already in.
+  pub mmr_lambda: f64,
   /// The most rows one subject fills in the searched part of a block.
   pub subject_cap: i64,
   /// The most facts of one speaker's sheet the core of a block carries; the rest reach a turn only through
@@ -727,9 +725,8 @@ impl Default for Rules {
   fn default() -> Self {
     Self {
       budget_tokens: 1_800,
-      weight_relevance: 1.0,
-      weight_importance: 1.0,
-      subject_bonus: 0.5,
+      max_associative_strength: 1.6,
+      mmr_lambda: 0.7,
       subject_cap: 4,
       core_fact_cap: 8,
       hit_times_kept: 64,

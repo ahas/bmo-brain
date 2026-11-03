@@ -8,6 +8,7 @@ mod events;
 mod learning;
 mod mcp;
 mod openapi;
+mod recall;
 mod repository;
 mod screen;
 mod sheets;

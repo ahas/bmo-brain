@@ -11,6 +11,7 @@ pub mod rules;
 pub mod sheets;
 pub mod tallies;
 pub mod versions;
+pub mod words;
 
 use std::time::{SystemTime, UNIX_EPOCH};
 

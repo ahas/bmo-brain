@@ -561,7 +561,7 @@ async fn recall_hands_out_the_core_and_the_searched_part_marks_repeats_and_keeps
       brain,
       fact.id,
       &MemoryVersion {
-        text: Some("The garden grows only beans now.".to_owned()),
+        text: Some("The garden grows only tomatoes now.".to_owned()),
         actor_name: "writer-a".to_owned(),
         ..MemoryVersion::default()
       },

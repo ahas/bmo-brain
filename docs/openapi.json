@@ -1553,6 +1553,18 @@
             "format": "int64",
             "type": "integer"
           },
+          "max_associative_strength": {
+            "default": 1.6,
+            "description": "The most relevance `S` a cue gives a memory linked to it, less the log of its fan.",
+            "format": "double",
+            "type": "number"
+          },
+          "mmr_lambda": {
+            "default": 0.7,
+            "description": "The weight `λ` recall's selection gives a row's relevance against its overlap with the rows already in.",
+            "format": "double",
+            "type": "number"
+          },
           "previous_value_days": {
             "default": 30,
             "description": "For how long after a version was superseded a reading says what the previous value was.",
@@ -1565,36 +1577,17 @@
             "format": "int64",
             "type": "integer"
           },
-          "subject_bonus": {
-            "default": 0.5,
-            "description": "What a memory of a subject the turn names adds to its relevance.",
-            "format": "double",
-            "type": "number"
-          },
           "subject_cap": {
             "default": 4,
             "description": "The most rows one subject fills in the searched part of a block.",
             "format": "int64",
             "type": "integer"
-          },
-          "weight_importance": {
-            "default": 1.0,
-            "description": "The weight of a memory's importance in the recall score.",
-            "format": "double",
-            "type": "number"
-          },
-          "weight_relevance": {
-            "default": 1.0,
-            "description": "The weight of a memory's relevance to the turn's words in the recall score.",
-            "format": "double",
-            "type": "number"
           }
         },
         "required": [
           "budget_tokens",
-          "weight_relevance",
-          "weight_importance",
-          "subject_bonus",
+          "max_associative_strength",
+          "mmr_lambda",
           "subject_cap",
           "core_fact_cap",
           "hit_times_kept",

@@ -1106,6 +1106,18 @@ export interface components {
              */
             hit_times_kept: number;
             /**
+             * Format: double
+             * @description The most relevance `S` a cue gives a memory linked to it, less the log of its fan.
+             * @default 1.6
+             */
+            max_associative_strength: number;
+            /**
+             * Format: double
+             * @description The weight `λ` recall's selection gives a row's relevance against its overlap with the rows already in.
+             * @default 0.7
+             */
+            mmr_lambda: number;
+            /**
              * Format: int64
              * @description For how long after a version was superseded a reading says what the previous value was.
              * @default 30
@@ -1118,29 +1130,11 @@ export interface components {
              */
             same_session_ms: number;
             /**
-             * Format: double
-             * @description What a memory of a subject the turn names adds to its relevance.
-             * @default 0.5
-             */
-            subject_bonus: number;
-            /**
              * Format: int64
              * @description The most rows one subject fills in the searched part of a block.
              * @default 4
              */
             subject_cap: number;
-            /**
-             * Format: double
-             * @description The weight of a memory's importance in the recall score.
-             * @default 1
-             */
-            weight_importance: number;
-            /**
-             * Format: double
-             * @description The weight of a memory's relevance to the turn's words in the recall score.
-             * @default 1
-             */
-            weight_relevance: number;
         };
         /** @description A candidate memory, whose likes the write judgement reads. */
         SimilarAsk: {
