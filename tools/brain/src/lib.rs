@@ -320,7 +320,9 @@ pub async fn answer(handed: Handed) -> Result<Answer, String> {
         "owner" => Source::Owner,
         "told" => Source::Told,
         "inferred" => Source::Inferred,
-        other => return Ok(Answer::refusal(format!("source is {other:?}; it is own, owner, told or inferred"))),
+        other => {
+          return Ok(Answer::refusal(format!("source is {other:?}; it is own, owner, told or inferred")));
+        }
       };
       let valid_from = match moment(arguments, "validFrom") {
         Ok(at) => at,
@@ -387,7 +389,10 @@ pub async fn answer(handed: Handed) -> Result<Answer, String> {
         .map(|m| json!({ "id": m.id, "status": m.status, "validTo": m.valid_to }))
     }
     "brain_list" => {
-      let subject_id = match arguments.get("subject").and_then(|s| serde_json::from_value::<SubjectKey>(s.clone()).ok()) {
+      let subject_id = match arguments
+        .get("subject")
+        .and_then(|s| serde_json::from_value::<SubjectKey>(s.clone()).ok())
+      {
         Some(named) => {
           let page = client
             .subjects(
@@ -445,8 +450,10 @@ pub async fn answer(handed: Handed) -> Result<Answer, String> {
       .await
       .map(|episodes| {
         json!({
-          "episodes": episodes.iter().map(|m| json!({
-            "id": m.id, "text": m.text, "importance": m.importance, "subjects": m.subjects, "validFrom": m.valid_from,
+          "episodes": episodes.iter().map(|e| json!({
+            "id": e.memory.id, "text": e.memory.text, "importance": e.memory.importance,
+            "subjects": e.memory.subjects, "validFrom": e.memory.valid_from,
+            "priority": e.priority, "gain": e.gain, "need": e.need, "taggedBy": e.tagged_by,
           })).collect::<Vec<_>>()
         })
       }),
@@ -460,7 +467,8 @@ pub async fn answer(handed: Handed) -> Result<Answer, String> {
       .await
       .map(|recorded| json!({ "recordedCount": recorded.recorded_count })),
     "brain_fold" => {
-      let session_key = handed.session.variables.get("BMO_RUN_NAME").cloned().unwrap_or_else(|| agent.clone());
+      let session_key =
+        handed.session.variables.get("BMO_RUN_NAME").cloned().unwrap_or_else(|| agent.clone());
       client
         .fold(brain, &Fold { session_key })
         .await

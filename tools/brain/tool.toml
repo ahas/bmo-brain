@@ -67,7 +67,7 @@ unbounded = true
 namespace = "bmo"
 name = "brain_unconsolidated"
 title = "Unconsolidated episodes"
-description = "The episodes not yet consolidated, most important first, for a consolidation."
+description = "The episodes not yet consolidated, highest priority first, for a consolidation."
 input = "brain_unconsolidated.json"
 hints = { read_only = true }
 capabilities = ["room.chat"]

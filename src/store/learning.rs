@@ -17,9 +17,6 @@ use super::{Fault, Held, Store, now};
 /// How many likes the judgement reads where the ask names no limit, and at most.
 const SIMILAR: i64 = 10;
 const SIMILAR_MOST: i64 = 50;
-/// How many episodes a consolidation reads where the ask names no limit, and at most.
-const EPISODES: i64 = 60;
-const EPISODES_MOST: i64 = 500;
 
 /// The types a candidate is never compared against.
 const UNCOMPARED: [&str; 2] = ["episode", "persona"];
@@ -226,28 +223,6 @@ impl Store {
     learned.written = Some(memory);
     self.commit(tx).await?;
     Ok(learned)
-  }
-
-  /// The episodes not yet consolidated, most important first, at most the limit.
-  pub async fn unconsolidated(&self, brain_id: i64, limit: Option<i64>) -> Held<Vec<Memory>> {
-    let limit = match limit {
-      None => EPISODES,
-      Some(limit) if (1..=EPISODES_MOST).contains(&limit) => limit,
-      Some(limit) => {
-        return Err(Fault::BadRequest(format!("limit is {limit}; it is 1 to {EPISODES_MOST}.")));
-      }
-    };
-    let mut conn = self.connection().await?;
-    brain_of(&mut conn, brain_id).await?;
-    let rows: Vec<MemoryRow> = sqlx::query_as(&format!(
-      "SELECT {MEMORY_COLUMNS} FROM memories WHERE brain_id = $1 AND type = 'episode' AND status = 'active' \
-       AND consolidated_at IS NULL ORDER BY importance DESC, id LIMIT $2"
-    ))
-    .bind(brain_id)
-    .bind(limit)
-    .fetch_all(&mut *conn)
-    .await?;
-    self.members(&mut conn, rows).await
   }
 
   /// The sum of the importance of a brain's unconsolidated episodes, read within a transaction.

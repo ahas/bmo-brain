@@ -196,7 +196,7 @@ the brain's tools. It writes in two moments.
 
 Consolidation is the agent's pass outside any answer: it reads episodes not yet consolidated, together with
 the live facts about the same subjects, and writes semantic facts, reflections and corrections from them. It
-takes the episodes with the highest importance first.
+takes the episodes in the brain's priority order.
 
 - **Two triggers, and no others:** the sum of the importance of a brain's unconsolidated episodes reaching the
   brain's threshold, and a session being folded or handed off. There is no nightly pass, no pass every N
@@ -204,7 +204,26 @@ takes the episodes with the highest importance first.
   other mode.
 - **The brain says when it is due:** every recall answers whether the importance threshold is reached, and
   the agent consolidates in its turn when it is, and at its fold. The brain reads the unconsolidated
-  episodes out, most important first, and is told which it consolidated; it runs no pass of its own.
+  episodes out in priority order and is told which it consolidated; it runs no pass of its own.
+- **Priority is the expected value of consolidating an episode,** after Mattar and Daw's (2018) value of a
+  memory backup: priority = gain × (1 + need), highest first, reckoned at the reading from what the brain
+  holds and never stored, so no stored value changes.
+  - **Gain** = importance × (1 + novelty). Novelty is one less the greatest Jaccard overlap between the
+    episode's stems and those of a live row that is no episode and shares one of its subjects (「Recall」);
+    an episode with no subject, or whose subjects no such row shares, has novelty one. An episode whose
+    stems are exactly those of such a row gains its importance alone.
+  - **Need** is the sum over the episode's subjects of ln(1 + the use counts of the live rows about that
+    subject added up) (「Use」): an episode about what the agent keeps using is needed more. An episode with
+    no subject has need zero.
+  - Equal priorities go by importance, highest first, then the older episode first.
+- **A strong episode tags its neighbours** (retroactive tagging, after Dunsmoor and colleagues, 2015), in
+  the order alone. An episode whose importance reaches `tag_importance` is a tag. Every other unconsolidated
+  episode of one of the tag's rooms, that is linked to a subject of type `room` the tag is linked to, written
+  within `same_session_ms` before or after the tag, that is not a tag itself and stands below it in priority
+  order, is read out directly after the tag, in its own priority order, and names the tag. An episode two tags
+  reach follows the one higher in the order; one standing above the tag keeps its place.
+- **The reading shows its reasons:** each episode is answered with its priority, its gain, its need and the
+  tag it follows, where one pulled it.
 - **What the agent writes passes the write judgement** like any fact, through the same call.
 
 ## Use
@@ -222,10 +241,10 @@ The brain records how a memory is used and lets nothing fade by itself.
   important rows (「Recall」); a reading of the screen orders by it where asked.
 - **The numbers are settings,** with placeholders until the owner's own conversation logs have fitted them:
   the importance threshold of consolidation, recall's length weighting (BM25's standard k1 and b) and its
-  selection's balance,
-  the per-subject cap, the core's cap of facts per speaker, the share of a condition's words a turn holds
-  before the condition matches, the token budget and the most use moments a row keeps. The brain reads them
-  from its configuration and names each in its health answer.
+  selection's balance, the per-subject cap, the core's cap of facts per speaker, the share of a condition's
+  words a turn holds before the condition matches, the token budget, the most use moments a row keeps, and
+  consolidation's tag importance and its window, the span of one session. The brain reads them from its
+  configuration and names each in its health answer.
 
 ## Recall
 

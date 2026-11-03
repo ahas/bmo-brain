@@ -713,12 +713,14 @@ pub struct Rules {
   pub core_fact_cap: i64,
   /// How many moments of use a row keeps, its newest.
   pub hit_times_kept: i64,
-  /// The span of one session, in milliseconds; read by no rule.
+  /// The span of one session, in milliseconds: the window around a tag in the consolidation order.
   pub same_session_ms: i64,
   /// For how long after a version was superseded a reading says what the previous value was.
   pub previous_value_days: i64,
   /// The share of a condition's words the turn must hold for the condition to match it.
   pub condition_share: f64,
+  /// The importance at which an unconsolidated episode tags its room's episodes written around it.
+  pub tag_importance: i64,
   /// The sum of importance of unconsolidated episodes that triggers a consolidation.
   pub consolidation_threshold: i64,
 }
@@ -736,6 +738,7 @@ impl Default for Rules {
       same_session_ms: 60 * 60 * 1_000,
       previous_value_days: 30,
       condition_share: 0.5,
+      tag_importance: 8,
       consolidation_threshold: 150,
     }
   }
@@ -835,6 +838,23 @@ pub struct UnconsolidatedQuery {
   /// Sixty where none is given, at most five hundred.
   #[serde(skip_serializing_if = "Option::is_none")]
   pub limit: Option<i64>,
+}
+
+/// An unconsolidated episode as a consolidation reads it: the memory, and why it stands where it does in the
+/// order.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct UnconsolidatedEpisode {
+  #[serde(flatten)]
+  pub memory: Memory,
+  /// The expected value of consolidating it: gain × (1 + need).
+  pub priority: f64,
+  /// Its importance × (1 + its novelty against the live rows about its subjects).
+  pub gain: f64,
+  /// The sum over its subjects of ln(1 + the use of the live rows about that subject).
+  pub need: f64,
+  /// The tag it is read out after, or null where it stands at its own place.
+  pub tagged_by: Option<i64>,
 }
 
 /// Episodes a consolidation read.

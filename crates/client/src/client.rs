@@ -9,7 +9,7 @@ use crate::brains::{
   LayerChange, LayersQuery, Learned, Learning, MemoriesQuery, Memory, MemoryMerge, MemoryMove,
   MemoryVersion, NewBrain, NewLayer, NewMemory, NewSubject, PersonaQuery, Recall, RecallAsk, Recorded,
   Restoration, SheetQuery, SimilarAsk, Subject, SubjectChange, SubjectsQuery, TalliesQuery, Tally,
-  TypeCount, UnconsolidatedQuery,
+  TypeCount, UnconsolidatedEpisode, UnconsolidatedQuery,
 };
 use crate::wire::{ConsoleManifest, ConsoleWords, Event, EventsQuery, Health, Page, WireError};
 
@@ -343,7 +343,11 @@ impl BrainClient {
   }
 
   /// `GET /brains/{brainId}/unconsolidated`
-  pub async fn unconsolidated(&self, brain_id: i64, query: &UnconsolidatedQuery) -> Answer<Vec<Memory>> {
+  pub async fn unconsolidated(
+    &self,
+    brain_id: i64,
+    query: &UnconsolidatedQuery,
+  ) -> Answer<Vec<UnconsolidatedEpisode>> {
     Self::answered(self.get(&["brains", &brain_id.to_string(), "unconsolidated"], query)).await
   }
 

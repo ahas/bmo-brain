@@ -444,7 +444,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The episodes not yet consolidated, most important first. */
+        /** The episodes not yet consolidated, in priority order, each with its priority, gain, need and tag. */
         get: operations["listUnconsolidated"];
         put?: never;
         post?: never;
@@ -1131,7 +1131,7 @@ export interface components {
             previous_value_days: number;
             /**
              * Format: int64
-             * @description The span of one session, in milliseconds; read by no rule.
+             * @description The span of one session, in milliseconds: the window around a tag in the consolidation order.
              * @default 3600000
              */
             same_session_ms: number;
@@ -1141,6 +1141,12 @@ export interface components {
              * @default 4
              */
             subject_cap: number;
+            /**
+             * Format: int64
+             * @description The importance at which an unconsolidated episode tags its room's episodes written around it.
+             * @default 8
+             */
+            tag_importance: number;
         };
         /** @description A candidate memory, whose likes the write judgement reads. */
         SimilarAsk: {
@@ -1241,6 +1247,102 @@ export interface components {
             /** @description Whether code depends on the type's meaning. */
             reserved: boolean;
             type: string;
+        };
+        /**
+         * @description An unconsolidated episode as a consolidation reads it: the memory, and why it stands where it does in the
+         *     order.
+         */
+        UnconsolidatedEpisode: {
+            /** @description Who wrote this version. */
+            actorName: string;
+            /** Format: int64 */
+            brainId: number;
+            /** Format: int64 */
+            consolidatedAt: number | null;
+            /** Format: int64 */
+            createdAt: number;
+            /**
+             * Format: double
+             * @description Its importance × (1 + its novelty against the live rows about its subjects).
+             */
+            gain: number;
+            /** Format: int64 */
+            id: number;
+            /**
+             * Format: int64
+             * @description The writer's weight at the time of writing, 1 to 10.
+             */
+            importance: number;
+            /** @description The caller's identifier, unique among the live rows of a brain. */
+            key: string | null;
+            labels: {
+                [key: string]: string;
+            };
+            /** Format: int64 */
+            lastConfirmedAt: number | null;
+            /**
+             * Format: int64
+             * @description Its latest use; null where it was never used.
+             */
+            lastUsedAt: number | null;
+            /** Format: int64 */
+            layerId: number | null;
+            /**
+             * Format: int64
+             * @description The first version's id in this row's line.
+             */
+            lineageId: number;
+            /**
+             * Format: double
+             * @description The sum over its subjects of ln(1 + the use of the live rows about that subject).
+             */
+            need: number;
+            /**
+             * Format: int64
+             * @description Where it stands within its layer.
+             */
+            position: number;
+            /**
+             * Format: double
+             * @description The expected value of consolidating it: gain × (1 + need).
+             */
+            priority: number;
+            /**
+             * @description Why its status was moved, as the mover said; null where nothing was said.
+             * @default null
+             */
+            reason: string | null;
+            /**
+             * @description The situation in which it is needed, in words, or null where it carries none.
+             * @default null
+             */
+            recallCondition: string | null;
+            /**
+             * @description The situation that ends it, in words, or null where it carries none.
+             * @default null
+             */
+            releaseCondition: string | null;
+            status: components["schemas"]["MemoryStatus"];
+            subjects: components["schemas"]["SubjectRef"][];
+            /** Format: int64 */
+            supersededBy: number | null;
+            /**
+             * Format: int64
+             * @description The tag it is read out after, or null where it stands at its own place.
+             */
+            taggedBy: number | null;
+            text: string;
+            /** @description What the row is; the reserved types are stated in the design. */
+            type: string;
+            /**
+             * Format: int64
+             * @description How often it was used: handed out, reported used, confirmed or read explicitly.
+             */
+            useCount: number;
+            /** Format: int64 */
+            validFrom: number;
+            /** Format: int64 */
+            validTo: number | null;
         };
         /** @description Every failure: its code and an English sentence saying what went wrong. */
         WireError: {
@@ -2397,7 +2499,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Memory"][];
+                    "application/json": components["schemas"]["UnconsolidatedEpisode"][];
                 };
             };
             400: components["responses"]["BadRequest"];

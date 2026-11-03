@@ -243,7 +243,7 @@ async fn a_learning_is_applied_whole_by_its_judgement_and_its_source() {
 }
 
 #[tokio::test]
-async fn unconsolidated_episodes_are_read_most_important_first_and_marked_with_the_due_signal_in_recall() {
+async fn unconsolidated_episodes_are_read_by_priority_and_marked_with_the_due_signal_in_recall() {
   let served = Served::new().await;
   let client = &served.client;
   let brain = brain_of(client).await;
@@ -282,7 +282,7 @@ async fn unconsolidated_episodes_are_read_most_important_first_and_marked_with_t
     .unwrap();
   assert_eq!((before.unconsolidated_importance, before.consolidation_due), (11, false));
   let listed = client.unconsolidated(brain, &UnconsolidatedQuery { limit: None }).await.unwrap();
-  assert_eq!(listed.iter().map(|m| m.id).collect::<Vec<_>>(), [big.id, small.id]);
+  assert_eq!(listed.iter().map(|m| m.memory.id).collect::<Vec<_>>(), [big.id, small.id]);
   for _ in 0..16 {
     client
       .memory_add(
@@ -321,7 +321,7 @@ async fn unconsolidated_episodes_are_read_most_important_first_and_marked_with_t
     .unwrap();
   assert_eq!(marked.recorded_count, 2);
   let left = client.unconsolidated(brain, &UnconsolidatedQuery { limit: Some(100) }).await.unwrap();
-  assert!(!left.iter().any(|m| m.id == big.id || m.id == small.id));
+  assert!(!left.iter().any(|m| m.memory.id == big.id || m.memory.id == small.id));
   assert!(client.memory(brain, big.id).await.unwrap().consolidated_at.is_some());
   let again = client
     .consolidated(

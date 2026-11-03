@@ -3,6 +3,7 @@
 //! work through them.
 
 pub mod brains;
+pub mod consolidation;
 pub mod events;
 pub mod files;
 pub mod learning;

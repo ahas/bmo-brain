@@ -4,6 +4,7 @@
 mod support;
 
 mod brains;
+mod consolidation;
 mod events;
 mod learning;
 mod mcp;

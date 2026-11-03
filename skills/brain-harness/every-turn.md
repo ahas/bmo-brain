@@ -75,7 +75,7 @@ it as you read, in the turn itself. Nothing writes it for you.
 ## Consolidation
 
 - When the recall says a consolidation is due, or when your session is about to be folded or handed off,
-  read `brain_unconsolidated`, most important first, with the facts you hold about their subjects, and write
+  read `brain_unconsolidated`, highest priority first, with the facts you hold about their subjects, and write
   what the episodes come to through `brain_learn`: the facts several episodes agree on, with the episodes
   under `grounds`; the corrections they force; the reflections worth keeping (type `reflection`: a pattern
   across episodes). Then mark the episodes with `brain_consolidated`.

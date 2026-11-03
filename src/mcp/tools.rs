@@ -331,7 +331,7 @@ pub fn tools() -> Vec<BrainTool> {
     ),
     tool(
       "brain_unconsolidated",
-      "The episodes not yet consolidated, most important first.",
+      "The episodes not yet consolidated, in priority order, each with its priority, gain, need and tag.",
       "GET /brains/{brainId}/unconsolidated",
       |client, Within { brain_id, body }: Within<UnconsolidatedQuery>| async move {
         client.unconsolidated(brain_id, &body).await

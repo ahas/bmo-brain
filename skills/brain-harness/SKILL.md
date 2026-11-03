@@ -54,7 +54,7 @@ apply the judgement with one `brain_learn`, and consolidate when the brain says 
 - **Correct with `brain_memory_version`,** never by writing a second row: the old version is superseded and
   kept. **Close with `brain_memory_move`:** `done` for a promise kept, `invalidated` for a fact that stopped
   holding; `active` approves a `pending` row.
-- **Consolidate when the recall says it is due:** `brain_unconsolidated` reads the episodes most important
+- **Consolidate when the recall says it is due:** `brain_unconsolidated` reads the episodes highest priority
   first, `brain_learn` writes what they come to with the episodes under `grounds`, and `brain_consolidated`
   marks them.
 - **Tell the brain when the session folds** with `brain_fold`, so the marks clear and what it knew may attach

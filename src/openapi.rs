@@ -13,7 +13,7 @@ use bmo_brain_client::{
 };
 use bmo_brain_client::{
   ConsoleManifest, ConsoleWords, Consolidated, Learned, Learning, Restoration, SimilarAsk, TalliesQuery,
-  Tally, UnconsolidatedQuery,
+  Tally, UnconsolidatedEpisode, UnconsolidatedQuery,
 };
 use schemars::generate::{SchemaGenerator, SchemaSettings};
 use schemars::{JsonSchema, Schema};
@@ -576,7 +576,7 @@ fn brain_routes(g: &mut SchemaGenerator) -> Vec<Route> {
       path: "/brains/{brainId}/unconsolidated",
       id: "listUnconsolidated",
       tag: "writing",
-      summary: "The episodes not yet consolidated, most important first.",
+      summary: "The episodes not yet consolidated, in priority order, each with its priority, gain, need and tag.",
       parameters: {
         let mut parameters = brain(g);
         parameters.extend(query::<UnconsolidatedQuery>(g));
@@ -584,7 +584,7 @@ fn brain_routes(g: &mut SchemaGenerator) -> Vec<Route> {
       },
       body: None,
       raw_body: None,
-      answers: vec![(200, json_answer::<Vec<Memory>>(g))],
+      answers: vec![(200, json_answer::<Vec<UnconsolidatedEpisode>>(g))],
       codes: vec![BadRequest, NotFound],
     },
     Route {

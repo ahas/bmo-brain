@@ -1579,13 +1579,19 @@
           },
           "same_session_ms": {
             "default": 3600000,
-            "description": "The span of one session, in milliseconds; read by no rule.",
+            "description": "The span of one session, in milliseconds: the window around a tag in the consolidation order.",
             "format": "int64",
             "type": "integer"
           },
           "subject_cap": {
             "default": 4,
             "description": "The most rows one subject fills in the searched part of a block.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "tag_importance": {
+            "default": 8,
+            "description": "The importance at which an unconsolidated episode tags its room's episodes written around it.",
             "format": "int64",
             "type": "integer"
           }
@@ -1601,6 +1607,7 @@
           "same_session_ms",
           "previous_value_days",
           "condition_share",
+          "tag_importance",
           "consolidation_threshold"
         ],
         "type": "object"
@@ -1851,6 +1858,201 @@
           "type",
           "count",
           "reserved"
+        ],
+        "type": "object"
+      },
+      "UnconsolidatedEpisode": {
+        "description": "An unconsolidated episode as a consolidation reads it: the memory, and why it stands where it does in the\norder.",
+        "properties": {
+          "actorName": {
+            "description": "Who wrote this version.",
+            "type": "string"
+          },
+          "brainId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "consolidatedAt": {
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "gain": {
+            "description": "Its importance × (1 + its novelty against the live rows about its subjects).",
+            "format": "double",
+            "type": "number"
+          },
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "importance": {
+            "description": "The writer's weight at the time of writing, 1 to 10.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "key": {
+            "description": "The caller's identifier, unique among the live rows of a brain.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "labels": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "lastConfirmedAt": {
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "lastUsedAt": {
+            "description": "Its latest use; null where it was never used.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "layerId": {
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "lineageId": {
+            "description": "The first version's id in this row's line.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "need": {
+            "description": "The sum over its subjects of ln(1 + the use of the live rows about that subject).",
+            "format": "double",
+            "type": "number"
+          },
+          "position": {
+            "description": "Where it stands within its layer.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "priority": {
+            "description": "The expected value of consolidating it: gain × (1 + need).",
+            "format": "double",
+            "type": "number"
+          },
+          "reason": {
+            "default": null,
+            "description": "Why its status was moved, as the mover said; null where nothing was said.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "recallCondition": {
+            "default": null,
+            "description": "The situation in which it is needed, in words, or null where it carries none.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "releaseCondition": {
+            "default": null,
+            "description": "The situation that ends it, in words, or null where it carries none.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/MemoryStatus"
+          },
+          "subjects": {
+            "items": {
+              "$ref": "#/components/schemas/SubjectRef"
+            },
+            "type": "array"
+          },
+          "supersededBy": {
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "taggedBy": {
+            "description": "The tag it is read out after, or null where it stands at its own place.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "text": {
+            "type": "string"
+          },
+          "type": {
+            "description": "What the row is; the reserved types are stated in the design.",
+            "type": "string"
+          },
+          "useCount": {
+            "description": "How often it was used: handed out, reported used, confirmed or read explicitly.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "validFrom": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "validTo": {
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "brainId",
+          "key",
+          "type",
+          "text",
+          "layerId",
+          "position",
+          "subjects",
+          "status",
+          "lineageId",
+          "supersededBy",
+          "validFrom",
+          "validTo",
+          "recallCondition",
+          "releaseCondition",
+          "importance",
+          "useCount",
+          "lastUsedAt",
+          "lastConfirmedAt",
+          "consolidatedAt",
+          "actorName",
+          "reason",
+          "labels",
+          "createdAt",
+          "priority",
+          "gain",
+          "need",
+          "taggedBy"
         ],
         "type": "object"
       },
@@ -4475,7 +4677,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "$ref": "#/components/schemas/Memory"
+                    "$ref": "#/components/schemas/UnconsolidatedEpisode"
                   },
                   "type": "array"
                 }
@@ -4496,7 +4698,7 @@
             "$ref": "#/components/responses/NotFound"
           }
         },
-        "summary": "The episodes not yet consolidated, most important first.",
+        "summary": "The episodes not yet consolidated, in priority order, each with its priority, gain, need and tag.",
         "tags": [
           "writing"
         ],
@@ -6077,7 +6279,7 @@
       "route": "POST /brains/{brainId}/similar"
     },
     {
-      "description": "The episodes not yet consolidated, most important first.",
+      "description": "The episodes not yet consolidated, in priority order, each with its priority, gain, need and tag.",
       "input": {
         "description": "A brain and what a route of it takes.",
         "properties": {
@@ -6102,7 +6304,7 @@
       "name": "brain_unconsolidated",
       "output": {
         "items": {
-          "$ref": "#/components/schemas/Memory"
+          "$ref": "#/components/schemas/UnconsolidatedEpisode"
         },
         "type": "array"
       },

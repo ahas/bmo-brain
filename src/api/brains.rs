@@ -12,7 +12,7 @@ use bmo_brain_client::{
   Injected, Layer, LayerChange, LayersQuery, Learned, Learning, MemoriesQuery, Memory, MemoryMerge,
   MemoryMove, MemoryVersion, NewBrain, NewLayer, NewMemory, NewSubject, Page, PersonaQuery, Recall,
   RecallAsk, Recorded, Restoration, SheetQuery, SimilarAsk, Subject, SubjectChange, SubjectsQuery,
-  TalliesQuery, Tally, TypeCount, UnconsolidatedQuery,
+  TalliesQuery, Tally, TypeCount, UnconsolidatedEpisode, UnconsolidatedQuery,
 };
 
 use super::{Answer, Body, Brain, Key, Query};
@@ -229,7 +229,7 @@ async fn unconsolidated(
   State(brain): State<Brain>,
   Key(id): Key<i64>,
   Query(query): Query<UnconsolidatedQuery>,
-) -> Answer<Json<Vec<Memory>>> {
+) -> Answer<Json<Vec<UnconsolidatedEpisode>>> {
   Ok(Json(brain.store.unconsolidated(id, query.limit).await?))
 }
 
