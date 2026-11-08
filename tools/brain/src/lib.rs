@@ -223,6 +223,7 @@ fn room_subject(arguments: &Value, session: &Session) -> Option<SubjectKey> {
   match arguments.get("room") {
     Some(Value::String(room)) if room.is_empty() => None,
     Some(Value::String(room)) => Some(subject("room", room)),
+    Some(Value::Number(room)) => Some(subject("room", &room.to_string())),
     _ => room_of(session).map(|room| subject("room", &room)),
   }
 }

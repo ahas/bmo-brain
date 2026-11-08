@@ -211,6 +211,23 @@ async fn the_executable_writes_an_episode_and_a_learning_into_the_agents_brain()
     .unwrap();
   assert_eq!(listed.items.len(), 1);
 
+  // A room given as a number links that room, not the turn's.
+  let numbered = called(
+    &served,
+    "brain_learn",
+    json!({ "type": "fact", "text": "The member keeps a boat.", "source": "own", "room": 9 }),
+    "agent-a",
+    "7",
+  );
+  assert_eq!(numbered["isError"], json!(false), "{numbered}");
+  let numbered_id = numbered["structuredContent"]["written"]["id"].as_i64().unwrap();
+  let written = served.client.memory(brain.id, numbered_id).await.unwrap();
+  assert!(
+    written.subjects.iter().any(|subject| subject.kind == "room" && subject.key == "9"),
+    "{:?}",
+    written.subjects
+  );
+
   // A memory written with the two situations, and the list narrowed by one of them.
   let conditioned = called(
     &served,

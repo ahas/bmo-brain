@@ -23,9 +23,10 @@
     "room": {
       "type": [
         "string",
+        "integer",
         "null"
       ],
-      "description": "The room's id; this turn's room where none is given."
+      "description": "The room's id, as a string or a number; this turn's room where none is given."
     }
   }
 }
