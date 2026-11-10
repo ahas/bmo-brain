@@ -93,7 +93,7 @@ fn the_arguments_read_by_the_names_the_schemas_give_and_a_missing_or_unknown_one
 
 #[test]
 fn a_call_missing_an_argument_is_refused_before_the_brain_is_reached() {
-  let answered = called("http://127.0.0.1:1", "memory_add", json!({ "action": "Paint the fence." }));
+  let answered = called("http://[::1]:1", "memory_add", json!({ "action": "Paint the fence." }));
   assert_eq!(answered["isError"], json!(true), "{answered}");
   let text = answered["content"][0]["text"].as_str().unwrap();
   assert!(text.contains("type is required"), "{text}");

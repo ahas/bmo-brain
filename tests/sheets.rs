@@ -127,7 +127,7 @@ impl Workspace {
     let config = folder.join("brain.toml");
     std::fs::write(
       &config,
-      format!("listen = \"127.0.0.1:1\"\ntoken = \"{TOKEN}\"\ndatabase = \"{}\"\n", served.address()),
+      format!("listen = \"[::1]:1\"\ntoken = \"{TOKEN}\"\ndatabase = \"{}\"\n", served.address()),
     )
     .unwrap();
     Workspace { folder, config }
