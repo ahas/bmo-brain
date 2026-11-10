@@ -41,7 +41,62 @@ fn the_manifest_declares_exactly_the_entries_the_executable_answers_each_with_a_
     let schema: Value = serde_json::from_str(&text).unwrap();
     assert_eq!(schema["type"].as_str(), Some("object"), "{schema}");
     assert_eq!(schema["additionalProperties"].as_bool(), Some(false), "{schema}");
+
+    // A run working for a chat agent holds the reading and the lessons alone, each argument it is shown one the
+    // entry takes.
+    let name = entry["name"].as_str().unwrap();
+    let lessons = entry.get("bundle").and_then(|bundle| bundle.get("brain.lessons"));
+
+    assert_eq!(lessons.is_some(), LESSONS.contains(&name), "{name}");
+
+    for shown in lessons.map(|form| form["shown"].as_array().unwrap().clone()).unwrap_or_default() {
+      let shown = shown.as_str().unwrap();
+
+      assert!(
+        schema["properties"].get(shown).is_some(),
+        "{name} shows {shown}, which it does not take"
+      );
+    }
   }
+}
+
+// The entries a run working for a chat agent holds.
+const LESSONS: [&str; 3] = ["brain_similar", "brain_learn", "brain_list"];
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_run_working_for_a_chat_agent_reads_and_writes_that_agents_brain() {
+  let served = Served::new().await;
+
+  served
+    .client
+    .brain_add(&NewBrain {
+      account_key: "account-a".to_owned(),
+      agent_key: "agent-a".to_owned(),
+      name: None,
+    })
+    .await
+    .unwrap();
+
+  // The run is a worker's, which holds no brain of its own, working for agent-a.
+  let session = json!({
+    "holderName": "worker-a",
+    "namespaces": ["bmo"],
+    "capabilities": ["brain.lessons"],
+    "variables": { "BMO_TURN_AGENT": "worker-a", "BMO_BRAIN_AGENT": "agent-a", "BMO_RUN_NAME": "job-1" },
+  });
+  let learned = called_under(
+    &served,
+    "brain_learn",
+    json!({ "type": "tip", "text": "The suite of repo-a needs its database up first.", "source": "inferred" }),
+    session.clone(),
+  );
+
+  assert_eq!(learned["isError"], json!(false), "{learned}");
+
+  let found = called_under(&served, "brain_list", json!({ "words": "database up first" }), session);
+  let memories = found["structuredContent"]["memories"].as_array().unwrap();
+
+  assert_eq!(memories.len(), 1, "{found}");
 }
 
 fn test_address() -> String {
@@ -66,7 +121,10 @@ struct Served {
 
 impl Served {
   async fn new() -> Self {
-    let database = format!("brain_tool_{}", std::process::id());
+    // One database a test, though the tests of a file share its process.
+    static MADE: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+    let made = MADE.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let database = format!("brain_tool_{}_{made}", std::process::id());
     let mut admin = PgConnection::connect_with(&options("postgres")).await.unwrap();
     let _ = admin
       .execute(format!("DROP DATABASE IF EXISTS \"{database}\" WITH (FORCE)").as_str())
@@ -117,17 +175,24 @@ impl Drop for Served {
 
 /// The executable handed one call, as the host hands it, with the brain's address in its environment.
 fn called(served: &Served, entry: &str, arguments: Value, agent: &str, chat: &str) -> Value {
+  let session = json!({
+    "holderName": agent,
+    "namespaces": ["bmo"],
+    "capabilities": ["room.chat"],
+    "variables": { "BMO_TURN_AGENT": agent, "BMO_TURN_CHAT": chat, "BMO_RUN_NAME": "run-1" },
+  });
+
+  called_under(served, entry, arguments, session)
+}
+
+/// The executable handed one call under the session record given.
+fn called_under(served: &Served, entry: &str, arguments: Value, session: Value) -> Value {
   let handed = json!({
     "protocol": 1,
     "kind": "call",
     "entry": format!("bmo/{entry}"),
     "arguments": arguments,
-    "session": {
-      "holderName": agent,
-      "namespaces": ["bmo"],
-      "capabilities": ["room.chat"],
-      "variables": { "BMO_TURN_AGENT": agent, "BMO_TURN_CHAT": chat, "BMO_RUN_NAME": "run-1" },
-    },
+    "session": session,
   });
   let mut child = Command::new(env!("CARGO_BIN_EXE_brain-tool"))
     .env_clear()

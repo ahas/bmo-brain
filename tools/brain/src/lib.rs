@@ -18,6 +18,8 @@ pub const PROTOCOL: u32 = 1;
 /// The variables the tool reads of the session record: the data root, and the turn's agent and room.
 pub const DATA_ROOT_VARIABLE: &str = "BMO_DATA_DIR";
 pub const AGENT_VARIABLE: &str = "BMO_TURN_AGENT";
+/// The variable naming the chat agent a run works for, whose brain its calls read and write.
+pub const BRAIN_AGENT_VARIABLE: &str = "BMO_BRAIN_AGENT";
 pub const CHAT_VARIABLE: &str = "BMO_TURN_CHAT";
 
 /// The env file under the data root the brain's `tool-env` verb writes, and its variables.
@@ -133,15 +135,19 @@ pub fn brain_at(session: &Session) -> Result<BrainClient, String> {
   BrainClient::new(&address, token)
 }
 
-/// The agent whose brain the call writes: the turn's agent, else the record's holder.
+/// The agent whose brain the call writes: the chat agent the run works for, else the turn's agent, else the
+/// record's holder.
 pub fn agent_of(session: &Session) -> Result<String, String> {
-  session
-    .variables
-    .get(AGENT_VARIABLE)
-    .cloned()
-    .filter(|agent| !agent.is_empty())
+  let named = |variable: &str| session.variables.get(variable).cloned().filter(|agent| !agent.is_empty());
+
+  named(BRAIN_AGENT_VARIABLE)
+    .or_else(|| named(AGENT_VARIABLE))
     .or_else(|| Some(session.holder_name.clone()).filter(|holder| !holder.is_empty()))
-    .ok_or_else(|| format!("the call names no agent: neither {AGENT_VARIABLE} nor the record's holder"))
+    .ok_or_else(|| {
+      format!(
+        "the call names no agent: neither {BRAIN_AGENT_VARIABLE}, {AGENT_VARIABLE} nor the record's holder"
+      )
+    })
 }
 
 /// The turn's room, where the turn has one.

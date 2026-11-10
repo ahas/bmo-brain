@@ -369,12 +369,18 @@ entries in the `bmo` namespace, each for a session holding the `room.chat` capab
 `brain-tool` answers one call handed on standard input with one tool result on standard output, as the tool
 host's call protocol states.
 
+- **A run that works for a chat agent reads its brain and writes its lessons** through the narrower form the
+  `brain.lessons` capability holds of three entries: `brain_list` whole, `brain_similar` whole, and
+  `brain_learn` without `room`, `grounds` or `validFrom`, since such a run stands in no room and keeps no
+  episode of its own. Every other entry is the chat agent's alone.
+
 - **It finds the brain** by `BRAIN_ADDRESS` and `BRAIN_TOKEN` in its own environment, else in `env/brain.env`
   under the data root the record's `BMO_DATA_DIR` names, else the deployment's conventional data root under
   the home the host passes through, which `bmo-brain --config <file> tool-env` writes
   from the configuration before a deployment flips.
-- **It finds the agent's brain** by the turn's agent, `BMO_TURN_AGENT` in the record's variables, else the
-  record's holder: the one brain registered for that agent key. The turn's room, `BMO_TURN_CHAT`, is the room
+- **It finds the agent's brain** by `BMO_BRAIN_AGENT` in the record's variables, the chat agent a run works
+  for where its record names one, else the turn's agent, `BMO_TURN_AGENT`, else the record's holder: the one
+  brain registered for that agent key. The turn's room, `BMO_TURN_CHAT`, is the room
   a write links where the call names none; a call's own `room` is a string or a number, both read as the
   room's key.
 - **Its entries,** each one call: `brain_episode` (`POST /brains/{brainId}/memories`, type `episode`),

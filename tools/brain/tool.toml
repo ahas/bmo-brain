@@ -1,5 +1,6 @@
 # The brain's tool: what a chat agent writes to and reads from its brain in a turn (docs/boundary-api.md, 「Its
-# tool」), each entry one call of a brain route through the brain's client. The tool finds the brain through the
+# tool」), each entry one call of a brain route through the brain's client, and the narrower form of three of them a
+# run working for a chat agent holds to read that brain and write its lessons. The tool finds the brain through the
 # data root's env file, and the agent's brain by the turn's agent. The crate's own test holds every entry here to
 # the executable answering it. Every entry is unbounded: a call waits for the brain's answer however long it
 # takes.
@@ -33,6 +34,9 @@ hints = { read_only = true }
 capabilities = ["room.chat"]
 unbounded = true
 
+[entry.bundle."brain.lessons"]
+shown = ["text", "subjects", "limit"]
+
 [[entry]]
 namespace = "bmo"
 name = "brain_learn"
@@ -42,6 +46,9 @@ input = "brain_learn.json"
 hints = { idempotent = false }
 capabilities = ["room.chat"]
 unbounded = true
+
+[entry.bundle."brain.lessons"]
+shown = ["type", "text", "subjects", "importance", "source", "confirms", "strengthens", "replaces", "key", "recallCondition", "releaseCondition"]
 
 [[entry]]
 namespace = "bmo"
@@ -62,6 +69,9 @@ input = "brain_list.json"
 hints = { read_only = true }
 capabilities = ["room.chat"]
 unbounded = true
+
+[entry.bundle."brain.lessons"]
+shown = ["type", "status", "subject", "key", "words", "situation", "limit"]
 
 [[entry]]
 namespace = "bmo"
