@@ -66,6 +66,8 @@ test("a text read whole shows its reading, says it is translated and opens its o
   expect(html).toContain("ko:Likes tea");
   expect(html).toContain(words.brain.label.translated);
   expect(html).toContain(words.brain.action.show_original);
+  // The line saying so stands above the text, not under it.
+  expect(html.indexOf(words.brain.label.translated)).toBeLessThan(html.indexOf("ko:Likes tea"));
 });
 
 test("an untranslated text shows its English with no translated label and no original link, and the screen says so", async () => {

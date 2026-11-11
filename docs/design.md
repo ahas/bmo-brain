@@ -575,8 +575,9 @@ console bundle contract and served by the brain itself (`docs/boundary-api.md`, 
   default, or English. In a language other than English, a memory's text wherever it stands (the list, the row
   view, the timeline, the layer view and the memories offered while teaching), a subject's summary and a persona
   layer's prompt source are shown translated through the translator the console names, page by page as they
-  are shown; each translated text in the row view, the timeline, the summary and the prompt source says so and
-  opens its English original with one tap, and the toggle turns every text back to English at once. The English stands while a
+  are shown; each translated text in the row view, the timeline, the summary and the prompt source says so on a
+  line above it, where one tap puts its English original in its place, and the toggle turns every text back to
+  English at once. The English stands while a
   translation is on its way, so a translation never holds the English view back, and where one fails, or the
   translator stays too busy to read a text and answers it untranslated, the English stays, without the
   translated label or the link to an original, with one sentence saying so. Where the console names no
