@@ -403,7 +403,9 @@ host's call protocol states.
   no timeout ends it, only the brain's answer, a refused or broken connection, or its caller going away.
 - **A deployment places it** in `tools/brain/.placed/` inside the release: the executable, the manifest and
   the schemas; and once the release stays up, registers that folder with the tool host as the service's own
-  tool, so no hand touches the registry.
+  tool, so no hand touches the registry. The registration allows every capability the manifest asks for,
+  `room.chat` and `brain.lessons`: the host refuses a manifest asking for one it does not allow and keeps the
+  tool it already holds.
 
 `GET /discipline` answers `text/plain`: the discipline a chat agent's system prompt carries, how it reads and
 writes its brain every turn, the same text the skill ships as `every-turn.md`.
