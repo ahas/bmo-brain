@@ -53,7 +53,7 @@ impl Stopping {
 /// Whose token a call carries.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Caller {
-  /// The service's: every route.
+  /// The service's: every route but the console bundle's own.
   Service,
   /// The console's, relaying for a reader: what the screen uses (docs/boundary-api.md, 「The console bundle」).
   Console,
@@ -187,11 +187,18 @@ async fn authorised(State(brain): State<Brain>, mut request: Request, next: Next
   next.run(request).await
 }
 
-// The console's token reaches the manifest and the words with no role, the routes the screen uses with an
-// `Owner-Role` allowing the screen's, and nothing else.
+// The console bundle's own routes are the console's token's alone. The console's token reaches the manifest and
+// the words with no role, the routes the screen uses with an `Owner-Role` allowing the screen's, and nothing
+// else.
 async fn guarded(request: Request, next: Next) -> Response {
+  let path = request.extensions().get::<MatchedPath>().map(MatchedPath::as_str).unwrap_or_default();
+  if request.extensions().get::<Caller>() == Some(&Caller::Service)
+    && console::console_only(request.method().as_str(), path)
+  {
+    return ApiError::new(ErrorCode::Unauthorized, "The console's token alone reaches the console bundle.")
+      .into_response();
+  }
   if request.extensions().get::<Caller>() == Some(&Caller::Console) {
-    let path = request.extensions().get::<MatchedPath>().map(MatchedPath::as_str).unwrap_or_default();
     match console::reach(request.method().as_str(), path) {
       Reach::Open => {}
       Reach::Screen => {

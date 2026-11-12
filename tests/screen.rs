@@ -567,9 +567,20 @@ async fn relayed(
   path: &str,
   role: Option<&str>,
 ) -> (u16, String) {
+  called(served, CONSOLE_TOKEN, method, path, role).await
+}
+
+/// A call under the token given, and the role where one is given.
+async fn called(
+  served: &Served,
+  token: &str,
+  method: reqwest::Method,
+  path: &str,
+  role: Option<&str>,
+) -> (u16, String) {
   let mut request = reqwest::Client::new()
     .request(method, format!("{}{path}", served.base))
-    .bearer_auth(CONSOLE_TOKEN)
+    .bearer_auth(token)
     .header("Accept", "application/json");
   if let Some(role) = role {
     request = request.header("Owner-Role", role);
@@ -627,6 +638,7 @@ async fn the_manifest_names_the_built_module_stylesheet_and_words_and_each_is_an
   std::fs::write(folder.join("module.js"), "export default { routes: [] };\n").unwrap();
   std::fs::write(folder.join("style.css"), ".brain {}\n").unwrap();
   std::fs::write(folder.join("words.json"), r#"{"ko":{"brain":{"title":{"screen":"x"}}}}"#).unwrap();
+  std::fs::write(folder.join("layer.json"), r#"{"layer":"0.1.0-rev.1"}"#).unwrap();
   let served = Served::with_bundle(&folder).await;
   std::fs::remove_dir_all(&folder).unwrap();
   let get = reqwest::Method::GET;
@@ -648,7 +660,17 @@ async fn the_manifest_names_the_built_module_stylesheet_and_words_and_each_is_an
   assert_eq!(read["role"], "administrator", "{read}");
   assert_eq!(read["apiPrefix"], "/");
   assert_eq!(read["calls"], serde_json::json!([]));
-  assert_eq!(served.client.console_manifest().await.unwrap(), manifest);
+  assert_eq!(read["layer"], "0.1.0-rev.1");
+  // The console bundle's routes are the console's token's alone: the service's own is refused there.
+  for path in [
+    "/console-manifest",
+    manifest.words.as_str(),
+    manifest.bundle.as_str(),
+    stylesheet.as_str(),
+  ] {
+    let (status, body) = called(&served, TOKEN, get.clone(), path, Some("administrator")).await;
+    assert_eq!((status, code(&body)), (401, "unauthorized".to_owned()), "{path}");
+  }
 
   let (status, body) = relayed(&served, get.clone(), &manifest.words, None).await;
   assert_eq!((status, body.as_str()), (200, r#"{"ko":{"brain":{"title":{"screen":"x"}}}}"#));
@@ -669,8 +691,14 @@ async fn the_manifest_names_the_services_the_settings_say_the_screen_calls() {
   std::fs::create_dir_all(&folder).unwrap();
   std::fs::write(folder.join("module.js"), "export default { routes: [] };\n").unwrap();
   std::fs::write(folder.join("words.json"), r#"{"ko":{"brain":{"title":{"screen":"x"}}}}"#).unwrap();
+  std::fs::write(folder.join("layer.json"), r#"{"layer":"0.1.0-rev.1"}"#).unwrap();
   let served = Served::with_bundle_calling(&folder, &["words-out"]).await;
+  // A folder with no layer file holds no bundle the brain answers, so a console leaves the brain out.
+  std::fs::remove_file(folder.join("layer.json")).unwrap();
+  let unlayered = Served::with_bundle(&folder).await;
   std::fs::remove_dir_all(&folder).unwrap();
+  let (status, body) = relayed(&unlayered, reqwest::Method::GET, "/console-manifest", None).await;
+  assert_eq!((status, code(&body)), (404, "not-found".to_owned()));
 
   let (status, body) = relayed(&served, reqwest::Method::GET, "/console-manifest", None).await;
   assert_eq!(status, 200, "{body}");

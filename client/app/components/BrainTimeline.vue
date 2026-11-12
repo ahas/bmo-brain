@@ -42,7 +42,7 @@
             </circle>
           </g>
         </svg>
-        <div class="flex flex-wrap gap-3 px-2 pb-2 text-xs text-muted">
+        <div class="flex flex-wrap gap-3 px-2 pb-2 text-sm text-muted">
           <span>◆ {{ t("brain.label.writer_agent") }}</span>
           <span>■ {{ t("brain.label.writer_tool") }}</span>
           <span>● {{ t("brain.label.writer_person") }}</span>
@@ -52,7 +52,7 @@
       </div>
 
       <div v-if="chosenVersion" class="flex flex-col gap-2 border-t border-default p-4">
-        <div class="flex items-center gap-2 text-xs text-muted">
+        <div class="flex items-center gap-2 text-sm text-muted">
           <BrainStatus :status="chosenVersion.status" />
           <span class="tabular-nums">#{{ chosenVersion.id }} · {{ stamp(chosenVersion.validFrom) }}</span>
           <span>· {{ chosenVersion.actorName }}</span>

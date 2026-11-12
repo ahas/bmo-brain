@@ -36,7 +36,7 @@
           >
             <div class="min-w-0 flex-1">
               <div class="truncate text-sm font-medium">{{ layer.name }}</div>
-              <div v-if="layer.description" class="truncate text-xs text-muted">{{ layer.description }}</div>
+              <div v-if="layer.description" class="truncate text-sm text-muted">{{ layer.description }}</div>
             </div>
             <UBadge color="neutral" variant="soft" size="sm"><RollingNumber :value="layerCount(String(layer.id))" /></UBadge>
           </button>
@@ -79,7 +79,7 @@
               >
                 <div class="min-w-0 flex-1">
                   <div class="truncate text-sm font-medium">{{ subject.name ?? subject.key }}</div>
-                  <div class="truncate text-xs text-muted">{{ subject.key }}<template v-if="subject.description"> · {{ subject.description }}</template></div>
+                  <div class="truncate text-sm text-muted">{{ subject.key }}<template v-if="subject.description"> · {{ subject.description }}</template></div>
                 </div>
                 <UBadge color="neutral" variant="soft" size="sm"><RollingNumber :value="subjectCount(subject.id)" /></UBadge>
               </button>

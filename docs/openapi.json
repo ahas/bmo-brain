@@ -189,6 +189,10 @@
             "description": "The icon drawn beside that name.",
             "type": "string"
           },
+          "layer": {
+            "description": "The version of bmo-ui the bundle was built on, as the bundle build wrote it beside the module.",
+            "type": "string"
+          },
           "name": {
             "description": "The bundle's name, in kebab-case: its words' namespace.",
             "type": "string"
@@ -242,6 +246,7 @@
           "icon",
           "screenPath",
           "serviceName",
+          "layer",
           "bundle",
           "words",
           "apiPrefix",
@@ -2403,7 +2408,7 @@
   "info": {
     "description": "An agent's long-term memory as a service. The service keeps many brains, each an account's and one agent's: subjects (what a memory is about, found by type and key), layers (the table of contents) and memories, one row a version, superseded and invalidated but never deleted. A turn asks recall for a block under a token budget; a persona is rendered as the same bytes until a piece changes; a brain moves in and out as a brain file. Nothing is held outside a brain. Bodies are JSON with camelCase keys, times are epoch milliseconds, lists are pages of items and more, and every failure is the error shape with its status. The harness plugin's tools, each a thin call of one route, are stated under x-tools.",
     "title": "bmo-brain",
-    "version": "0.1.0-rev.31"
+    "version": "0.1.0-rev.32"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -5204,7 +5209,8 @@
           "forbidden",
           "not-found"
         ],
-        "x-console": "open"
+        "x-console": "open",
+        "x-console-only": true
       }
     },
     "/console-bundle/{file}": {
@@ -5255,7 +5261,8 @@
           "forbidden",
           "not-found"
         ],
-        "x-console": "screen"
+        "x-console": "screen",
+        "x-console-only": true
       }
     },
     "/console-manifest": {
@@ -5291,7 +5298,8 @@
           "forbidden",
           "not-found"
         ],
-        "x-console": "open"
+        "x-console": "open",
+        "x-console-only": true
       }
     },
     "/discipline": {

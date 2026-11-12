@@ -4,11 +4,11 @@
        reading is on its way, where it failed or came back untranslated, or while the screen reads English. The
        English may be drawn by the slot, as the timeline draws a version's change. -->
   <div class="flex flex-col gap-1">
-    <div v-if="reader.pending(text)" class="flex items-center gap-1 text-xs text-dimmed">
+    <div v-if="reader.pending(text)" class="flex items-center gap-1 text-sm text-dimmed">
       <UIcon name="i-material-symbols-translate" class="size-3.5 shrink-0" />
       <span>{{ t("brain.status.translating") }}</span>
     </div>
-    <div v-else-if="reading !== undefined" class="flex items-center gap-1 text-xs text-muted">
+    <div v-else-if="reading !== undefined" class="flex items-center gap-1 text-sm text-muted">
       <UIcon name="i-material-symbols-translate" class="size-3.5 shrink-0" />
       <span>{{ original ? t("brain.label.original") : reading.whole ? t("brain.label.translated") : t("brain.label.translated_in_part") }}</span>
       <UButton

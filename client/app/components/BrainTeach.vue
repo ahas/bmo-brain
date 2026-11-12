@@ -23,7 +23,7 @@
           </UFormField>
         </div>
         <UFormField v-if="mode === 'learning'" :label="t('brain.field.subjects')" :hint="t('brain.hint.subjects')">
-          <UInput v-model="subjectText" class="w-full font-mono text-xs" />
+          <UInput v-model="subjectText" class="w-full font-mono text-sm" />
         </UFormField>
         <div v-else class="grid grid-cols-2 gap-3">
           <UFormField :label="t('brain.field.layer')">
@@ -37,11 +37,11 @@
         <template v-if="mode === 'learning'">
           <div class="flex items-center gap-2">
             <UButton color="neutral" variant="outline" icon="i-material-symbols-search" :label="t('brain.action.similar')" :loading="looking || words.busy.value" :disabled="text.trim() === ''" @click="lookSimilar" />
-            <span v-if="candidates !== null" class="text-xs text-muted">{{ t("brain.label.similar_count", { n: candidates.length }) }}</span>
+            <span v-if="candidates !== null" class="text-sm text-muted">{{ t("brain.label.similar_count", { n: candidates.length }) }}</span>
           </div>
           <ul v-if="candidates !== null && candidates.length > 0" class="flex flex-col divide-y divide-default rounded-md border border-default">
             <li v-for="candidate in candidates" :key="candidate.id" class="flex flex-col gap-2 p-2">
-              <p class="text-sm">{{ reader.shown(candidate.text) }} <span class="text-xs text-muted">#{{ candidate.id }} · {{ typeName(t, te, candidate.type) }}</span></p>
+              <p class="text-sm">{{ reader.shown(candidate.text) }} <span class="text-sm text-muted">#{{ candidate.id }} · {{ typeName(t, te, candidate.type) }}</span></p>
               <USelect v-model="judged[candidate.id]" :items="judgements" size="xs" class="w-48" />
             </li>
           </ul>

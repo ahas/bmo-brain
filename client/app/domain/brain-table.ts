@@ -21,7 +21,7 @@ export const MEMORY_COLUMNS: readonly MemoryColumn[] = [
   { id: "layer", rem: 6, flexible: false, th: "w-24", td: "max-w-24 text-muted" },
   { id: "status", rem: 4.5, flexible: false, th: "w-18", td: "max-w-18" },
   { id: "importance", rem: 3, flexible: false, th: "w-12 text-end", td: "max-w-12 text-end tabular-nums" },
-  { id: "validFrom", rem: 5.5, flexible: false, th: "w-22 text-end", td: "max-w-22 text-end text-xs text-muted tabular-nums" }
+  { id: "validFrom", rem: 5.5, flexible: false, th: "w-22 text-end", td: "max-w-22 text-end text-sm text-muted tabular-nums" }
 ];
 
 // Under this width of its pane the table gives way to the stacked rows a phone shows.

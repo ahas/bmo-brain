@@ -103,6 +103,9 @@ impl Route {
       "x-codes": codes.iter().map(|code| code.name()).collect::<Vec<_>>(),
       "x-console": console::reach(self.method, self.path).name(),
     });
+    if console::console_only(self.method, self.path) {
+      operation["x-console-only"] = json!(true);
+    }
     if !self.parameters.is_empty() {
       operation["parameters"] = self.parameters.into();
     }

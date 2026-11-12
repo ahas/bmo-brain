@@ -43,6 +43,7 @@
 
 <script setup lang="ts">
 import { useIsland } from "bmo-ui/app/domain/island";
+import { askQuestion } from "bmo-ui/app/domain/question";
 import BrainHeading from "./BrainHeading.vue";
 import BrainText from "./BrainText.vue";
 import { typeName } from "../domain/brain-names";
@@ -138,7 +139,7 @@ async function swap(from: number, to: number): Promise<void> {
 
   if (a === undefined || b === undefined) return;
 
-  if ((a.type === "persona" || b.type === "persona") && !(await island.ask({ title: t("brain.hint.persona_cache"), confirm: t("common.action.save"), tone: "warning" }))) return;
+  if ((a.type === "persona" || b.type === "persona") && !(await askQuestion({ title: t("brain.title.persona_reorder"), effect: t("brain.hint.persona_cache"), confirm: t("common.action.save") }))) return;
 
   busy.value = true;
 

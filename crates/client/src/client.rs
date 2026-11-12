@@ -11,7 +11,7 @@ use crate::brains::{
   RecallAsk, Recorded, Restoration, SearchMiss, SheetQuery, SimilarAsk, Subject, SubjectChange,
   SubjectsQuery, TalliesQuery, Tally, TypeCount, UnconsolidatedEpisode, UnconsolidatedQuery,
 };
-use crate::wire::{ConsoleManifest, ConsoleWords, Event, EventsQuery, Health, Page, WireError};
+use crate::wire::{Event, EventsQuery, Health, Page, WireError};
 
 /// What a call came to short of the route's answer.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -121,21 +121,6 @@ impl BrainClient {
   /// `GET /health`
   pub async fn health(&self) -> Answer<Health> {
     Self::answered(self.request(Method::GET, &["health"])).await
-  }
-
-  /// `GET /console-manifest`
-  pub async fn console_manifest(&self) -> Answer<ConsoleManifest> {
-    Self::answered(self.request(Method::GET, &["console-manifest"])).await
-  }
-
-  /// `GET /console-bundle/words`
-  pub async fn console_words(&self) -> Answer<ConsoleWords> {
-    Self::answered(self.request(Method::GET, &["console-bundle", "words"])).await
-  }
-
-  /// `GET /console-bundle/{file}`: the module or the stylesheet the manifest names.
-  pub async fn console_file(&self, file: &str) -> Answer<Vec<u8>> {
-    Self::bytes(self.request(Method::GET, &["console-bundle", file])).await
   }
 
   /// `GET /events`, as a page.

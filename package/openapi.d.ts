@@ -634,6 +634,8 @@ export interface components {
             events: boolean;
             /** @description The icon drawn beside that name. */
             icon: string;
+            /** @description The version of bmo-ui the bundle was built on, as the bundle build wrote it beside the module. */
+            layer: string;
             /** @description The bundle's name, in kebab-case: its words' namespace. */
             name: string;
             /** @description Whether every call the screen makes needs the reader's owner key. */

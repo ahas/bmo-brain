@@ -17,7 +17,7 @@
     <div class="min-h-0 flex-1 overflow-auto p-3">
       <p v-if="groups.length === 0" class="p-6 text-center text-sm text-muted">{{ t("brain.status.nothing") }}</p>
       <table v-else-if="asTable" class="w-full text-sm">
-        <thead class="text-xs text-muted">
+        <thead class="text-sm text-muted">
           <tr>
             <th class="py-1 text-start">{{ by === "type" ? t("brain.field.type") : t("brain.field.layer") }}</th>
             <th class="py-1 text-end">{{ t("brain.label.count") }}</th>

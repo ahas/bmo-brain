@@ -46,13 +46,13 @@
             @click="emit('open', memory.id)"
           >
             <div class="flex flex-col gap-1">
-              <div class="flex items-center gap-2 text-xs text-muted">
+              <div class="flex items-center gap-2 text-sm text-muted">
                 <span>{{ typeName(t, te, memory.type) }}</span>
                 <BrainStatus :status="memory.status" />
                 <span class="ms-auto tabular-nums">{{ day(memory.validFrom) }}</span>
               </div>
               <p class="line-clamp-3 text-sm">{{ reader.shown(memory.text) }}</p>
-              <div v-if="memory.subjects.length > 0" class="truncate text-xs text-muted">
+              <div v-if="memory.subjects.length > 0" class="truncate text-sm text-muted">
                 {{ memory.subjects.map((subject) => subjectNames.get(subject.id) ?? subject.key).join(" · ") }}
               </div>
             </div>

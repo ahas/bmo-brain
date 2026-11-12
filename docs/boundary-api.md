@@ -34,7 +34,7 @@ plugin」). The binary declares no noun, so the platform's `bmo` hands it no com
 | Setting | Key | What it is |
 |---|---|---|
 | listen address | `listen` | where the service answers |
-| token | `token` | the service's bearer token, which reaches every route |
+| token | `token` | the service's bearer token, which reaches every route but the console bundle's (「The console bundle」) |
 | console | `[console]` | the console bundle (「The console bundle」), where the brain serves one: `token`, the console's bearer token, which reaches what the screen uses; `bundle`, the folder the build of `client/` wrote the module, its stylesheet and its words into, the release's `console` where none is given; `calls`, the other services the screen calls through the console, each by the service name its own manifest gives it, which the manifest names under `calls`, none where none is given |
 | database | `database` | the address of the brain's own PostgreSQL database, which holds its tables and nothing else |
 | embedding | `[embedding]` | the embedding model the brain searches by meaning with (`docs/design.md`, 「Vectors」), none where it is not named: `address`, the LLM gateway's base address, whose `/v1/embeddings` it asks; `key_file`, the file holding the gateway's bearer key, read at each ask; `model`, the model name, `embedding` where none is given; `dims`, the vectors' length, 1024; `batch`, the most texts one ask carries, 32; `max_tokens`, where a text is cut by a conservative count (a CJK or Hangul character one token, any other three characters one), 480; `query_instruction`, the instruction a query is embedded after, `Given a question, retrieve memories that answer it`, none where it is empty |
@@ -56,8 +56,9 @@ finish, and the service then ends; the unit waits for that and never escalates t
 
 - **Auth.** Every route, `GET /health` among them, needs `Authorization: Bearer <token>`, the service's
   token or the console's; a missing or wrong token is answered 401 `unauthorized`. The service's token
-  reaches every route; the console's reaches only what the screen uses (「The console bundle」), and any other
-  route is answered 403 `forbidden` to it.
+  reaches every route but the console bundle's, where it is answered 401 `unauthorized`; the console's reaches
+  only the console bundle and what the screen uses (「The console bundle」), and any other route is answered
+  403 `forbidden` to it.
 - **Pages.** A list answers `{"items": [...], "more": boolean}`, oldest first by the member's `id` where its
   route names no other order, and is paged by `after`, the last `id` seen, the page continuing past that
   member in the order the list stands in, and `limit` (50 where none is given, at most 500).
@@ -306,9 +307,11 @@ which is not read.
 
 ## The console bundle
 
-The brain's screen (`docs/design.md`, 「The screen」) is a console bundle by bmo-ui's console bundle contract
-(bmo-ui's `docs/console-bundles.md`), built from `client/`. The brain answers its manifest, its module, its
-stylesheet and its words, and guards every route the screen uses.
+The brain's screen (`docs/design.md`, 「The screen」) is a console bundle under bmo-ui's console plugin
+contract, bmo-ui's `docs/console-bundles.md`, which is the one statement of the manifest, the bundle, the
+layer, the roles and the guard; this section names only the parts of it the brain uses and what the brain
+adds. The screen is built from `client/` on the bmo-ui release vendored under `client/vendor/`, with the
+layer's own bundle build.
 
 | Route | Answers |
 |---|---|
@@ -316,25 +319,23 @@ stylesheet and its words, and guards every route the screen uses.
 | `GET /console-bundle/words` | 200, the bundle's words |
 | `GET /console-bundle/{file}` | 200, the module or the stylesheet the manifest names |
 
-- **The manifest** is the contract's shape: the bundle `brain`, its menu title the key `brain.title.screen`,
-  its icon, its screens under `/brain`, the service `brain`, the paths of its module, its stylesheet and its
-  words, the API prefix `/`, the role `administrator`, no owner key, the event stream read and no socket, no
-  event raised as a notice, and under `calls` the services the configuration's `[console] calls` names. The
-  brain names no service itself: which service the screen translates through is the console's setting, and the
-  deployment names that service here so the console relays the screen's calls to it.
-- **The module and the stylesheet** are the files the build of `client/` writes into the bundle folder the
-  configuration names, read when the service starts. Each is answered at `/console-bundle/` and a name
-  carrying the first sixteen hexadecimal digits of the SHA-256 of its bytes, so its path changes whenever
-  its bytes do and may be kept by whoever loaded it. A name the manifest does not name is `not-found`.
-- **The words** are each locale's words of the bundle under the locale's code, every key under `brain`, as
-  the build writes them beside the module.
-- **Where the folder holds no module or no words,** the manifest, the module, the stylesheet and the words
-  are all `not-found`, so a console leaves the brain out.
-- **The guard.** A call with the console's token is the console relaying for a reader, and it reaches the
-  manifest and the words with no role, and the module, the stylesheet and every route the screen uses where
-  its `Owner-Role` header is `administrator`; one whose header is missing or names another role is refused
-  403 `forbidden`, as is any other route. The OpenAPI document states each route's reach under `x-console`:
-  `open`, `screen` or `closed`.
+- **What the brain's manifest names:** the bundle and service `brain`, its menu title `brain.title.screen`,
+  its screens under `/brain`, the role `administrator` with no owner key, the event stream read, the API
+  prefix `/`, the layer the build wrote beside the module, and under `calls` the services the configuration's
+  `[console] calls` names. The brain names no service itself: which service the screen translates through
+  is the console's setting, and the deployment names that service here so the console relays the screen's
+  calls to it. Of the contract's optional parts it uses the translator and the title bar, and no share page,
+  sidebar count, relayed route or notice kind.
+- **The bundle folder** the configuration names holds what the build of `client/` writes: the module, its
+  stylesheet, its words and the layer file, read when the service starts. The module and the stylesheet are
+  answered under a name carrying the first sixteen hexadecimal digits of the SHA-256 of their bytes. Where the
+  folder holds no module, no words or no layer, every route of this section is `not-found`, so a console
+  leaves the brain out.
+- **Which token reaches what.** The console's token alone reaches the routes of this section, as the contract
+  asks; the service's token is refused there 401 `unauthorized`. The console's token reaches the routes the
+  screen uses where the `Owner-Role` header allows `administrator`, and no other route. The OpenAPI document
+  states each route's reach for the console's token under `x-console`, `open`, `screen` or `closed`, and marks
+  the routes the service's token does not reach with `x-console-only`.
 - **The routes the screen uses:** `GET /brains` and `GET /brains/{brainId}`; under a brain, the reads of
   subjects and a subject's sheet, layers, memories, lineages, types and tallies, the persona and the export; the writes of
   subjects, layers, memories, versions, moves, restorations, confirmations and learnings, and the similar
@@ -492,7 +493,7 @@ Every failure is the common error shape, `code` and `error`.
 | Status | `code` | When |
 |---|---|---|
 | 400 | `bad-request` | the body, the query or a key is not the shape the route takes; the sentence names what is wrong |
-| 401 | `unauthorized` | the token is missing or wrong |
+| 401 | `unauthorized` | the token is missing or wrong, or the service's token on the console bundle's routes |
 | 403 | `forbidden` | the console's token on a route the screen does not use, or without the role the screen needs |
 | 404 | `no-route` | no route answers this method and path |
 | 404 | `not-found` | nothing stands at the key the path names |

@@ -57,9 +57,9 @@
             </UFormField>
           </div>
           <UFormField :label="t('brain.field.labels')" :hint="t('brain.hint.labels')">
-            <UTextarea v-model="draft.labels" :rows="2" autoresize class="w-full font-mono text-xs" />
+            <UTextarea v-model="draft.labels" :rows="2" autoresize class="w-full font-mono text-sm" />
           </UFormField>
-          <p v-if="memory.type === 'persona'" class="text-xs text-warning">{{ t("brain.hint.persona_cache") }}</p>
+          <p v-if="memory.type === 'persona'" class="text-sm text-warning">{{ t("brain.hint.persona_cache") }}</p>
           <div class="flex justify-end gap-2">
             <UButton color="neutral" variant="ghost" :label="t('common.action.cancel')" @click="editing = false" />
             <UButton :label="t('common.action.save')" :loading="busy || draftWords.busy.value" @click="saveEdit" />
@@ -87,7 +87,7 @@
           </template>
           <template v-if="memory.key">
             <dt>{{ t("brain.field.key") }}</dt>
-            <dd class="font-mono text-xs break-all">{{ memory.key }}</dd>
+            <dd class="font-mono text-sm break-all">{{ memory.key }}</dd>
           </template>
           <template v-if="memory.layerId !== null && memory.layerId !== undefined">
             <dt>{{ t("brain.field.layer") }}</dt>
@@ -135,7 +135,7 @@
           <dd>{{ memory.actorName }} <span class="text-muted tabular-nums">· {{ stamp(memory.createdAt) }}</span></dd>
           <template v-if="labelPairs.length > 0">
             <dt>{{ t("brain.field.labels") }}</dt>
-            <dd class="font-mono text-xs">
+            <dd class="font-mono text-sm">
               <div v-for="[name, value] in labelPairs" :key="name">{{ name }} = {{ value }}</div>
             </dd>
           </template>
@@ -174,6 +174,7 @@
 
 <script setup lang="ts">
 import { useIsland } from "bmo-ui/app/domain/island";
+import { askQuestion } from "bmo-ui/app/domain/question";
 import BrainStatus from "./BrainStatus.vue";
 import BrainText from "./BrainText.vue";
 import * as api from "../domain/brain-api";
@@ -322,7 +323,7 @@ async function saveEdit(): Promise<void> {
 
   if (draft.text !== found.text && text === null) return;
 
-  if (found.type === "persona" && !(await island.ask({ title: t("brain.hint.persona_cache"), confirm: t("common.action.save"), tone: "warning" }))) return;
+  if (found.type === "persona" && !(await askQuestion({ title: t("brain.title.persona_save"), effect: t("brain.hint.persona_cache"), confirm: t("common.action.save") }))) return;
 
   busy.value = true;
 

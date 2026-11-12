@@ -605,8 +605,8 @@ console bundle contract and served by the brain itself (`docs/boundary-api.md`, 
   the index, the first where none is, its items in position order, moved up and down as new versions, narrowed
   by the type, the subject, the status and the words. A persona layer shows its prompt source, the very bytes
   the brain hands a system prompt, placeholders left as they stand; the prompt source is the whole layer's
-  and no filter narrows it. A change to a persona item says first that the prompts built on it start their
-  cache afresh once. A layer is exported as a brain file from here.
+  and no filter narrows it. A change to a persona item is asked first in bmo-ui's question dialog, which
+  says that the prompts built on it start their cache afresh once. A layer is exported as a brain file from here.
 - **A version timeline:** one lineage on a time axis, each version a point at its `validFrom` and a bar for
   the span it held, the point's colour its status and its mark its writer; the rows a merge folded into it
   reach it as lines, and the episodes a conclusion rests on stand under the axis at their moments. A point
