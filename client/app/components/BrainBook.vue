@@ -8,7 +8,7 @@
       <template #tools>
         <TabSwitch v-if="hasPersona" v-model="reading" :items="readings" :label="t('brain.label.reading')" />
         <UTooltip v-if="current" :text="t('brain.action.export')">
-          <UButton icon="i-material-symbols-download" color="neutral" variant="ghost" :aria-label="t('brain.action.export')" :to="exportHref" external download />
+          <UButton size="sm" square icon="i-material-symbols-download" color="neutral" variant="ghost" :aria-label="t('brain.action.export')" :to="exportHref" external download />
         </UTooltip>
       </template>
     </BrainHeading>

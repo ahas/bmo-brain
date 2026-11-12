@@ -5,16 +5,16 @@
   <div class="flex min-h-0 flex-1 flex-col">
     <div class="flex shrink-0 items-center gap-1 border-b border-default px-1 py-1">
       <UTooltip :text="t('brain.action.close_memory')">
-        <UButton :icon="narrow ? 'i-material-symbols-arrow-back' : 'i-material-symbols-close'" color="neutral" variant="ghost" :aria-label="t('brain.action.close_memory')" @click="emit('close')" />
+        <UButton size="sm" square :icon="narrow ? 'i-material-symbols-arrow-back' : 'i-material-symbols-close'" color="neutral" variant="ghost" :aria-label="t('brain.action.close_memory')" @click="emit('close')" />
       </UTooltip>
       <h2 class="min-w-0 flex-1 truncate text-base font-semibold">
         {{ memory ? t("brain.label.memory_head", { id: memoryId, type: typeName(t, te, memory.type) }) : `#${memoryId}` }}
       </h2>
       <UTooltip v-if="memory && editable" :text="t('brain.action.edit')">
-        <UButton icon="i-material-symbols-edit-outline" color="neutral" variant="ghost" :aria-label="t('brain.action.edit')" @click="startEdit" />
+        <UButton size="sm" square icon="i-material-symbols-edit-outline" color="neutral" variant="ghost" :aria-label="t('brain.action.edit')" @click="startEdit" />
       </UTooltip>
       <UTooltip :text="t('brain.action.all_versions')">
-        <UButton icon="i-material-symbols-timeline" color="neutral" variant="ghost" :aria-label="t('brain.action.all_versions')" @click="emit('timeline')" />
+        <UButton size="sm" square icon="i-material-symbols-timeline" color="neutral" variant="ghost" :aria-label="t('brain.action.all_versions')" @click="emit('timeline')" />
       </UTooltip>
     </div>
 

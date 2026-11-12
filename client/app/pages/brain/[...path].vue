@@ -4,9 +4,9 @@
        phone the view is the body, the index rises from the bottom edge and a memory stands over the view.
        The brain, the view, the filters and the memory open are the address. -->
   <UDashboardPanel id="brain" :ui="{ body: 'p-0 sm:p-0 gap-0 sm:gap-0 overflow-y-hidden [&>*]:max-w-none' }">
-    <!-- Under a console that offers its title bar the screen draws none of its own, and its two actions on the
-         screen as a whole stand in the place the bar keeps for them (bmo-ui's `docs/console-bundles.md`,
-         "The title bar"). -->
+    <!-- Under a console that offers its title bar the screen draws none of its own (bmo-ui's
+         `docs/console-bundles.md`, "The title bar"). Either bar holds the name alone: the screen's actions stand
+         at the end of its toolbar. -->
     <template v-if="bar === null" #header>
       <UDashboardNavbar :title="t('brain.title.screen')" icon="i-material-symbols-neurology-outline" />
     </template>
@@ -17,25 +17,20 @@
       </div>
 
       <div v-else class="flex min-h-0 flex-1 flex-col">
-        <ToolBar :label="t('brain.label.toolbar')">
-          <div>
+        <ToolBar ref="toolbar" :label="t('brain.label.toolbar')">
+          <div v-if="!narrow">
             <span class="text-muted">{{ t("brain.label.brain") }}</span>
-            <USelect
-              :model-value="place.brainId ?? undefined"
-              :items="brainItems"
-              :placeholder="t('brain.label.brain')"
-              :aria-label="t('brain.label.brain')"
-              variant="ghost"
-              class="min-w-20"
-              @update:model-value="chooseBrain(Number($event))"
-            />
+            <USelect v-bind="brainSelect" size="sm" variant="ghost" class="min-w-20" />
           </div>
           <div v-if="narrow">
-            <UButton icon="i-material-symbols-toc" color="neutral" variant="ghost" :aria-label="t('brain.action.index')" @click="indexOpen = true" />
+            <UTooltip :text="t('brain.action.index')">
+              <UButton size="sm" square icon="i-material-symbols-toc" color="neutral" variant="ghost" :aria-label="t('brain.action.index')" @click="indexOpen = true" />
+            </UTooltip>
           </div>
           <div>
             <span class="text-muted">{{ t("brain.label.view") }}</span>
             <USelect
+              size="sm"
               :model-value="place.view"
               :items="viewItems"
               :icon="viewItems.find((item) => item.value === place.view)?.icon"
@@ -45,66 +40,51 @@
               @update:model-value="go({ view: $event as View })"
             />
           </div>
-          <div>
+          <div v-if="!gathered">
             <UTooltip :text="unhonoured('q')" :disabled="honours(place.view, 'q')">
-              <UInput
-                :model-value="place.q"
-                icon="i-material-symbols-search"
-                :placeholder="t('brain.label.search')"
-                :aria-label="t('brain.label.words')"
-                :disabled="!honours(place.view, 'q')"
-                variant="none"
-                class="w-28"
-                @change="go({ q: ($event.target as HTMLInputElement).value, memory: null })"
-              />
-            </UTooltip>
-          </div>
-          <div>
-            <span class="text-muted">{{ t("brain.label.status") }}</span>
-            <UTooltip :text="unhonoured('status')" :disabled="honours(place.view, 'status')">
-              <USelect
-                :model-value="place.status"
-                :items="statusItems"
-                :aria-label="t('brain.label.status')"
-                :disabled="!honours(place.view, 'status')"
-                variant="ghost"
-                @update:model-value="go({ status: $event as StatusChoice })"
-              />
-            </UTooltip>
-          </div>
-          <div>
-            <span class="text-muted">{{ t("brain.label.type") }}</span>
-            <UTooltip :text="unhonoured('type')" :disabled="honours(place.view, 'type')">
-              <USelect
-                :model-value="place.type"
-                :items="typeItems"
-                :aria-label="t('brain.label.type')"
-                :disabled="!honours(place.view, 'type')"
-                variant="ghost"
-                @update:model-value="go({ type: String($event) })"
-              />
-            </UTooltip>
-          </div>
-          <div>
-            <span class="text-muted">{{ t("brain.label.order") }}</span>
-            <UTooltip :text="unhonoured('order')" :disabled="honours(place.view, 'order')">
-              <USelect
-                :model-value="orderOf(place) as Order"
-                :items="orderItems"
-                :aria-label="t('brain.label.order')"
-                :disabled="!honours(place.view, 'order')"
-                variant="ghost"
-                @update:model-value="go({ order: $event as Order })"
-              />
+              <UInput v-bind="wordsInput" size="sm" icon="i-material-symbols-search" :placeholder="t('brain.label.search')" variant="none" class="w-28" />
             </UTooltip>
           </div>
           <div>
             <UPopover>
               <UTooltip :text="t('brain.action.filters')">
-                <UButton icon="i-material-symbols-filter-list" color="neutral" variant="ghost" :aria-label="t('brain.action.filters')" :disabled="!honours(place.view, 'key')" />
+                <UButton size="sm" square icon="i-material-symbols-filter-list" color="neutral" variant="ghost" :aria-label="t('brain.action.filters')" :disabled="!honours(place.view, 'key')" />
               </UTooltip>
               <template #content>
-                <div class="flex w-72 flex-col gap-3 p-3">
+                <div class="flex w-72 max-w-[calc(100vw-2rem)] flex-col gap-3 p-3">
+                  <UFormField v-if="gathered" :label="t('brain.label.words')" :help="unhonoured('q')">
+                    <UInput v-bind="wordsInput" icon="i-material-symbols-search" class="w-full" />
+                  </UFormField>
+                  <UFormField :label="t('brain.label.status')" :help="unhonoured('status')">
+                    <USelect
+                      :model-value="place.status"
+                      :items="statusItems"
+                      :aria-label="t('brain.label.status')"
+                      :disabled="!honours(place.view, 'status')"
+                      class="w-full"
+                      @update:model-value="go({ status: $event as StatusChoice })"
+                    />
+                  </UFormField>
+                  <UFormField :label="t('brain.label.type')" :help="unhonoured('type')">
+                    <USelect
+                      :model-value="place.type"
+                      :items="typeItems"
+                      :aria-label="t('brain.label.type')"
+                      :disabled="!honours(place.view, 'type')"
+                      class="w-full"
+                      @update:model-value="go({ type: String($event) })"
+                    />
+                  </UFormField>
+                  <UFormField :label="t('brain.label.order')" :help="unhonoured('order')">
+                    <USelect
+                      :model-value="orderOf(place) as Order"
+                      :items="orderItems"
+                      :aria-label="t('brain.label.order')"
+                      :disabled="!honours(place.view, 'order')"
+                      class="w-full"
+                      @update:model-value="go({ order: $event as Order })"
+                    />
+                  </UFormField>
                   <UFormField :label="t('brain.field.key')">
                     <UInput :model-value="place.key" class="w-full" @change="go({ key: ($event.target as HTMLInputElement).value })" />
                   </UFormField>
@@ -115,23 +95,7 @@
               </template>
             </UPopover>
           </div>
-          <Teleport v-if="bar === null || placed" defer :to="bar?.screenActions ?? 'body'" :disabled="bar === null">
-            <div v-if="reader.offered" :class="{ 'ms-auto': bar === null }">
-              <UButton
-                icon="i-material-symbols-translate"
-                :aria-label="t('brain.action.reading')"
-                :aria-pressed="translating"
-                color="neutral"
-                :variant="translating ? 'soft' : 'ghost'"
-                @click="reader.choose(translating ? ENGLISH : reader.home)"
-              />
-            </div>
-            <div :class="{ 'ms-auto': bar === null && !reader.offered }">
-              <UTooltip :text="t('brain.action.teach')">
-                <UButton icon="i-material-symbols-school-outline" color="neutral" variant="ghost" :aria-label="t('brain.action.teach')" :disabled="place.brainId === null" @click="teachOpen = true" />
-              </UTooltip>
-            </div>
-          </Teleport>
+          <ActionGroup class="ms-auto" :actions="screenActions" />
         </ToolBar>
 
         <p v-if="translating && reader.failed.value" role="status" class="border-b border-default px-3 py-1.5 text-sm text-warning">{{ t("brain.error.translate_read") }}</p>
@@ -145,6 +109,9 @@
           </div>
           <UDrawer v-model:open="indexOpen" :title="t('brain.action.index')" :ui="FULL_SHEET">
             <template #body>
+              <UFormField :label="t('brain.label.brain')" class="px-3 pb-3">
+                <USelect v-bind="brainSelect" class="w-full" />
+              </UFormField>
               <BrainIndex v-bind="indexProps" @choose="indexOpen = false; choose($event)" @changed="reread" />
             </template>
           </UDrawer>
@@ -190,6 +157,7 @@
 </template>
 
 <script setup lang="ts">
+import { useBarGathers } from "bmo-ui/app/domain/actionbar";
 import { useIsland } from "bmo-ui/app/domain/island";
 import { useNarrow } from "bmo-ui/app/domain/screen";
 import { FULL_SHEET, SPLIT_HANDLE } from "bmo-ui/app/domain/side-parts";
@@ -211,6 +179,7 @@ import { useBrainStream } from "../../domain/brain-stream";
 import type { Brain, Layer, Memory, Subject, Tally, TypeCount } from "../../domain/brain-api";
 import type { Heading, HeadingChip } from "../../domain/brain-heading";
 import type { Choice, Order, Place, StatusChoice, View } from "../../domain/brain-place";
+import type { BarAction } from "bmo-ui/app/domain/tabs";
 import type { SplitterItem } from "@nuxt/ui";
 
 // The screen is one screen for every place inside it, so a memory opened or a filter changed reads again
@@ -234,37 +203,16 @@ const PAGE = 50;
 const route = useRoute();
 const router = useRouter();
 const { t, te } = useI18n();
-// The console's title bar where the console this screen stands in offers one, under the key the layer names for it:
-// the selector of the place it keeps for the screen's actions.
-const bar = inject<{ screenActions: string } | null>("bmo-console-title-bar", null);
-// Whether the bar's place for the screen's actions stands yet. On the first arrival from a screen without the bar
-// the console may lay the place only after the screen is mounted, so the actions wait until it is in the document.
-const placed = ref(false);
-let placing: MutationObserver | null = null;
-
-onMounted(() => {
-  if (bar === null) return;
-
-  const stands = () => document.querySelector(bar.screenActions) !== null;
-
-  if (stands()) {
-    placed.value = true;
-
-    return;
-  }
-
-  placing = new MutationObserver(() => {
-    if (!stands()) return;
-
-    placed.value = true;
-    placing?.disconnect();
-    placing = null;
-  });
-  placing.observe(document.body, { childList: true, subtree: true });
-});
-onScopeDispose(() => placing?.disconnect());
+// Whether the console this screen stands in offers its title bar, under the key the layer names for it. Only its
+// presence is read: the screen lays nothing into it.
+const bar = inject<object | null>("bmo-console-title-bar", null);
 const island = useIsland(t);
 const narrow = useNarrow();
+// Whether the toolbar gathers, by the room it has rather than the window's: then the words join the other filters,
+// so the actions at its end stay in sight.
+const toolbar = useTemplateRef<{ $el: HTMLElement }>("toolbar");
+const barGathers = useBarGathers(() => toolbar.value?.$el);
+const gathered = computed(() => narrow.value || barGathers.value);
 // The reading language (docs/design.md, 「The screen」): the console's own where a translator is named.
 const reader = useReading();
 const translating = computed(() => reader.language.value !== ENGLISH);
@@ -285,6 +233,31 @@ const indexOpen = ref(false);
 const teachOpen = ref(false);
 // Bumped whenever the brain says something changed, so the parts that read on their own read again.
 const changes = ref(0);
+
+// The screen's actions on the screen as a whole, at the toolbar's end: the reading language where a translator is
+// named, and teaching.
+const screenActions = computed<BarAction[]>(() => [
+  ...(reader.offered
+    ? [
+        {
+          id: "reading",
+          label: t("brain.action.reading"),
+          icon: "i-material-symbols-translate",
+          pressed: translating.value,
+          onSelect: () => reader.choose(translating.value ? ENGLISH : reader.home)
+        }
+      ]
+    : []),
+  {
+    id: "teach",
+    label: t("brain.action.teach"),
+    icon: "i-material-symbols-school-outline",
+    disabled: place.value.brainId === null,
+    onSelect: () => {
+      teachOpen.value = true;
+    }
+  }
+]);
 
 const place = computed<Place>(() => {
   const path = route.params.path;
@@ -314,6 +287,23 @@ function openMemory(id: number): void {
 const brainItems = computed(() =>
   (brainList.value ?? []).map((brain) => ({ label: brain.name || brain.agentKey, value: brain.id }))
 );
+
+// The brain's select, standing in the toolbar or, on a phone, at the head of the index.
+const brainSelect = computed(() => ({
+  modelValue: place.value.brainId ?? undefined,
+  items: brainItems.value,
+  placeholder: t("brain.label.brain"),
+  "aria-label": t("brain.label.brain"),
+  "onUpdate:modelValue": (brainId: unknown) => chooseBrain(Number(brainId))
+}));
+
+// The words the view is narrowed by, standing in the toolbar or, on a phone, among the filters.
+const wordsInput = computed(() => ({
+  modelValue: place.value.q,
+  "aria-label": t("brain.label.words"),
+  disabled: !honours(place.value.view, "q"),
+  onChange: (event: Event) => go({ q: (event.target as HTMLInputElement).value, memory: null })
+}));
 
 const viewItems = computed(() =>
   (

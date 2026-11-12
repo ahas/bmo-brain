@@ -10,18 +10,34 @@ test("the screen's route asks for the console's title bar", () => {
 });
 
 test("the screen draws a bar of its own only where the console offers none", () => {
-  expect(page).toContain('inject<{ screenActions: string } | null>("bmo-console-title-bar", null)');
+  expect(page).toContain('inject<object | null>("bmo-console-title-bar", null)');
   expect(page).toContain('<template v-if="bar === null" #header>');
   expect(page.match(/<UDashboardNavbar\b/g)?.length).toBe(1);
 });
 
-test("the reading toggle and teaching stand in the bar's place for the screen's actions, deferred", () => {
-  const from = page.indexOf('<Teleport v-if="bar === null || placed" defer :to="bar?.screenActions');
-  const to = page.indexOf("</Teleport>", from);
-  const moved = page.slice(from, to);
+test("nothing is laid into the console's bar", () => {
+  expect(page).not.toContain("<Teleport");
+  expect(page).not.toContain("screenActions:");
+  expect(page).not.toContain("screenLead");
+});
 
-  expect(from).toBeGreaterThan(-1);
-  expect(page).toContain(':disabled="bar === null"');
-  expect(moved).toContain("brain.action.reading");
-  expect(moved).toContain("brain.action.teach");
+test("the reading toggle and teaching stand at the toolbar's end", () => {
+  const from = page.indexOf("<ToolBar");
+  const to = page.indexOf("</ToolBar>", from);
+  const toolbar = page.slice(from, to);
+  const group = toolbar.lastIndexOf("<ActionGroup");
+
+  expect(group).toBeGreaterThan(-1);
+  expect(toolbar.slice(group)).toContain('<ActionGroup class="ms-auto" :actions="screenActions" />');
+  expect(page).toContain('label: t("brain.action.reading")');
+  expect(page).toContain('label: t("brain.action.teach")');
+});
+
+test("the status, the type and the order stand behind the filters button, and a phone chooses the brain in the index", () => {
+  const toolbar = page.slice(page.indexOf("<ToolBar"), page.indexOf("</ToolBar>"));
+  const filters = toolbar.slice(toolbar.indexOf("<template #content>"), toolbar.indexOf("</template>", toolbar.indexOf("<template #content>")));
+  const drawer = page.slice(page.indexOf("<UDrawer"), page.indexOf("</UDrawer>"));
+
+  for (const choice of ["status", "type", "order"]) expect(filters).toContain(`t('brain.label.${choice}')`);
+  expect(drawer).toContain('<USelect v-bind="brainSelect"');
 });

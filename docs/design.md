@@ -495,13 +495,15 @@ console bundle contract and served by the brain itself (`docs/boundary-api.md`, 
 - **Who opens it.** An administrator, and no member. The brain does not know who sits at the screen: the
   console relays it with its own token and the reader's role, and the screen shows every brain the brain
   keeps. A write from the screen carries the screen's own `actorName`.
-- **One title bar.** The screen's route asks for the console's one title bar (bmo-ui's
+- **One title bar, holding only the name.** The screen's route asks for the console's one title bar (bmo-ui's
   `docs/console-bundles.md`, 「The title bar」). Under a console that offers it, the screen draws no bar of its
-  own and lays its two actions on the screen as a whole, the reading language's toggle and teaching, in the
-  place the bar keeps for them; standing alone, it draws its own bar with the screen's name and keeps the two
-  at the end of the toolbar.
-- **One brain at a time.** The toolbar's first control chooses the brain among those `GET /brains` answers,
-  each by its name. Two brains share nothing, so no list ever mixes them.
+  own; standing alone, it draws its own bar with the screen's name. Either way nothing but the name and its mark
+  stands in the bar: the screen's two actions on the screen as a whole, the reading language's toggle and
+  teaching, stand at the right end of the toolbar directly under it, as one group of small icon buttons that
+  folds into one menu where the toolbar has not the room for it. The screen is opened from no other screen, so
+  it has no way back.
+- **One brain at a time.** The toolbar's first control, on a phone the index's, chooses the brain among those
+  `GET /brains` answers, each by its name. Two brains share nothing, so no list ever mixes them.
 - **Three panes.** The index on the left, the view in the middle and the memory open on the right. The right
   pane stands only while a memory is open; with none open the view takes its room. On a phone the view is the
   body, the index rises from the bottom edge and a memory stands over the view.
@@ -514,12 +516,20 @@ console bundle contract and served by the brain itself (`docs/boundary-api.md`, 
   own rows; under a subject's sheet it takes its own height and the view scrolls both. Where the pane is
   narrower than 588 pixels, as it is beside an open memory, the rows stand stacked as on a phone, with no names
   over them.
-- **One toolbar** under the title bar carries the brain, the view and every filter, and nothing else is a toolbar:
-  a view's own controls stand at the end of the view's heading. Every select carries a visible label naming
-  what it chooses (the brain, the view, the status, the type, the order), and its value reads as words a
-  person understands, with its count: the live memories, a status, every type but episodes, a type by its
-  name. On a phone the view is chosen by a labelled select rather than a row of marks, and the toolbar flows
-  sideways.
+- **One toolbar** under the title bar carries the brain, the view, the words and one button opening the other
+  filters (the status, the type, the order, the key and the label), with the screen's two actions at its end,
+  and nothing else is a toolbar: a view's own controls stand at the end of the view's heading, and every
+  filter standing apart from its default shows there as a chip. So the row is narrow enough for its end to stand
+  in sight under a console's sidebar. Where the toolbar has less room than a bar needs to stand its actions,
+  measured on the toolbar itself rather than the window, the words join the other filters and the two actions
+  fold into one menu; on a phone the brain is chosen at the head of the index's drawer as well, so the row fits
+  the phone's width. Every control in the toolbar is the
+  library's small size, a button at its own size with its hover on its own shape, never a cell stretched to the
+  toolbar's height, and the same holds for the buttons of the view's heading and of the row view's heading.
+  Every select carries a visible label naming what it chooses (the brain, the view, the status, the type, the
+  order), and its value reads as words a person understands, with its count: the live memories, a status,
+  every type but episodes, a type by its name. On a phone the view is chosen by a labelled select rather than a
+  row of marks.
 - **The index** stands on the left in three tabs, 레이어, 대상 and 유형 in the Korean pack, each with one line
   under the tab head saying what it lists and that choosing one narrows the view. The layers, in position
   order, each with its description and its count of live memories, the unfiled last; the subjects, grouped by
@@ -530,7 +540,7 @@ console bundle contract and served by the brain itself (`docs/boundary-api.md`, 
   and every toolbar filter, narrows whatever the view shows: the memories, the layer's items, the memories
   around the map's centre, the bubbles. Where a view cannot honour a choice (the version timeline shows one
   lineage, so it honours none; the layer view and the map keep their own order), that choice is disabled there,
-  in the index and in the toolbar alike, with one line saying why, and it is never silently ignored. The view
+  in the index and among the filters alike, with one line saying why, and it is never silently ignored. The view
   scrolls back to its start whenever the choice changes.
 - **The heading** stands at the top of the middle pane and names exactly what is shown: the brain, the view,
   each choice standing (the layer, the subject, the type, the status, the words, the key, the label), each

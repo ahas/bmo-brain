@@ -9,7 +9,7 @@
         <span class="text-sm text-muted">{{ t("brain.label.group_by") }}</span>
         <TabSwitch :items="byItems" :model-value="by" :label="t('brain.label.group_by')" @update:model-value="emit('by', $event)" />
         <UTooltip :text="asTable ? t('brain.view.bubbles') : t('brain.label.as_table')">
-          <UButton :icon="asTable ? 'i-material-symbols-bubble-chart-outline' : 'i-material-symbols-table-outline'" color="neutral" variant="ghost" :aria-label="asTable ? t('brain.view.bubbles') : t('brain.label.as_table')" @click="asTable = !asTable" />
+          <UButton size="sm" square :icon="asTable ? 'i-material-symbols-bubble-chart-outline' : 'i-material-symbols-table-outline'" color="neutral" variant="ghost" :aria-label="asTable ? t('brain.view.bubbles') : t('brain.label.as_table')" @click="asTable = !asTable" />
         </UTooltip>
       </template>
     </BrainHeading>
