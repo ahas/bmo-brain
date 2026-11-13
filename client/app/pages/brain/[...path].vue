@@ -5,8 +5,8 @@
        The brain, the view, the filters and the memory open are the address. -->
   <UDashboardPanel id="brain" :ui="{ body: 'p-0 sm:p-0 gap-0 sm:gap-0 overflow-y-hidden [&>*]:max-w-none' }">
     <!-- Under a console that offers its title bar the screen draws none of its own (bmo-ui's
-         `docs/console-bundles.md`, "The title bar"). Either bar holds the name alone: the screen's actions stand
-         at the end of its toolbar. -->
+         `docs/console-bundles.md`, "The title bar"). Either bar holds the name alone: the screen's actions and its
+         create button stand at the end of its toolbar. -->
     <template v-if="bar === null" #header>
       <UDashboardNavbar :title="t('brain.title.screen')" icon="i-material-symbols-neurology-outline" />
     </template>
@@ -96,6 +96,11 @@
             </UPopover>
           </div>
           <ActionGroup class="ms-auto" :actions="screenActions" />
+          <!-- The screen's one create button, its last cell, and on a phone floating over the view instead; its
+               press and its key drop the menu of what it makes. -->
+          <UDropdownMenu :items="createItems" :disabled="place.brainId === null" :content="createMenu">
+            <CreateButton ref="create" :class="{ 'ms-auto': screenActions.length === 0 }" :label="t('brain.action.create')" :disabled="place.brainId === null" />
+          </UDropdownMenu>
         </ToolBar>
 
         <p v-if="translating && reader.failed.value" role="status" class="border-b border-default px-3 py-1.5 text-sm text-warning">{{ t("brain.error.translate_read") }}</p>
@@ -151,6 +156,7 @@
           :narrow="narrow"
           @taught="taught"
         />
+        <BrainLayerAdd v-if="place.brainId !== null" v-model:open="layerAddOpen" :brain-id="place.brainId" @added="reread" />
       </div>
     </template>
   </UDashboardPanel>
@@ -165,6 +171,7 @@ import { FULL_SHEET, SPLIT_HANDLE } from "bmo-ui/app/domain/side-parts";
 import BrainBook from "../../components/BrainBook.vue";
 import BrainBubbles from "../../components/BrainBubbles.vue";
 import BrainIndex from "../../components/BrainIndex.vue";
+import BrainLayerAdd from "../../components/BrainLayerAdd.vue";
 import BrainList from "../../components/BrainList.vue";
 import BrainMindmap from "../../components/BrainMindmap.vue";
 import BrainRow from "../../components/BrainRow.vue";
@@ -180,7 +187,7 @@ import type { Brain, Layer, Memory, Subject, Tally, TypeCount } from "../../doma
 import type { Heading, HeadingChip } from "../../domain/brain-heading";
 import type { Choice, Order, Place, StatusChoice, View } from "../../domain/brain-place";
 import type { BarAction } from "bmo-ui/app/domain/tabs";
-import type { SplitterItem } from "@nuxt/ui";
+import type { DropdownMenuItem, SplitterItem } from "@nuxt/ui";
 
 // The screen is one screen for every place inside it, so a memory opened or a filter changed reads again
 // what it needs and never builds the screen anew.
@@ -231,13 +238,15 @@ const loadingMore = ref(false);
 const listFailure = ref("");
 const indexOpen = ref(false);
 const teachOpen = ref(false);
+const layerAddOpen = ref(false);
+const create = useTemplateRef<{ element: () => HTMLElement | null }>("create");
 // Bumped whenever the brain says something changed, so the parts that read on their own read again.
 const changes = ref(0);
 
 // The screen's actions on the screen as a whole, at the toolbar's end: the reading language where a translator is
-// named, and teaching.
-const screenActions = computed<BarAction[]>(() => [
-  ...(reader.offered
+// named.
+const screenActions = computed<BarAction[]>(() =>
+  reader.offered
     ? [
         {
           id: "reading",
@@ -247,17 +256,53 @@ const screenActions = computed<BarAction[]>(() => [
           onSelect: () => reader.choose(translating.value ? ENGLISH : reader.home)
         }
       ]
-    : []),
+    : []
+);
+
+// What the create button makes: a memory, by teaching, or a layer.
+const createItems = computed<DropdownMenuItem[]>(() => [
   {
-    id: "teach",
     label: t("brain.action.teach"),
     icon: "i-material-symbols-school-outline",
-    disabled: place.value.brainId === null,
     onSelect: () => {
       teachOpen.value = true;
     }
+  },
+  {
+    label: t("brain.action.layer_add"),
+    icon: "i-material-symbols-layers-outline",
+    onSelect: () => {
+      layerAddOpen.value = true;
+    }
   }
 ]);
+
+// The create menu's content stands against the button itself, wherever it stands at each placing: in the
+// toolbar, where the menu's trigger is the button's cell, which takes no focus, or floating on a phone, where
+// the trigger has no box of its own in the row. The focus the menu held goes back to the button as it closes,
+// and a focus the reader already moved elsewhere stays there. It is one object from the first render, as the
+// menu reads only the settings it was first handed.
+function createButton(): HTMLElement | null {
+  return create.value?.element() ?? null;
+}
+
+const createMenu = {
+  align: "end" as const,
+  reference: {
+    getBoundingClientRect: (): DOMRect => createButton()?.getBoundingClientRect() ?? new DOMRect(),
+    get contextElement(): HTMLElement | undefined {
+      return createButton() ?? undefined;
+    }
+  },
+  onCloseAutoFocus: (event: Event): void => {
+    event.preventDefault();
+
+    const focused = document.activeElement;
+    const menu = event.target;
+
+    if (focused === null || focused === document.body || (menu instanceof Node && menu.contains(focused))) createButton()?.focus();
+  }
+};
 
 const place = computed<Place>(() => {
   const path = route.params.path;

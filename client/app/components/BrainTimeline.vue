@@ -5,7 +5,7 @@
        the axis. A point opens the version below with the words it changed from the one before. -->
   <div class="flex min-h-0 flex-1 flex-col">
     <BrainHeading v-bind="heading" :title="memoryId === null ? heading.title : `${heading.title} · #${memoryId}`" :count="versions === null || memoryId === null ? null : versions.length" />
-    <div class="flex min-h-0 flex-1 flex-col overflow-y-auto">
+    <div class="flex min-h-0 flex-1 flex-col overflow-y-auto pb-(--bmo-create-room)">
     <p v-if="memoryId === null" class="p-6 text-center text-sm text-muted">{{ t("brain.status.timeline_empty") }}</p>
     <ContentSkeleton v-else-if="versions === null" class="p-4" :rows="4" list-class="flex flex-col gap-3" :label="t('brain.status.loading')">
       <SkeletonBar class="h-6 w-full" />

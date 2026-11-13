@@ -11,7 +11,7 @@
         <UButton v-for="subject in subjects.slice(0, 40)" :key="subject.id" size="xs" color="neutral" variant="outline" :label="subject.name ?? `${subjectTypeName(t, te, subject.type)} ${subject.key}`" @click="emit('centre', subject.id)" />
       </div>
     </div>
-    <div v-else class="min-h-0 flex-1 overflow-auto p-2">
+    <div v-else class="min-h-0 flex-1 overflow-auto p-2 pb-[calc(var(--spacing)*2+var(--bmo-create-room))]">
       <svg :viewBox="`${-SIZE / 2} ${-SIZE / 2} ${SIZE} ${SIZE}`" class="mx-auto h-full max-h-[48rem] w-full" role="img" :aria-label="t('brain.view.map')">
         <g v-for="point in points" :key="`l${point.key}`">
           <line :x1="point.from.x" :y1="point.from.y" :x2="point.x" :y2="point.y" class="stroke-(--ui-border-accented) transition-all duration-500 motion-reduce:transition-none" />

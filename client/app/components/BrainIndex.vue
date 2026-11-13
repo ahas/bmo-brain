@@ -2,8 +2,9 @@
   <!-- The index (docs/design.md, 「The screen」): the layers in position order with their live counts and the
        unfiled last, the subjects grouped by type and called by their names, and the types in use, each tab with
        one line saying what it lists. Choosing one narrows the view to it, and choosing it again clears it; the
-       chosen row stands highlighted and in sight, and where the view honours no choice the rows say so. A layer is added and its description changed here; a subject's
-       description too. A row's actions are icon buttons at its end, shown while the row is hovered or
+       chosen row stands highlighted and in sight, and where the view honours no choice the rows say so. A layer's
+       description and position are changed here, and a subject's description; a layer is added from the screen's
+       create button. A row's actions are icon buttons at its end, shown while the row is hovered or
        focused and always on a coarse pointer; a row never grows a second line of buttons. -->
   <div class="flex min-h-0 flex-1 flex-col">
     <!-- The three tabs share the column's width, each its short name whole at the column's default width; a column
@@ -60,9 +61,6 @@
             <UBadge color="neutral" variant="soft" size="sm"><RollingNumber :value="layerCount(null)" /></UBadge>
           </button>
         </li>
-        <li class="px-3 py-2">
-          <UButton size="sm" color="neutral" variant="outline" icon="i-material-symbols-add" :label="t('brain.action.layer_add')" :disabled="brainId === null" @click="addLayer" />
-        </li>
       </ul>
 
       <div v-else-if="tab === 'subjects'" class="flex flex-col py-1">
@@ -116,12 +114,9 @@
       </ul>
     </div>
 
-    <UModal v-model:open="editing" :title="editTitle">
+    <UModal v-model:open="editing" :title="t('brain.action.describe')">
       <template #body>
         <div class="flex flex-col gap-3">
-          <UFormField v-if="editKind === 'layer-new'" :label="t('brain.field.name')">
-            <UInput v-model="editName" class="w-full" />
-          </UFormField>
           <UFormField :label="t('brain.field.description')">
             <UTextarea v-model="editDescription" :rows="3" autoresize class="w-full" />
           </UFormField>
@@ -227,15 +222,10 @@ function subjectCount(id: number): number {
 
 const editing = ref(false);
 const saving = ref(false);
-const editKind = ref<"layer" | "layer-new" | "subject">("layer");
+const editKind = ref<"layer" | "subject">("layer");
 const editId = ref(0);
-const editName = ref("");
 const editDescription = ref("");
 const editPosition = ref(0);
-
-const editTitle = computed(() =>
-  editKind.value === "layer-new" ? t("brain.action.layer_add") : t("brain.action.describe")
-);
 
 function describeLayer(layer: Layer): void {
   editKind.value = "layer";
@@ -252,21 +242,13 @@ function describeSubject(subject: Subject): void {
   editing.value = true;
 }
 
-function addLayer(): void {
-  editKind.value = "layer-new";
-  editName.value = "";
-  editDescription.value = "";
-  editing.value = true;
-}
-
 async function save(): Promise<void> {
   if (props.brainId === null) return;
 
   saving.value = true;
 
   try {
-    if (editKind.value === "layer-new") await api.addLayer(props.brainId, editName.value.trim(), editDescription.value);
-    else if (editKind.value === "layer") await api.changeLayer(props.brainId, editId.value, { description: editDescription.value, position: editPosition.value });
+    if (editKind.value === "layer") await api.changeLayer(props.brainId, editId.value, { description: editDescription.value, position: editPosition.value });
     else await api.changeSubject(props.brainId, editId.value, editDescription.value);
 
     editing.value = false;

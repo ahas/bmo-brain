@@ -14,7 +14,7 @@
       </template>
     </BrainHeading>
 
-    <div class="min-h-0 flex-1 overflow-auto p-3">
+    <div class="min-h-0 flex-1 overflow-auto p-3 pb-[calc(var(--spacing)*3+var(--bmo-create-room))]">
       <p v-if="groups.length === 0" class="p-6 text-center text-sm text-muted">{{ t("brain.status.nothing") }}</p>
       <table v-else-if="asTable" class="w-full text-sm">
         <thead class="text-sm text-muted">

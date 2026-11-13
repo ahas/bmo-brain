@@ -14,7 +14,7 @@
     </BrainHeading>
 
     <p v-if="current === undefined && layer !== 'unfiled'" class="p-6 text-center text-sm text-muted">{{ t("brain.status.no_layers") }}</p>
-    <div v-else ref="scroller" class="min-h-0 flex-1 overflow-y-auto">
+    <div v-else ref="scroller" class="min-h-0 flex-1 overflow-y-auto pb-(--bmo-create-room)">
       <div v-if="current?.description" class="border-b border-default px-4 py-2 text-sm text-muted">{{ current.description }}</div>
 
       <BrainText v-if="reading === 'rendering' && hasPersona" :text="rendering" tag="pre" text-class="font-mono text-sm whitespace-pre-wrap select-text" class="p-4" />

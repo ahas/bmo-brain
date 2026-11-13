@@ -11,7 +11,7 @@
     <!-- The pane is measured for the table: where it holds it the memories stand in the shared table, which fills
          the pane and scrolls its own rows, or under a subject's sheet takes its own height while the pane scrolls
          both; where it does not, they stand stacked. -->
-    <div v-else ref="scroller" class="flex min-h-0 min-w-0 flex-1 flex-col" :class="tableFills ? '' : 'overflow-y-auto'">
+    <div v-else ref="scroller" class="flex min-h-0 min-w-0 flex-1 flex-col pb-(--bmo-create-room)" :class="tableFills ? '' : 'overflow-y-auto'">
       <BrainSheet v-if="subjectId !== null" :brain-id="brainId" :subject-id="subjectId" :name="subjectNames.get(subjectId) ?? ''" :changes="changes" />
       <p v-if="failure" class="p-4 text-sm text-error">{{ failure }}</p>
       <p v-else-if="memories.length === 0" class="p-6 text-center text-sm text-muted">{{ t("brain.status.nothing") }}</p>

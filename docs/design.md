@@ -498,10 +498,17 @@ console bundle contract and served by the brain itself (`docs/boundary-api.md`, 
 - **One title bar, holding only the name.** The screen's route asks for the console's one title bar (bmo-ui's
   `docs/console-bundles.md`, 「The title bar」). Under a console that offers it, the screen draws no bar of its
   own; standing alone, it draws its own bar with the screen's name. Either way nothing but the name and its mark
-  stands in the bar: the screen's two actions on the screen as a whole, the reading language's toggle and
-  teaching, stand at the right end of the toolbar directly under it, as one group of small icon buttons that
-  folds into one menu where the toolbar has not the room for it. The screen is opened from no other screen, so
-  it has no way back.
+  stands in the bar: the screen's action on the screen as a whole, the reading language's toggle, stands at the
+  right end of the toolbar directly under it, as bmo-ui's group of small icon buttons that folds into one menu
+  where the toolbar has not the room for it, and the create button stands after it. The screen is opened from no
+  other screen, so it has no way back.
+- **One create button.** The screen creates from bmo-ui's one create button (`docs/components.md`, 「Creating」, in
+  bmo-ui), named for what the screen makes, a memory or a layer, and its press opens a menu of the two: teaching
+  and adding a layer. On a wide screen it is the grey icon in a cell of its own at the toolbar's right end, its
+  key `n` named in its tooltip; on a phone it floats at the bottom right, and every scrolling view and the memory
+  open keep the layer's create room at their scrolling end, so their last line stands clear of it. It stands
+  disabled while no brain is chosen. Nothing else on the screen creates: no button in the index or the toolbar of
+  the screen's own.
 - **One brain at a time.** The toolbar's first control, on a phone the index's, chooses the brain among those
   `GET /brains` answers, each by its name. Two brains share nothing, so no list ever mixes them.
 - **Three panes.** The index on the left, the view in the middle and the memory open on the right. The right
@@ -517,12 +524,13 @@ console bundle contract and served by the brain itself (`docs/boundary-api.md`, 
   narrower than 588 pixels, as it is beside an open memory, the rows stand stacked as on a phone, with no names
   over them.
 - **One toolbar** under the title bar carries the brain, the view, the words and one button opening the other
-  filters (the status, the type, the order, the key and the label), with the screen's two actions at its end,
+  filters (the status, the type, the order, the key and the label), with the screen's actions and its create
+  button at its end,
   and nothing else is a toolbar: a view's own controls stand at the end of the view's heading, and every
   filter standing apart from its default shows there as a chip. So the row is narrow enough for its end to stand
   in sight under a console's sidebar. Where the toolbar has less room than a bar needs to stand its actions,
-  measured on the toolbar itself rather than the window, the words join the other filters and the two actions
-  fold into one menu; on a phone the brain is chosen at the head of the index's drawer as well, so the row fits
+  measured on the toolbar itself rather than the window, the words join the other filters and the actions fold
+  into one menu; on a phone the brain is chosen at the head of the index's drawer as well, so the row fits
   the phone's width. Every control in the toolbar is the
   library's small size, a button at its own size with its hover on its own shape, never a cell stretched to the
   toolbar's height, and the same holds for the buttons of the view's heading and of the row view's heading.
@@ -574,8 +582,9 @@ console bundle contract and served by the brain itself (`docs/boundary-api.md`, 
   is saved as a new version. An edit is made over the version read: where another writer wrote a version in
   between, the brain refuses it with a conflict, and the screen shows the new version and keeps the words
   being written. A closed version, an episode's text, the fields the brain sets (ids, lineage, `validTo`,
-  the use, the moments) and a subject's type and key and a layer's name are not editable. Layers
-  are added and their descriptions and positions changed, and subjects' descriptions changed, in place.
+  the use, the moments) and a subject's type and key and a layer's name are not editable. A layer is added
+  from the create button, by its name and description; its description and position, and a subject's
+  description, are changed in place in the index.
 - **Teaching.** A person teaches through the write judgement: the screen shows the live memories most like
   the words to teach, at most ten, the person judges them as a duplicate, a strengthening, a contradiction or
   new, and one learning with the source `owner` applies it. A piece placed at a position in a layer, a

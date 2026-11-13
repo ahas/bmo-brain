@@ -23,7 +23,7 @@
     </ContentSkeleton>
     <p v-else-if="memory === null" class="p-4 text-sm text-error">{{ failure }}</p>
 
-    <div v-else class="min-h-0 flex-1 overflow-y-auto">
+    <div v-else class="min-h-0 flex-1 overflow-y-auto pb-(--bmo-create-room)">
       <div v-if="memory.status === 'superseded' && live" class="flex items-center gap-2 border-b border-default bg-elevated px-4 py-2 text-sm">
         <UIcon name="i-material-symbols-history" class="size-4 shrink-0" />
         <span class="min-w-0 flex-1">{{ t("brain.status.superseded_band") }}</span>
