@@ -26,8 +26,27 @@
     </div>
 
     <div ref="scroller" class="min-h-0 flex-1 overflow-y-auto" :class="{ 'pointer-events-none opacity-50': !usable }" :aria-disabled="!usable">
-      <ul v-if="tab === 'layers'" class="flex flex-col py-1">
-        <li v-for="layer in shownLayers" :key="layer.id" class="group flex items-stretch hover:bg-elevated" :class="{ 'bg-primary/10 shadow-[inset_3px_0_0_var(--ui-primary)]': place.layer === layer.id }" :data-chosen="place.layer === layer.id || undefined">
+      <!-- A layer is carried by the pointer to another place among the layers, a line marking where it will land; a
+           piece of the layer view dropped on a layer, or on the unfiled, moves there as a new version. -->
+      <ul v-if="tab === 'layers'" ref="layerList" class="flex flex-col py-1" @dragover="layerOver" @drop="layerDropped">
+        <li
+          v-for="(layer, index) in shownLayers"
+          :key="layer.id"
+          :draggable="usable"
+          data-layer
+          class="group flex cursor-grab items-stretch hover:bg-elevated active:cursor-grabbing"
+          :class="[
+            { 'bg-primary/10 shadow-[inset_3px_0_0_var(--ui-primary)]': place.layer === layer.id },
+            landing === index ? LINE_BEFORE : '',
+            landing === shownLayers.length && index === shownLayers.length - 1 ? LINE_AFTER : '',
+            pieceOver === layer.id ? 'bg-primary/10 ring-1 ring-primary ring-inset' : ''
+          ]"
+          :data-chosen="place.layer === layer.id || undefined"
+          @dragstart="carryLayer($event, index)"
+          @dragend="setLayerDown"
+          @dragenter="pieceEnter($event, layer.id)"
+          @dragleave="pieceLeave($event, layer.id)"
+        >
           <button
             type="button"
             class="flex min-w-0 flex-1 items-start gap-2 py-2 ps-3 text-start"
@@ -47,11 +66,11 @@
             </UTooltip>
           </div>
         </li>
-        <li>
+        <li data-unfiled @dragenter="pieceEnter($event, 'unfiled')" @dragleave="pieceLeave($event, 'unfiled')">
           <button
             type="button"
             class="flex w-full items-center gap-2 px-3 py-2 text-start hover:bg-elevated"
-            :class="{ 'bg-primary/10 shadow-[inset_3px_0_0_var(--ui-primary)]': place.layer === 'unfiled' }"
+            :class="[{ 'bg-primary/10 shadow-[inset_3px_0_0_var(--ui-primary)]': place.layer === 'unfiled' }, pieceOver === 'unfiled' ? 'bg-primary/10 ring-1 ring-primary ring-inset' : '']"
             :data-chosen="place.layer === 'unfiled' || undefined"
             :aria-pressed="place.layer === 'unfiled'"
             :disabled="!usable"
@@ -140,8 +159,11 @@ import { useIsland } from "bmo-ui/app/domain/island";
 import * as api from "../domain/brain-api";
 import { subjectTypeName, typeName } from "../domain/brain-names";
 import { EVERY_TYPE_BUT_EPISODES, honours } from "../domain/brain-place";
+import { askQuestion } from "bmo-ui/app/domain/question";
+import { carriedTo, PIECE_DRAG } from "../domain/brain-order";
 
 import type { Layer, Subject, Tally, TypeCount } from "../domain/brain-api";
+import type { Carried } from "../domain/brain-order";
 import type { Place } from "../domain/brain-place";
 
 const props = defineProps<{
@@ -164,6 +186,113 @@ type Tab = "layers" | "subjects" | "types";
 const tab = ref<Tab>("layers");
 const words = ref("");
 const scroller = ref<HTMLElement | null>(null);
+const layerList = ref<HTMLElement | null>(null);
+
+// --- A layer carried among the layers, and a piece of the layer view carried onto one ---
+
+// The marks of where a carried layer would land: a line over the layer it lands before, or under the last.
+const LINE_BEFORE = "shadow-[inset_0_2px_0_0_var(--ui-primary)]";
+const LINE_AFTER = "shadow-[inset_0_-2px_0_0_var(--ui-primary)]";
+
+const carrying = ref<number | null>(null);
+const landing = ref<number | null>(null);
+// The layer, or the unfiled, a carried piece stands over.
+const pieceOver = ref<number | "unfiled" | null>(null);
+
+function carryLayer(event: DragEvent, index: number): void {
+  if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
+  event.dataTransfer?.setData("text/plain", shownLayers.value[index]?.name ?? "");
+  carrying.value = index;
+}
+
+function setLayerDown(): void {
+  carrying.value = null;
+  landing.value = null;
+}
+
+function carriesPiece(event: DragEvent): boolean {
+  return event.dataTransfer?.types.includes(PIECE_DRAG) ?? false;
+}
+
+function pieceEnter(event: DragEvent, layer: number | "unfiled"): void {
+  if (carriesPiece(event)) pieceOver.value = layer;
+}
+
+function pieceLeave(event: DragEvent, layer: number | "unfiled"): void {
+  // A pointer passing onto a child of the row has not left it.
+  if ((event.currentTarget as HTMLElement).contains(event.relatedTarget as Node | null)) return;
+  if (pieceOver.value === layer) pieceOver.value = null;
+}
+
+/** A layer carried: where among the layers it would be put down. A piece carried: the row under it takes it. */
+function layerOver(event: DragEvent): void {
+  if (carriesPiece(event)) {
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
+
+    return;
+  }
+
+  if (carrying.value === null || layerList.value === null) return;
+
+  event.preventDefault();
+
+  const rows = [...layerList.value.querySelectorAll<HTMLElement>(":scope > [data-layer]")];
+  const at = rows.findIndex((row) => {
+    const box = row.getBoundingClientRect();
+
+    return event.clientY < box.top + box.height / 2;
+  });
+
+  landing.value = at === -1 ? rows.length : at;
+}
+
+async function layerDropped(event: DragEvent): Promise<void> {
+  const brainId = props.brainId;
+
+  if (brainId === null) return;
+
+  if (carriesPiece(event)) {
+    event.preventDefault();
+
+    const target = pieceOver.value;
+
+    pieceOver.value = null;
+    if (target === null) return;
+
+    await movePiece(brainId, JSON.parse(event.dataTransfer!.getData(PIECE_DRAG)) as Carried, target);
+
+    return;
+  }
+
+  const from = carrying.value;
+  const land = landing.value;
+
+  if (from === null || land === null) return;
+
+  event.preventDefault();
+  setLayerDown();
+
+  try {
+    for (const one of carriedTo(shownLayers.value, from, land)) await api.changeLayer(brainId, one.id, { position: one.position });
+    emit("changed");
+  } catch (error) {
+    island.fail(error, t("brain.error.save"));
+  }
+}
+
+// A piece moved to a layer, or to none, as a new version; a persona piece is asked first.
+async function movePiece(brainId: number, piece: Carried, target: number | "unfiled"): Promise<void> {
+  if (piece.layerId === (target === "unfiled" ? null : target)) return;
+  if (piece.type === "persona" && !(await askQuestion({ title: t("brain.title.persona_save"), effect: t("brain.hint.persona_cache"), confirm: t("common.action.save") }))) return;
+
+  try {
+    await api.writeVersion(brainId, piece.id, { layerId: target === "unfiled" ? null : target });
+    emit("changed");
+  } catch (error) {
+    island.fail(error, t("brain.error.save"));
+  }
+}
 
 // Whether the view open honours the index's choices; the version timeline honours none.
 const usable = computed(() => honours(props.place.view, "layer"));

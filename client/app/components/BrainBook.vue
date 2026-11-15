@@ -20,8 +20,19 @@
       <BrainText v-if="reading === 'rendering' && hasPersona" :text="rendering" tag="pre" text-class="font-mono text-sm whitespace-pre-wrap select-text" class="p-4" />
 
       <template v-else>
-        <ol class="flex flex-col">
-          <li v-for="(piece, index) in pieces" :key="piece.id" class="group flex items-start gap-2 border-b border-default px-4 py-3">
+        <!-- A piece is carried by the pointer to another place in the layer, a line marking where it will land; its
+             buttons move it one place for a reader without a pointer. -->
+        <ol class="flex flex-col" @dragover="over" @drop="dropped">
+          <li
+            v-for="(piece, index) in pieces"
+            :key="piece.id"
+            :draggable="!busy"
+            data-piece
+            class="group flex cursor-grab items-start gap-2 border-b border-default px-4 py-3 active:cursor-grabbing"
+            :class="[landing === index ? LINE_BEFORE : '', landing === pieces.length && index === pieces.length - 1 ? LINE_AFTER : '', carrying === index ? 'opacity-50' : '']"
+            @dragstart="carry($event, index)"
+            @dragend="setDown"
+          >
             <span class="w-8 shrink-0 text-sm text-muted tabular-nums">{{ piece.position }}</span>
             <button type="button" class="min-w-0 flex-1 text-start text-sm whitespace-pre-wrap hover:text-primary" @click="emit('open', piece.id)">{{ reader.shown(piece.text) }}</button>
             <span class="shrink-0 text-sm text-muted">{{ typeName(t, te, piece.type) }}</span>
@@ -49,8 +60,10 @@ import BrainText from "./BrainText.vue";
 import { typeName } from "../domain/brain-names";
 import * as api from "../domain/brain-api";
 import { useReading } from "../domain/brain-reading";
+import { carriedTo, PIECE_DRAG } from "../domain/brain-order";
 
 import type { Layer, Memory, MemoryFilter } from "../domain/brain-api";
+import type { Carried } from "../domain/brain-order";
 import type { Heading } from "../domain/brain-heading";
 
 const props = defineProps<{
@@ -132,6 +145,75 @@ watch(() => [props.brainId, current.value?.id, props.layer, JSON.stringify(props
 
 watch(() => [pieces.value, reader.language.value] as const, ([shown]) => reader.want(shown.map((piece) => piece.text)), { immediate: true });
 
+// The marks of where a carried piece would land: a line over the piece it lands before, or under the last.
+const LINE_BEFORE = "shadow-[inset_0_2px_0_0_var(--ui-primary)]";
+const LINE_AFTER = "shadow-[inset_0_-2px_0_0_var(--ui-primary)]";
+
+const carrying = ref<number | null>(null);
+// Where among the pieces the carried one would be put down: before the piece at that index.
+const landing = ref<number | null>(null);
+
+function carry(event: DragEvent, index: number): void {
+  const piece = pieces.value[index];
+
+  if (piece !== undefined) event.dataTransfer?.setData(PIECE_DRAG, JSON.stringify({ id: piece.id, type: piece.type, layerId: piece.layerId ?? null } satisfies Carried));
+  if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
+  carrying.value = index;
+}
+
+function setDown(): void {
+  carrying.value = null;
+  landing.value = null;
+}
+
+/** Where the pointer stands among the pieces: before the first whose middle it has not passed. */
+function over(event: DragEvent): void {
+  if (carrying.value === null) return;
+
+  event.preventDefault();
+
+  const rows = [...(event.currentTarget as HTMLElement).querySelectorAll<HTMLElement>(":scope > [data-piece]")];
+  const at = rows.findIndex((row) => {
+    const box = row.getBoundingClientRect();
+
+    return event.clientY < box.top + box.height / 2;
+  });
+
+  landing.value = at === -1 ? rows.length : at;
+}
+
+/** A piece let go where the line stood: the fewest pieces written again to stand it there. */
+async function dropped(event: DragEvent): Promise<void> {
+  const from = carrying.value;
+  const land = landing.value;
+
+  if (from === null || land === null) return;
+
+  event.preventDefault();
+  setDown();
+  await write(carriedTo(pieces.value, from, land));
+}
+
+// Positions written as new versions, asked first where a persona item is among them.
+async function write(positions: { id: number; position: number }[]): Promise<void> {
+  if (positions.length === 0) return;
+
+  const persona = positions.some((one) => pieces.value.find((piece) => piece.id === one.id)?.type === "persona");
+
+  if (persona && !(await askQuestion({ title: t("brain.title.persona_reorder"), effect: t("brain.hint.persona_cache"), confirm: t("common.action.save") }))) return;
+
+  busy.value = true;
+
+  try {
+    for (const one of positions) await api.writeVersion(props.brainId, one.id, { position: one.position });
+    emit("changed");
+  } catch (error) {
+    island.fail(error, t("brain.error.save"));
+  } finally {
+    busy.value = false;
+  }
+}
+
 // Two pieces trade places: each is written again at the other's position, as a new version.
 async function swap(from: number, to: number): Promise<void> {
   const a = pieces.value[from];
@@ -139,20 +221,11 @@ async function swap(from: number, to: number): Promise<void> {
 
   if (a === undefined || b === undefined) return;
 
-  if ((a.type === "persona" || b.type === "persona") && !(await askQuestion({ title: t("brain.title.persona_reorder"), effect: t("brain.hint.persona_cache"), confirm: t("common.action.save") }))) return;
+  const [aPosition, bPosition] = a.position === b.position ? [b.position + (to > from ? 1 : -1), a.position] : [b.position, a.position];
 
-  busy.value = true;
-
-  try {
-    const [aPosition, bPosition] = a.position === b.position ? [b.position + (to > from ? 1 : -1), a.position] : [b.position, a.position];
-
-    await api.writeVersion(props.brainId, a.id, { position: aPosition });
-    await api.writeVersion(props.brainId, b.id, { position: bPosition });
-    emit("changed");
-  } catch (error) {
-    island.fail(error, t("brain.error.save"));
-  } finally {
-    busy.value = false;
-  }
+  await write([
+    { id: a.id, position: aPosition },
+    { id: b.id, position: bPosition }
+  ]);
 }
 </script>
