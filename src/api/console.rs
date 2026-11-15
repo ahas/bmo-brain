@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use axum::extract::State;
 use axum::http::{HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Json, Response};
-use bmo_brain_client::{ConsoleManifest, ErrorCode, Role};
+use bmo_brain_client::{ConsoleManifest, ErrorCode, Role, SidebarSection};
 use sha2::{Digest, Sha256};
 
 use super::{Answer, ApiError, Brain, Key};
@@ -183,6 +183,7 @@ impl Bundle {
       name: NAME.to_owned(),
       title: format!("{NAME}.title.screen"),
       icon: "i-material-symbols-neurology-outline".to_owned(),
+      sidebar_section: SidebarSection::Administration,
       screen_path: format!("/{NAME}"),
       service_name: NAME.to_owned(),
       layer: self.layer.clone(),

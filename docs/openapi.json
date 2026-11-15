@@ -220,6 +220,11 @@
             "description": "The service's name, which a console relays it under.",
             "type": "string"
           },
+          "sidebarSection": {
+            "$ref": "#/components/schemas/SidebarSection",
+            "default": "application",
+            "description": "The section of a console's sidebar the screen's entry stands in, `application` where none is named."
+          },
           "stylesheet": {
             "description": "The path the stylesheet is answered at, where the bundle has one.",
             "type": [
@@ -244,6 +249,7 @@
           "name",
           "title",
           "icon",
+          "sidebarSection",
           "screenPath",
           "serviceName",
           "layer",
@@ -1908,6 +1914,21 @@
         ],
         "type": "object"
       },
+      "SidebarSection": {
+        "description": "The section of a console's sidebar a bundle's entry stands in, as bmo-ui's console bundle contract names it.",
+        "oneOf": [
+          {
+            "const": "administration",
+            "description": "Among the services an administrator runs the system with.",
+            "type": "string"
+          },
+          {
+            "const": "application",
+            "description": "Among the applications a reader works in.",
+            "type": "string"
+          }
+        ]
+      },
       "SimilarAsk": {
         "description": "A candidate memory, whose likes the write judgement reads.",
         "properties": {
@@ -2410,7 +2431,7 @@
   "info": {
     "description": "An agent's long-term memory as a service. The service keeps many brains, each an account's and one agent's: subjects (what a memory is about, found by type and key), layers (the table of contents) and memories, one row a version, superseded and invalidated but never deleted. A turn asks recall for a block under a token budget; a persona is rendered as the same bytes until a piece changes; a brain moves in and out as a brain file. Nothing is held outside a brain. Bodies are JSON with camelCase keys, times are epoch milliseconds, lists are pages of items and more, and every failure is the error shape with its status. The harness plugin's tools, each a thin call of one route, are stated under x-tools.",
     "title": "bmo-brain",
-    "version": "0.1.0-rev.34"
+    "version": "0.1.0-rev.35"
   },
   "openapi": "3.1.0",
   "paths": {

@@ -22,5 +22,5 @@ pub use client::{Answer, BrainClient, ClientFailure};
 pub use reqwest::Client as HttpClient;
 pub use wire::{
   ConsoleManifest, ConsoleWords, Cursor, EmbeddingHealth, ErrorCode, Event, EventsQuery, Health, Labels,
-  Object, Page, Role, WireError, nullable,
+  Object, Page, Role, SidebarSection, WireError, nullable,
 };

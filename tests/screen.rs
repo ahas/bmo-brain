@@ -656,8 +656,10 @@ async fn the_manifest_names_the_built_module_stylesheet_and_words_and_each_is_an
   );
   assert!(manifest.bundle.starts_with("/console-bundle/module.") && manifest.bundle.ends_with(".js"));
   let stylesheet = manifest.stylesheet.clone().unwrap();
+  assert_eq!(manifest.sidebar_section, bmo_brain_client::SidebarSection::Administration);
   let read = read_by_contract(&body);
   assert_eq!(read["role"], "administrator", "{read}");
+  assert_eq!(read["sidebarSection"], "administration");
   assert_eq!(read["apiPrefix"], "/");
   assert_eq!(read["calls"], serde_json::json!([]));
   assert_eq!(read["layer"], "0.1.0-rev.1");

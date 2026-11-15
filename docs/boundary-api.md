@@ -320,8 +320,9 @@ layer's own bundle build.
 | `GET /console-bundle/{file}` | 200, the module or the stylesheet the manifest names |
 
 - **What the brain's manifest names:** the bundle and service `brain`, its menu title `brain.title.screen`,
-  its screens under `/brain`, the role `administrator` with no owner key, the event stream read, the API
-  prefix `/`, the layer the build wrote beside the module, and under `calls` the services the configuration's
+  its entry in the sidebar section `administration`, among the services an administrator runs the system
+  with, its screens under `/brain`, the role `administrator` with no owner key, the event stream read, the
+  API prefix `/`, the layer the build wrote beside the module, and under `calls` the services the configuration's
   `[console] calls` names. The brain names no service itself: which service the screen translates through
   is the console's setting, and the deployment names that service here so the console relays the screen's
   calls to it. Of the contract's optional parts it uses the translator and the title bar, and no share page,

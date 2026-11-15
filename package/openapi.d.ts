@@ -648,6 +648,11 @@ export interface components {
             screenPath: string;
             /** @description The service's name, which a console relays it under. */
             serviceName: string;
+            /**
+             * @description The section of a console's sidebar the screen's entry stands in, `application` where none is named.
+             * @default application
+             */
+            sidebarSection: components["schemas"]["SidebarSection"];
             /** @description The path the stylesheet is answered at, where the bundle has one. */
             stylesheet?: string | null;
             /** @description The key, in the bundle's words, of the name a console's menu gives the screen. */
@@ -1347,6 +1352,8 @@ export interface components {
             /** @description Whether anything stands past the last item. */
             more: boolean;
         };
+        /** @description The section of a console's sidebar a bundle's entry stands in, as bmo-ui's console bundle contract names it. */
+        SidebarSection: "administration" | "application";
         /** @description A candidate memory, whose likes the write judgement reads. */
         SimilarAsk: {
             /**

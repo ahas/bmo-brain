@@ -222,6 +222,17 @@ impl Role {
   }
 }
 
+/// The section of a console's sidebar a bundle's entry stands in, as bmo-ui's console bundle contract names it.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum SidebarSection {
+  /// Among the services an administrator runs the system with.
+  Administration,
+  /// Among the applications a reader works in.
+  #[default]
+  Application,
+}
+
 /// The console bundle's manifest, in the shape bmo-ui's `console-manifest` module states.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -232,6 +243,9 @@ pub struct ConsoleManifest {
   pub title: String,
   /// The icon drawn beside that name.
   pub icon: String,
+  /// The section of a console's sidebar the screen's entry stands in, `application` where none is named.
+  #[serde(default)]
+  pub sidebar_section: SidebarSection,
   /// The path the bundle's screens stand under.
   pub screen_path: String,
   /// The service's name, which a console relays it under.
