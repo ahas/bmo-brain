@@ -45,10 +45,14 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo fmt --all --check
 bun install --cwd package --frozen-lockfile
 bun run --cwd package check
+bun install --cwd client --frozen-lockfile
+bun run --cwd client check
 ```
 
 The tests make their own databases on the PostgreSQL server `BMO_TEST_POSTGRES` names, the local socket's where
-it names none.
+it names none. The console bundle's tests under `client/tests/browser/` drive the screen in a real Chromium through
+playwright-core, the screen stood alone on the Nuxt host under `client/tests/browser/host/` and the brain's routes
+answered by a stand-in in the test; they are skipped where the browser playwright-core pins is not on the machine.
 
 ## Clients
 

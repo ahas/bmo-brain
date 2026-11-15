@@ -5,3 +5,4 @@
 /client/node_modules
 /client/.nuxt
 /client/.output
+/client/tests/browser/host/node_modules

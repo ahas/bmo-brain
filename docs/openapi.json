@@ -1221,6 +1221,7 @@
             ]
           },
           "layerId": {
+            "description": "The layer the new version stands in: the old version's where not given, and a null takes it out of\nevery layer.",
             "format": "int64",
             "type": [
               "integer",
@@ -1228,6 +1229,7 @@
             ]
           },
           "position": {
+            "description": "The old version's where not given, or after the last of the layer the new version moves into.",
             "format": "int64",
             "type": [
               "integer",
@@ -2408,7 +2410,7 @@
   "info": {
     "description": "An agent's long-term memory as a service. The service keeps many brains, each an account's and one agent's: subjects (what a memory is about, found by type and key), layers (the table of contents) and memories, one row a version, superseded and invalidated but never deleted. A turn asks recall for a block under a token budget; a persona is rendered as the same bytes until a piece changes; a brain moves in and out as a brain file. Nothing is held outside a brain. Bodies are JSON with camelCase keys, times are epoch milliseconds, lists are pages of items and more, and every failure is the error shape with its status. The harness plugin's tools, each a thin call of one route, are stated under x-tools.",
     "title": "bmo-brain",
-    "version": "0.1.0-rev.33"
+    "version": "0.1.0-rev.34"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -6223,6 +6225,7 @@
             ]
           },
           "layerId": {
+            "description": "The layer the new version stands in: the old version's where not given, and a null takes it out of\nevery layer.",
             "format": "int64",
             "type": [
               "integer",
@@ -6234,6 +6237,7 @@
             "type": "integer"
           },
           "position": {
+            "description": "The old version's where not given, or after the last of the layer the new version moves into.",
             "format": "int64",
             "type": [
               "integer",

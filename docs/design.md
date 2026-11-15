@@ -70,7 +70,8 @@ A layer is a heading in the brain's table of contents: a topic, a category, a bo
 rulebook. `id`, `name` (unique within the brain), `description`, `position`, `createdAt`.
 
 - **One layer holds many memories; a memory stands in at most one layer.** A memory with no layer is
-  unfiled and found through its subjects and its words alone.
+  unfiled and found through its subjects and its words alone. A version that moves a memory into another
+  layer, or out of every layer, and names no position stands it after the last there.
 - **Layers carry no versions** either.
 
 ### Memories
@@ -538,14 +539,16 @@ console bundle contract and served by the brain itself (`docs/boundary-api.md`, 
   order), and its value reads as words a person understands, with its count: the live memories, a status,
   every type but episodes, a type by its name. On a phone the view is chosen by a labelled select rather than a
   row of marks.
-- **The index** stands on the left in three tabs, 레이어, 대상 and 유형 in the Korean pack, each with one line
-  under the tab head saying what it lists and that choosing one narrows the view. The layers, in position
-  order, each with its description and its count of live memories, the unfiled last; the subjects, grouped by
-  type, each called by its newest active `name` memory or else by its type and key; the types in use, the
-  reserved ones first, each with its count of live memories. A chosen row stands highlighted and is scrolled
-  into sight, the tab holding it is the one open, and choosing it again clears it. A layer is carried by the
-  pointer to another place among the layers, a line marking where it will land, and a piece of the layer view
-  dropped on a layer, or on the unfiled, moves there as a new version, a persona piece asked first.
+- **The index** stands on the left in three tabs, 레이어, 대상 and 유형 in the Korean pack, each with one line under
+  the tab head saying what it lists and that choosing one narrows the view. The layers, in position order,
+  each with its description and its count of live memories, the unfiled last; the subjects, grouped by type,
+  each called by its newest active `name` memory or else by its type and key; the types in use, the reserved
+  ones first, each with its count of live memories. A chosen row stands highlighted and is scrolled into
+  sight, the tab holding it is the one open, and choosing it again clears it. A layer is carried by the
+  pointer, a drag handle at its left, to another place among the layers, a line marking where it will land,
+  and a piece of the layer view dropped on another layer, or on the unfiled, the row under it highlighted,
+  moves there as a new version after its last piece, a persona piece asked first; dropped on its own layer, it
+  writes nothing. While a piece stands over the index, the layer view shows no line of its own.
 - **Every choice narrows the view, or says why it cannot.** A layer, a subject or a type chosen in the index,
   and every toolbar filter, narrows whatever the view shows: the memories, the layer's items, the memories
   around the map's centre, the bubbles. Where a view cannot honour a choice (the version timeline shows one
@@ -613,12 +616,13 @@ console bundle contract and served by the brain itself (`docs/boundary-api.md`, 
   what is saved. Where the translation fails, the words come back untranslated, or no translator is named, the
   screen says so in one sentence and saves nothing until the words are English.
 - **The layer view** (레이어 in the Korean pack) reads the persona and the lore like a book: the layer chosen in
-  the index, the first where none is, its items in position order, carried by the pointer to another place, a
-  line marking where one will land, or moved up and down by their buttons, each move written as new versions of
-  as few items as the order allows, narrowed by the type, the subject, the status and the words. A persona layer
-  shows its prompt source, the very bytes the brain hands a system prompt, placeholders left as they stand; the prompt source is the whole layer's
-  and no filter narrows it. A change to a persona item is asked first in bmo-ui's question dialog, which
-  says that the prompts built on it start their cache afresh once. A layer is exported as a brain file from here.
+  the index, the first where none is, its items in position order, each with a drag handle at its left,
+  carried by the pointer to another place, a line marking where one will land, or moved up and down by their
+  buttons, each move written as new versions of as few items as the order allows, narrowed by the type, the
+  subject, the status and the words. A persona layer shows its prompt source, the very bytes the brain hands a
+  system prompt, placeholders left as they stand; the prompt source is the whole layer's and no filter narrows
+  it. A change to a persona item is asked first in bmo-ui's question dialog, which says that the prompts built
+  on it start their cache afresh once. A layer is exported as a brain file from here.
 - **A version timeline:** one lineage on a time axis, each version a point at its `validFrom` and a bar for
   the span it held, the point's colour its status and its mark its writer; the rows a merge folded into it
   reach it as lines, and the episodes a conclusion rests on stand under the axis at their moments. A point

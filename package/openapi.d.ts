@@ -1033,9 +1033,16 @@ export interface components {
             labels?: {
                 [key: string]: string;
             } | null;
-            /** Format: int64 */
+            /**
+             * Format: int64
+             * @description The layer the new version stands in: the old version's where not given, and a null takes it out of
+             *     every layer.
+             */
             layerId?: number | null;
-            /** Format: int64 */
+            /**
+             * Format: int64
+             * @description The old version's where not given, or after the last of the layer the new version moves into.
+             */
             position?: number | null;
             /** @description The situation in which it is needed: the old version's where not given, and a null clears it. */
             recallCondition?: string | null;

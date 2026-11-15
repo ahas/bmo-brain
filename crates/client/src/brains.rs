@@ -327,8 +327,15 @@ pub struct MemoryVersion {
   pub text: Option<String>,
   #[serde(rename = "type", default, skip_serializing_if = "Option::is_none")]
   pub kind: Option<String>,
-  #[serde(default, skip_serializing_if = "Option::is_none")]
+  /// The layer the new version stands in: the old version's where not given, and a null takes it out of
+  /// every layer.
+  #[serde(
+    default,
+    deserialize_with = "crate::wire::nullable",
+    skip_serializing_if = "Option::is_none"
+  )]
   pub layer_id: Option<Option<i64>>,
+  /// The old version's where not given, or after the last of the layer the new version moves into.
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub position: Option<i64>,
   /// The subjects the new version is about, replacing the old version's whole where given.

@@ -359,6 +359,55 @@ async fn a_memory_is_versioned_never_edited_and_its_key_moves_with_the_live_vers
 }
 
 #[tokio::test]
+async fn a_version_moves_a_memory_between_layers_after_the_last_there_and_out_of_every_layer() {
+  let served = Served::new().await;
+  let client = &served.client;
+  let brain = brain_of(client, "agent-a").await;
+  let layer = |name: &str| NewLayer {
+    name: name.to_owned(),
+    description: String::new(),
+    position: None,
+  };
+  let lore = client.layer_add(brain, &layer("lore")).await.unwrap();
+  let notes = client.layer_add(brain, &layer("notes")).await.unwrap();
+  let placed = |layer_id: Option<i64>, position: i64, text: &str| NewMemory {
+    layer_id,
+    position: Some(position),
+    ..memory("fact", text)
+  };
+  let carried = client.memory_add(brain, &placed(Some(lore.id), 1, "Carried.")).await.unwrap();
+  client.memory_add(brain, &placed(Some(notes.id), 1, "First note.")).await.unwrap();
+  client.memory_add(brain, &placed(Some(notes.id), 4, "Last note.")).await.unwrap();
+  client.memory_add(brain, &placed(None, 9, "Unfiled.")).await.unwrap();
+  let version = |layer_id: Option<Option<i64>>, position: Option<i64>| MemoryVersion {
+    layer_id,
+    position,
+    actor_name: "writer-b".to_owned(),
+    ..MemoryVersion::default()
+  };
+
+  // A version naming another layer and no position stands the memory after that layer's last.
+  let moved = client
+    .memory_version(brain, carried.id, &version(Some(Some(notes.id)), None))
+    .await
+    .unwrap();
+  assert_eq!((moved.layer_id, moved.position), (Some(notes.id), 5));
+
+  // One naming neither keeps both, and one naming a position stands it there.
+  let kept = client.memory_version(brain, moved.id, &version(None, None)).await.unwrap();
+  assert_eq!((kept.layer_id, kept.position), (Some(notes.id), 5));
+  let placed_back = client
+    .memory_version(brain, kept.id, &version(Some(Some(lore.id)), Some(3)))
+    .await
+    .unwrap();
+  assert_eq!((placed_back.layer_id, placed_back.position), (Some(lore.id), 3));
+
+  // A null takes it out of every layer, after the last of the unfiled.
+  let unfiled = client.memory_version(brain, placed_back.id, &version(Some(None), None)).await.unwrap();
+  assert_eq!((unfiled.layer_id, unfiled.position), (None, 10));
+}
+
+#[tokio::test]
 async fn hits_and_confirmations_record_a_use_and_nothing_else() {
   let served = Served::new().await;
   let client = &served.client;

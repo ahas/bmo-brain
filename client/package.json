@@ -1,6 +1,6 @@
 {
   "name": "bmo-brain-console",
-  "version": "0.1.0-rev.33",
+  "version": "0.1.0-rev.34",
   "description": "The brain's screen, built as the browser module a console loads by the brain's manifest.",
   "license": "MIT",
   "private": true,
@@ -24,6 +24,7 @@
     "bmo-brain-client": "file:../package",
     "bmo-ui": "file:vendor/bmo-ui-0.1.0-rev.24.tgz",
     "nuxt": "^4.5.2",
+    "playwright-core": "1.62.1",
     "tailwindcss": "4.3.3",
     "typescript": "^5.9.3",
     "unplugin-auto-import": "21.1.0",

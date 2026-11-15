@@ -22,17 +22,18 @@
       <template v-else>
         <!-- A piece is carried by the pointer to another place in the layer, a line marking where it will land; its
              buttons move it one place for a reader without a pointer. -->
-        <ol class="flex flex-col" @dragover="over" @drop="dropped">
+        <ol class="flex flex-col" @dragover="over" @dragleave="left" @drop="dropped">
           <li
             v-for="(piece, index) in pieces"
             :key="piece.id"
             :draggable="!busy"
             data-piece
-            class="group flex cursor-grab items-start gap-2 border-b border-default px-4 py-3 active:cursor-grabbing"
+            class="group flex cursor-grab items-start gap-2 border-b border-default p-4 active:cursor-grabbing"
             :class="[landing === index ? LINE_BEFORE : '', landing === pieces.length && index === pieces.length - 1 ? LINE_AFTER : '', carrying === index ? 'opacity-50' : '']"
             @dragstart="carry($event, index)"
             @dragend="setDown"
           >
+            <UIcon name="i-material-symbols-drag-indicator" class="size-5 shrink-0 text-muted" aria-hidden="true" />
             <span class="w-8 shrink-0 text-sm text-muted tabular-nums">{{ piece.position }}</span>
             <button type="button" class="min-w-0 flex-1 text-start text-sm whitespace-pre-wrap hover:text-primary" @click="emit('open', piece.id)">{{ reader.shown(piece.text) }}</button>
             <span class="shrink-0 text-sm text-muted">{{ typeName(t, te, piece.type) }}</span>
@@ -180,6 +181,11 @@ function over(event: DragEvent): void {
   });
 
   landing.value = at === -1 ? rows.length : at;
+}
+
+/** The pointer gone out of the pieces, onto the index or anywhere else: no line stands where it will not land. */
+function left(event: DragEvent): void {
+  if (!(event.currentTarget as HTMLElement).contains(event.relatedTarget as Node | null)) landing.value = null;
 }
 
 /** A piece let go where the line stood: the fewest pieces written again to stand it there. */

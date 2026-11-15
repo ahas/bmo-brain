@@ -28,7 +28,7 @@
     <div ref="scroller" class="min-h-0 flex-1 overflow-y-auto" :class="{ 'pointer-events-none opacity-50': !usable }" :aria-disabled="!usable">
       <!-- A layer is carried by the pointer to another place among the layers, a line marking where it will land; a
            piece of the layer view dropped on a layer, or on the unfiled, moves there as a new version. -->
-      <ul v-if="tab === 'layers'" ref="layerList" class="flex flex-col py-1" @dragover="layerOver" @drop="layerDropped">
+      <ul v-if="tab === 'layers'" ref="layerList" class="flex flex-col py-1" @dragover="layerOver" @dragleave="layerLeft" @drop="layerDropped">
         <li
           v-for="(layer, index) in shownLayers"
           :key="layer.id"
@@ -49,11 +49,12 @@
         >
           <button
             type="button"
-            class="flex min-w-0 flex-1 items-start gap-2 py-2 ps-3 text-start"
+            class="flex min-w-0 flex-1 items-start gap-2 py-3 ps-3 text-start"
             :aria-pressed="place.layer === layer.id"
             :disabled="!usable"
             @click="emit('choose', { layer: place.layer === layer.id ? null : layer.id })"
           >
+            <UIcon name="i-material-symbols-drag-indicator" class="size-5 shrink-0 text-muted" aria-hidden="true" />
             <div class="min-w-0 flex-1">
               <div class="truncate text-sm font-medium">{{ layer.name }}</div>
               <div v-if="layer.description" class="truncate text-sm text-muted">{{ layer.description }}</div>
@@ -69,13 +70,15 @@
         <li data-unfiled @dragenter="pieceEnter($event, 'unfiled')" @dragleave="pieceLeave($event, 'unfiled')">
           <button
             type="button"
-            class="flex w-full items-center gap-2 px-3 py-2 text-start hover:bg-elevated"
+            class="flex w-full items-center gap-2 px-3 py-3 text-start hover:bg-elevated"
             :class="[{ 'bg-primary/10 shadow-[inset_3px_0_0_var(--ui-primary)]': place.layer === 'unfiled' }, pieceOver === 'unfiled' ? 'bg-primary/10 ring-1 ring-primary ring-inset' : '']"
             :data-chosen="place.layer === 'unfiled' || undefined"
             :aria-pressed="place.layer === 'unfiled'"
             :disabled="!usable"
             @click="emit('choose', { layer: place.layer === 'unfiled' ? null : 'unfiled' })"
           >
+            <!-- No handle, since the unfiled is not carried; its name keeps the layers' column. -->
+            <span class="size-5 shrink-0" aria-hidden="true" />
             <span class="min-w-0 flex-1 truncate text-sm text-muted">{{ t("brain.label.unfiled") }}</span>
             <UBadge color="neutral" variant="soft" size="sm"><RollingNumber :value="layerCount(null)" /></UBadge>
           </button>
@@ -245,6 +248,11 @@ function layerOver(event: DragEvent): void {
   });
 
   landing.value = at === -1 ? rows.length : at;
+}
+
+/** The pointer gone out of the layers: no line stands where a carried layer will not land. */
+function layerLeft(event: DragEvent): void {
+  if (!(event.currentTarget as HTMLElement).contains(event.relatedTarget as Node | null)) landing.value = null;
 }
 
 async function layerDropped(event: DragEvent): Promise<void> {

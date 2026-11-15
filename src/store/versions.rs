@@ -510,6 +510,11 @@ impl Store {
     if let Some(layer) = layer_id {
       layer_of(&mut *tx, brain_id, layer).await?;
     }
+    let position = match body.position {
+      Some(position) => position,
+      None if layer_id != old.layer_id => next_position(&mut *tx, brain_id, layer_id).await?,
+      None => old.position,
+    };
     let subject_ids = match (&body.subject_ids, &body.subjects) {
       (None, None) => {
         sqlx::query_scalar(
@@ -549,7 +554,7 @@ impl Store {
     .bind(body.kind.as_ref().unwrap_or(&old.kind))
     .bind(body.text.as_ref().unwrap_or(&old.text))
     .bind(layer_id)
-    .bind(body.position.unwrap_or(old.position))
+    .bind(position)
     .bind(status.name())
     .bind(old.lineage_id)
     .bind(valid_from)
