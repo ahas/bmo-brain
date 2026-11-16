@@ -39,6 +39,11 @@ The common wire format and the API design rules are bmo-chat's `docs/conventions
 - **One account sees its own brains alone.** A caller names the brain it reads or writes in the path, and
   every member of that brain carries the brain's id. Two agents of one account have two brains that share
   nothing; two accounts never see each other's.
+- **A caller reads an agent's memories from that agent's brain alone.** It finds the brain by the account that
+  owns the agent and the agent's key, and never answers one agent, of any account, from another agent's brain.
+  An agent's key that stands under more than one account names no brain until the account is given, and an agent
+  the service keeps no brain for has no memories to read; a caller answers it nothing rather than another
+  brain's.
 - **The brains stand in one store,** the service's own PostgreSQL database, every row keyed by its brain,
   so one set of migrations serves every brain. The unit a brain moves in, is backed up in and is let go in
   is the brain itself, and its portable form is the brain file (「Export and injection」).
