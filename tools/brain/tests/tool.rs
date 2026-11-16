@@ -4,15 +4,15 @@
 
 use std::io::Write as _;
 use std::process::{Command, Stdio};
-use std::str::FromStr;
 
 use bmo_brain::api::{Brain, Stopping, router};
-use bmo_brain::store::{MIGRATOR, Store};
+use bmo_brain::store::Store;
 use bmo_brain_client::{BrainClient, MemoriesQuery, NewBrain};
 use brain_tool::{ACTOR, ENTRIES};
 use serde_json::{Value, json};
-use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
-use sqlx::{ConnectOptions, Connection, Executor, PgConnection};
+use sqlx::postgres::PgPoolOptions;
+
+use crate::scratch::Scratch;
 
 const ROOT: &str = env!("CARGO_MANIFEST_DIR");
 const TOKEN: &str = "the-brain-token";
@@ -99,40 +99,18 @@ async fn a_run_working_for_a_chat_agent_reads_and_writes_that_agents_brain() {
   assert_eq!(memories.len(), 1, "{found}");
 }
 
-fn test_address() -> String {
-  std::env::var("BMO_TEST_POSTGRES")
-    .unwrap_or_else(|_| "postgres:///bmo_test?host=/var/run/postgresql".into())
-}
-
-fn options(database: &str) -> PgConnectOptions {
-  PgConnectOptions::from_str(&test_address())
-    .unwrap()
-    .database(database)
-    .disable_statement_logging()
-}
-
 /// A migrated database of this test's own, served on a port of its own; the database is dropped with the guard.
 struct Served {
-  database: String,
   base: String,
   client: BrainClient,
   serving: tokio::task::JoinHandle<()>,
+  _scratch: Scratch,
 }
 
 impl Served {
   async fn new() -> Self {
-    // One database a test, though the tests of a file share its process.
-    static MADE: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
-    let made = MADE.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-    let database = format!("brain_tool_{}_{made}", std::process::id());
-    let mut admin = PgConnection::connect_with(&options("postgres")).await.unwrap();
-    let _ = admin
-      .execute(format!("DROP DATABASE IF EXISTS \"{database}\" WITH (FORCE)").as_str())
-      .await;
-    admin.execute(format!("CREATE DATABASE \"{database}\"").as_str()).await.unwrap();
-    admin.close().await.unwrap();
-    let pool = PgPoolOptions::new().max_connections(4).connect_with(options(&database)).await.unwrap();
-    MIGRATOR.run(&pool).await.unwrap();
+    let scratch = Scratch::copy().await;
+    let pool = PgPoolOptions::new().max_connections(4).connect_with(scratch.options()).await.unwrap();
     let store = Store::over(pool);
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let base = format!("http://{}", listener.local_addr().unwrap());
@@ -147,10 +125,10 @@ impl Served {
     });
     let client = BrainClient::new(&base, TOKEN).unwrap();
     Self {
-      database,
       base,
       client,
       serving,
+      _scratch: scratch,
     }
   }
 }
@@ -158,18 +136,6 @@ impl Served {
 impl Drop for Served {
   fn drop(&mut self) {
     self.serving.abort();
-    let database = std::mem::take(&mut self.database);
-    let _ = std::thread::spawn(move || {
-      let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
-      runtime.block_on(async move {
-        let mut admin = PgConnection::connect_with(&options("postgres")).await.unwrap();
-        let _ = admin
-          .execute(format!("DROP DATABASE IF EXISTS \"{database}\" WITH (FORCE)").as_str())
-          .await;
-        let _ = admin.close().await;
-      });
-    })
-    .join();
   }
 }
 

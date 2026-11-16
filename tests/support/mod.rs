@@ -1,19 +1,15 @@
 //! What the service's tests share: a migrated database of the test's own, and the service answering over it on
 //! a port of its own, with a client that reaches it.
-//!
-//! The migrations run once per test binary into a template database, and each test is handed a copy of it,
-//! which the server makes in a fraction of the time a migration takes. A copy is dropped when its test is
-//! done, and the template and copies a binary left behind are dropped by the next binary to make a template.
 
-use std::str::FromStr;
-use std::sync::atomic::{AtomicU32, Ordering};
+mod scratch;
 
 use bmo_brain::api::console::Console;
 use bmo_brain::api::{Brain, Stopping, router};
 use bmo_brain::store::{MIGRATOR, Store};
 use bmo_brain_client::BrainClient;
-use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
-use sqlx::{ConnectOptions, Connection, Executor, PgConnection};
+use scratch::Scratch;
+use sqlx::postgres::PgPoolOptions;
+use sqlx::{Connection, PgConnection};
 use tokio::sync::watch;
 use tokio::task::JoinHandle;
 
@@ -22,104 +18,15 @@ pub const TOKEN: &str = "the-brain-token";
 /// The console's token the served brain takes.
 pub const CONSOLE_TOKEN: &str = "the-console-token";
 
-// What a template's and a copy's names begin with, ahead of the process that made them.
-const TEMPLATE: &str = "brain_rs_tmpl_";
-const COPY: &str = "brain_rs_copy_";
-
-static COPIES: AtomicU32 = AtomicU32::new(0);
-static MADE: tokio::sync::OnceCell<String> = tokio::sync::OnceCell::const_new();
-
-/// The suite's PostgreSQL server, as the run names it, and the machine's own socket where nothing does.
-fn test_address() -> String {
-  std::env::var("BMO_TEST_POSTGRES")
-    .unwrap_or_else(|_| "postgres:///bmo_test?host=/var/run/postgresql".into())
-}
-
-fn options(database: &str) -> PgConnectOptions {
-  PgConnectOptions::from_str(&test_address())
-    .unwrap()
-    .database(database)
-    .disable_statement_logging()
-}
-
-async fn server() -> PgConnection {
-  PgConnection::connect_with(&options("postgres")).await.unwrap()
-}
-
-fn alive(pid: &str) -> bool {
-  std::path::Path::new("/proc").join(pid).exists()
-}
-
-// The template this binary's copies are made from, migrated the first time a test asks. The databases a
-// binary that is gone left behind are dropped first.
-async fn template() -> String {
-  MADE
-    .get_or_init(|| async {
-      let mut admin = server().await;
-      let left: Vec<String> = sqlx::query_scalar(
-        "SELECT datname::text FROM pg_database WHERE datname LIKE $1 OR datname LIKE $2",
-      )
-      .bind(format!("{}%", TEMPLATE.replace('_', "\\_")))
-      .bind(format!("{}%", COPY.replace('_', "\\_")))
-      .fetch_all(&mut admin)
-      .await
-      .unwrap();
-      for old in left {
-        let pid = old
-          .trim_start_matches(TEMPLATE)
-          .trim_start_matches(COPY)
-          .split('_')
-          .next()
-          .unwrap_or_default();
-        if !alive(pid) {
-          let _ = admin.execute(format!("DROP DATABASE IF EXISTS \"{old}\" WITH (FORCE)").as_str()).await;
-        }
-      }
-      let name = format!("{TEMPLATE}{}", std::process::id());
-      admin
-        .execute(
-          format!(
-            "CREATE DATABASE \"{name}\" TEMPLATE template0 ENCODING 'UTF8' LC_COLLATE 'C' LC_CTYPE 'C'"
-          )
-          .as_str(),
-        )
-        .await
-        .unwrap();
-      admin.close().await.unwrap();
-      let mut db = PgConnection::connect_with(&options(&name)).await.unwrap();
-      MIGRATOR.run(&mut db).await.unwrap();
-      db.close().await.unwrap();
-      name
-    })
-    .await
-    .clone()
-}
-
-/// A copy dropped, its connections ended with it. It goes on a thread of its own, since a guard dropped inside
-/// the runtime may not block on it.
-fn drop_copy(database: String) {
-  let _ = std::thread::spawn(move || {
-    let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
-    runtime.block_on(async move {
-      let mut admin = server().await;
-      let _ = admin
-        .execute(format!("DROP DATABASE IF EXISTS \"{database}\" WITH (FORCE)").as_str())
-        .await;
-      let _ = admin.close().await;
-    });
-  })
-  .join();
-}
-
 /// The service over a migrated, empty database of the test's own, answering on a port of its own until the
 /// guard goes.
 pub struct Served {
-  database: String,
   pub store: Store,
   pub client: BrainClient,
   pub base: String,
   serving: JoinHandle<()>,
   stop: watch::Sender<bool>,
+  scratch: Scratch,
 }
 
 impl Served {
@@ -148,15 +55,8 @@ impl Served {
     calls: Vec<String>,
     embedding: Option<bmo_brain::store::vectors::EmbeddingConfig>,
   ) -> Served {
-    let template = template().await;
-    let database = format!("{COPY}{}_{}", std::process::id(), COPIES.fetch_add(1, Ordering::SeqCst));
-    let mut admin = server().await;
-    admin
-      .execute(format!("CREATE DATABASE \"{database}\" TEMPLATE \"{template}\"").as_str())
-      .await
-      .unwrap();
-    admin.close().await.unwrap();
-    let pool = PgPoolOptions::new().max_connections(8).connect_with(options(&database)).await.unwrap();
+    let scratch = Scratch::copy().await;
+    let pool = PgPoolOptions::new().max_connections(8).connect_with(scratch.options()).await.unwrap();
     let store = Store::over(pool).embedding(embedding);
     store.load_vectors().await.unwrap();
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -181,12 +81,12 @@ impl Served {
     });
     let client = BrainClient::new(&base, TOKEN).unwrap();
     Served {
-      database,
       store,
       client,
       base,
       serving,
       stop,
+      scratch,
     }
   }
 
@@ -202,16 +102,7 @@ impl Served {
 
   /// The database's address, as a caller handed one opens it.
   pub fn address(&self) -> String {
-    let address = test_address();
-    let (base, query) = address
-      .split_once('?')
-      .map_or((address.as_str(), None), |(base, query)| (base, Some(query)));
-    let base = base.rsplit_once('/').map(|(head, _)| head).unwrap_or(base);
-
-    match query {
-      Some(query) => format!("{base}/{}?{query}", self.database),
-      None => format!("{base}/{}", self.database),
-    }
+    self.scratch.address()
   }
 
   /// The events published so far, every kind.
@@ -224,31 +115,20 @@ impl Served {
 impl Drop for Served {
   fn drop(&mut self) {
     self.serving.abort();
-    drop_copy(std::mem::take(&mut self.database));
   }
 }
 
 /// An empty database of the test's own, migrated by the migrations up to and including `through`, for a test
 /// that reads what a later migration makes of the rows it writes; dropped when the guard goes.
 pub struct Bare {
-  pub name: String,
+  scratch: Scratch,
 }
 
 impl Bare {
   pub async fn through(through: i64) -> Bare {
-    let name = format!("{COPY}{}_{}", std::process::id(), COPIES.fetch_add(1, Ordering::SeqCst));
-    let mut admin = server().await;
-    admin
-      .execute(
-        format!(
-          "CREATE DATABASE \"{name}\" TEMPLATE template0 ENCODING 'UTF8' LC_COLLATE 'C' LC_CTYPE 'C'"
-        )
-        .as_str(),
-      )
-      .await
-      .unwrap();
-    admin.close().await.unwrap();
-    let bare = Bare { name };
+    let bare = Bare {
+      scratch: Scratch::blank().await,
+    };
     let mut db = bare.connect().await;
     let early = sqlx::migrate::Migrator {
       migrations: std::borrow::Cow::Owned(
@@ -264,13 +144,7 @@ impl Bare {
   }
 
   pub async fn connect(&self) -> PgConnection {
-    PgConnection::connect_with(&options(&self.name)).await.unwrap()
-  }
-}
-
-impl Drop for Bare {
-  fn drop(&mut self) {
-    drop_copy(std::mem::take(&mut self.name));
+    self.scratch.connect().await
   }
 }
 
