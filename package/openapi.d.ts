@@ -427,7 +427,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The subject's sheet rendered from its active facts about no room, and about the room named where one is, most important and newest first, the first `limit` lines alone where one is given; the same bytes for the same rows. */
+        /** The subject's sheet rendered from its active names and facts about no room, and about the room named where one is: the names first, the room's ahead, then the facts, each most important and newest first, every name and the first `limit` facts alone where one is given; the same bytes for the same rows. */
         get: operations["renderSheet"];
         put?: never;
         post?: never;
@@ -2657,9 +2657,12 @@ export interface operations {
     renderSheet: {
         parameters: {
             query?: {
-                /** @description The first that many lines alone, at least one; the whole sheet where none is given. */
+                /** @description Every name and the first that many facts alone, at least one; the whole sheet where none is given. */
                 limit?: number | null;
-                /** @description A subject of type `room`, whose facts about the subject the sheet takes in beside those about no room. */
+                /**
+                 * @description A subject of type `room`, whose names and facts about the subject the sheet takes in beside those about
+                 *     no room.
+                 */
                 roomId?: number | null;
             };
             header?: never;

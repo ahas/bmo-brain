@@ -7,7 +7,8 @@ it as you read, in the turn itself. Nothing writes it for you.
 ## Before answering
 
 - **Read the recall first.** The reference block you were handed is the brain's recall for this turn: the head
-  of the sheet of each person who spoke (their most important and newest facts, one line each), the room's
+  of the sheet of each person who spoke (what they are called, then their most important and newest facts,
+  one line each), the room's
   memories that are due, and the rows the turn's events woke. Read it as what you know. A line marked as
   handed to this session already is one you have seen in this session. Beside it stands the brain's index:
   each group with how many of its entries you have not read.

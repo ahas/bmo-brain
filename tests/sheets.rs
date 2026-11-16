@@ -1,7 +1,7 @@
-//! A subject's sheet, rendered from its facts and never stored (docs/design.md, 「A person is a subject」;
-//! docs/boundary-api.md, 「Subjects」 and 「Splitting sheets」): the rendering and its room, the refusal of the
-//! type `sheet`, the head of it recall's core carries (docs/boundary-api.md, 「Recall」), and the split of the
-//! sheet rows a store still holds live, run through the binary.
+//! A subject's sheet, rendered from its names and facts and never stored (docs/design.md, 「A person is a
+//! subject」; docs/boundary-api.md, 「Subjects」 and 「Splitting sheets」): the rendering and its room, the
+//! refusal of the type `sheet`, the head of it recall's core carries (docs/boundary-api.md, 「Recall」), and
+//! the split of the sheet rows a store still holds live, run through the binary.
 
 use crate::support;
 
@@ -322,6 +322,62 @@ async fn a_sheet_orders_equal_importance_newest_first_and_renders_its_first_line
     refused(client.sheet(brain, person_id, &limited(0)).await),
     (400, "bad-request".to_owned())
   );
+}
+
+#[tokio::test]
+async fn a_sheet_puts_every_name_ahead_of_its_facts_the_rooms_first_and_a_limit_cuts_facts_alone() {
+  let served = Served::new().await;
+  let client = &served.client;
+  let brain = brain_of(client, "agent-a").await;
+  let person = subject("person", "1");
+  let room = subject("room", "7");
+  let write = |kind: &'static str, text: &'static str, subjects: Vec<SubjectKey>, importance, at: &str| {
+    let body = NewMemory {
+      subjects,
+      importance: Some(importance),
+      valid_from: Some(day(at)),
+      ..memory(kind, text)
+    };
+    async move { client.memory_add(brain, &body).await.unwrap().id }
+  };
+  let fact = write("fact", "Owns the plot.", vec![person.clone()], 9, "2026-01-01").await;
+  let later_fact = write("fact", "Grows beans.", vec![person.clone()], 5, "2026-02-01").await;
+  let name = write("name", "nickname-a", vec![person.clone()], 5, "2026-01-01").await;
+  let weighty_name = write("name", "nickname-b", vec![person.clone()], 7, "2026-01-01").await;
+  let room_name = write(
+    "name",
+    "Called nickname-c in this room.",
+    vec![person.clone(), room.clone()],
+    3,
+    "2026-01-01",
+  )
+  .await;
+  write(
+    "name",
+    "Called nickname-d there.",
+    vec![person.clone(), subject("room", "8")],
+    9,
+    "2026-01-01",
+  )
+  .await;
+  write("name", "nickname-e", vec![subject("person", "2")], 9, "2026-01-01").await;
+  let person_id = subject_id(client, brain, "person", "1").await;
+  let room_id = subject_id(client, brain, "room", "7").await;
+
+  let common = client.sheet(brain, person_id, &SheetQuery::default()).await.unwrap();
+  assert_eq!(
+    common.lines().take(2).collect::<Vec<_>>(),
+    [format!("- [#{weighty_name} name] nickname-b"), format!("- [#{name} name] nickname-a")]
+  );
+  assert_eq!(line_ids(&common), [weighty_name, name, fact, later_fact]);
+
+  let head = SheetQuery {
+    room_id: Some(room_id),
+    limit: Some(1),
+  };
+  let in_the_room = client.sheet(brain, person_id, &head).await.unwrap();
+  assert_eq!(line_ids(&in_the_room), [room_name, weighty_name, name, fact]);
+  assert_eq!(client.sheet(brain, person_id, &head).await.unwrap(), in_the_room);
 }
 
 #[tokio::test]

@@ -712,10 +712,11 @@ pub struct PersonaQuery {
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct SheetQuery {
-  /// A subject of type `room`, whose facts about the subject the sheet takes in beside those about no room.
+  /// A subject of type `room`, whose names and facts about the subject the sheet takes in beside those about
+  /// no room.
   #[serde(skip_serializing_if = "Option::is_none")]
   pub room_id: Option<i64>,
-  /// The first that many lines alone, at least one; the whole sheet where none is given.
+  /// Every name and the first that many facts alone, at least one; the whole sheet where none is given.
   #[serde(skip_serializing_if = "Option::is_none")]
   pub limit: Option<i64>,
 }

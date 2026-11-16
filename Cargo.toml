@@ -5,7 +5,7 @@ members = ["crates/client", "tools/brain", "tools/memory"]
 resolver = "3"
 
 [workspace.package]
-version = "0.1.0-rev.36"
+version = "0.1.0-rev.37"
 edition = "2024"
 license = "MIT"
 

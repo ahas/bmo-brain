@@ -1,5 +1,5 @@
-//! A subject's sheet, rendered from its facts (docs/design.md, 「A person is a subject」), and the split of the
-//! `sheet` rows a store still holds live into facts (docs/boundary-api.md, 「Splitting sheets」).
+//! A subject's sheet, rendered from its names and facts (docs/design.md, 「A person is a subject」), and the
+//! split of the `sheet` rows a store still holds live into facts (docs/boundary-api.md, 「Splitting sheets」).
 
 use bmo_brain_client::{Labels, MemoryMove, MemoryStatus, NewMemory};
 use sqlx::PgConnection;
@@ -9,8 +9,14 @@ use super::recall::day;
 use super::versions::{MEMORY_COLUMNS, MemoryRow};
 use super::{Fault, Held, Store, now};
 
-/// The word no memory is written under: a person's sheet is a rendering of their facts.
+/// The word no memory is written under: a person's sheet is a rendering of their names and facts.
 pub const SHEET: &str = "sheet";
+
+/// The type of the rows a sheet renders as what is known of its subject.
+const FACT: &str = "fact";
+
+/// The reserved type of a subject's names, which a sheet renders ahead of its facts.
+const NAME: &str = "name";
 
 /// Who the split writes as.
 pub const SPLITTER: &str = "migration";
@@ -30,10 +36,41 @@ pub(crate) fn written_type(kind: &str) -> Held<()> {
   Ok(())
 }
 
-/// The facts a subject's sheet renders: its active facts about no room, and about the room named where one
-/// is, by importance, highest first, then newest first: by the moment they hold from, by the moment last
-/// confirmed (a fact never confirmed after the confirmed ones), and by id; the first `limit` alone where one
-/// is given.
+/// The rows of one type a subject's sheet renders: its active rows of that type about no room, and about the
+/// room named where one is; `rooms_first` puts those linked to the room ahead of the rest. Then by importance,
+/// highest first, then newest first: by the moment they hold from, by the moment last confirmed (a row never
+/// confirmed after the confirmed ones), and by id; the first `limit` alone where one is given.
+async fn rows_about(
+  conn: &mut PgConnection,
+  brain_id: i64,
+  subject_id: i64,
+  room: Option<i64>,
+  kind: &str,
+  rooms_first: bool,
+  limit: Option<i64>,
+) -> Held<Vec<MemoryRow>> {
+  Ok(
+    sqlx::query_as(&format!(
+      "SELECT {MEMORY_COLUMNS} FROM memories m WHERE brain_id = $1 AND status = 'active' AND type = $4 \
+       AND id IN (SELECT memory_id FROM memory_subjects WHERE subject_id = $2) \
+       AND (NOT EXISTS (SELECT 1 FROM memory_subjects ms JOIN subjects s ON s.id = ms.subject_id \
+             WHERE ms.memory_id = m.id AND s.type = 'room') \
+         OR ($3::bigint IS NOT NULL AND id IN (SELECT memory_id FROM memory_subjects WHERE subject_id = $3))) \
+       ORDER BY ($5 AND id IN (SELECT memory_id FROM memory_subjects WHERE subject_id = $3)) DESC, \
+         importance DESC, valid_from DESC, last_confirmed_at DESC NULLS LAST, id DESC LIMIT $6"
+    ))
+    .bind(brain_id)
+    .bind(subject_id)
+    .bind(room)
+    .bind(kind)
+    .bind(rooms_first)
+    .bind(limit)
+    .fetch_all(&mut *conn)
+    .await?,
+  )
+}
+
+/// The facts a subject's sheet renders, in the sheet's order; the first `limit` alone where one is given.
 pub(crate) async fn sheet_rows(
   conn: &mut PgConnection,
   brain_id: i64,
@@ -41,26 +78,27 @@ pub(crate) async fn sheet_rows(
   room: Option<i64>,
   limit: Option<i64>,
 ) -> Held<Vec<MemoryRow>> {
-  Ok(
-    sqlx::query_as(&format!(
-      "SELECT {MEMORY_COLUMNS} FROM memories m WHERE brain_id = $1 AND status = 'active' AND type = 'fact' \
-       AND id IN (SELECT memory_id FROM memory_subjects WHERE subject_id = $2) \
-       AND (NOT EXISTS (SELECT 1 FROM memory_subjects ms JOIN subjects s ON s.id = ms.subject_id \
-             WHERE ms.memory_id = m.id AND s.type = 'room') \
-         OR ($3::bigint IS NOT NULL AND id IN (SELECT memory_id FROM memory_subjects WHERE subject_id = $3))) \
-       ORDER BY importance DESC, valid_from DESC, last_confirmed_at DESC NULLS LAST, id DESC LIMIT $4"
-    ))
-    .bind(brain_id)
-    .bind(subject_id)
-    .bind(room)
-    .bind(limit)
-    .fetch_all(&mut *conn)
-    .await?,
-  )
+  rows_about(conn, brain_id, subject_id, room, FACT, false, limit).await
+}
+
+/// The names a subject's sheet renders ahead of its facts, every one of them: those linked to the room named
+/// first, then those about no room.
+async fn sheet_names(
+  conn: &mut PgConnection,
+  brain_id: i64,
+  subject_id: i64,
+  room: Option<i64>,
+) -> Held<Vec<MemoryRow>> {
+  rows_about(conn, brain_id, subject_id, room, NAME, true, None).await
+}
+
+/// One name as a line of a sheet: its id, the mark `name`, and its words.
+fn name_line(row: &MemoryRow) -> String {
+  format!("- [#{} {NAME}] {}", row.id, row.text.trim())
 }
 
 /// One fact as a line of a sheet: its id, the day it holds from, and its words.
-fn sheet_line(row: &MemoryRow) -> String {
+fn fact_line(row: &MemoryRow) -> String {
   format!("- [#{} since {}] {}", row.id, day(row.valid_from), row.text.trim())
 }
 
@@ -223,8 +261,8 @@ pub fn sheet_line_read(line: &str) -> SheetLine {
 }
 
 impl Store {
-  /// A subject's sheet rendered: the facts `sheet_rows` reads, one line each, joined by a newline, the same
-  /// bytes for the same rows.
+  /// A subject's sheet rendered: every name `sheet_names` reads, then the facts `sheet_rows` reads, the first
+  /// `limit` alone where one is given, one line each, joined by a newline, the same bytes for the same rows.
   pub async fn sheet(
     &self,
     brain_id: i64,
@@ -263,8 +301,10 @@ impl Store {
         }
       }
     }
-    let rows = sheet_rows(&mut conn, brain_id, subject_id, room_id, limit).await?;
-    Ok(rows.iter().map(sheet_line).collect::<Vec<_>>().join("\n"))
+    let names = sheet_names(&mut conn, brain_id, subject_id, room_id).await?;
+    let facts = sheet_rows(&mut conn, brain_id, subject_id, room_id, limit).await?;
+    let lines = names.iter().map(name_line).chain(facts.iter().map(fact_line));
+    Ok(lines.collect::<Vec<_>>().join("\n"))
   }
 
   /// Every live `sheet` row of every brain split into facts, each sheet with its facts in one transaction

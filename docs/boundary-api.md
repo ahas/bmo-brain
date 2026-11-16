@@ -132,7 +132,7 @@ the text of its newest `active` one, or null where it has none.
 | `POST /subjects` | `type`, `key`, `description`: makes the subject, or finds the one standing and sets its description where one is given | 201 where new, 200 where it stood |
 | `GET /subjects/{subjectId}` | reads one | 200; 404 |
 | `PATCH /subjects/{subjectId}` | sets `description` | 200; 404 |
-| `GET /subjects/{subjectId}/sheet` | renders the subject's sheet; `roomId`, a subject of type `room`, takes that room's facts in as well; `limit`, at least 1, renders the first that many lines alone, the whole sheet where none is given | 200, `text/plain`; 400 for a `roomId` that is no room or a `limit` below 1; 404 |
+| `GET /subjects/{subjectId}/sheet` | renders the subject's sheet (`docs/design.md`, 「A person is a subject」): its active `name` rows first, one line each as `- [#<id> name] <text>`, those linked to the room named ahead of those about no room, then its active facts, one line each as `- [#<id> since <date>] <text>`; `roomId`, a subject of type `room`, takes that room's names and facts in as well; `limit`, at least 1, renders every name and the first that many facts alone, the whole sheet where none is given | 200, `text/plain`; 400 for a `roomId` that is no room or a `limit` below 1; 404 |
 
 A subject's sheet (`docs/design.md`, 「A person is a subject」) is its active `fact` memories that are about
 no subject of type `room`, and, where `roomId` names a room, its active facts about that room as well. They
@@ -224,8 +224,8 @@ null where it was not among the nearest), `fusedScore` (its Reciprocal Rank Fusi
 - **The core** is the room's active `situation` memories and the head of the sheet of everyone who spoke:
   the first facts `GET /subjects/{subjectId}/sheet` renders for each speaker with the turn's room as
   `roomId`, in its order, at most the rules' `core_fact_cap` of them per speaker, each a line of the block.
-  The room's `rule` memories and a speaker's other facts are rows like any other: they reach the block only
-  through the searched part.
+  The room's `rule` memories and a speaker's other facts and names are rows like any other: they reach the
+  block only through the searched part.
 - **Every line of either part keeps the budget,** a marked one as well: a line that would carry the block
   past `budgetTokens` is left out.
 - **The searched part** is the active rows holding one of the turn's stems or about a subject the turn

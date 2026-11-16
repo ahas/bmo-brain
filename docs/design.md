@@ -12,7 +12,8 @@ A brain is one agent's long-term memory. The service keeps many brains, each own
 belonging to one agent of that account, and serves them over HTTP. Everything an agent reads about the
 world beside the conversation in front of it is a memory in its brain: episodes, facts, tips, rules,
 situation rules, its knowledge, its persona and its lore. Nothing an agent reads is a file, and nothing it
-reads about a person is a sheet kept apart: a person's standing sheet is rendered from the facts about them.
+reads about a person is a sheet kept apart: a person's standing sheet is rendered from their names and the
+facts about them.
 
 - **One table of memories, with a type on each row.** Episodes, facts, situation rules, persona pieces and
   the rest are values of `type`, never tables of their own. No table stands for one feature.
@@ -116,8 +117,8 @@ every other value is whatever the writer called it, and the brain lists the type
 live memories each, so a meaning does not split into two spellings; a type whose rows are all closed is no
 longer in use, and its history is read by status.
 
-No type is called `sheet`. A person's standing sheet is a rendering of the facts about them (「A person is
-a subject」), never a row, and a write that names `sheet` as its type is refused.
+No type is called `sheet`. A person's standing sheet is a rendering of their names and the facts about them
+(「A person is a subject」), never a row, and a write that names `sheet` as its type is refused.
 
 | Reserved type | Means |
 |---|---|
@@ -294,7 +295,8 @@ a block and a list of what it chose.
 - **The core carries the head of each speaker's sheet:** the first of their facts in the sheet's order
   (「Rooms, people and rules」), at most the core's cap per speaker, eight where the configuration names
   none. A person's sheet can hold hundreds of facts and a turn has room for a few; the rest of a speaker's
-  facts reach a turn only through the searched part, scored and capped as any other row is.
+  facts, and their names, reach a turn only through the searched part, scored and capped as any other row
+  is.
 - **Cues.** A turn's cues are the subjects it names that stand in the brain, its room and its speakers, and
   its words: lowercased, English stop words left out, each reduced to its Snowball stem. A memory's words are
   indexed the same way, so a turn's word reaches every memory holding a word of the same stem, and a stop word
@@ -456,15 +458,17 @@ judged on the brain's own record.
 - **A person is a subject** of type `person`, keyed by the id the caller knows them by. What is known about
   them is rows linked to them, a fact one row each, and a fact that holds only in one room is linked to that
   room as well.
-- **A person's sheet is rendered, never stored.** Their sheet is their live `fact` rows that are about no
-  room; their sheet in a room is those together with the live facts linked to them and to that room. The
-  rendering orders the facts by importance, highest first, and among equal importance newest first: by
-  `validFrom`, latest first, then by the moment last confirmed, latest first and a row never confirmed after
-  the confirmed ones, then by id, highest first. Each fact is one line carrying the row's id and the date it
-  holds from, and the rendering adds nothing that changes between calls, so the same rows give the same
-  bytes, as the persona's rendering does. The rendering is the whole sheet; a reader may ask for its first
-  lines alone, in the same order. A change to a sheet is a change to a fact: a new version, a closed row or a
-  new row.
+- **A person's sheet is rendered, never stored.** Their sheet is their live `name` and `fact` rows that are
+  about no room; their sheet in a room is those together with the live names and facts linked to them and to
+  that room. The rendering puts the names first, those linked to the room ahead of those about no room, and
+  the facts after them. Within each of those groups the rows go by importance, highest first, and among
+  equal importance newest first: by `validFrom`, latest first, then by the moment last confirmed, latest first
+  and a row never confirmed after the confirmed ones, then by id, highest first. A name is one line carrying
+  the row's id and the mark `name`, a fact one line carrying the row's id and the date it holds from, and the
+  rendering adds nothing that changes between calls, so the same rows give the same bytes, as the persona's
+  rendering does. The rendering is the whole sheet; a reader may ask for its head alone, every name and the
+  first facts, in the same order, so a head never leaves out what a person is called. A change to a sheet is
+  a change to a name or a fact: a new version, a closed row or a new row.
 - **A `sheet` row a store still holds live is split into facts** by the brain's own command
   (`docs/boundary-api.md`, 「Splitting sheets」): one fact per line of it, carrying its subjects, and the
   sheet row is then `done`.
