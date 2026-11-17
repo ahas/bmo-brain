@@ -1,8 +1,7 @@
 /target
 /package/node_modules
-.graph/*
-!.graph/settings.toml
 /client/node_modules
 /client/.nuxt
 /client/.output
 /client/tests/browser/host/node_modules
+.graph/
