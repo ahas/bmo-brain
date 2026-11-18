@@ -10,10 +10,10 @@ import type { Browser, Locator, Page, Route } from "playwright-core";
 // The brain's screen (docs/design.md, 「The screen」) driven in a real Chromium. The pointer's three carries, with
 // the mouse: a piece of the layer view carried to another place, a layer carried among the layers, and a piece
 // dropped on another layer, on the unfiled or on its own layer. And its selects, at a wide window and a phone's: a
-// list of more than seven choices opens with a search field, one of seven or fewer without. The screen stands alone
-// on the host under `host/`, and the brain's routes are answered by a stand-in holding one brain, which keeps every
-// write, so what the screen wrote is read back and the screen read again shows it. Skipped where the browser
-// playwright-core pins is not on the machine.
+// list of more than seven choices opens with a search field, on an edge of its trigger and inside the window, one of
+// seven or fewer without. The screen stands alone on the host under `host/`, and the brain's routes are answered by
+// a stand-in holding one brain, which keeps every write, so what the screen wrote is read back and the screen read
+// again shows it. Skipped where the browser playwright-core pins is not on the machine.
 
 function browserReady(): boolean {
   try {
@@ -289,6 +289,21 @@ async function openFilters(): Promise<void> {
   await chosen(WORDS.brain.label.status!).waitFor();
 }
 
+type Box = { x: number; y: number; width: number; height: number };
+
+/** The open list's box once its opening animation has ended: a list measured while it opens stands narrower. */
+async function openList(): Promise<Box> {
+  return page.getByRole("listbox").evaluate(async (element) => {
+    const content = element.closest("[data-slot='content']") ?? element;
+
+    await Promise.all(content.getAnimations({ subtree: true }).map((animation) => animation.finished));
+
+    const { x, y, width, height } = content.getBoundingClientRect();
+
+    return { x, y, width, height };
+  });
+}
+
 /** The mouse pressed on a row and moved off the press, so the browser starts carrying it. */
 async function pick(row: Locator): Promise<void> {
   const box = (await row.boundingBox())!;
@@ -317,14 +332,18 @@ describe.skipIf(!ready)("the brain's screen in a browser", () => {
     const port = freePort();
 
     origin = `http://127.0.0.1:${port}`;
-    // Run by Bun itself, in its own process group, so the host and everything it starts go down together; what it
-    // says is kept for the message of a start that fails. Nuxt's dev server locks its build folder, and a host a run
-    // killed from outside left alive still holds that lock while it serves nothing; the machine's turn runs one
-    // browser test at a time, so the host starts past the lock rather than refusing the run.
-    host = spawn(process.execPath, ["--bun", `${CLIENT}node_modules/.bin/nuxi`, "dev", HOST, "--host", "127.0.0.1", "--port", String(port)], {
+    // Run by Bun itself, in a process group of its own, so the host and everything it starts go down together; what
+    // it says is kept for the message of a start that fails. A shell stands at the group's head and ends the whole
+    // group once its input closes, which it does the moment this run ends however it ends, so a run killed from
+    // outside leaves no host behind. Nuxt's dev server locks its build folder, and a host an older run left alive
+    // still holds that lock while it serves nothing; the machine's turn runs one browser test at a time, so the host
+    // starts past the lock rather than refusing the run.
+    const nuxi = [process.execPath, "--bun", `${CLIENT}node_modules/.bin/nuxi`, "dev", HOST];
+
+    host = spawn("sh", ["-c", '"$@" & read -r _; kill 0', "sh", ...nuxi, "--host", "127.0.0.1", "--port", String(port)], {
       cwd: CLIENT,
       detached: true,
-      stdio: ["ignore", "pipe", "pipe"],
+      stdio: ["pipe", "pipe", "pipe"],
       env: { ...process.env, NUXT_TELEMETRY_DISABLED: "1", NUXT_IGNORE_LOCK: "1" }
     });
 
@@ -473,6 +492,17 @@ describe.skipIf(!ready)("the brain's screen in a browser", () => {
         await page.getByRole("option").first().waitFor();
         expect(await page.getByRole("option").count()).toBe(8);
         expect(await search.isVisible()).toBe(true);
+
+        // The list stands at least as wide as its trigger, on one of the trigger's edges, and inside the window.
+        const trigger = (await chosen(WORDS.brain.label.status!).boundingBox())!;
+        const list = await openList();
+        const onStart = Math.abs(list.x - trigger.x) < 1;
+        const onEnd = Math.abs(list.x + list.width - (trigger.x + trigger.width)) < 1;
+
+        expect(list.width).toBeGreaterThanOrEqual(trigger.width - 1);
+        expect(onStart || onEnd).toBe(true);
+        expect(list.x).toBeGreaterThanOrEqual(0);
+        expect(list.x + list.width).toBeLessThanOrEqual(viewport.width);
         await page.keyboard.press("Escape");
         await search.waitFor({ state: "hidden" });
 
