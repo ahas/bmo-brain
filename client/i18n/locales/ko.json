@@ -58,7 +58,7 @@
       "layer": "레이어",
       "lineage": "버전 이력",
       "name": "이름",
-      "position": "자리",
+      "position": "위치",
       "reason": "이유",
       "source": "출처",
       "status": "상태",
@@ -142,7 +142,7 @@
       "validFrom": "오래된 것 먼저",
       "desc_importance": "중요도 높은 순",
       "desc_useCount": "많이 쓴 순",
-      "position": "자리 순"
+      "position": "위치 순"
     },
     "status": {
       "confirmed": "확인을 기록했습니다.",

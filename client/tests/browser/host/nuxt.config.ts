@@ -7,6 +7,11 @@ const cache = fileURLToPath(new URL("../../../node_modules/.cache/brain-browser-
 
 export default defineNuxtConfig({
   extends: ["../../.."],
+  // The layer's `common.*` words the screen draws, which a console answers from its own pack and the bundle's
+  // words never hold: merged here into the screen's Korean, so a browser test reads the words a console shows.
+  i18n: {
+    locales: [{ code: "ko", language: "ko-KR", file: "ko.json" }]
+  },
   buildDir: `${cache}/nuxt`,
   vite: { cacheDir: `${cache}/vite` },
   devtools: { enabled: false },

@@ -547,7 +547,10 @@ console bundle contract and served by the brain itself (`docs/boundary-api.md`, 
   Every select carries a visible label naming what it chooses (the brain, the view, the status, the type, the
   order), and its value reads as words a person understands, with its count: the live memories, a status,
   every type but episodes, a type by its name. On a phone the view is chosen by a labelled select rather than a
-  row of marks.
+  row of marks. Every select on the screen, the toolbar's and the filters' as well as a memory's layer and a
+  teaching's layer and judgements, is bmo-ui's one value select (its `docs/components.md`, 「Choosing a
+  value」): a list of more than seven choices opens with a search field and one of seven or fewer without, by
+  the layer's rule and never the screen's.
 - **The index** stands on the left in three tabs, 레이어, 대상 and 유형 in the Korean pack, each with one line under
   the tab head saying what it lists and that choosing one narrows the view. The layers, in position order,
   each with its description and its count of live memories, the unfiled last; the subjects, grouped by type,

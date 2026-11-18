@@ -50,7 +50,7 @@
               <UInput v-model.number="draft.importance" type="number" :min="1" :max="10" class="w-full" />
             </UFormField>
             <UFormField :label="t('brain.field.layer')">
-              <USelect v-model="draft.layer" :items="layerItems" class="w-full" />
+              <ChoiceSelect v-model="draft.layer" :items="layerItems" value-key="value" class="w-full" />
             </UFormField>
             <UFormField :label="t('brain.field.position')">
               <UInput v-model.number="draft.position" type="number" class="w-full" />

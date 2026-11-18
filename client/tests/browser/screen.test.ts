@@ -7,12 +7,13 @@ import { chromium } from "playwright-core";
 import type { ChildProcess } from "node:child_process";
 import type { Browser, Locator, Page, Route } from "playwright-core";
 
-// The pointer's three carries on the brain's screen (docs/design.md, 「The screen」), driven with the mouse in a
-// real Chromium: a piece of the layer view carried to another place, a layer carried among the layers, and a piece
-// dropped on another layer, on the unfiled or on its own layer. The screen stands alone on the host under `host/`,
-// and the brain's routes are answered by a stand-in holding one brain, which keeps every write, so what the screen
-// wrote is read back and the screen read again shows it. Skipped where the browser playwright-core pins is not on
-// the machine.
+// The brain's screen (docs/design.md, 「The screen」) driven in a real Chromium. The pointer's three carries, with
+// the mouse: a piece of the layer view carried to another place, a layer carried among the layers, and a piece
+// dropped on another layer, on the unfiled or on its own layer. And its selects, at a wide window and a phone's: a
+// list of more than seven choices opens with a search field, one of seven or fewer without. The screen stands alone
+// on the host under `host/`, and the brain's routes are answered by a stand-in holding one brain, which keeps every
+// write, so what the screen wrote is read back and the screen read again shows it. Skipped where the browser
+// playwright-core pins is not on the machine.
 
 function browserReady(): boolean {
   try {
@@ -27,7 +28,11 @@ const CLIENT = new URL("../..", import.meta.url).pathname;
 const HOST = new URL("./host", import.meta.url).pathname;
 const RELAY = "/relay/brain";
 const WORDS = JSON.parse(readFileSync(new URL("../../i18n/locales/ko.json", import.meta.url), "utf8")) as {
-  brain: { title: Record<string, string> };
+  brain: { title: Record<string, string>; label: Record<string, string>; action: Record<string, string> };
+};
+// The layer's words the host answers beside the screen's own (`host/i18n/`).
+const COMMON = JSON.parse(readFileSync(new URL("./host/i18n/locales/ko.json", import.meta.url), "utf8")) as {
+  common: { placeholder: { search: string } };
 };
 
 // --- The stand-in brain ---
@@ -196,6 +201,10 @@ async function answer(route: Route): Promise<void> {
 
 // --- The host and the browser ---
 
+const WIDE = { width: 1400, height: 900 };
+// A phone's window, where the screen stands as it does on a phone.
+const NARROW = { width: 360, height: 780 };
+
 let host: ChildProcess | null = null;
 let origin = "";
 let browser: Browser;
@@ -269,6 +278,17 @@ async function ringed(row: Locator): Promise<boolean> {
   return row.evaluate((element) => getComputedStyle(element).boxShadow.includes("0px 0px 0px 1px inset"));
 }
 
+// A select of the screen, by the name its trigger, a button, carries.
+const chosen = (name: string) => page.getByRole("button", { name, exact: true });
+
+// The filters' popover opened, unless it already stands open.
+async function openFilters(): Promise<void> {
+  if (await chosen(WORDS.brain.label.status!).isVisible()) return;
+
+  await page.getByRole("button", { name: WORDS.brain.action.filters!, exact: true }).click();
+  await chosen(WORDS.brain.label.status!).waitFor();
+}
+
 /** The mouse pressed on a row and moved off the press, so the browser starts carrying it. */
 async function pick(row: Locator): Promise<void> {
   const box = (await row.boundingBox())!;
@@ -292,7 +312,7 @@ async function bring(row: Locator, at: "upper" | "middle"): Promise<void> {
   for (const x of [41, 40, 41, 40]) await page.mouse.move(box.x + x, y);
 }
 
-describe.skipIf(!ready)("the pointer carries pieces and layers on the brain's screen", () => {
+describe.skipIf(!ready)("the brain's screen in a browser", () => {
   beforeAll(async () => {
     const port = freePort();
 
@@ -316,7 +336,7 @@ describe.skipIf(!ready)("the pointer carries pieces and layers on the brain's sc
 
     browser = await chromium.launch();
 
-    const context = await browser.newContext({ viewport: { width: 1400, height: 900 } });
+    const context = await browser.newContext({ viewport: WIDE });
 
     await context.addCookies([{ name: "nuxt-color-mode", value: "light", url: origin }]);
     page = await context.newPage();
@@ -340,97 +360,126 @@ describe.skipIf(!ready)("the pointer carries pieces and layers on the brain's sc
     }
   });
 
-  beforeEach(seed);
+  describe("the pointer carries pieces and layers", () => {
+    beforeEach(seed);
 
-  test("a piece carried in the layer view lands where its line stood, and stands there read again", async () => {
-    await open("?layer=2");
-    expect(await shown()).toEqual(["lore one", "lore two", "lore three", "lore four"]);
+    test("a piece carried in the layer view lands where its line stood, and stands there read again", async () => {
+      await open("?layer=2");
+      expect(await shown()).toEqual(["lore one", "lore two", "lore three", "lore four"]);
 
-    await pick(piece("lore four"));
-    await bring(piece("lore two"), "upper");
-    expect(await settledLines("[data-piece]", ["", "before", "", ""])).toEqual(["", "before", "", ""]);
+      await pick(piece("lore four"));
+      await bring(piece("lore two"), "upper");
+      expect(await settledLines("[data-piece]", ["", "before", "", ""])).toEqual(["", "before", "", ""]);
 
-    // Over the index, the layer view marks no place of its own.
-    await bring(layerRow("notes"), "middle");
-    expect(await settledLines("[data-piece]", ["", "", "", ""])).toEqual(["", "", "", ""]);
+      // Over the index, the layer view marks no place of its own.
+      await bring(layerRow("notes"), "middle");
+      expect(await settledLines("[data-piece]", ["", "", "", ""])).toEqual(["", "", "", ""]);
 
-    await bring(piece("lore two"), "upper");
-    expect(await settledLines("[data-piece]", ["", "before", "", ""])).toEqual(["", "before", "", ""]);
-    await page.mouse.up();
-    await until(() => writes.length === 3, "the three writes");
-    expect(writes.every((write) => write.method === "POST" && write.path.endsWith("/versions"))).toBe(true);
+      await bring(piece("lore two"), "upper");
+      expect(await settledLines("[data-piece]", ["", "before", "", ""])).toEqual(["", "before", "", ""]);
+      await page.mouse.up();
+      await until(() => writes.length === 3, "the three writes");
+      expect(writes.every((write) => write.method === "POST" && write.path.endsWith("/versions"))).toBe(true);
 
-    await open("?layer=2");
-    expect(await shown()).toEqual(["lore one", "lore four", "lore two", "lore three"]);
-  }, 60_000);
+      await open("?layer=2");
+      expect(await shown()).toEqual(["lore one", "lore four", "lore two", "lore three"]);
+    }, 60_000);
 
-  test("a layer carried among the layers lands where its line stood, and stands there read again", async () => {
-    await open("?layer=2");
-    expect(await layerNames()).toEqual(["persona-core", "lore", "notes"]);
+    test("a layer carried among the layers lands where its line stood, and stands there read again", async () => {
+      await open("?layer=2");
+      expect(await layerNames()).toEqual(["persona-core", "lore", "notes"]);
 
-    await pick(layerRow("notes"));
-    await bring(layerRow("persona-core"), "upper");
-    expect(await settledLines("[data-layer]", ["before", "", ""])).toEqual(["before", "", ""]);
+      await pick(layerRow("notes"));
+      await bring(layerRow("persona-core"), "upper");
+      expect(await settledLines("[data-layer]", ["before", "", ""])).toEqual(["before", "", ""]);
 
-    await page.mouse.up();
-    await until(() => writes.length === 1, "the layer's write");
-    expect(writes[0]!.method).toBe("PATCH");
+      await page.mouse.up();
+      await until(() => writes.length === 1, "the layer's write");
+      expect(writes[0]!.method).toBe("PATCH");
 
-    await open("?layer=2");
-    expect(await layerNames()).toEqual(["notes", "persona-core", "lore"]);
-  }, 60_000);
+      await open("?layer=2");
+      expect(await layerNames()).toEqual(["notes", "persona-core", "lore"]);
+    }, 60_000);
 
-  test("a piece dropped on another layer moves there after its last piece, and on its own layer writes nothing", async () => {
-    await open("?layer=2");
+    test("a piece dropped on another layer moves there after its last piece, and on its own layer writes nothing", async () => {
+      await open("?layer=2");
 
-    await pick(piece("lore two"));
-    await bring(layerRow("lore"), "middle");
-    await page.mouse.up();
-    // The screen read again comes after anything the drop would have written.
-    await open("?layer=2");
-    expect(writes).toEqual([]);
+      await pick(piece("lore two"));
+      await bring(layerRow("lore"), "middle");
+      await page.mouse.up();
+      // The screen read again comes after anything the drop would have written.
+      await open("?layer=2");
+      expect(writes).toEqual([]);
 
-    await pick(piece("lore one"));
-    await bring(layerRow("notes"), "middle");
-    expect(await ringed(layerRow("notes"))).toBe(true);
-    expect(await settledLines("[data-piece]", ["", "", "", ""])).toEqual(["", "", "", ""]);
+      await pick(piece("lore one"));
+      await bring(layerRow("notes"), "middle");
+      expect(await ringed(layerRow("notes"))).toBe(true);
+      expect(await settledLines("[data-piece]", ["", "", "", ""])).toEqual(["", "", "", ""]);
 
-    await page.mouse.up();
-    await until(() => writes.length === 1, "the piece's write");
-    expect(writes[0]!.body).toMatchObject({ layerId: 3 });
-    expect(await ringed(layerRow("notes"))).toBe(false);
+      await page.mouse.up();
+      await until(() => writes.length === 1, "the piece's write");
+      expect(writes[0]!.body).toMatchObject({ layerId: 3 });
+      expect(await ringed(layerRow("notes"))).toBe(false);
 
-    await open("?layer=2");
-    expect(await shown()).toEqual(["lore two", "lore three", "lore four"]);
-    await open("?layer=3");
-    expect(await shown()).toEqual(["note one", "lore one"]);
-  }, 60_000);
+      await open("?layer=2");
+      expect(await shown()).toEqual(["lore two", "lore three", "lore four"]);
+      await open("?layer=3");
+      expect(await shown()).toEqual(["note one", "lore one"]);
+    }, 60_000);
 
-  test("a persona piece dropped on the unfiled is asked first, and moves only once the question is answered yes", async () => {
-    await open("?layer=1");
+    test("a persona piece dropped on the unfiled is asked first, and moves only once the question is answered yes", async () => {
+      await open("?layer=1");
 
-    const asked = page.getByRole("alertdialog").or(page.getByRole("dialog"));
+      const asked = page.getByRole("alertdialog").or(page.getByRole("dialog"));
 
-    await pick(piece("persona one"));
-    await bring(page.locator("[data-unfiled]"), "middle");
-    expect(await ringed(page.locator("[data-unfiled] button"))).toBe(true);
-    await page.mouse.up();
-    await asked.waitFor();
-    expect(await asked.innerText()).toContain(WORDS.brain.title.persona_save!);
-    await page.keyboard.press("Escape");
-    await asked.waitFor({ state: "hidden" });
-    await open("?layer=1");
-    expect(writes).toEqual([]);
+      await pick(piece("persona one"));
+      await bring(page.locator("[data-unfiled]"), "middle");
+      expect(await ringed(page.locator("[data-unfiled] button"))).toBe(true);
+      await page.mouse.up();
+      await asked.waitFor();
+      expect(await asked.innerText()).toContain(WORDS.brain.title.persona_save!);
+      await page.keyboard.press("Escape");
+      await asked.waitFor({ state: "hidden" });
+      await open("?layer=1");
+      expect(writes).toEqual([]);
 
-    await pick(piece("persona one"));
-    await bring(page.locator("[data-unfiled]"), "middle");
-    await page.mouse.up();
-    await asked.waitFor();
-    await asked.getByRole("button").last().click();
-    await until(() => writes.length === 1, "the persona piece's write");
-    expect(writes[0]!.body).toMatchObject({ layerId: null });
+      await pick(piece("persona one"));
+      await bring(page.locator("[data-unfiled]"), "middle");
+      await page.mouse.up();
+      await asked.waitFor();
+      await asked.getByRole("button").last().click();
+      await until(() => writes.length === 1, "the persona piece's write");
+      expect(writes[0]!.body).toMatchObject({ layerId: null });
 
-    await open("?layer=unfiled");
-    expect(await shown()).toEqual(["unfiled one", "persona one"]);
-  }, 60_000);
+      await open("?layer=unfiled");
+      expect(await shown()).toEqual(["unfiled one", "persona one"]);
+    }, 60_000);
+  });
+
+  describe("a value is chosen in the one select, which searches past seven choices", () => {
+    for (const viewport of [{ width: 1280, height: 800 }, NARROW]) {
+      test(`at ${viewport.width} wide, the status's eight choices open with a search field and the order's five without`, async () => {
+        await page.setViewportSize(viewport);
+        await page.goto(`${origin}/brain/1/list`, { waitUntil: "load" });
+        // A row the stand-in answered stands once the page has come alive and read the brain.
+        await page.getByText("unfiled one").first().waitFor();
+
+        const search = page.getByPlaceholder(COMMON.common.placeholder.search, { exact: true });
+
+        await openFilters();
+        await chosen(WORDS.brain.label.status!).click();
+        await page.getByRole("option").first().waitFor();
+        expect(await page.getByRole("option").count()).toBe(8);
+        expect(await search.isVisible()).toBe(true);
+        await page.keyboard.press("Escape");
+        await search.waitFor({ state: "hidden" });
+
+        await openFilters();
+        await chosen(WORDS.brain.label.order!).click();
+        await page.getByRole("option").first().waitFor();
+        expect(await page.getByRole("option").count()).toBe(5);
+        expect(await search.count()).toBe(0);
+      }, 60_000);
+    }
+  });
 });

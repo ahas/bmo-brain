@@ -20,7 +20,7 @@
         <ToolBar ref="toolbar" :label="t('brain.label.toolbar')">
           <div v-if="!narrow">
             <span class="text-muted">{{ t("brain.label.brain") }}</span>
-            <USelect v-bind="brainSelect" size="sm" variant="ghost" class="min-w-20" />
+            <ChoiceSelect v-bind="brainSelect" size="sm" variant="ghost" class="min-w-20" />
           </div>
           <div v-if="narrow">
             <UTooltip :text="t('brain.action.index')">
@@ -29,10 +29,11 @@
           </div>
           <div>
             <span class="text-muted">{{ t("brain.label.view") }}</span>
-            <USelect
+            <ChoiceSelect
               size="sm"
               :model-value="place.view"
               :items="viewItems"
+              value-key="value"
               :icon="viewItems.find((item) => item.value === place.view)?.icon"
               :aria-label="t('brain.label.view')"
               variant="ghost"
@@ -56,9 +57,10 @@
                     <UInput v-bind="wordsInput" icon="i-material-symbols-search" class="w-full" />
                   </UFormField>
                   <UFormField :label="t('brain.label.status')" :help="unhonoured('status')">
-                    <USelect
+                    <ChoiceSelect
                       :model-value="place.status"
                       :items="statusItems"
+                      value-key="value"
                       :aria-label="t('brain.label.status')"
                       :disabled="!honours(place.view, 'status')"
                       class="w-full"
@@ -66,9 +68,10 @@
                     />
                   </UFormField>
                   <UFormField :label="t('brain.label.type')" :help="unhonoured('type')">
-                    <USelect
+                    <ChoiceSelect
                       :model-value="place.type"
                       :items="typeItems"
+                      value-key="value"
                       :aria-label="t('brain.label.type')"
                       :disabled="!honours(place.view, 'type')"
                       class="w-full"
@@ -76,9 +79,10 @@
                     />
                   </UFormField>
                   <UFormField :label="t('brain.label.order')" :help="unhonoured('order')">
-                    <USelect
+                    <ChoiceSelect
                       :model-value="orderOf(place) as Order"
                       :items="orderItems"
+                      value-key="value"
                       :aria-label="t('brain.label.order')"
                       :disabled="!honours(place.view, 'order')"
                       class="w-full"
@@ -115,7 +119,7 @@
           <UDrawer v-model:open="indexOpen" :title="t('brain.action.index')" :ui="FULL_SHEET">
             <template #body>
               <UFormField :label="t('brain.label.brain')" class="px-3 pb-3">
-                <USelect v-bind="brainSelect" class="w-full" />
+                <ChoiceSelect v-bind="brainSelect" class="w-full" />
               </UFormField>
               <BrainIndex v-bind="indexProps" @choose="indexOpen = false; choose($event)" @changed="reread" />
             </template>
@@ -337,6 +341,7 @@ const brainItems = computed(() =>
 const brainSelect = computed(() => ({
   modelValue: place.value.brainId ?? undefined,
   items: brainItems.value,
+  valueKey: "value",
   placeholder: t("brain.label.brain"),
   "aria-label": t("brain.label.brain"),
   "onUpdate:modelValue": (brainId: unknown) => chooseBrain(Number(brainId))

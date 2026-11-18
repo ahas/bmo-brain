@@ -27,7 +27,7 @@
         </UFormField>
         <div v-else class="grid grid-cols-2 gap-3">
           <UFormField :label="t('brain.field.layer')">
-            <USelect v-model="layer" :items="layerItems" class="w-full" />
+            <ChoiceSelect v-model="layer" :items="layerItems" value-key="value" class="w-full" />
           </UFormField>
           <UFormField :label="t('brain.field.position')" :hint="t('brain.hint.position')">
             <UInput v-model="position" type="number" class="w-full" />
@@ -42,7 +42,7 @@
           <ul v-if="candidates !== null && candidates.length > 0" class="flex flex-col divide-y divide-default rounded-md border border-default">
             <li v-for="candidate in candidates" :key="candidate.id" class="flex flex-col gap-2 p-2">
               <p class="text-sm">{{ reader.shown(candidate.text) }} <span class="text-sm text-muted">#{{ candidate.id }} · {{ typeName(t, te, candidate.type) }}</span></p>
-              <USelect v-model="judged[candidate.id]" :items="judgements" size="xs" class="w-48" />
+              <ChoiceSelect v-model="judged[candidate.id]" :items="judgements" value-key="value" size="xs" class="w-48" />
             </li>
           </ul>
         </template>

@@ -52,5 +52,5 @@ test("the status, the type and the order stand behind the filters button, and a 
   const drawer = page.slice(page.indexOf("<UDrawer"), page.indexOf("</UDrawer>"));
 
   for (const choice of ["status", "type", "order"]) expect(filters).toContain(`t('brain.label.${choice}')`);
-  expect(drawer).toContain('<USelect v-bind="brainSelect"');
+  expect(drawer).toContain('<ChoiceSelect v-bind="brainSelect"');
 });
