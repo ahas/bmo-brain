@@ -318,12 +318,14 @@ describe.skipIf(!ready)("the brain's screen in a browser", () => {
 
     origin = `http://127.0.0.1:${port}`;
     // Run by Bun itself, in its own process group, so the host and everything it starts go down together; what it
-    // says is kept for the message of a start that fails.
+    // says is kept for the message of a start that fails. Nuxt's dev server locks its build folder, and a host a run
+    // killed from outside left alive still holds that lock while it serves nothing; the machine's turn runs one
+    // browser test at a time, so the host starts past the lock rather than refusing the run.
     host = spawn(process.execPath, ["--bun", `${CLIENT}node_modules/.bin/nuxi`, "dev", HOST, "--host", "127.0.0.1", "--port", String(port)], {
       cwd: CLIENT,
       detached: true,
       stdio: ["ignore", "pipe", "pipe"],
-      env: { ...process.env, NUXT_TELEMETRY_DISABLED: "1" }
+      env: { ...process.env, NUXT_TELEMETRY_DISABLED: "1", NUXT_IGNORE_LOCK: "1" }
     });
 
     let said = "";
