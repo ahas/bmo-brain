@@ -73,6 +73,7 @@ async fn a_run_working_for_a_chat_agent_reads_and_writes_that_agents_brain() {
       account_key: "account-a".to_owned(),
       agent_key: "agent-a".to_owned(),
       name: None,
+      kind: None,
     })
     .await
     .unwrap();
@@ -184,6 +185,7 @@ async fn the_executable_writes_an_episode_and_a_learning_into_the_agents_brain()
       account_key: "account-a".to_owned(),
       agent_key: "agent-a".to_owned(),
       name: None,
+      kind: None,
     })
     .await
     .unwrap();

@@ -7,9 +7,10 @@ use serde::de::DeserializeOwned;
 use crate::brains::{
   Brain, BrainsQuery, Confirmations, Consolidated, ConsolidationState, ExportQuery, Fold, Folded, Hits,
   Injected, Layer, LayerChange, LayersQuery, Learned, Learning, MemoriesQuery, Memory, MemoryMerge,
-  MemoryMove, MemoryVersion, MissesQuery, NewBrain, NewLayer, NewMemory, NewSubject, PersonaQuery, Recall,
-  RecallAsk, Recorded, Restoration, SearchMiss, SheetQuery, SimilarAsk, Subject, SubjectChange,
-  SubjectsQuery, TalliesQuery, Tally, TypeCount, UnconsolidatedEpisode, UnconsolidatedQuery,
+  MemoryMove, MemoryVersion, MissesQuery, NewBrain, NewLayer, NewMemory, NewSubject, OrgTopic,
+  OrgTopicsQuery, PersonaQuery, Recall, RecallAsk, Recorded, Restoration, SearchMiss, SheetQuery,
+  SimilarAsk, Subject, SubjectChange, SubjectsQuery, TalliesQuery, Tally, TypeCount, UnconsolidatedEpisode,
+  UnconsolidatedQuery,
 };
 use crate::wire::{Event, EventsQuery, Health, Page, WireError};
 
@@ -150,6 +151,11 @@ impl BrainClient {
   /// `POST /brains`
   pub async fn brain_add(&self, body: &NewBrain) -> Answer<Brain> {
     Self::answered(self.send(Method::POST, &["brains"], body)).await
+  }
+
+  /// `GET /org-topics`
+  pub async fn org_topics(&self, query: &OrgTopicsQuery) -> Answer<Vec<OrgTopic>> {
+    Self::answered(self.get(&["org-topics"], query)).await
   }
 
   /// `GET /brains/{brainId}`

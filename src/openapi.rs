@@ -8,8 +8,8 @@ use std::collections::BTreeMap;
 use bmo_brain_client::{
   Brain, BrainsQuery, Confirmations, ErrorCode, Event, EventsQuery, ExportQuery, Fold, Folded, Health,
   Hits, Injected, Layer, LayerChange, LayersQuery, MemoriesQuery, Memory, MemoryMerge, MemoryMove,
-  MemoryVersion, NewBrain, NewLayer, NewMemory, NewSubject, Page, PersonaQuery, Recall, RecallAsk,
-  Recorded, SheetQuery, Subject, SubjectChange, SubjectsQuery, TypeCount, WireError,
+  MemoryVersion, NewBrain, NewLayer, NewMemory, NewSubject, OrgTopic, OrgTopicsQuery, Page, PersonaQuery,
+  Recall, RecallAsk, Recorded, SheetQuery, Subject, SubjectChange, SubjectsQuery, TypeCount, WireError,
 };
 use bmo_brain_client::{
   ConsoleManifest, ConsoleWords, Consolidated, ConsolidationState, Learned, Learning, MissesQuery,
@@ -210,7 +210,7 @@ fn brain_routes(g: &mut SchemaGenerator) -> Vec<Route> {
       path: "/brains",
       id: "listBrains",
       tag: "brains",
-      summary: "The brains, by account and agent.",
+      summary: "The brains, by kind, account and agent.",
       parameters: query::<BrainsQuery>(g),
       body: None,
       raw_body: None,
@@ -222,12 +222,25 @@ fn brain_routes(g: &mut SchemaGenerator) -> Vec<Route> {
       path: "/brains",
       id: "createBrain",
       tag: "brains",
-      summary: "Make a brain for an account and an agent that have none.",
+      summary: "Make a brain, an agent's or an org unit's, at a pair of keys where none stands.",
       parameters: vec![],
       body: body::<NewBrain>(g),
       raw_body: None,
       answers: vec![(201, json_answer::<Brain>(g))],
       codes: vec![BadRequest, Conflict],
+    },
+    Route {
+      method: "get",
+      path: "/org-topics",
+      id: "listOrgTopics",
+      tag: "brains",
+      summary: "What stands for a member of an organisation: each topic the org brains of the member's units hold, \
+        answered from the farthest unit holding it locked, else the nearest holding it.",
+      parameters: query::<OrgTopicsQuery>(g),
+      body: None,
+      raw_body: None,
+      answers: vec![(200, json_answer::<Vec<OrgTopic>>(g))],
+      codes: vec![BadRequest, NotFound],
     },
     Route {
       method: "get",

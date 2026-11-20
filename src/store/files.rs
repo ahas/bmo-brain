@@ -8,13 +8,17 @@ use rusqlite::{Connection, params};
 use sqlx::types::Json;
 
 use super::brains::{brain_of, subject_found_or_made};
+use super::orgs::Marks;
 use super::versions::{MEMORY_COLUMNS, MemoryRow, link_subjects};
 use super::{Fault, Held, Store, now, publish};
 
 /// The version of the file's shape, written in every file and checked on every read; a shape-1 file holds no
-/// memory condition, its rows carrying none, and a file of shape 1 or 2 holds a storage strength, which is not
-/// read.
-pub const SHAPE: i64 = 3;
+/// memory condition, its rows carrying none, a file of shape 1 or 2 holds a storage strength, which is not
+/// read, and a file of shape 1 to 3 holds no org memory's marks.
+pub const SHAPE: i64 = 4;
+
+/// The first shape holding an org memory's marks.
+const MARKED_SHAPE: i64 = 4;
 
 /// The oldest shape this brain still reads.
 const OLDEST_SHAPE: i64 = 1;
@@ -27,7 +31,8 @@ CREATE TABLE memories (id INTEGER PRIMARY KEY, key TEXT, type TEXT NOT NULL, tex
   position INTEGER NOT NULL, status TEXT NOT NULL, lineage_id INTEGER NOT NULL, superseded_by INTEGER, \
   valid_from INTEGER NOT NULL, valid_to INTEGER, importance INTEGER NOT NULL, hits INTEGER NOT NULL, \
   last_hit_at INTEGER, last_confirmed_at INTEGER, actor_name TEXT NOT NULL, \
-  labels TEXT NOT NULL, recall_condition TEXT, release_condition TEXT, created_at INTEGER NOT NULL);
+  labels TEXT NOT NULL, recall_condition TEXT, release_condition TEXT, created_at INTEGER NOT NULL, \
+  locked INTEGER NOT NULL, internal_only INTEGER NOT NULL);
 CREATE TABLE memory_subjects (memory_id INTEGER NOT NULL, subject_id INTEGER NOT NULL, PRIMARY KEY (memory_id, subject_id));
 ";
 
@@ -60,6 +65,8 @@ struct FileMemory {
   labels: Labels,
   recall_condition: Option<String>,
   release_condition: Option<String>,
+  /// The marks, where the file's shape holds them.
+  marks: Option<Marks>,
   subject_ids: Vec<i64>,
 }
 
@@ -153,8 +160,9 @@ impl Store {
             .execute(
               "INSERT INTO memories (id, key, type, text, layer_id, position, status, lineage_id, superseded_by, \
                valid_from, valid_to, importance, hits, last_hit_at, last_confirmed_at, actor_name, labels, \
-               recall_condition, release_condition, created_at) \
-               VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20)",
+               recall_condition, release_condition, created_at, locked, internal_only) \
+               VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, \
+               ?21, ?22)",
               params![
                 row.id,
                 row.key,
@@ -175,7 +183,9 @@ impl Store {
                 labels,
                 row.recall_condition,
                 row.release_condition,
-                row.created_at
+                row.created_at,
+                row.locked,
+                row.internal_only
               ],
             )
             .map_err(failed)?;
@@ -242,10 +252,11 @@ impl Store {
           })
           .map_err(failed)?;
         let conditions = if shape >= 2 { "recall_condition, release_condition" } else { "NULL, NULL" };
+        let marks = if shape >= MARKED_SHAPE { "locked, internal_only" } else { "NULL, NULL" };
         let memories = file
           .prepare(&format!(
             "SELECT id, key, type, text, layer_id, position, status, valid_from, importance, actor_name, labels, \
-             {conditions} FROM memories WHERE status IN ('active', 'pending') ORDER BY id"
+             {conditions}, {marks} FROM memories WHERE status IN ('active', 'pending') ORDER BY id"
           ))
           .and_then(|mut s| {
             s.query_map([], |r| {
@@ -264,6 +275,10 @@ impl Store {
                 labels: serde_json::from_str(&labels).unwrap_or_default(),
                 recall_condition: r.get(11)?,
                 release_condition: r.get(12)?,
+                marks: match (r.get::<_, Option<bool>>(13)?, r.get::<_, Option<bool>>(14)?) {
+                  (Some(locked), Some(internal_only)) => Some(Marks { locked, internal_only }),
+                  _ => None,
+                },
                 subject_ids: vec![],
               })
             })?
@@ -297,7 +312,7 @@ impl Store {
 
     let at = now();
     let mut tx = self.begin().await?;
-    brain_of(&mut tx, brain_id).await?;
+    let brain = brain_of(&mut tx, brain_id).await?;
     let mut injected = Injected {
       subjects_added: 0,
       layers_added: 0,
@@ -352,6 +367,7 @@ impl Store {
       let subject_ids: Vec<i64> =
         memory.subject_ids.iter().filter_map(|id| subject_map.get(id).copied()).collect();
       let labels = Json(&memory.labels);
+      let marks = Marks::injected(brain.kind, memory.marks);
       let holder: Option<MemoryRow> = match &memory.key {
         Some(key) => {
           sqlx::query_as(&format!(
@@ -371,6 +387,7 @@ impl Store {
             && old.layer_id == layer_id
             && old.recall_condition == memory.recall_condition
             && old.release_condition == memory.release_condition
+            && Marks::of(&old) == marks
           {
             continue;
           }
@@ -382,9 +399,9 @@ impl Store {
           let new_id: i64 = sqlx::query_scalar(
             "INSERT INTO memories (brain_id, key, type, text, layer_id, position, status, lineage_id, valid_from, \
              recall_condition, release_condition, importance, hits, hit_times, last_hit_at, last_confirmed_at, \
-             actor_name, labels, created_at) \
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19) \
-             RETURNING id",
+             actor_name, labels, created_at, locked, internal_only) \
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, \
+             $21) RETURNING id",
           )
           .bind(brain_id)
           .bind(&old.key)
@@ -405,6 +422,8 @@ impl Store {
           .bind(&memory.actor_name)
           .bind(labels)
           .bind(at)
+          .bind(marks.locked)
+          .bind(marks.internal_only)
           .fetch_one(&mut *tx)
           .await?;
           sqlx::query("UPDATE memories SET superseded_by = $2, superseded_at = $3 WHERE id = $1")
@@ -419,8 +438,8 @@ impl Store {
         None => {
           let id: i64 = sqlx::query_scalar(
             "INSERT INTO memories (brain_id, key, type, text, layer_id, position, status, lineage_id, valid_from, \
-             recall_condition, release_condition, importance, actor_name, labels, created_at) \
-             VALUES ($1, $2, $3, $4, $5, $6, $7, 0, $8, $9, $10, $11, $12, $13, $14) RETURNING id",
+             recall_condition, release_condition, importance, actor_name, labels, created_at, locked, internal_only) \
+             VALUES ($1, $2, $3, $4, $5, $6, $7, 0, $8, $9, $10, $11, $12, $13, $14, $15, $16) RETURNING id",
           )
           .bind(brain_id)
           .bind(&memory.key)
@@ -436,6 +455,8 @@ impl Store {
           .bind(&memory.actor_name)
           .bind(labels)
           .bind(at)
+          .bind(marks.locked)
+          .bind(marks.internal_only)
           .fetch_one(&mut *tx)
           .await?;
           sqlx::query("UPDATE memories SET lineage_id = id WHERE id = $1")

@@ -11,6 +11,7 @@ mod learning;
 mod mcp;
 mod misses;
 mod openapi;
+mod orgs;
 mod recall;
 mod repository;
 mod screen;

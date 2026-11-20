@@ -82,6 +82,7 @@ impl From<Fault> for ApiError {
   fn from(fault: Fault) -> Self {
     let code = match &fault {
       Fault::BadRequest(_) => ErrorCode::BadRequest,
+      Fault::Forbidden(_) => ErrorCode::Forbidden,
       Fault::NotFound(_) => ErrorCode::NotFound,
       Fault::Conflict(_) => ErrorCode::Conflict,
       Fault::Gone(_) => ErrorCode::Gone,

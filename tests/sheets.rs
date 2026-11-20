@@ -39,6 +39,9 @@ fn memory(kind: &str, text: &str) -> NewMemory {
     status: None,
     actor_name: "writer-a".to_owned(),
     labels: labels(&[]),
+    internal_only: None,
+    locked: None,
+    standing: None,
   }
 }
 
@@ -48,6 +51,7 @@ async fn brain_of(client: &BrainClient, agent: &str) -> i64 {
       account_key: "account-a".to_owned(),
       agent_key: agent.to_owned(),
       name: None,
+      kind: None,
     })
     .await
     .unwrap()
@@ -194,6 +198,7 @@ async fn a_sheet_renders_the_live_facts_in_a_fixed_order_and_the_same_bytes_twic
         actor_name: "writer-a".to_owned(),
         reason: None,
         text: None,
+        standing: None,
       },
     )
     .await
@@ -491,6 +496,9 @@ async fn no_write_takes_the_type_sheet() {
     layer_id: None,
     actor_name: "writer-a".to_owned(),
     labels: labels(&[]),
+    internal_only: None,
+    locked: None,
+    standing: None,
   };
   assert_eq!(refused(client.learn(brain, &learned).await), bad);
 
@@ -515,6 +523,7 @@ async fn no_write_takes_the_type_sheet() {
         actor_name: "writer-a".to_owned(),
         reason: None,
         text: None,
+        standing: None,
       },
     )
     .await
@@ -522,6 +531,7 @@ async fn no_write_takes_the_type_sheet() {
   let restored = Restoration {
     text: None,
     actor_name: "writer-a".to_owned(),
+    standing: None,
   };
   assert_eq!(
     refused(client.memory_restore(brain, sheet, &restored).await),
@@ -555,6 +565,9 @@ async fn a_learning_is_dated_where_it_names_when_it_began() {
         layer_id: None,
         actor_name: "writer-a".to_owned(),
         labels: labels(&[]),
+        internal_only: None,
+        locked: None,
+        standing: None,
       },
     )
     .await

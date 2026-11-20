@@ -83,8 +83,23 @@
       }
     },
     "schemas": {
+      "Audience": {
+        "description": "Whom a reading of an org brain is for.",
+        "oneOf": [
+          {
+            "const": "internal",
+            "description": "A room where everyone is of the company.",
+            "type": "string"
+          },
+          {
+            "const": "external",
+            "description": "A room where someone outside the company sits: the internal-only memories are left out.",
+            "type": "string"
+          }
+        ]
+      },
       "Brain": {
-        "description": "One agent's long-term memory, keyed by the account that owns it and the agent it belongs to.",
+        "description": "A brain: one agent's long-term memory, keyed by the account that owns it and the agent it belongs to, or\none unit's of an organisation, keyed by the company and the unit.",
         "properties": {
           "accountKey": {
             "description": "The account's opaque key, as the caller gives it.",
@@ -102,18 +117,39 @@
             "format": "int64",
             "type": "integer"
           },
+          "kind": {
+            "$ref": "#/components/schemas/BrainKind",
+            "default": "agent",
+            "description": "Whose it is; set when it is made and never changed. An answer that names none is an agent's brain."
+          },
           "name": {
             "type": "string"
           }
         },
         "required": [
           "id",
+          "kind",
           "accountKey",
           "agentKey",
           "name",
           "createdAt"
         ],
         "type": "object"
+      },
+      "BrainKind": {
+        "description": "Whose a brain is: an agent's, or a unit's of an organisation (docs/design.md, 「Org brains」).",
+        "oneOf": [
+          {
+            "const": "agent",
+            "description": "One agent's, keyed by the account that owns it and the agent's key.",
+            "type": "string"
+          },
+          {
+            "const": "org",
+            "description": "One unit's of an organisation, keyed by the company as its account and the unit as its agent.",
+            "type": "string"
+          }
+        ]
       },
       "BrainPage": {
         "description": "One page of a list, oldest first.",
@@ -728,6 +764,13 @@
               "null"
             ]
           },
+          "internalOnly": {
+            "description": "In an org brain, whether it is kept from a room where someone outside the company sits; true where none\nis given.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "key": {
             "type": [
               "string",
@@ -745,6 +788,13 @@
             "format": "int64",
             "type": [
               "integer",
+              "null"
+            ]
+          },
+          "locked": {
+            "description": "In an org brain, whether no lower unit overrides its topic; false where none is given.",
+            "type": [
+              "boolean",
               "null"
             ]
           },
@@ -773,6 +823,17 @@
           },
           "source": {
             "$ref": "#/components/schemas/Source"
+          },
+          "standing": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Standing"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Who writes into an org brain; `member` where none is given."
           },
           "strengthens": {
             "description": "The live memory this says more fully: a new version of it is written.",
@@ -848,6 +909,11 @@
             "format": "int64",
             "type": "integer"
           },
+          "internalOnly": {
+            "default": false,
+            "description": "In an org brain, whether it is kept from a room where someone outside the company sits; false in an\nagent's brain.",
+            "type": "boolean"
+          },
           "key": {
             "description": "The caller's identifier, unique among the live rows of a brain.",
             "type": [
@@ -887,6 +953,11 @@
             "description": "The first version's id in this row's line.",
             "format": "int64",
             "type": "integer"
+          },
+          "locked": {
+            "default": false,
+            "description": "In an org brain, whether no lower unit overrides its topic; false in an agent's brain.",
+            "type": "boolean"
           },
           "position": {
             "description": "Where it stands within its layer.",
@@ -1001,6 +1072,8 @@
           "actorName",
           "reason",
           "labels",
+          "locked",
+          "internalOnly",
           "createdAt"
         ],
         "type": "object"
@@ -1015,6 +1088,13 @@
             "format": "int64",
             "type": [
               "integer",
+              "null"
+            ]
+          },
+          "internalOnly": {
+            "description": "In an org brain, whether it is kept from a room where someone outside the company sits; set where any\nmerged row carries it, where not given.",
+            "type": [
+              "boolean",
               "null"
             ]
           },
@@ -1037,6 +1117,13 @@
             "format": "int64",
             "type": [
               "integer",
+              "null"
+            ]
+          },
+          "locked": {
+            "description": "In an org brain, whether no lower unit overrides its topic; set where any merged row carries it, where\nnot given.",
+            "type": [
+              "boolean",
               "null"
             ]
           },
@@ -1068,6 +1155,17 @@
               "string",
               "null"
             ]
+          },
+          "standing": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Standing"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Who writes into an org brain; `member` where none is given."
           },
           "subjectIds": {
             "items": {
@@ -1131,6 +1229,17 @@
               "string",
               "null"
             ]
+          },
+          "standing": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Standing"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Who writes into an org brain; `member` where none is given."
           },
           "status": {
             "$ref": "#/components/schemas/MemoryStatus"
@@ -1217,6 +1326,13 @@
               "null"
             ]
           },
+          "internalOnly": {
+            "description": "In an org brain, whether it is kept from a room where someone outside the company sits; the old\nversion's where not given.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "labels": {
             "additionalProperties": {
               "type": "string"
@@ -1231,6 +1347,13 @@
             "format": "int64",
             "type": [
               "integer",
+              "null"
+            ]
+          },
+          "locked": {
+            "description": "In an org brain, whether no lower unit overrides its topic; the old version's where not given.",
+            "type": [
+              "boolean",
               "null"
             ]
           },
@@ -1255,6 +1378,17 @@
               "string",
               "null"
             ]
+          },
+          "standing": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Standing"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Who writes into an org brain; `member` where none is given."
           },
           "subjectIds": {
             "description": "The subjects the new version is about, replacing the old version's whole where given.",
@@ -1311,6 +1445,17 @@
           "agentKey": {
             "type": "string"
           },
+          "kind": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BrainKind"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "`agent` where none is given."
+          },
           "name": {
             "description": "The agent's key where none is given.",
             "type": [
@@ -1364,6 +1509,13 @@
               "null"
             ]
           },
+          "internalOnly": {
+            "description": "In an org brain, whether it is kept from a room where someone outside the company sits; true where none\nis given.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "key": {
             "type": [
               "string",
@@ -1381,6 +1533,13 @@
             "format": "int64",
             "type": [
               "integer",
+              "null"
+            ]
+          },
+          "locked": {
+            "description": "In an org brain, whether no lower unit overrides its topic; false where none is given.",
+            "type": [
+              "boolean",
               "null"
             ]
           },
@@ -1404,6 +1563,17 @@
               "string",
               "null"
             ]
+          },
+          "standing": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Standing"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Who writes into an org brain; `member` where none is given."
           },
           "status": {
             "anyOf": [
@@ -1476,6 +1646,38 @@
           "type",
           "key",
           "description"
+        ],
+        "type": "object"
+      },
+      "OrgTopic": {
+        "description": "One topic as it stands for a member: the memories of the one unit whose word on it holds.",
+        "properties": {
+          "brainId": {
+            "description": "The brain whose memories stand for it: the first named holding a locked one, else the last holding one.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "locked": {
+            "description": "Whether that brain's memories of it are locked.",
+            "type": "boolean"
+          },
+          "memories": {
+            "description": "Those memories, by importance, highest first, then latest first.",
+            "items": {
+              "$ref": "#/components/schemas/Memory"
+            },
+            "type": "array"
+          },
+          "topic": {
+            "description": "The key of the subject of type `topic`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "topic",
+          "brainId",
+          "locked",
+          "memories"
         ],
         "type": "object"
       },
@@ -1694,6 +1896,17 @@
         "properties": {
           "actorName": {
             "type": "string"
+          },
+          "standing": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Standing"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Who writes into an org brain; `member` where none is given."
           },
           "text": {
             "description": "The closed row's text where none is given.",
@@ -1990,6 +2203,21 @@
           }
         ]
       },
+      "Standing": {
+        "description": "Who writes into an org brain, as the caller checked it with the service that keeps the organisation.",
+        "oneOf": [
+          {
+            "const": "member",
+            "description": "A member of the unit: a first version or a learning is a proposal, and nothing else is taken.",
+            "type": "string"
+          },
+          {
+            "const": "head",
+            "description": "A head of the unit, or a holder of its grant to write org memory.",
+            "type": "string"
+          }
+        ]
+      },
       "Subject": {
         "description": "Something a memory can be about, found by its type and key alone.",
         "properties": {
@@ -2222,6 +2450,11 @@
             "format": "int64",
             "type": "integer"
           },
+          "internalOnly": {
+            "default": false,
+            "description": "In an org brain, whether it is kept from a room where someone outside the company sits; false in an\nagent's brain.",
+            "type": "boolean"
+          },
           "key": {
             "description": "The caller's identifier, unique among the live rows of a brain.",
             "type": [
@@ -2261,6 +2494,11 @@
             "description": "The first version's id in this row's line.",
             "format": "int64",
             "type": "integer"
+          },
+          "locked": {
+            "default": false,
+            "description": "In an org brain, whether no lower unit overrides its topic; false in an agent's brain.",
+            "type": "boolean"
           },
           "need": {
             "description": "The sum over its subjects of ln(1 + the use of the live rows about that subject).",
@@ -2393,6 +2631,8 @@
           "actorName",
           "reason",
           "labels",
+          "locked",
+          "internalOnly",
           "createdAt",
           "priority",
           "gain",
@@ -2431,7 +2671,7 @@
   "info": {
     "description": "An agent's long-term memory as a service. The service keeps many brains, each an account's and one agent's: subjects (what a memory is about, found by type and key), layers (the table of contents) and memories, one row a version, superseded and invalidated but never deleted. A turn asks recall for a block under a token budget; a persona is rendered as the same bytes until a piece changes; a brain moves in and out as a brain file. Nothing is held outside a brain. Bodies are JSON with camelCase keys, times are epoch milliseconds, lists are pages of items and more, and every failure is the error shape with its status. The harness plugin's tools, each a thin call of one route, are stated under x-tools.",
     "title": "bmo-brain",
-    "version": "0.1.0-rev.40"
+    "version": "0.1.0-rev.41"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -2475,6 +2715,21 @@
           },
           {
             "in": "query",
+            "name": "kind",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/BrainKind"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          {
+            "in": "query",
             "name": "limit",
             "required": false,
             "schema": {
@@ -2507,7 +2762,7 @@
             "$ref": "#/components/responses/Forbidden"
           }
         },
-        "summary": "The brains, by account and agent.",
+        "summary": "The brains, by kind, account and agent.",
         "tags": [
           "brains"
         ],
@@ -2554,7 +2809,7 @@
             "$ref": "#/components/responses/Conflict"
           }
         },
-        "summary": "Make a brain for an account and an agent that have none.",
+        "summary": "Make a brain, an agent's or an org unit's, at a pair of keys where none stands.",
         "tags": [
           "brains"
         ],
@@ -5498,6 +5753,78 @@
         ],
         "x-console": "closed"
       }
+    },
+    "/org-topics": {
+      "get": {
+        "operationId": "listOrgTopics",
+        "parameters": [
+          {
+            "description": "`internal` where none is given.",
+            "in": "query",
+            "name": "audience",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/Audience"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`internal` where none is given."
+            }
+          },
+          {
+            "description": "The org brains' ids, comma-separated, the farthest unit first: one to fifty, none twice.",
+            "in": "query",
+            "name": "brainIds",
+            "required": true,
+            "schema": {
+              "description": "The org brains' ids, comma-separated, the farthest unit first: one to fifty, none twice.",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/OrgTopic"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "summary": "What stands for a member of an organisation: each topic the org brains of the member's units hold, answered from the farthest unit holding it locked, else the nearest holding it.",
+        "tags": [
+          "brains"
+        ],
+        "x-codes": [
+          "bad-request",
+          "unauthorized",
+          "forbidden",
+          "not-found"
+        ],
+        "x-console": "closed"
+      }
     }
   },
   "security": [
@@ -5589,6 +5916,16 @@
               "null"
             ]
           },
+          "kind": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BrainKind"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "limit": {
             "format": "int64",
             "type": [
@@ -5615,6 +5952,17 @@
           },
           "agentKey": {
             "type": "string"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BrainKind"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "`agent` where none is given."
           },
           "name": {
             "description": "The agent's key where none is given.",
@@ -5971,6 +6319,13 @@
               "null"
             ]
           },
+          "internalOnly": {
+            "description": "In an org brain, whether it is kept from a room where someone outside the company sits; true where none\nis given.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "key": {
             "type": [
               "string",
@@ -5988,6 +6343,13 @@
             "format": "int64",
             "type": [
               "integer",
+              "null"
+            ]
+          },
+          "locked": {
+            "description": "In an org brain, whether no lower unit overrides its topic; false where none is given.",
+            "type": [
+              "boolean",
               "null"
             ]
           },
@@ -6011,6 +6373,17 @@
               "string",
               "null"
             ]
+          },
+          "standing": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Standing"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Who writes into an org brain; `member` where none is given."
           },
           "status": {
             "anyOf": [
@@ -6117,6 +6490,13 @@
               "null"
             ]
           },
+          "internalOnly": {
+            "description": "In an org brain, whether it is kept from a room where someone outside the company sits; set where any\nmerged row carries it, where not given.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "key": {
             "type": [
               "string",
@@ -6136,6 +6516,13 @@
             "format": "int64",
             "type": [
               "integer",
+              "null"
+            ]
+          },
+          "locked": {
+            "description": "In an org brain, whether no lower unit overrides its topic; set where any merged row carries it, where\nnot given.",
+            "type": [
+              "boolean",
               "null"
             ]
           },
@@ -6167,6 +6554,17 @@
               "string",
               "null"
             ]
+          },
+          "standing": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Standing"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Who writes into an org brain; `member` where none is given."
           },
           "subjectIds": {
             "items": {
@@ -6236,6 +6634,13 @@
               "null"
             ]
           },
+          "internalOnly": {
+            "description": "In an org brain, whether it is kept from a room where someone outside the company sits; the old\nversion's where not given.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "labels": {
             "additionalProperties": {
               "type": "string"
@@ -6250,6 +6655,13 @@
             "format": "int64",
             "type": [
               "integer",
+              "null"
+            ]
+          },
+          "locked": {
+            "description": "In an org brain, whether no lower unit overrides its topic; the old version's where not given.",
+            "type": [
+              "boolean",
               "null"
             ]
           },
@@ -6278,6 +6690,17 @@
               "string",
               "null"
             ]
+          },
+          "standing": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Standing"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Who writes into an org brain; `member` where none is given."
           },
           "subjectIds": {
             "description": "The subjects the new version is about, replacing the old version's whole where given.",
@@ -6363,6 +6786,17 @@
               "string",
               "null"
             ]
+          },
+          "standing": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Standing"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Who writes into an org brain; `member` where none is given."
           },
           "status": {
             "$ref": "#/components/schemas/MemoryStatus"
@@ -6638,6 +7072,13 @@
               "null"
             ]
           },
+          "internalOnly": {
+            "description": "In an org brain, whether it is kept from a room where someone outside the company sits; true where none\nis given.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "key": {
             "type": [
               "string",
@@ -6655,6 +7096,13 @@
             "format": "int64",
             "type": [
               "integer",
+              "null"
+            ]
+          },
+          "locked": {
+            "description": "In an org brain, whether no lower unit overrides its topic; false where none is given.",
+            "type": [
+              "boolean",
               "null"
             ]
           },
@@ -6683,6 +7131,17 @@
           },
           "source": {
             "$ref": "#/components/schemas/Source"
+          },
+          "standing": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Standing"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Who writes into an org brain; `member` where none is given."
           },
           "strengthens": {
             "description": "The live memory this says more fully: a new version of it is written.",

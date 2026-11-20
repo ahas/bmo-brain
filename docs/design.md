@@ -9,7 +9,8 @@ study those rest on (archive document 302).
 ## What the brain is
 
 A brain is one agent's long-term memory. The service keeps many brains, each owned by an account and
-belonging to one agent of that account, and serves them over HTTP. Everything an agent reads about the
+belonging to one agent of that account, or to one unit of an organisation (「Org brains」), and serves them
+over HTTP. Everything an agent reads about the
 world beside the conversation in front of it is a memory in its brain: episodes, facts, tips, rules,
 situation rules, its knowledge, its persona and its lore. Nothing an agent reads is a file, and nothing it
 reads about a person is a sheet kept apart: a person's standing sheet is rendered from their names and the
@@ -37,6 +38,10 @@ The common wire format and the API design rules are bmo-chat's `docs/conventions
   gives it; `agentKey` is the agent's opaque key as the agency registers it. The brain reads
   neither:
   it only separates by them. Nothing is held outside a brain.
+- **A brain is of one kind,** `agent` or `org`, set when it is made and never changed. An org brain is keyed
+  the same way, by the company as its account and the unit as its agent (「Org brains」). One pair of keys
+  names one brain whatever its kind, and a caller finding an agent's brain asks for the kind `agent`, so an
+  org brain never answers for an agent.
 - **One account sees its own brains alone.** A caller names the brain it reads or writes in the path, and
   every member of that brain carries the brain's id. Two agents of one account have two brains that share
   nothing; two accounts never see each other's.
@@ -44,7 +49,9 @@ The common wire format and the API design rules are bmo-chat's `docs/conventions
   owns the agent and the agent's key, and never answers one agent, of any account, from another agent's brain.
   An agent's key that stands under more than one account names no brain until the account is given, and an agent
   the service keeps no brain for has no memories to read; a caller answers it nothing rather than another
-  brain's.
+  brain's. The one exception is the org brains: a caller that selects a turn's reference for an agent reads,
+  beside that agent's own brain, the org brains of the units the person the agent serves belongs to, and only
+  what stands there for that person (「Org brains」). No agent's brain is ever read for another agent.
 - **The brains stand in one store,** the service's own PostgreSQL database, every row keyed by its brain,
   so one set of migrations serves every brain. The unit a brain moves in, is backed up in and is let go in
   is the brain itself, and its portable form is the brain file (「Export and injection」).
@@ -105,6 +112,8 @@ One row is one thing the agent remembers, in one version.
 | `lastConfirmedAt` | when the memory was last confirmed by a source apart from the reading |
 | `actorName` | who wrote this version: the agent's session, a tool, a person at the screen |
 | `labels` | the caller's own metadata, a map of strings |
+| `locked` | in an org brain, whether a lower unit may not override its topic (「Org brains」); off in an agent's brain |
+| `internalOnly` | in an org brain, whether it is kept from a room where someone outside the company sits; off in an agent's brain |
 | `createdAt` | when this version was written |
 
 The two conditions are optional. A memory that carries neither is a permanent one: no situation has to be
@@ -437,8 +446,10 @@ judged on the brain's own record.
 ## Export and injection
 
 - **The brain file** is a brain, or part of one, as a SQLite database holding the three tables and the
-  memory-subject links in the brain's own shape, with the ids local to the file. It carries the version of
-  the shape it was written in.
+  memory-subject links in the brain's own shape, each memory with its marks (「Org brains」), with the ids
+  local to the file. It carries the version of the shape it was written in. Read into an agent's brain, a
+  row's marks are left off; read into an org brain from a file older than the marks, a row is internal-only
+  and not locked, as a write that names neither is.
 - **Export** writes a brain file from a brain: the whole brain, or the layers named, with the subjects and
   the live rows those layers hold.
 - **Injection** reads a brain file into a brain it names. It overwrites nothing: a row whose `key` matches a
@@ -475,6 +486,58 @@ judged on the brain's own record.
 - **What a user said in one room stays in that room's memories** unless it is theirs: the reading narrows
   by the room's subject, and the one carry-over, a user's own words into their private room, is the caller's
   to ask for by naming both rooms.
+
+## Org brains
+
+An org brain holds what every agent serving a member of one unit of an organisation shares, the unit being a
+company, a division, a team or a part: what the company does, its working hours, a team's own hours, the day
+a team's weekly report is due, where site photographs are kept. It is a brain like any other, with the same
+three tables, versions and reads; what differs is stated here.
+
+- **Keyed by the company and the unit.** An org brain is made with the kind `org`, its `accountKey` the
+  company's key and its `agentKey` the unit's, both as the caller gives them. The brain does not know the
+  organisation: which unit stands under which, and who belongs where, is the caller's, which names a member's
+  units in order when it reads for them.
+- **No memory about a person.** An org brain holds what holds for its whole unit; what is known of one
+  person, their standing, their circumstances, what they said in a conversation of their own, stays in
+  agents' brains, and nothing of an agent's brain is carried into an org brain. The brain holds this by its
+  shape: an org brain holds no subject of type `person`, so a write that names one, by its id or its key, a
+  subject made with that type, and a brain file holding one are refused whole, and no memory in it is about a
+  person. Whether a sentence speaks of someone is the writer's judgement, since the brain reads no meaning in
+  the words.
+- **A topic is what an org memory overrides by.** A memory that stands for its unit on a matter links a
+  subject of type `topic`, keyed by the caller's word for the matter (`working-hours`, `industry`). Where two
+  units on a member's path hold the same topic, the nearer one's stands: a team's working hours stand in
+  place of the company's for the team's members. A memory with no topic does not stand for anyone; a caller reads it as any memory is read, by its
+  words, its layer or its subjects, and tells by its brain which unit it is from.
+- **Two marks, each on the version.** `locked`: no lower unit overrides its topic, which is answered from the
+  farthest unit on the path holding a locked memory of it, whatever a nearer unit holds (a security rule, a
+  company policy). `internalOnly`: it is kept from a room where someone outside the company sits; it is on
+  where the writer does not say. A new version, the words a move to `done` ends on and the version a
+  retraction writes carry the marks of the version they follow where the writer gives none; a merge sets a
+  mark where any merged row carries it; a restoration takes the closed row's. An agent's brain takes neither
+  mark: its rows carry both off, and a write that sets one there is refused.
+- **What stands for a member.** A caller reading for a member names the org brains of the member's units in
+  order, the farthest first: the units where the member holds a second post, then the company, then each unit
+  under it down to the member's own, so the member's own path wins a topic over a second post. For each topic
+  any of them holds, the brain answers the standing memories of the one unit that holds it: the farthest
+  holding a locked one of the topic, else the nearest holding one. A standing memory is an `active` row
+  linked to a topic that is neither a `rumor` nor an `episode`, so a proposal never stands. Read for a room
+  where someone outside the company sits, the internal-only rows are left out after each topic's unit is
+  decided, so a rule kept inside is never replaced by a farther unit's. The answer goes by unit, the farthest
+  first, then by topic, and records no use; the caller decides what of it a turn carries.
+- **Who writes is the caller's check, and a member's word is a proposal.** The brain calls no unit, so before
+  each write into an org brain its caller asks the service that keeps the organisation whether the writer
+  heads the unit (acting heads among them) or holds the unit's grant to write org memory, and names the
+  outcome on the write as its standing, `head` or `member`. A head's write is applied as in any brain, so a
+  head's own word is a fact at once, as the owner's is. A member's write, and a write that names no standing,
+  is a proposal: a first version or a learning is written as a `rumor` whatever type it names, closes nothing
+  and versions nothing, and any other write of a member, a version, a merge, a move or a restoration, is
+  refused. A head accepts a proposal by writing a version of it, or a learning that strengthens it, under a
+  type that is no `rumor`, and declines it by moving it to `invalidated`. An agent's brain reads no standing.
+- **The brain whole is an administrative act.** Making an org brain, letting it go and injecting a brain file
+  into it take no standing, as they take none for an agent's brain; its subjects and layers, which hold no
+  fact, are written as an agent brain's are, a person apart.
 
 ## What the brain acts on by itself
 

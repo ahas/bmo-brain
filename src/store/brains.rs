@@ -1,11 +1,12 @@
 //! The brains, their subjects and their layers (docs/design.md, 「Whose a brain is」 and 「The three tables」).
 
 use bmo_brain_client::{
-  Brain, BrainsQuery, Layer, LayerChange, LayersQuery, NewBrain, NewLayer, NewSubject, Page, Subject,
-  SubjectChange, SubjectKey, SubjectsQuery,
+  Brain, BrainKind, BrainsQuery, Layer, LayerChange, LayersQuery, NewBrain, NewLayer, NewSubject, Page,
+  Subject, SubjectChange, SubjectKey, SubjectsQuery,
 };
 use sqlx::{FromRow, PgConnection, Postgres, QueryBuilder};
 
+use super::orgs::no_person_in;
 use super::{Fault, Held, Store, holding, limit, listed, now, page, publish, text};
 
 /// The longest a brain's name, a subject's or a layer's description is.
@@ -16,9 +17,13 @@ pub(crate) fn event_scope(brain_id: i64) -> String {
   format!("brain:{brain_id}")
 }
 
+/// A brain's columns as a read answers them.
+const BRAIN_COLUMNS: &str = "id, kind, account_key, agent_key, name, created_at";
+
 #[derive(FromRow)]
 struct BrainRow {
   id: i64,
+  kind: String,
   account_key: String,
   agent_key: String,
   name: String,
@@ -29,6 +34,7 @@ impl From<BrainRow> for Brain {
   fn from(row: BrainRow) -> Self {
     Self {
       id: row.id,
+      kind: BrainKind::named(&row.kind).unwrap_or_default(),
       account_key: row.account_key,
       agent_key: row.agent_key,
       name: row.name,
@@ -118,11 +124,10 @@ pub(crate) fn given(field: &str, value: &str) -> Held<()> {
 
 /// The brain the path names, or why there is none.
 pub(crate) async fn brain_of(conn: &mut PgConnection, brain_id: i64) -> Held<Brain> {
-  let row: Option<BrainRow> =
-    sqlx::query_as("SELECT id, account_key, agent_key, name, created_at FROM brains WHERE id = $1")
-      .bind(brain_id)
-      .fetch_optional(&mut *conn)
-      .await?;
+  let row: Option<BrainRow> = sqlx::query_as(&format!("SELECT {BRAIN_COLUMNS} FROM brains WHERE id = $1"))
+    .bind(brain_id)
+    .fetch_optional(&mut *conn)
+    .await?;
   row
     .map(Brain::from)
     .ok_or_else(|| Fault::NotFound(format!("There is no brain {brain_id}.")))
@@ -151,6 +156,7 @@ pub(crate) async fn subject_found_or_made(
 ) -> Held<(bool, Subject)> {
   given("type", &named.kind)?;
   given("key", &named.key)?;
+  no_person_in(&mut *conn, brain_id, &named.kind).await?;
   let standing: Option<SubjectRow> = sqlx::query_as(&format!(
     "SELECT {SUBJECT_COLUMNS} FROM subjects WHERE brain_id = $1 AND type = $2 AND key = $3"
   ))
@@ -201,9 +207,10 @@ impl Store {
   /// A page of brains.
   pub async fn brains(&self, query: &BrainsQuery) -> Held<Page<Brain>> {
     let limit = limit(query.limit)?;
-    let mut sql = QueryBuilder::<Postgres>::new(
-      "SELECT id, account_key, agent_key, name, created_at FROM brains WHERE TRUE",
-    );
+    let mut sql = QueryBuilder::<Postgres>::new(format!("SELECT {BRAIN_COLUMNS} FROM brains WHERE TRUE"));
+    if let Some(kind) = query.kind {
+      sql.push(" AND kind = ").push_bind(kind.name());
+    }
     if let Some(account) = &query.account_key {
       sql.push(" AND account_key = ").push_bind(account.clone());
     }
@@ -232,12 +239,15 @@ impl Store {
         .fetch_optional(&mut *tx)
         .await?;
     if let Some(id) = standing {
-      return Err(Fault::Conflict(format!("Brain {id} is this account's brain of this agent already.")));
+      return Err(Fault::Conflict(format!(
+        "Brain {id} stands at this account's key and agent's key already."
+      )));
     }
-    let row: BrainRow = sqlx::query_as(
-      "INSERT INTO brains (account_key, agent_key, name, created_at) VALUES ($1, $2, $3, $4) \
-       RETURNING id, account_key, agent_key, name, created_at",
-    )
+    let row: BrainRow = sqlx::query_as(&format!(
+      "INSERT INTO brains (kind, account_key, agent_key, name, created_at) VALUES ($1, $2, $3, $4, $5) \
+       RETURNING {BRAIN_COLUMNS}"
+    ))
+    .bind(body.kind.unwrap_or_default().name())
     .bind(&body.account_key)
     .bind(&body.agent_key)
     .bind(&name)

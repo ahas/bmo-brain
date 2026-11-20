@@ -33,6 +33,9 @@ fn memory(kind: &str, text: &str, subjects: Vec<SubjectKey>) -> NewMemory {
     status: None,
     actor_name: "writer-a".to_owned(),
     labels: labels(&[]),
+    internal_only: None,
+    locked: None,
+    standing: None,
   }
 }
 
@@ -54,6 +57,9 @@ fn learning(kind: &str, text: &str, source: Source) -> Learning {
     layer_id: None,
     actor_name: "agent-session".to_owned(),
     labels: labels(&[]),
+    internal_only: None,
+    locked: None,
+    standing: None,
   }
 }
 
@@ -63,6 +69,7 @@ async fn brain_of(client: &BrainClient) -> i64 {
       account_key: "account-a".to_owned(),
       agent_key: "agent-a".to_owned(),
       name: None,
+      kind: None,
     })
     .await
     .unwrap()

@@ -9,6 +9,7 @@ use sqlx::PgConnection;
 
 use super::brains::{brain_of, given};
 use super::misses::Asked;
+use super::orgs::{PROPOSAL, heads_only, proposes};
 use super::recall::Cues;
 use super::sheets::written_type;
 use super::vectors::fuse;
@@ -146,14 +147,19 @@ impl Store {
 
   /// A learning applied whole: the memories it confirms confirmed; the one it strengthens given a new
   /// version; the ones it replaces closed, unless it is heard; and the row written as a fact or, heard, as a
-  /// rumor. One transaction, so a judgement is never half applied.
+  /// rumor. A member's learning in an org brain is a proposal: heard, written as a rumor whatever its type,
+  /// and strengthening nothing. One transaction, so a judgement is never half applied.
   pub async fn learn(&self, brain_id: i64, body: &Learning) -> Held<Learned> {
     given("actorName", &body.actor_name)?;
     written_type(&body.kind)?;
     let at = now();
     let mut tx = self.begin().await?;
-    brain_of(&mut tx, brain_id).await?;
-    let heard = body.source.is_heard();
+    let brain = brain_of(&mut tx, brain_id).await?;
+    let proposal = proposes(&brain, body.standing);
+    if body.strengthens.is_some() {
+      heads_only(&brain, body.standing, "learning that strengthens a memory")?;
+    }
+    let heard = proposal || body.source.is_heard();
     let mut learned = Learned {
       confirmed_count: 0,
       invalidated_ids: vec![],
@@ -191,7 +197,11 @@ impl Store {
         key: ground.to_string(),
       });
     }
-    let kind = if heard && body.kind == "fact" { "rumor".to_owned() } else { body.kind.clone() };
+    let kind = if proposal || (heard && body.kind == "fact") {
+      PROPOSAL.to_owned()
+    } else {
+      body.kind.clone()
+    };
     let mut labels = body.labels.clone();
     labels.insert(
       "source".to_owned(),
@@ -243,6 +253,9 @@ impl Store {
             release_condition: body.release_condition.clone().map(Some),
             actor_name: body.actor_name.clone(),
             labels: Some(labels),
+            locked: body.locked,
+            internal_only: body.internal_only,
+            standing: body.standing,
           },
           at,
         )
@@ -269,6 +282,7 @@ impl Store {
               actor_name: body.actor_name.clone(),
               reason: None,
               text: None,
+              standing: body.standing,
             },
           )
           .await?;
@@ -296,6 +310,9 @@ impl Store {
           status: None,
           actor_name: body.actor_name.clone(),
           labels,
+          locked: body.locked,
+          internal_only: body.internal_only,
+          standing: body.standing,
         },
         at,
         behind,

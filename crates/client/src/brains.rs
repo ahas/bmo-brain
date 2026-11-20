@@ -7,11 +7,63 @@ use serde::{Deserialize, Serialize};
 
 use crate::wire::Labels;
 
-/// One agent's long-term memory, keyed by the account that owns it and the agent it belongs to.
+/// Whose a brain is: an agent's, or a unit's of an organisation (docs/design.md, 「Org brains」).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum BrainKind {
+  /// One agent's, keyed by the account that owns it and the agent's key.
+  #[default]
+  Agent,
+  /// One unit's of an organisation, keyed by the company as its account and the unit as its agent.
+  Org,
+}
+
+impl BrainKind {
+  /// The kind as the wire and the store name it.
+  pub fn name(self) -> &'static str {
+    match self {
+      Self::Agent => "agent",
+      Self::Org => "org",
+    }
+  }
+
+  /// The kind a name stands for, or none.
+  pub fn named(name: &str) -> Option<Self> {
+    [Self::Agent, Self::Org].into_iter().find(|kind| kind.name() == name)
+  }
+}
+
+/// Who writes into an org brain, as the caller checked it with the service that keeps the organisation.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum Standing {
+  /// A member of the unit: a first version or a learning is a proposal, and nothing else is taken.
+  #[default]
+  Member,
+  /// A head of the unit, or a holder of its grant to write org memory.
+  Head,
+}
+
+/// Whom a reading of an org brain is for.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum Audience {
+  /// A room where everyone is of the company.
+  #[default]
+  Internal,
+  /// A room where someone outside the company sits: the internal-only memories are left out.
+  External,
+}
+
+/// A brain: one agent's long-term memory, keyed by the account that owns it and the agent it belongs to, or
+/// one unit's of an organisation, keyed by the company and the unit.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Brain {
   pub id: i64,
+  /// Whose it is; set when it is made and never changed. An answer that names none is an agent's brain.
+  #[serde(default)]
+  pub kind: BrainKind,
   /// The account's opaque key, as the caller gives it.
   pub account_key: String,
   /// The agent's opaque key, as the caller gives it.
@@ -21,11 +73,14 @@ pub struct Brain {
 }
 
 /// A brain to make.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct NewBrain {
   pub account_key: String,
   pub agent_key: String,
+  /// `agent` where none is given.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub kind: Option<BrainKind>,
   /// The agent's key where none is given.
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub name: Option<String>,
@@ -35,6 +90,8 @@ pub struct NewBrain {
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct BrainsQuery {
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub kind: Option<BrainKind>,
   #[serde(skip_serializing_if = "Option::is_none")]
   pub account_key: Option<String>,
   #[serde(skip_serializing_if = "Option::is_none")]
@@ -277,11 +334,18 @@ pub struct Memory {
   #[serde(default)]
   pub reason: Option<String>,
   pub labels: Labels,
+  /// In an org brain, whether no lower unit overrides its topic; false in an agent's brain.
+  #[serde(default)]
+  pub locked: bool,
+  /// In an org brain, whether it is kept from a room where someone outside the company sits; false in an
+  /// agent's brain.
+  #[serde(default)]
+  pub internal_only: bool,
   pub created_at: i64,
 }
 
 /// A memory to write as a first version.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct NewMemory {
   #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -317,6 +381,16 @@ pub struct NewMemory {
   pub actor_name: String,
   #[serde(default)]
   pub labels: Labels,
+  /// In an org brain, whether no lower unit overrides its topic; false where none is given.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub locked: Option<bool>,
+  /// In an org brain, whether it is kept from a room where someone outside the company sits; true where none
+  /// is given.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub internal_only: Option<bool>,
+  /// Who writes into an org brain; `member` where none is given.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub standing: Option<Standing>,
 }
 
 /// A new version of a memory, superseding the version it is written over: only the fields given differ.
@@ -365,6 +439,16 @@ pub struct MemoryVersion {
   pub actor_name: String,
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub labels: Option<Labels>,
+  /// In an org brain, whether no lower unit overrides its topic; the old version's where not given.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub locked: Option<bool>,
+  /// In an org brain, whether it is kept from a room where someone outside the company sits; the old
+  /// version's where not given.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub internal_only: Option<bool>,
+  /// Who writes into an org brain; `member` where none is given.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub standing: Option<Standing>,
 }
 
 /// One row written over several live rows about the same thing: the new row starts a lineage, and each
@@ -402,6 +486,17 @@ pub struct MemoryMerge {
   pub actor_name: String,
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub labels: Option<Labels>,
+  /// In an org brain, whether no lower unit overrides its topic; set where any merged row carries it, where
+  /// not given.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub locked: Option<bool>,
+  /// In an org brain, whether it is kept from a room where someone outside the company sits; set where any
+  /// merged row carries it, where not given.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub internal_only: Option<bool>,
+  /// Who writes into an org brain; `member` where none is given.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub standing: Option<Standing>,
 }
 
 /// A move of a memory's status by a caller's word.
@@ -420,16 +515,22 @@ pub struct MemoryMove {
   /// `retracted`: what the speaker meant instead, written as a new active version the retracted row points at.
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub text: Option<String>,
+  /// Who writes into an org brain; `member` where none is given.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub standing: Option<Standing>,
 }
 
 /// A closed lineage restored: a new active version written after its newest, closed one.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Restoration {
   /// The closed row's text where none is given.
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub text: Option<String>,
   pub actor_name: String,
+  /// Who writes into an org brain; `member` where none is given.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub standing: Option<Standing>,
 }
 
 /// Which memories to list.
@@ -851,6 +952,16 @@ pub struct Learning {
   pub actor_name: String,
   #[serde(default)]
   pub labels: Labels,
+  /// In an org brain, whether no lower unit overrides its topic; false where none is given.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub locked: Option<bool>,
+  /// In an org brain, whether it is kept from a room where someone outside the company sits; true where none
+  /// is given.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub internal_only: Option<bool>,
+  /// Who writes into an org brain; `member` where none is given.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub standing: Option<Standing>,
 }
 
 /// What a learning came to.
@@ -960,4 +1071,29 @@ pub struct ConsolidationState {
 #[serde(rename_all = "camelCase")]
 pub struct Consolidated {
   pub episode_ids: Vec<i64>,
+}
+
+/// What stands for a member of an organisation: the org brains of the member's units, the farthest first.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct OrgTopicsQuery {
+  /// The org brains' ids, comma-separated, the farthest unit first: one to fifty, none twice.
+  pub brain_ids: String,
+  /// `internal` where none is given.
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub audience: Option<Audience>,
+}
+
+/// One topic as it stands for a member: the memories of the one unit whose word on it holds.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct OrgTopic {
+  /// The key of the subject of type `topic`.
+  pub topic: String,
+  /// The brain whose memories stand for it: the first named holding a locked one, else the last holding one.
+  pub brain_id: i64,
+  /// Whether that brain's memories of it are locked.
+  pub locked: bool,
+  /// Those memories, by importance, highest first, then latest first.
+  pub memories: Vec<Memory>,
 }

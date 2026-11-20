@@ -27,6 +27,9 @@ fn memory(kind: &str, text: &str) -> NewMemory {
     status: None,
     actor_name: "writer-a".to_owned(),
     labels: labels(&[]),
+    internal_only: None,
+    locked: None,
+    standing: None,
   }
 }
 
@@ -37,6 +40,7 @@ fn moved(status: MemoryStatus) -> MemoryMove {
     actor_name: "writer-b".to_owned(),
     reason: None,
     text: None,
+    standing: None,
   }
 }
 
@@ -65,6 +69,7 @@ async fn brain_of(client: &BrainClient) -> i64 {
       account_key: "account-a".to_owned(),
       agent_key: "agent-a".to_owned(),
       name: None,
+      kind: None,
     })
     .await
     .unwrap()
@@ -195,6 +200,9 @@ async fn the_list_finds_the_unfiled_and_the_rows_a_version_superseded() {
         release_condition: None,
         actor_name: "writer-b".to_owned(),
         labels: None,
+        internal_only: None,
+        locked: None,
+        standing: None,
       },
     )
     .await
@@ -460,6 +468,7 @@ async fn a_closed_lineage_is_restored_by_a_new_version_and_only_from_its_newest_
     let body = Restoration {
       text: text.map(str::to_owned),
       actor_name: "screen".to_owned(),
+      standing: None,
     };
     async move { client.memory_restore(brain, id, &body).await }
   };

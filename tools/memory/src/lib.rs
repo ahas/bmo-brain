@@ -6,8 +6,8 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use bmo_brain_client::{
-  BrainClient, BrainsQuery, ClientFailure, MemoriesQuery, MemoryMove, MemoryStatus, MemoryVersion,
-  NewMemory, Restoration, SubjectKey, SubjectsQuery,
+  BrainClient, BrainKind, BrainsQuery, ClientFailure, MemoriesQuery, MemoryMove, MemoryStatus,
+  MemoryVersion, NewMemory, Restoration, SubjectKey, SubjectsQuery,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -168,6 +168,7 @@ fn failed(why: ClientFailure) -> String {
 pub async fn brain_id(client: &BrainClient, agent: &str) -> Result<i64, String> {
   let page = client
     .brains(&BrainsQuery {
+      kind: Some(BrainKind::Agent),
       agent_key: Some(agent.to_owned()),
       limit: Some(2),
       ..Default::default()
@@ -589,6 +590,9 @@ async fn entry(client: &BrainClient, brain: i64, session: &Session, call: Call) 
             status: Some(MemoryStatus::Active),
             actor_name: ACTOR.to_owned(),
             labels: Default::default(),
+            internal_only: None,
+            locked: None,
+            standing: None,
           },
         )
         .await
@@ -632,6 +636,7 @@ async fn entry(client: &BrainClient, brain: i64, session: &Session, call: Call) 
             actor_name: ACTOR.to_owned(),
             reason: None,
             text,
+            standing: None,
           },
         )
         .await
@@ -650,6 +655,7 @@ async fn entry(client: &BrainClient, brain: i64, session: &Session, call: Call) 
             actor_name: ACTOR.to_owned(),
             reason: Some(why),
             text: None,
+            standing: None,
           },
         )
         .await
@@ -665,6 +671,7 @@ async fn entry(client: &BrainClient, brain: i64, session: &Session, call: Call) 
           &Restoration {
             text: None,
             actor_name: ACTOR.to_owned(),
+            standing: None,
           },
         )
         .await
@@ -687,6 +694,7 @@ async fn entry(client: &BrainClient, brain: i64, session: &Session, call: Call) 
             actor_name: ACTOR.to_owned(),
             reason: Some(why),
             text: None,
+            standing: None,
           },
         )
         .await

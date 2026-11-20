@@ -13,8 +13,9 @@ account's and one agent's: its subjects, its layers and its memories, one row a 
 brain's recall for a block under a token budget; a persona is rendered as the same bytes until a piece
 changes; a brain moves in and out as a brain file. The brain never executes and calls no other unit.
 
-- **A brain is keyed by `accountKey` and `agentKey`,** strings the caller gives and the brain never reads.
-  Every subject, layer and memory belongs to one brain and is reached under its id.
+- **A brain is keyed by `accountKey` and `agentKey`,** strings the caller gives and the brain never reads,
+  and is of the kind `agent` or `org` (`docs/design.md`, 「Org brains」). Every subject, layer and memory
+  belongs to one brain and is reached under its id.
 - **Nothing is held outside a brain** (`docs/design.md`, 「What the brain holds besides brains」). A
   memory's `key` and `labels` and a subject's `type` and `key` are the caller's; the brain gives none of them
   a meaning.
@@ -105,16 +106,28 @@ events as a page instead.
 
 ## Brains
 
-A brain is `id`, `accountKey`, `agentKey`, `name` and `createdAt`. `accountKey` and `agentKey` are strings
-the caller gives, 1 to 200 characters with no control character, and one account has at most one brain per
-agent.
+A brain is `id`, `kind`, `accountKey`, `agentKey`, `name` and `createdAt`. `kind` is `agent`, an agent's
+brain, or `org`, a unit's of an organisation, its `accountKey` the company's and its `agentKey` the unit's
+(`docs/design.md`, 「Org brains」); it is set when the brain is made and never changes. `accountKey` and
+`agentKey` are strings the caller gives, 1 to 200 characters with no control character, and one pair of them
+names at most one brain, whatever its kind.
 
 | Route | Does | Answers |
 |---|---|---|
-| `GET /brains` | lists brains by `accountKey` and `agentKey` | 200, a page |
-| `POST /brains` | makes one: `accountKey`, `agentKey`, `name` (the agent's key where none is given) | 201, the brain; 409 `conflict` where the account has the agent's brain already |
+| `GET /brains` | lists brains by `kind`, `accountKey` and `agentKey` | 200, a page |
+| `POST /brains` | makes one: `accountKey`, `agentKey`, `kind` (`agent` where none is given), `name` (the agent's key where none is given) | 201, the brain; 409 `conflict` where a brain stands at the pair of keys already |
+| `GET /org-topics` | what stands for a member of an organisation (`docs/design.md`, 「Org brains」): `brainIds`, the org brains of the member's units, comma-separated, the farthest first (one to 50, none twice); `audience`, `internal` (where none is given) or `external`, for a room where someone outside the company sits, which leaves the internal-only rows out | 200, a list; 400 for a brain named twice or one that is no org brain; 404 for a brain that does not stand |
 | `GET /brains/{brainId}` | reads one | 200; 404 |
 | `DELETE /brains/{brainId}` | lets it go whole, with everything it held | 200, the brain as it stood; 404 |
+
+`GET /org-topics` answers one item a topic: `topic`, the key of the subject of type `topic`; `brainId`, the
+brain whose memories stand for it, the first among those named holding a locked memory of it, else the last
+holding one; `locked`, whether that brain's memories of it are locked; and `memories`, those memories, by
+importance, highest first, then by `validFrom` and `id`, latest first. A memory of a topic is an `active` row
+linked to the topic's subject that is neither a `rumor` nor an `episode`. With `audience` `external`, the
+internal-only memories are left out after each topic's brain is decided, and a topic left with none is not
+answered. The items go by their brain's place among those named, the first first, then by topic; the read
+records no use.
 
 Every route below stands under `/brains/{brainId}` and answers 404 `not-found` for a brain that does not
 stand.
@@ -129,7 +142,7 @@ the text of its newest `active` one, or null where it has none.
 | Route | Does | Answers |
 |---|---|---|
 | `GET /subjects` | lists by `type`, `key`, `q` (words the description holds) and `ids` (comma-separated ids) | 200, a page |
-| `POST /subjects` | `type`, `key`, `description`: makes the subject, or finds the one standing and sets its description where one is given | 201 where new, 200 where it stood |
+| `POST /subjects` | `type`, `key`, `description`: makes the subject, or finds the one standing and sets its description where one is given | 201 where new, 200 where it stood; 400 for a subject of type `person` in an org brain |
 | `GET /subjects/{subjectId}` | reads one | 200; 404 |
 | `PATCH /subjects/{subjectId}` | sets `description` | 200; 404 |
 | `GET /subjects/{subjectId}/sheet` | renders the subject's sheet (`docs/design.md`, 「A person is a subject」): its active `name` rows first, one line each as `- [#<id> name] <text>`, those linked to the room named ahead of those about no room, then its active facts, one line each as `- [#<id> since <date>] <text>`; `roomId`, a subject of type `room`, takes that room's names and facts in as well; `limit`, at least 1, renders every name and the first that many facts alone, the whole sheet where none is given | 200, `text/plain`; 400 for a `roomId` that is no room or a `limit` below 1; 404 |
@@ -165,7 +178,22 @@ closed it; null while current), `validFrom`, `validTo` (or null), `recallConditi
 (or null), `releaseCondition` (or null), `importance` (1
 to 10), `useCount` (how often it was used: handed out, reported used, confirmed or read explicitly),
 `lastUsedAt` (its latest use, or null), `lastConfirmedAt`, `consolidatedAt`, `actorName`, `reason` (why its status was
-moved, as the mover said, or null), `labels` and `createdAt`.
+moved, as the mover said, or null), `labels`, `locked`, `internalOnly` and `createdAt`.
+
+`locked` and `internalOnly` are an org memory's marks (`docs/design.md`, 「Org brains」): no lower unit
+overrides its topic, and it is kept from a room where someone outside the company sits. A first version, a
+learning, a version and a merge may set either; where none is given, a first version and a learning in an org
+brain are internal-only and not locked, a version takes the marks of the version it supersedes, and a merge
+sets a mark where any merged row carries it. In an agent's brain both are false, and a write that sets one
+true is answered 400 `bad-request`.
+
+`standing` is who writes into an org brain, as the caller checked it: `head`, a head of the unit or a holder
+of its grant to write org memory, or `member`, which a write that names none is. A first version, a version,
+a merge, a move, a restoration and a learning take it. A member's first version or learning is a proposal,
+written as a `rumor` whatever its `type`, closing nothing: a learning's `replaces` closes nothing and its
+`strengthens` is answered 403 `forbidden`, as a member's version, merge, move and restoration are. An agent's
+brain reads no standing. No memory of an org brain is about a person: a write naming a subject of type
+`person` there is answered 400 `bad-request`.
 
 `recallCondition` is the situation in which the memory is needed and `releaseCondition` the situation that ends
 it, each the writer's words and null where it carries none (`docs/design.md`, 「Recall」). Both are set by a
@@ -191,12 +219,12 @@ moves a caller's word may make:
 | Route | Does | Answers |
 |---|---|---|
 | `GET /memories` | lists by `type` and `status` (each one value or several, comma-separated), `excludeTypes` (comma-separated), `layerId`, `unfiled` (true for the rows in no layer), `subjectId`, `key`, `lineageId`, `ids` (comma-separated), `supersededBy` (comma-separated: the rows superseded by these), `label` (`key` or `key=value`), `q` (words the text holds), `situation` (words the `recallCondition` holds; a first page by `q` with no `asOf` also takes the `vector_candidates` live rows that pass the other filters nearest the words in meaning, the two lists fused by Reciprocal Rank Fusion and the page cut at `limit`) and `asOf` (a moment: the rows that held then, `validFrom` at or before it and `validTo` after it or, with none, `supersededAt` after it or null, whatever their status now, never a `retracted` row), in the order `order` names; a list by `key`, `subjectId`, `type`, `q` or `situation` is an explicit read, which records a use of each live row of the page it answers unless `record` is false (true where none is given) | 200, a page |
-| `POST /memories` | writes a first version: `type`, `text`, `actorName` required; `key`, `layerId`, `position`, `subjectIds`, `subjects` (each `type` and `key`, made where none stands), `importance` (5 where none), `validFrom` (now where none), `status` (`active` where none, or `pending`), `recallCondition`, `releaseCondition`, `labels`; where a live row holds the key and the new `validFrom` is earlier than its own, the row is written already superseded by it in its lineage, `validTo` its `validFrom`, with the reason `earlier-than-live` | 201, the memory; 409 `conflict` where a live row holds the key and the new `validFrom` is not earlier than its own |
+| `POST /memories` | writes a first version: `type`, `text`, `actorName` required; `key`, `layerId`, `position`, `subjectIds`, `subjects` (each `type` and `key`, made where none stands), `importance` (5 where none), `validFrom` (now where none), `status` (`active` where none, or `pending`), `recallCondition`, `releaseCondition`, `labels`, `locked`, `internalOnly`, `standing`; where a live row holds the key and the new `validFrom` is earlier than its own, the row is written already superseded by it in its lineage, `validTo` its `validFrom`, with the reason `earlier-than-live` | 201, the memory; 409 `conflict` where a live row holds the key and the new `validFrom` is not earlier than its own |
 | `GET /memories/{memoryId}` | reads one | 200; 404 |
-| `PATCH /memories/{memoryId}` | moves its status: `status`, `actorName`, `at` (when it stopped holding, now where none), `reason` (kept on the row moved), `text` (for a move to `done`: the words it ended on, written as a new version that is then moved; for a move to `retracted`: what the speaker meant instead, written as a new active version, the row named retracted and pointing at it; each in one transaction); the row moved records the moment of the move as its `supersededAt` | 200, the row moved (for a retraction with `text`, the retracted row); 400 for `text` on another move; 404; 409 for a move the table does not allow |
-| `POST /memories/{memoryId}/restorations` | restores a closed lineage: the row named is the newest of a `done` or `invalidated` lineage, never a `retracted` one; `actorName` required and `text` (the closed row's where none); a new `active` version is written in the lineage, and the closed row stays as it was | 201, the new version; 404; 409 where the row is not the newest of its lineage, is not `done` or `invalidated`, or a live row holds its key |
-| `POST /memories/{memoryId}/versions` | writes a new version over a live one: `actorName` required; `text`, `type`, `layerId` (a null takes it out of every layer), `position` (after the last of the layer it moves into, or of the unfiled, where it moves and none is given), `subjectIds` or `subjects` (replacing the subjects whole), `importance`, `validFrom`, `recallCondition`, `releaseCondition` (a null clears one), `labels`, each taken from the old version where not given | 201, the new version; the old is `superseded` with `validTo` the new one's `validFrom`; 409 over a row that is not live |
-| `POST /merges` | writes one row over several: `memoryIds` (two or more live rows), `type`, `text`, `actorName` required; `key`, `layerId`, `position`, `subjectIds` or `subjects` (the union of the merged rows' subjects where none is given), `importance` (the highest merged where none), `validFrom` (now where none), `recallCondition` and `releaseCondition` (the one the merged rows share where none is given), `labels`; each merged row becomes `superseded` pointing at the new one | 201, the new row; 400; 404; 409 for a row that is not live |
+| `PATCH /memories/{memoryId}` | moves its status: `status`, `actorName`, `standing`, `at` (when it stopped holding, now where none), `reason` (kept on the row moved), `text` (for a move to `done`: the words it ended on, written as a new version that is then moved; for a move to `retracted`: what the speaker meant instead, written as a new active version, the row named retracted and pointing at it; each in one transaction); the row moved records the moment of the move as its `supersededAt` | 200, the row moved (for a retraction with `text`, the retracted row); 400 for `text` on another move; 404; 409 for a move the table does not allow |
+| `POST /memories/{memoryId}/restorations` | restores a closed lineage: the row named is the newest of a `done` or `invalidated` lineage, never a `retracted` one; `actorName` required, `standing` and `text` (the closed row's where none); a new `active` version is written in the lineage, and the closed row stays as it was | 201, the new version; 404; 409 where the row is not the newest of its lineage, is not `done` or `invalidated`, or a live row holds its key |
+| `POST /memories/{memoryId}/versions` | writes a new version over a live one: `actorName` required; `text`, `type`, `layerId` (a null takes it out of every layer), `position` (after the last of the layer it moves into, or of the unfiled, where it moves and none is given), `subjectIds` or `subjects` (replacing the subjects whole), `importance`, `validFrom`, `recallCondition`, `releaseCondition` (a null clears one), `labels`, `locked`, `internalOnly`, each taken from the old version where not given, and `standing` | 201, the new version; the old is `superseded` with `validTo` the new one's `validFrom`; 409 over a row that is not live |
+| `POST /merges` | writes one row over several: `memoryIds` (two or more live rows), `type`, `text`, `actorName` required; `key`, `layerId`, `position`, `subjectIds` or `subjects` (the union of the merged rows' subjects where none is given), `importance` (the highest merged where none), `validFrom` (now where none), `recallCondition` and `releaseCondition` (the one the merged rows share where none is given), `labels`, `locked` and `internalOnly` (set where any merged row carries it, where none is given), `standing`; each merged row becomes `superseded` pointing at the new one | 201, the new row; 400; 404; 409 for a row that is not live |
 | `GET /lineages/{lineageId}` | every version of a lineage, oldest first | 200, a list; 404 |
 | `POST /hits` | records a hand-out, or the rows the agent used: `memoryIds`, `actorName`, `sessionKey` (which marks the rows for that session), `at`; a use of each row | 201, `recordedCount` |
 | `POST /confirmations` | records confirmations: `memoryIds`, `actorName`, `at`; a use of each row and its `lastConfirmedAt` set, nothing else | 201, `recordedCount` |
@@ -265,7 +293,7 @@ material and its mechanics.
 | Route | Does | Answers |
 |---|---|---|
 | `POST /similar` | `text`, `subjects` (each `type` and `key`), `limit` (10 where none, at most 50), `asOf` (a moment: the rows that held then, as `GET /memories` reads it, in place of the live ones, searched by words alone): the live memories most like the candidate, neither an `episode` nor a `persona`: those about one of its subjects or holding one of its stems, ranked by the relevance recall reckons with the candidate's stems and subjects as the cues, and the `vector_candidates` nearest its text in meaning, the two lists fused by Reciprocal Rank Fusion and ordered by the fused score, then by `id`, highest first | 200, a list |
-| `POST /learnings` | a learning applied whole in one transaction: `type`, `text`, `subjects`, `importance`, `source` (`own`, `owner`, `told`, `inferred`), `confirms` (ids confirmed), `strengthens` (an id given a new version with the text), `replaces` (ids invalidated, unless the source is heard), `grounds` (episode ids linked as subjects of type `episode`), `validFrom` (when it began holding; now where none), `key`, `layerId`, `recallCondition`, `releaseCondition`, `actorName`, `labels`; where the new row's `validFrom` is earlier than that of every row it would close, the one it strengthens or all it replaces, it closes none and is written already superseded by the one of them that began first, `validTo` that row's `validFrom`, with the reason `earlier-than-live` | 201: `confirmedCount`, `invalidatedIds`, `written` (the version written, or null where the learning only confirms), `versioned`; 400 for a ground that is no episode; 409 where `strengthens` names a row that is not live |
+| `POST /learnings` | a learning applied whole in one transaction: `type`, `text`, `subjects`, `importance`, `source` (`own`, `owner`, `told`, `inferred`), `confirms` (ids confirmed), `strengthens` (an id given a new version with the text), `replaces` (ids invalidated, unless the source is heard), `grounds` (episode ids linked as subjects of type `episode`), `validFrom` (when it began holding; now where none), `key`, `layerId`, `recallCondition`, `releaseCondition`, `actorName`, `labels`, `locked`, `internalOnly`, `standing`; where the new row's `validFrom` is earlier than that of every row it would close, the one it strengthens or all it replaces, it closes none and is written already superseded by the one of them that began first, `validTo` that row's `validFrom`, with the reason `earlier-than-live` | 201: `confirmedCount`, `invalidatedIds`, `written` (the version written, or null where the learning only confirms), `versioned`; 400 for a ground that is no episode; 409 where `strengthens` names a row that is not live |
 | `GET /unconsolidated` | the active `episode` rows not yet consolidated, in priority order (`docs/design.md`, 「Consolidation」), the first `limit` of them (60 where none, at most 500); each the memory with `priority` (gain × (1 + need)), `gain` (importance × (1 + novelty), novelty one less the greatest share of the episode's stems a live row of its subjects holds), `need` and `taggedBy` (the tag it was read out after, or null) beside it | 200, a list |
 | `GET /consolidation` | the consolidation state, the same numbers a recall answers reckoned the same way, nothing recorded: `unconsolidatedImportance` (the sum of the importance of the unconsolidated episodes), `unconsolidatedCount` (how many they are), `threshold` (the rules' `consolidation_threshold`) and `consolidationDue` (whether the sum has reached it) | 200; 404 |
 | `POST /consolidated` | `episodeIds`: marks them consolidated | 200, `recordedCount` |
@@ -298,12 +326,13 @@ takes the base layer alone; a named layer that does not stand is 404.
 | Route | Does | Answers |
 |---|---|---|
 | `GET /export` | the brain, or the layers `layers` names (comma-separated) with the subjects and live rows they hold, as a brain file | 200, `application/vnd.sqlite3`; 404 for a layer that does not stand |
-| `POST /injections` | reads the brain file in the body (`application/vnd.sqlite3`) into the brain: a layer is reused by its name, a subject by its type and key, a live row whose key a live row of the brain holds supersedes it unless it is the same, every other live row is added; nothing is overwritten | 201, `subjectsAdded`, `layersAdded`, `memoriesAdded`, `memoriesSuperseded`; 400 for a body that is no brain file, of another shape, or holding a live row whose key is no key or whose type is `sheet`; nothing of such a file is read in |
+| `POST /injections` | reads the brain file in the body (`application/vnd.sqlite3`) into the brain: a layer is reused by its name, a subject by its type and key, a live row whose key a live row of the brain holds supersedes it unless it is the same, every other live row is added; nothing is overwritten | 201, `subjectsAdded`, `layersAdded`, `memoriesAdded`, `memoriesSuperseded`; 400 for a body that is no brain file, of another shape, holding a live row whose key is no key or whose type is `sheet`, or, read into an org brain, holding a subject of type `person`; nothing of such a file is read in |
 
 The file is a SQLite database of the tables `brain_file` (`shape`, `exported_at`, `name`), `subjects`,
-`layers`, `memories` and `memory_subjects`, its ids local to the file; this brain writes shape 3 and reads
-shapes 1 to 3, a shape-1 file's rows carrying no condition and a file of shape 1 or 2 a storage strength,
-which is not read.
+`layers`, `memories` and `memory_subjects`, its ids local to the file; this brain writes shape 4 and reads
+shapes 1 to 4, a shape-1 file's rows carrying no condition, a file of shape 1 or 2 a storage strength, which
+is not read, and a file of shape 1 to 3 no mark. Read into an agent's brain, a row's marks are false; read
+into an org brain, a row of a file with no marks is internal-only and not locked.
 
 ## The console bundle
 
@@ -382,7 +411,7 @@ host's call protocol states.
   from the configuration before a deployment flips.
 - **It finds the agent's brain** by `BMO_BRAIN_AGENT` in the record's variables, the chat agent a run works
   for where its record names one, else the turn's agent, `BMO_TURN_AGENT`, else the record's holder: the one
-  brain registered for that agent key. The turn's room, `BMO_TURN_CHAT`, is the room
+  brain of the kind `agent` registered for that agent key, so an org brain never stands for an agent. The turn's room, `BMO_TURN_CHAT`, is the room
   a write links where the call names none; a call's own `room` is a string or a number, both read as the
   room's key.
 - **Its entries,** each one call: `brain_episode` (`POST /brains/{brainId}/memories`, type `episode`),
@@ -495,7 +524,7 @@ Every failure is the common error shape, `code` and `error`.
 |---|---|---|
 | 400 | `bad-request` | the body, the query or a key is not the shape the route takes; the sentence names what is wrong |
 | 401 | `unauthorized` | the token is missing or wrong, or the service's token on the console bundle's routes |
-| 403 | `forbidden` | the console's token on a route the screen does not use, or without the role the screen needs |
+| 403 | `forbidden` | the console's token on a route the screen does not use, or without the role the screen needs; a write of a member's standing that an org brain takes from a head alone |
 | 404 | `no-route` | no route answers this method and path |
 | 404 | `not-found` | nothing stands at the key the path names |
 | 409 | `conflict` | the member's state does not allow the change |

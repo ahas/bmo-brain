@@ -34,6 +34,9 @@ fn memory(kind: &str, text: &str) -> NewMemory {
     status: None,
     actor_name: "writer-a".to_owned(),
     labels: labels(&[]),
+    internal_only: None,
+    locked: None,
+    standing: None,
   }
 }
 
@@ -43,6 +46,7 @@ async fn brain_of(client: &BrainClient, agent: &str) -> i64 {
       account_key: "account-a".to_owned(),
       agent_key: agent.to_owned(),
       name: None,
+      kind: None,
     })
     .await
     .unwrap()
@@ -58,6 +62,7 @@ async fn a_brain_is_made_once_per_account_and_agent_and_listed_by_them() {
       account_key: "account-a".to_owned(),
       agent_key: "agent-a".to_owned(),
       name: None,
+      kind: None,
     })
     .await
     .unwrap();
@@ -67,6 +72,7 @@ async fn a_brain_is_made_once_per_account_and_agent_and_listed_by_them() {
       account_key: "account-a".to_owned(),
       agent_key: "agent-a".to_owned(),
       name: Some("Other".to_owned()),
+      kind: None,
     })
     .await;
   assert_eq!(refused(again), (409, "conflict".to_owned()));
@@ -287,6 +293,7 @@ async fn a_memory_is_versioned_never_edited_and_its_key_moves_with_the_live_vers
         actor_name: "writer-b".to_owned(),
         reason: None,
         text: None,
+        standing: None,
       },
     )
     .await
@@ -302,6 +309,7 @@ async fn a_memory_is_versioned_never_edited_and_its_key_moves_with_the_live_vers
         actor_name: "writer-b".to_owned(),
         reason: None,
         text: None,
+        standing: None,
       },
     )
     .await;
@@ -349,6 +357,7 @@ async fn a_memory_is_versioned_never_edited_and_its_key_moves_with_the_live_vers
         actor_name: "owner".to_owned(),
         reason: None,
         text: None,
+        standing: None,
       },
     )
     .await
@@ -462,6 +471,7 @@ async fn the_types_in_use_count_their_live_rows_with_the_reserved_ones_first() {
     actor_name: "writer-a".to_owned(),
     reason: Some("closed".to_owned()),
     text: None,
+    standing: None,
   };
   client.memory_add(brain, &memory("fact", "A")).await.unwrap();
   let versioned = client.memory_add(brain, &memory("fact", "A2")).await.unwrap();

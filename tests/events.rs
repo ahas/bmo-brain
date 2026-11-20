@@ -17,6 +17,7 @@ fn brain(agent: &str) -> NewBrain {
     account_key: "account-a".into(),
     agent_key: agent.into(),
     name: None,
+    kind: None,
   }
 }
 

@@ -7,15 +7,15 @@ mod client;
 mod wire;
 
 pub use brains::{
-  Brain, BrainsQuery, Confirmations, Consolidated, ExportQuery, Fold, Folded, Hits, Injected, Layer,
-  LayerChange, LayersQuery, Learned, Learning, MemoriesQuery, Memory, MemoryMerge, MemoryMove,
-  MemoryStatus, MemoryVersion, NewBrain, NewLayer, NewMemory, NewSubject, PersonaQuery, Recall, RecallAsk,
-  RecallChoice, RecallPart, Recorded, Restoration, Rules, SheetQuery, Subject, SubjectChange, SubjectKey,
-  SubjectRef, SubjectsQuery, TalliesQuery, Tally, TallyBy, TypeCount,
+  Audience, Brain, BrainKind, BrainsQuery, Confirmations, Consolidated, ExportQuery, Fold, Folded, Hits,
+  Injected, Layer, LayerChange, LayersQuery, Learned, Learning, MemoriesQuery, Memory, MemoryMerge,
+  MemoryMove, MemoryStatus, MemoryVersion, NewBrain, NewLayer, NewMemory, NewSubject, PersonaQuery, Recall,
+  RecallAsk, RecallChoice, RecallPart, Recorded, Restoration, Rules, SheetQuery, Subject, SubjectChange,
+  SubjectKey, SubjectRef, SubjectsQuery, TalliesQuery, Tally, TallyBy, TypeCount,
 };
 pub use brains::{
-  ConsolidationState, MissesQuery, SearchCount, SearchMiss, SimilarAsk, Source, UnconsolidatedEpisode,
-  UnconsolidatedQuery,
+  ConsolidationState, MissesQuery, OrgTopic, OrgTopicsQuery, SearchCount, SearchMiss, SimilarAsk, Source,
+  Standing, UnconsolidatedEpisode, UnconsolidatedQuery,
 };
 pub use client::{Answer, BrainClient, ClientFailure};
 /// The HTTP client a `BrainClient` calls through, for a caller that sets its own timeout or proxy.

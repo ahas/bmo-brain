@@ -11,10 +11,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The brains, by account and agent. */
+        /** The brains, by kind, account and agent. */
         get: operations["listBrains"];
         put?: never;
-        /** Make a brain for an account and an agent that have none. */
+        /** Make a brain, an agent's or an org unit's, at a pair of keys where none stands. */
         post: operations["createBrain"];
         delete?: never;
         options?: never;
@@ -590,11 +590,33 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/org-topics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** What stands for a member of an organisation: each topic the org brains of the member's units hold, answered from the farthest unit holding it locked, else the nearest holding it. */
+        get: operations["listOrgTopics"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        /** @description One agent's long-term memory, keyed by the account that owns it and the agent it belongs to. */
+        /** @description Whom a reading of an org brain is for. */
+        Audience: "internal" | "external";
+        /**
+         * @description A brain: one agent's long-term memory, keyed by the account that owns it and the agent it belongs to, or
+         *     one unit's of an organisation, keyed by the company and the unit.
+         */
         Brain: {
             /** @description The account's opaque key, as the caller gives it. */
             accountKey: string;
@@ -604,8 +626,15 @@ export interface components {
             createdAt: number;
             /** Format: int64 */
             id: number;
+            /**
+             * @description Whose it is; set when it is made and never changed. An answer that names none is an agent's brain.
+             * @default agent
+             */
+            kind: components["schemas"]["BrainKind"];
             name: string;
         };
+        /** @description Whose a brain is: an agent's, or a unit's of an organisation (docs/design.md, 「Org brains」). */
+        BrainKind: "agent" | "org";
         /** @description One page of a list, oldest first. */
         BrainPage: {
             items: components["schemas"]["Brain"][];
@@ -856,6 +885,11 @@ export interface components {
             grounds: number[];
             /** Format: int64 */
             importance?: number | null;
+            /**
+             * @description In an org brain, whether it is kept from a room where someone outside the company sits; true where none
+             *     is given.
+             */
+            internalOnly?: boolean | null;
             key?: string | null;
             /** @default {} */
             labels: {
@@ -863,6 +897,8 @@ export interface components {
             };
             /** Format: int64 */
             layerId?: number | null;
+            /** @description In an org brain, whether no lower unit overrides its topic; false where none is given. */
+            locked?: boolean | null;
             /** @description The situation in which it is needed, in words. */
             recallCondition?: string | null;
             /** @description The situation that ends it, in words. */
@@ -873,6 +909,8 @@ export interface components {
              */
             replaces: number[];
             source: components["schemas"]["Source"];
+            /** @description Who writes into an org brain; `member` where none is given. */
+            standing?: components["schemas"]["Standing"] | null;
             /**
              * Format: int64
              * @description The live memory this says more fully: a new version of it is written.
@@ -905,6 +943,12 @@ export interface components {
              * @description The writer's weight at the time of writing, 1 to 10.
              */
             importance: number;
+            /**
+             * @description In an org brain, whether it is kept from a room where someone outside the company sits; false in an
+             *     agent's brain.
+             * @default false
+             */
+            internalOnly: boolean;
             /** @description The caller's identifier, unique among the live rows of a brain. */
             key: string | null;
             labels: {
@@ -924,6 +968,11 @@ export interface components {
              * @description The first version's id in this row's line.
              */
             lineageId: number;
+            /**
+             * @description In an org brain, whether no lower unit overrides its topic; false in an agent's brain.
+             * @default false
+             */
+            locked: boolean;
             /**
              * Format: int64
              * @description Where it stands within its layer.
@@ -981,12 +1030,22 @@ export interface components {
             actorName: string;
             /** Format: int64 */
             importance?: number | null;
+            /**
+             * @description In an org brain, whether it is kept from a room where someone outside the company sits; set where any
+             *     merged row carries it, where not given.
+             */
+            internalOnly?: boolean | null;
             key?: string | null;
             labels?: {
                 [key: string]: string;
             } | null;
             /** Format: int64 */
             layerId?: number | null;
+            /**
+             * @description In an org brain, whether no lower unit overrides its topic; set where any merged row carries it, where
+             *     not given.
+             */
+            locked?: boolean | null;
             /** @description The live rows merged, two or more. */
             memoryIds: number[];
             /** Format: int64 */
@@ -995,6 +1054,8 @@ export interface components {
             recallCondition?: string | null;
             /** @description The situation that ends it; the one every merged row shares where none is given. */
             releaseCondition?: string | null;
+            /** @description Who writes into an org brain; `member` where none is given. */
+            standing?: components["schemas"]["Standing"] | null;
             subjectIds?: number[] | null;
             subjects?: components["schemas"]["SubjectKey"][] | null;
             text: string;
@@ -1015,6 +1076,8 @@ export interface components {
             at?: number | null;
             /** @description Why it moves, kept on the row moved. */
             reason?: string | null;
+            /** @description Who writes into an org brain; `member` where none is given. */
+            standing?: components["schemas"]["Standing"] | null;
             status: components["schemas"]["MemoryStatus"];
             /**
              * @description For a move to `done`: the words it ended on, written as a new version that is then moved. For a move to
@@ -1035,6 +1098,11 @@ export interface components {
             actorName: string;
             /** Format: int64 */
             importance?: number | null;
+            /**
+             * @description In an org brain, whether it is kept from a room where someone outside the company sits; the old
+             *     version's where not given.
+             */
+            internalOnly?: boolean | null;
             labels?: {
                 [key: string]: string;
             } | null;
@@ -1044,6 +1112,8 @@ export interface components {
              *     every layer.
              */
             layerId?: number | null;
+            /** @description In an org brain, whether no lower unit overrides its topic; the old version's where not given. */
+            locked?: boolean | null;
             /**
              * Format: int64
              * @description The old version's where not given, or after the last of the layer the new version moves into.
@@ -1053,6 +1123,8 @@ export interface components {
             recallCondition?: string | null;
             /** @description The situation that ends it: the old version's where not given, and a null clears it. */
             releaseCondition?: string | null;
+            /** @description Who writes into an org brain; `member` where none is given. */
+            standing?: components["schemas"]["Standing"] | null;
             /** @description The subjects the new version is about, replacing the old version's whole where given. */
             subjectIds?: number[] | null;
             subjects?: components["schemas"]["SubjectKey"][] | null;
@@ -1068,6 +1140,8 @@ export interface components {
         NewBrain: {
             accountKey: string;
             agentKey: string;
+            /** @description `agent` where none is given. */
+            kind?: components["schemas"]["BrainKind"] | null;
             /** @description The agent's key where none is given. */
             name?: string | null;
         };
@@ -1090,6 +1164,11 @@ export interface components {
              * @description 1 to 10; 5 where none is given.
              */
             importance?: number | null;
+            /**
+             * @description In an org brain, whether it is kept from a room where someone outside the company sits; true where none
+             *     is given.
+             */
+            internalOnly?: boolean | null;
             key?: string | null;
             /** @default {} */
             labels: {
@@ -1097,12 +1176,16 @@ export interface components {
             };
             /** Format: int64 */
             layerId?: number | null;
+            /** @description In an org brain, whether no lower unit overrides its topic; false where none is given. */
+            locked?: boolean | null;
             /** Format: int64 */
             position?: number | null;
             /** @description The situation in which it is needed, in words. */
             recallCondition?: string | null;
             /** @description The situation that ends it, in words. */
             releaseCondition?: string | null;
+            /** @description Who writes into an org brain; `member` where none is given. */
+            standing?: components["schemas"]["Standing"] | null;
             /** @description `active` where none is given; `pending` is the other status a first version takes. */
             status?: components["schemas"]["MemoryStatus"] | null;
             /**
@@ -1129,6 +1212,20 @@ export interface components {
             description: string;
             key: string;
             type: string;
+        };
+        /** @description One topic as it stands for a member: the memories of the one unit whose word on it holds. */
+        OrgTopic: {
+            /**
+             * Format: int64
+             * @description The brain whose memories stand for it: the first named holding a locked one, else the last holding one.
+             */
+            brainId: number;
+            /** @description Whether that brain's memories of it are locked. */
+            locked: boolean;
+            /** @description Those memories, by importance, highest first, then latest first. */
+            memories: components["schemas"]["Memory"][];
+            /** @description The key of the subject of type `topic`. */
+            topic: string;
         };
         /** @description What a turn is handed. */
         Recall: {
@@ -1219,6 +1316,8 @@ export interface components {
         /** @description A closed lineage restored: a new active version written after its newest, closed one. */
         Restoration: {
             actorName: string;
+            /** @description Who writes into an org brain; `member` where none is given. */
+            standing?: components["schemas"]["Standing"] | null;
             /** @description The closed row's text where none is given. */
             text?: string | null;
         };
@@ -1372,6 +1471,8 @@ export interface components {
         };
         /** @description Where a learning came from, which decides whether it stands as a fact on its own. */
         Source: "own" | "owner" | "told" | "inferred";
+        /** @description Who writes into an org brain, as the caller checked it with the service that keeps the organisation. */
+        Standing: "member" | "head";
         /** @description Something a memory can be about, found by its type and key alone. */
         Subject: {
             /** Format: int64 */
@@ -1484,6 +1585,12 @@ export interface components {
              * @description The writer's weight at the time of writing, 1 to 10.
              */
             importance: number;
+            /**
+             * @description In an org brain, whether it is kept from a room where someone outside the company sits; false in an
+             *     agent's brain.
+             * @default false
+             */
+            internalOnly: boolean;
             /** @description The caller's identifier, unique among the live rows of a brain. */
             key: string | null;
             labels: {
@@ -1503,6 +1610,11 @@ export interface components {
              * @description The first version's id in this row's line.
              */
             lineageId: number;
+            /**
+             * @description In an org brain, whether no lower unit overrides its topic; false in an agent's brain.
+             * @default false
+             */
+            locked: boolean;
             /**
              * Format: double
              * @description The sum over its subjects of ln(1 + the use of the live rows about that subject).
@@ -1661,6 +1773,7 @@ export interface operations {
                 accountKey?: string | null;
                 after?: number | null;
                 agentKey?: string | null;
+                kind?: components["schemas"]["BrainKind"] | null;
                 limit?: number | null;
             };
             header?: never;
@@ -2946,6 +3059,35 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+        };
+    };
+    listOrgTopics: {
+        parameters: {
+            query: {
+                /** @description `internal` where none is given. */
+                audience?: components["schemas"]["Audience"] | null;
+                /** @description The org brains' ids, comma-separated, the farthest unit first: one to fifty, none twice. */
+                brainIds: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrgTopic"][];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
         };
     };
 }

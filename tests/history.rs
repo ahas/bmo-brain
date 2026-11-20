@@ -26,6 +26,9 @@ fn memory(text: &str) -> NewMemory {
     status: None,
     actor_name: "writer-a".to_owned(),
     labels: labels(&[]),
+    internal_only: None,
+    locked: None,
+    standing: None,
   }
 }
 
@@ -35,6 +38,7 @@ async fn brain_of(client: &BrainClient) -> i64 {
       account_key: "account-a".to_owned(),
       agent_key: "agent-a".to_owned(),
       name: None,
+      kind: None,
     })
     .await
     .unwrap()
@@ -92,6 +96,7 @@ async fn a_row_records_when_it_stopped_being_current() {
         actor_name: "writer-a".to_owned(),
         reason: None,
         text: None,
+        standing: None,
       },
     )
     .await
@@ -172,6 +177,7 @@ async fn a_retracted_statement_reads_as_retracted_in_its_successors_line() {
         actor_name: "writer-a".to_owned(),
         reason: Some("the member said it wrong".to_owned()),
         text: Some("The member lives in Lille.".to_owned()),
+        standing: None,
       },
     )
     .await
@@ -221,6 +227,7 @@ async fn a_retracted_statement_reads_as_retracted_in_its_successors_line() {
         actor_name: "writer-a".to_owned(),
         reason: None,
         text: None,
+        standing: None,
       },
     )
     .await
@@ -362,6 +369,9 @@ async fn a_row_told_after_a_later_one_takes_its_place_behind_it() {
         layer_id: None,
         actor_name: "writer-a".to_owned(),
         labels: labels(&[]),
+        internal_only: None,
+        locked: None,
+        standing: None,
       },
     )
     .await

@@ -10,9 +10,10 @@ use axum::routing::{get, post};
 use bmo_brain_client::{
   Brain as BrainMember, BrainsQuery, Confirmations, Consolidated, ConsolidationState, ExportQuery, Fold,
   Folded, Hits, Injected, Layer, LayerChange, LayersQuery, Learned, Learning, MemoriesQuery, Memory,
-  MemoryMerge, MemoryMove, MemoryVersion, MissesQuery, NewBrain, NewLayer, NewMemory, NewSubject, Page,
-  PersonaQuery, Recall, RecallAsk, Recorded, Restoration, SearchMiss, SheetQuery, SimilarAsk, Subject,
-  SubjectChange, SubjectsQuery, TalliesQuery, Tally, TypeCount, UnconsolidatedEpisode, UnconsolidatedQuery,
+  MemoryMerge, MemoryMove, MemoryVersion, MissesQuery, NewBrain, NewLayer, NewMemory, NewSubject, OrgTopic,
+  OrgTopicsQuery, Page, PersonaQuery, Recall, RecallAsk, Recorded, Restoration, SearchMiss, SheetQuery,
+  SimilarAsk, Subject, SubjectChange, SubjectsQuery, TalliesQuery, Tally, TypeCount, UnconsolidatedEpisode,
+  UnconsolidatedQuery,
 };
 
 use super::{Answer, Body, Brain, Key, Query};
@@ -33,6 +34,13 @@ async fn brains(
   Query(query): Query<BrainsQuery>,
 ) -> Answer<Json<Page<BrainMember>>> {
   Ok(Json(brain.store.brains(&query).await?))
+}
+
+async fn org_topics(
+  State(brain): State<Brain>,
+  Query(query): Query<OrgTopicsQuery>,
+) -> Answer<Json<Vec<OrgTopic>>> {
+  Ok(Json(brain.store.org_topics(&query).await?))
 }
 
 async fn brain_add(State(brain): State<Brain>, Body(body): Body<NewBrain>) -> Answer<Created<BrainMember>> {
@@ -300,6 +308,7 @@ async fn inject(State(brain): State<Brain>, Key(id): Key<i64>, body: Bytes) -> A
 pub fn routes() -> Router<Brain> {
   Router::new()
     .route("/brains", get(brains).post(brain_add))
+    .route("/org-topics", get(org_topics))
     .route("/brains/{brainId}", get(brain_read).delete(brain_let_go))
     .route("/brains/{brainId}/subjects", get(subjects).post(subject_add))
     .route("/brains/{brainId}/subjects/{subjectId}", get(subject).patch(subject_change))

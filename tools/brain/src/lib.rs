@@ -6,8 +6,8 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use bmo_brain_client::{
-  BrainClient, BrainsQuery, ClientFailure, Consolidated, Fold, Learning, MemoriesQuery, MemoryMove,
-  MemoryStatus, NewMemory, SimilarAsk, Source, SubjectKey, UnconsolidatedQuery,
+  BrainClient, BrainKind, BrainsQuery, ClientFailure, Consolidated, Fold, Learning, MemoriesQuery,
+  MemoryMove, MemoryStatus, NewMemory, SimilarAsk, Source, SubjectKey, UnconsolidatedQuery,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -163,6 +163,7 @@ fn failed(why: ClientFailure) -> String {
 pub async fn brain_id(client: &BrainClient, agent: &str) -> Result<i64, String> {
   let page = client
     .brains(&BrainsQuery {
+      kind: Some(BrainKind::Agent),
       agent_key: Some(agent.to_owned()),
       limit: Some(2),
       ..Default::default()
@@ -288,6 +289,9 @@ pub async fn answer(handed: Handed) -> Result<Answer, String> {
             status: None,
             actor_name: ACTOR.to_owned(),
             labels: Default::default(),
+            internal_only: None,
+            locked: None,
+            standing: None,
           },
         )
         .await
@@ -362,6 +366,9 @@ pub async fn answer(handed: Handed) -> Result<Answer, String> {
             layer_id: None,
             actor_name: ACTOR.to_owned(),
             labels: Default::default(),
+            internal_only: None,
+            locked: None,
+            standing: None,
           },
         )
         .await
@@ -391,6 +398,7 @@ pub async fn answer(handed: Handed) -> Result<Answer, String> {
             actor_name: ACTOR.to_owned(),
             reason: None,
             text: None,
+            standing: None,
           },
         )
         .await

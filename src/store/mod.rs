@@ -8,6 +8,7 @@ pub mod events;
 pub mod files;
 pub mod learning;
 pub mod misses;
+pub mod orgs;
 pub mod recall;
 pub mod rules;
 pub mod sheets;
@@ -32,6 +33,8 @@ pub static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("./migrations");
 pub enum Fault {
   /// The request is not the shape the route takes; the sentence names what is wrong.
   BadRequest(String),
+  /// The writer's standing does not allow the change.
+  Forbidden(String),
   /// Nothing stands at the key named.
   NotFound(String),
   /// The member's state does not allow the change.
@@ -46,6 +49,7 @@ impl std::fmt::Display for Fault {
   fn fmt(&self, out: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match self {
       Self::BadRequest(why)
+      | Self::Forbidden(why)
       | Self::NotFound(why)
       | Self::Conflict(why)
       | Self::Gone(why)

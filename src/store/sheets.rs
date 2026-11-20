@@ -383,6 +383,7 @@ impl Store {
                 status: Some(status),
                 actor_name: SPLITTER.to_owned(),
                 labels,
+                ..NewMemory::default()
               },
               at,
             )
@@ -406,6 +407,7 @@ impl Store {
               actor_name: SPLITTER.to_owned(),
               reason: Some(SPLIT_REASON.to_owned()),
               text: None,
+              standing: None,
             },
           )
           .await?;
