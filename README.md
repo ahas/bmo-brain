@@ -20,6 +20,15 @@ No personal data stands in this repository: no person's name, handle, account id
 number, home path, host name, domain, token or private network address, in code, comments, documents, test
 fixtures or commit messages. `docs/PERSONAL-DATA.md` states the rule and the check that holds it.
 
+## Models
+
+The brain searches by meaning through an embedding model it asks over HTTP; the repository holds none. Its
+`[embedding]` settings name an OpenAI-compatible `/v1/embeddings` address, the file its key is read from, the
+model name and the vectors' length (1024 by default, `docs/boundary-api.md`). Any model that answers vectors of
+that length serves, a small local one such as Qwen3-Embedding-0.6B (1024 dimensions) behind an LLM gateway among
+them; changing the model is a settings change followed by `bmo-brain embed`, which embeds every live row again.
+Without `[embedding]` the brain searches by words alone. The model keeps its own licence; the code here is MIT.
+
 ## Layout
 
 | Folder | Holds |
