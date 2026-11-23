@@ -52,7 +52,7 @@ file = "env/brain.toml"
 text = '''
 listen = "127.0.0.1:{{port.brain.server}}"
 token = "{{token.brain.service}}"
-database = "postgres:///bmo_brain?host=/var/run/postgresql"
+database = "postgres:///bmo_brain?host={{postgres.host}}&port={{postgres.port}}"
 data_root = "{{data_root}}"
 
 [console]
