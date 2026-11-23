@@ -565,6 +565,9 @@ what came of that. What a person changes there takes the shape a tool's change t
 status move, and nothing is deleted. The screen is built from `client/` as a browser module on bmo-ui's
 console bundle contract and served by the brain itself (`docs/boundary-api.md`, 「The console bundle」).
 
+- **Four languages.** The screen's words come in English, Korean, Japanese and Simplified Chinese (`en`, `ko`,
+  `ja` and `zh-CN`), one pack each under `client/i18n/locales`, every pack holding the same keys with the same
+  placeholders; the bundle answers all four and the screen speaks the console's own locale.
 - **Who opens it.** An administrator, and no member. The brain does not know who sits at the screen: the
   console relays it with its own token and the reader's role, and the screen shows every brain the brain
   keeps. A write from the screen carries the screen's own `actorName`.
@@ -685,8 +688,8 @@ console bundle contract and served by the brain itself (`docs/boundary-api.md`, 
   subject, headed by the subject's name, as the brain renders it from the facts about it (「A person is a
   subject」), and not at all where the subject has no fact.
 - **Writing in another language.** The brain's rows stay English: no word of another script reaches a row. Words
-  typed in the console's own language to teach, to edit a text, or as a move's reason or the words a row ended on
-  are translated into English through the same translator before they are saved, and the screen shows the
+  typed in the console's own language to teach, to edit a text, or as a move's reason or the words a row ended on,
+  read as such by holding Hangul, kana or Han, are translated into English through the same translator before they are saved, and the screen shows the
   English to confirm, with a label saying it was translated; the English, which the person may still change, is
   what is saved. Where the translation fails, the words come back untranslated, or no translator is named, the
   screen says so in one sentence and saves nothing until the words are English.

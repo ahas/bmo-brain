@@ -2,7 +2,7 @@ import { TRANSLATION_BATCH, hasTranslator, translated } from "bmo-ui/app/domain/
 import { ref, shallowReactive, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
-import { holdsHangul } from "./brain-words";
+import { holdsOtherScript } from "./brain-words";
 
 import type { Reading } from "bmo-ui/app/domain/translation";
 import type { Ref } from "vue";
@@ -137,7 +137,11 @@ export function useReading(): Reader {
   if (reader === null) {
     const { locale } = useI18n();
 
-    reader = readerOver(String(locale.value).split("-")[0] ?? ENGLISH, translated, hasTranslator());
+    const tag = String(locale.value);
+
+    // A regional English reads English; any other locale keeps its whole tag, so Simplified Chinese is asked for
+    // as such.
+    reader = readerOver(tag.split("-")[0] === ENGLISH ? ENGLISH : tag, translated, hasTranslator());
   }
 
   return reader;
@@ -145,7 +149,7 @@ export function useReading(): Reader {
 
 /**
  * Why words could not be made English for a row: no translator, a translation that failed or came back
- * untranslated, or Hangul still in it.
+ * untranslated, or another script still in it.
  */
 export type EnglishFault = "no-translator" | "failed" | "not-english";
 
@@ -175,7 +179,7 @@ export function useEnglishWords(words: () => string) {
     if (english.value !== null) {
       const confirmed = english.value.trim();
 
-      if (holdsHangul(confirmed)) {
+      if (holdsOtherScript(confirmed)) {
         fault.value = "not-english";
         return null;
       }
@@ -185,7 +189,7 @@ export function useEnglishWords(words: () => string) {
 
     const typed = words().trim();
 
-    if (!holdsHangul(typed)) return typed;
+    if (!holdsOtherScript(typed)) return typed;
 
     if (!translator) {
       fault.value = "no-translator";

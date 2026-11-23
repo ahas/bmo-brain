@@ -46,7 +46,8 @@ export function wordChange(before: string, after: string): Piece[] {
   return pieces;
 }
 
-// Whether words hold Hangul, which the screen does not save while no translator reaches it.
-export function holdsHangul(words: string): boolean {
-  return /[ᄀ-ᇿ㄰-㆏ꥠ-꥿가-힯ힰ-퟿]/.test(words);
+// Whether words hold a script of the screen's other languages, Hangul, kana or Han, which the screen reads into
+// English before it saves them and does not save while no translator reaches it.
+export function holdsOtherScript(words: string): boolean {
+  return /[\p{Script=Hangul}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Han}]/u.test(words);
 }

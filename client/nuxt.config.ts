@@ -7,7 +7,12 @@ export default defineNuxtConfig({
   i18n: {
     strategy: "no_prefix",
     defaultLocale: "ko",
-    locales: [{ code: "ko", language: "ko-KR", file: "ko.json" }]
+    locales: [
+      { code: "ko", language: "ko-KR", file: "ko.json" },
+      { code: "en", language: "en-US", file: "en.json" },
+      { code: "ja", language: "ja-JP", file: "ja.json" },
+      { code: "zh-CN", language: "zh-CN", file: "zh-CN.json" }
+    ]
   },
   compatibilityDate: "2025-09-01",
   devtools: { enabled: false }
