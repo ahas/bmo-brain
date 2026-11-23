@@ -237,7 +237,7 @@
       "keep_short": "Keep",
       "drop": "Drop",
       "keep_effect": "Not made global; only the original in {brain} stays.",
-      "drop_effect": "The original in {brain} is moved to not correct as well, so nothing reads it.",
+      "drop_effect": "Dropping it also marks the original in {brain} as not correct, so nothing reads it any more.",
       "source": "{brain} #{id}",
       "open_source": "Open the original"
     }

@@ -237,7 +237,7 @@
       "keep_short": "保留",
       "drop": "丢弃",
       "keep_effect": "不设为全局，只保留 {brain} 中的原记忆。",
-      "drop_effect": "{brain} 中的原记忆也会移为不正确，任何地方都不再读取它。",
+      "drop_effect": "丢弃后，{brain} 中的原记忆也会一并改为“不正确”，任何地方都不再读取它。",
       "source": "{brain} #{id}",
       "open_source": "打开原记忆"
     }

@@ -237,7 +237,7 @@
       "keep_short": "남김",
       "drop": "버림",
       "keep_effect": "전역으로 올리지 않고 {brain}의 원래 기억만 남깁니다.",
-      "drop_effect": "{brain}의 원래 기억도 맞지 않음으로 옮겨 어디에서도 읽히지 않습니다.",
+      "drop_effect": "버리면 {brain}의 원래 기억도 함께 '맞지 않음'으로 바뀌어, 어디에서도 더는 읽히지 않습니다.",
       "source": "{brain} #{id}",
       "open_source": "원래 기억 열기"
     }

@@ -237,7 +237,7 @@
       "keep_short": "残す",
       "drop": "破棄",
       "keep_effect": "グローバルにはせず、{brain}の元の記憶だけを残します。",
-      "drop_effect": "{brain}の元の記憶も正しくないに移し、どこからも読まれなくなります。",
+      "drop_effect": "破棄すると、{brain}の元の記憶も「正しくない」に変わり、どこからも読まれなくなります。",
       "source": "{brain} #{id}",
       "open_source": "元の記憶を開く"
     }
