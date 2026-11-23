@@ -22,7 +22,8 @@ rules it keeps.
 - **No `bmo-*` dependency but the base libraries** `bmo-chat`, `bmo-chat-client` and `bmo-ui`, and this
   repository's own crates. `tests/repository.rs` fails on any other.
 - **English only** in code, comments, strings, tests and documents, and in commit messages. What a machine
-  reads is a status code and a kebab-case code; the sentence beside it is English.
+  reads is a status code and a kebab-case code; the sentence beside it is English. The README alone also comes
+  translated, as `README.ko.md`, `README.ja.md` and `README.zh-CN.md` beside it, each kept to the English one.
 - **No personal data** in code, comments, documents, test fixtures or commits: no agent, owner, host or
   company name, mail address, telephone number, home path, token or private network address. Tests use
   neutral names such as `writer-a` and `room:a`. `docs/PERSONAL-DATA.md` states the rule, and

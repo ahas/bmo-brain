@@ -1,3 +1,5 @@
+**English** | [한국어](README.ko.md) | [日本語](README.ja.md) | [简体中文](README.zh-CN.md)
+
 # brain
 
 The brain service, `bmo-brain`: an agent's long-term memory as a service. It keeps many brains, each an
@@ -28,7 +30,7 @@ fixtures or commit messages. `docs/PERSONAL-DATA.md` states the rule and the che
 | `client/` | the brain's screen, a Nuxt layer on bmo-ui built into the console bundle the brain serves: its pages, components, words, build and tests |
 | `migrations/` | the database's migrations, built into the binary |
 | `skills/` | `brain-harness/`, the plugin's skill |
-| `docs/` | the design, the boundary document, the OpenAPI document and the personal-data rule |
+| `docs/` | the design, the boundary document, the OpenAPI document, the tests' databases and the personal-data rule |
 | `tests/` | the service's tests and the checks that span the repository |
 | `deploy/` | the service's user unit, `bmo-brain.service`, which a deployment links from the deploy tree |
 | `tools/` | the tools for the tool host: the brain's, `brain/`, and the memory tool, `memory/`, each with its manifest, its entries' schemas and the crate of its executable |
@@ -69,8 +71,13 @@ The service publishes its client in two languages, both from `docs/openapi.json`
 ## Running
 
 - `bmo-brain --config <file> serve` runs the migrations and answers on the listen address. The configuration is
-  a TOML file of three keys: `listen`, `token` and `database`.
+  a TOML file whose required keys are `listen`, `token` and `database`; `data_root`, `[rules]`, `[embedding]` and
+  `[console]` are optional (`docs/boundary-api.md`, 「Configuration」).
 - `bmo-brain --config <file> health` ends 0 only where that service answers ready.
 - `bmo-brain mcp --brain <url>` serves the harness tools over MCP on standard input and output, with the token
   in `BRAIN_TOKEN`.
 - `bmo-brain openapi` prints the OpenAPI document; `docs/openapi.json` is its output.
+- `bmo-brain --config <file> embed` embeds every live row lacking a vector of the configured model.
+- `bmo-brain --config <file> tool-env` writes the env file the brain's tool reads the service's address and token
+  from, under the data root.
+- `bmo-brain --config <file> sheets split` splits the live sheet rows into facts; `--dry-run` writes nothing.
