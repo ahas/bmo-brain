@@ -908,6 +908,11 @@ export interface components {
              * @default []
              */
             replaces: number[];
+            /**
+             * @description In an org brain, whether it is a memory about a person that may be known inside the organisation; false
+             *     where none is given.
+             */
+            shared?: boolean | null;
             source: components["schemas"]["Source"];
             /** @description Who writes into an org brain; `member` where none is given. */
             standing?: components["schemas"]["Standing"] | null;
@@ -993,6 +998,12 @@ export interface components {
              * @default null
              */
             releaseCondition: string | null;
+            /**
+             * @description In an org brain, whether it is a memory about a person that may be known inside the organisation; false
+             *     in an agent's brain.
+             * @default false
+             */
+            shared: boolean;
             status: components["schemas"]["MemoryStatus"];
             subjects: components["schemas"]["SubjectRef"][];
             /**
@@ -1054,6 +1065,11 @@ export interface components {
             recallCondition?: string | null;
             /** @description The situation that ends it; the one every merged row shares where none is given. */
             releaseCondition?: string | null;
+            /**
+             * @description In an org brain, whether it is a memory about a person that may be known inside the organisation; set
+             *     where any merged row carries it, where not given.
+             */
+            shared?: boolean | null;
             /** @description Who writes into an org brain; `member` where none is given. */
             standing?: components["schemas"]["Standing"] | null;
             subjectIds?: number[] | null;
@@ -1123,6 +1139,11 @@ export interface components {
             recallCondition?: string | null;
             /** @description The situation that ends it: the old version's where not given, and a null clears it. */
             releaseCondition?: string | null;
+            /**
+             * @description In an org brain, whether it is a memory about a person that may be known inside the organisation; the
+             *     old version's where not given.
+             */
+            shared?: boolean | null;
             /** @description Who writes into an org brain; `member` where none is given. */
             standing?: components["schemas"]["Standing"] | null;
             /** @description The subjects the new version is about, replacing the old version's whole where given. */
@@ -1184,6 +1205,11 @@ export interface components {
             recallCondition?: string | null;
             /** @description The situation that ends it, in words. */
             releaseCondition?: string | null;
+            /**
+             * @description In an org brain, whether it is a memory about a person that may be known inside the organisation; false
+             *     where none is given.
+             */
+            shared?: boolean | null;
             /** @description Who writes into an org brain; `member` where none is given. */
             standing?: components["schemas"]["Standing"] | null;
             /** @description `active` where none is given; `pending` is the other status a first version takes. */
@@ -1472,7 +1498,7 @@ export interface components {
         /** @description Where a learning came from, which decides whether it stands as a fact on its own. */
         Source: "own" | "owner" | "told" | "inferred";
         /** @description Who writes into an org brain, as the caller checked it with the service that keeps the organisation. */
-        Standing: "member" | "head";
+        Standing: "member" | "head" | "person";
         /** @description Something a memory can be about, found by its type and key alone. */
         Subject: {
             /** Format: int64 */
@@ -1645,6 +1671,12 @@ export interface components {
              * @default null
              */
             releaseCondition: string | null;
+            /**
+             * @description In an org brain, whether it is a memory about a person that may be known inside the organisation; false
+             *     in an agent's brain.
+             * @default false
+             */
+            shared: boolean;
             status: components["schemas"]["MemoryStatus"];
             subjects: components["schemas"]["SubjectRef"][];
             /**

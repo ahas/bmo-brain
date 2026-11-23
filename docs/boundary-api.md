@@ -23,14 +23,16 @@ changes; a brain moves in and out as a brain file. The brain never executes and 
 
 ## Configuration
 
-The binary, `bmo-brain`, reads the TOML file `--config` names at start and holds it for its life.
-`bmo-brain --config <file> serve` runs the migrations and answers on the listen address;
-`bmo-brain --config <file> health` asks the service the file names whether it is ready and ends;
-`bmo-brain --config <file> sheets split` splits the live `sheet` rows of the database the file names into
-facts (「Splitting sheets」); `bmo-brain --config <file> embed` embeds every live row lacking a vector of the
-configuration's model, deletes the other models' vectors once none lacks one, prints how many it embedded, and
-ends (`docs/design.md`, 「Vectors」). The MCP server, `bmo-brain mcp`, takes no configuration file (「The harness
-plugin」). The binary declares no noun, so the platform's `bmo` hands it no command.
+The binary, `bmo-brain`, reads the TOML file `--config` names at start and holds it for its life. `bmo-brain
+--config <file> serve` runs the migrations and answers on the listen address; `bmo-brain --config <file> health`
+asks the service the file names whether it is ready and ends; `bmo-brain --config <file> sheets split` splits the
+live `sheet` rows of the database the file names into facts (「Splitting sheets」); `bmo-brain --config <file>
+embed` embeds every live row lacking a vector of the configuration's model, deletes the other models' vectors once
+none lacks one, prints how many it embedded, and ends (`docs/design.md`, 「Vectors」); `bmo-brain --config <file>
+chain declare` declares the brain's kinds on the delegation chain (「Declaring the chain's kinds」); `bmo-brain
+--config <file> base candidates` raises the candidates of the base from a source brain (「Raising candidates」). The
+MCP server, `bmo-brain mcp`, takes no configuration file (「The harness plugin」). The binary declares no noun, so
+the platform's `bmo` hands it no command.
 
 | Setting | Key | What it is |
 |---|---|---|
@@ -39,19 +41,21 @@ plugin」). The binary declares no noun, so the platform's `bmo` hands it no com
 | console | `[console]` | the console bundle (「The console bundle」), where the brain serves one: `token`, the console's bearer token, which reaches what the screen uses; `bundle`, the folder the build of `client/` wrote the module, its stylesheet and its words into, the release's `console` where none is given; `calls`, the other services the screen calls through the console, each by the service name its own manifest gives it, which the manifest names under `calls`, none where none is given |
 | database | `database` | the address of the brain's own PostgreSQL database, which holds its tables and nothing else |
 | embedding | `[embedding]` | the embedding model the brain searches by meaning with (`docs/design.md`, 「Vectors」), none where it is not named: `address`, the LLM gateway's base address, whose `/v1/embeddings` it asks; `key_file`, the file holding the gateway's bearer key, read at each ask; `model`, the model name, `embedding` where none is given; `dims`, the vectors' length, 1024; `batch`, the most texts one ask carries, 32; `max_tokens`, where a text is cut by a conservative count (a CJK or Hangul character one token, any other three characters one), 480; `query_instruction`, the instruction a query is embedded after, `Given a question, retrieve memories that answer it`, none where it is empty |
+| classifier | `[classifier]` | the chat model the candidates of the base are judged by (`docs/design.md`, 「Raising a memory to the base」), none where it is not named: `address`, the LLM gateway's base address, whose `/v1/chat/completions` it asks; `key_file`, the file holding the gateway's bearer key, read at each ask; `model`, the registration's name; `max_tokens`, the answer's ceiling, 400; `concurrency`, how many asks stand at once, 4 |
 | data root | `data_root` | the data root whose `env/brain.env` the brain's tool reads the service's address and token from; the `tool-env` verb writes it |
 | rules | `[rules]` | the numbers the brain reads by (`docs/design.md`), each with a default: `budget_tokens`, `vector_candidates` (how many rows nearest in meaning join a search's candidates, 40), `rrf_k` (the rank offset of Reciprocal Rank Fusion, 60), `bm25_k1` (how far a matched stem's weight saturates with a row's length, 1.2), `bm25_b` (how much a row's length relative to the brain's mean weighs on a matched stem, 0.75), `mmr_lambda` (the weight recall's selection gives relevance against overlap with the rows already in, 0.7), `subject_cap`, `core_fact_cap` (the most facts of one speaker's sheet the core of a recall carries, 8), `hit_times_kept` (the most use moments a memory keeps, 64), `same_session_ms` (the span of one session, an hour: the window around a tag in the consolidation order), `tag_importance` (the importance at which an unconsolidated episode tags its room's episodes around it, 8), `misses_kept` (the most misses of its searches by words a brain keeps, the newest, 5000), `previous_value_days`, `condition_share` (the share of a condition's words a turn holds before it matches, 0.5), `consolidation_threshold` |
 
-Deployed, the file stands under the data root as `env/brain.toml`, and each release links to it as
-`brain.toml`. The service runs as the user unit `deploy/bmo-brain.service`, the repository's one service: a
-deployment restarts it, waits on its health command, `bmo-brain --config <deploy tree>/brain.toml health`,
-and rolls back where it does not come up ready. Before its flip it waits for quiet (`testbed.toml`, `quiet`): the
-receiver's `quiet` command, run by its deployed path, says whether a chat turn or a research run stands under way
-that the restart would cut (the receiver's `docs/boundary-api.md`, 「The service and its commands」). The health command asks the listen address (an unspecified
-host asked at the loopback one) with the token, waits for the answer however long it takes, and ends 0 where
-the service answers ready and 1 where it answers otherwise or its connection is refused or breaks, saying why on
-its error stream. A stop (SIGTERM or an interrupt) ends every open event stream and lets the calls under way
-finish, and the service then ends; the unit waits for that and never escalates the stop to a kill.
+Deployed, the file stands under the data root as `env/brain.toml`, and each release links to it as `brain.toml`.
+The service runs as the user unit `deploy/bmo-brain.service`, the repository's one service: a deployment restarts
+it, waits on its health command, `bmo-brain --config <deploy tree>/brain.toml health`, and rolls back where it
+does not come up ready. Before its flip it waits for quiet (`testbed.toml`, `quiet`): the receiver's `quiet`
+command, run by its deployed path, says whether a chat turn or a research run stands under way that the restart
+would cut (the receiver's `docs/boundary-api.md`, 「The service and its commands」). The health command asks the
+listen address (an unspecified host asked at the loopback one) with the token, waits for the answer however long
+it takes, and ends 0 where the service answers ready and 1 where it answers otherwise or its connection is refused
+or breaks, saying why on its error stream. A stop (SIGTERM or an interrupt) ends every open event stream and lets
+the calls under way finish, and the service then ends; the unit waits for that and never escalates the stop to a
+kill.
 
 ## Common rules
 
@@ -69,15 +73,15 @@ finish, and the service then ends; the unit waits for that and never escalates t
 
 ## Health
 
-`GET /health` answers `ready`, `reason` (null when ready), `version`, `rules`, the numbers the brain
-reads by, and `searches`, each brain's count of its asks by words: `brainId`, `asks` and `misses`
-(`docs/design.md`, 「What the brain counts」), for every brain that has been asked; and `embedding`, null where the
-configuration names none, else its `address`, `keyFile`, `model`, `dims` and `batch`, `vectorised` (the live rows
-holding a vector of the model), `lacking` (the live rows holding none), `vectorAsks`, `wordAsks` and
-`vectorSkipped` (the asks since the service started that searched with vectors, by words alone, and by words
-alone because the gateway did not answer), `rejected` (the live rows the model refused even cut to 64 tokens,
-passed over until the model changes), `maxTokens`, `queryInstruction` and `lastError` (why the last ask of the gateway failed, or null). The
-service is ready where its database answers.
+`GET /health` answers `ready`, `reason` (null when ready), `version`, `rules`, the numbers the brain reads by, and
+`searches`, each brain's count of its asks by words: `brainId`, `asks` and `misses` (`docs/design.md`, 「What the
+brain counts」), for every brain that has been asked; and `embedding`, null where the configuration names none,
+else its `address`, `keyFile`, `model`, `dims` and `batch`, `vectorised` (the live rows holding a vector of the
+model), `lacking` (the live rows holding none), `vectorAsks`, `wordAsks` and `vectorSkipped` (the asks since the
+service started that searched with vectors, by words alone, and by words alone because the gateway did not
+answer), `rejected` (the live rows the model refused even cut to 64 tokens, passed over until the model changes),
+`maxTokens`, `queryInstruction` and `lastError` (why the last ask of the gateway failed, or null). The service is
+ready where its database answers.
 
 ## Events
 
@@ -127,7 +131,8 @@ importance, highest first, then by `validFrom` and `id`, latest first. A memory 
 linked to the topic's subject that is neither a `rumor` nor an `episode`. With `audience` `external`, the
 internal-only memories are left out after each topic's brain is decided, and a topic left with none is not
 answered. The items go by their brain's place among those named, the first first, then by topic; the read
-records no use.
+records no use. The base, the org brain keyed `platform` and `platform` (`docs/design.md`, 「The base」), is named
+first where it is read, as the farthest unit.
 
 Every route below stands under `/brains/{brainId}` and answers 404 `not-found` for a brain that does not
 stand.
@@ -142,7 +147,7 @@ the text of its newest `active` one, or null where it has none.
 | Route | Does | Answers |
 |---|---|---|
 | `GET /subjects` | lists by `type`, `key`, `q` (words the description holds) and `ids` (comma-separated ids) | 200, a page |
-| `POST /subjects` | `type`, `key`, `description`: makes the subject, or finds the one standing and sets its description where one is given | 201 where new, 200 where it stood; 400 for a subject of type `person` in an org brain |
+| `POST /subjects` | `type`, `key`, `description`: makes the subject, or finds the one standing and sets its description where one is given | 201 where new, 200 where it stood |
 | `GET /subjects/{subjectId}` | reads one | 200; 404 |
 | `PATCH /subjects/{subjectId}` | sets `description` | 200; 404 |
 | `GET /subjects/{subjectId}/sheet` | renders the subject's sheet (`docs/design.md`, 「A person is a subject」): its active `name` rows first, one line each as `- [#<id> name] <text>`, those linked to the room named ahead of those about no room, then its active facts, one line each as `- [#<id> since <date>] <text>`; `roomId`, a subject of type `room`, takes that room's names and facts in as well; `limit`, at least 1, renders every name and the first that many facts alone, the whole sheet where none is given | 200, `text/plain`; 400 for a `roomId` that is no room or a `limit` below 1; 404 |
@@ -169,31 +174,33 @@ A layer is a heading in the brain's table of contents: `id`, `brainId`, `name` (
 
 ### Memories
 
-One row is one memory in one version: `id`, `brainId`, `key` (the caller's identifier, or null; unique among
-the live rows of a brain; 1 to 200 characters with no control character and no whitespace, whether written or
-injected), `type`, `text`, `layerId` (or null), `position`, `subjects` (each `id`, `type`,
-`key`), `status`, `lineageId`, `supersededBy` (or null), `supersedes` (the ids of the rows this version
-replaced), `supersededAt` (when the row stopped being current: the moment of the version, merge or move that
-closed it; null while current), `validFrom`, `validTo` (or null), `recallCondition`
-(or null), `releaseCondition` (or null), `importance` (1
-to 10), `useCount` (how often it was used: handed out, reported used, confirmed or read explicitly),
-`lastUsedAt` (its latest use, or null), `lastConfirmedAt`, `consolidatedAt`, `actorName`, `reason` (why its status was
-moved, as the mover said, or null), `labels`, `locked`, `internalOnly` and `createdAt`.
+One row is one memory in one version: `id`, `brainId`, `key` (the caller's identifier, or null; unique among the
+live rows of a brain; 1 to 200 characters with no control character and no whitespace, whether written or
+injected), `type`, `text`, `layerId` (or null), `position`, `subjects` (each `id`, `type`, `key`), `status`,
+`lineageId`, `supersededBy` (or null), `supersedes` (the ids of the rows this version replaced), `supersededAt`
+(when the row stopped being current: the moment of the version, merge or move that closed it; null while current),
+`validFrom`, `validTo` (or null), `recallCondition` (or null), `releaseCondition` (or null), `importance` (1 to
+10), `useCount` (how often it was used: handed out, reported used, confirmed or read explicitly), `lastUsedAt`
+(its latest use, or null), `lastConfirmedAt`, `consolidatedAt`, `actorName`, `reason` (why its status was moved,
+as the mover said, or null), `labels`, `locked`, `internalOnly`, `shared` and `createdAt`.
 
-`locked` and `internalOnly` are an org memory's marks (`docs/design.md`, 「Org brains」): no lower unit
-overrides its topic, and it is kept from a room where someone outside the company sits. A first version, a
-learning, a version and a merge may set either; where none is given, a first version and a learning in an org
-brain are internal-only and not locked, a version takes the marks of the version it supersedes, and a merge
-sets a mark where any merged row carries it. In an agent's brain both are false, and a write that sets one
-true is answered 400 `bad-request`.
+`locked`, `internalOnly` and `shared` are an org memory's marks (`docs/design.md`, 「Org brains」): no lower unit
+overrides its topic; it is kept from a room where someone outside the company sits; and it is a memory about a
+person that may be known inside the organisation. A first version, a learning, a version and a merge may set
+each; where none is given, a first version and a learning in an org brain are internal-only, not locked and not
+shared, a version takes the marks of the version it supersedes, and a merge sets a mark where any merged row
+carries it. In an agent's brain all three are false, and a write that sets one true is answered 400
+`bad-request`. In an org brain a write whose memory links a subject of type `person` and is not `shared`, or is
+`shared` and links none, is answered 400 `bad-request`.
 
 `standing` is who writes into an org brain, as the caller checked it: `head`, a head of the unit or a holder
-of its grant to write org memory, or `member`, which a write that names none is. A first version, a version,
-a merge, a move, a restoration and a learning take it. A member's first version or learning is a proposal,
-written as a `rumor` whatever its `type`, closing nothing: a learning's `replaces` closes nothing and its
-`strengthens` is answered 403 `forbidden`, as a member's version, merge, move and restoration are. An agent's
-brain reads no standing. No memory of an org brain is about a person: a write naming a subject of type
-`person` there is answered 400 `bad-request`.
+of its grant to write org memory; `person`, the person the memory is about; or `member`, which a write that
+names none is. A first version, a version, a merge, a move, a restoration and a learning take it. `person` is
+taken as `head` where the memory written, or the row moved or restored, is `shared` and links one subject of
+type `person` alone, and as `member` otherwise. A member's first version or learning is a proposal, written as a
+`rumor` whatever its `type`, closing nothing: a learning's `replaces` closes nothing and its `strengthens` is
+answered 403 `forbidden`, as a member's version, merge, move and restoration are. An agent's brain reads no
+standing.
 
 `recallCondition` is the situation in which the memory is needed and `releaseCondition` the situation that ends
 it, each the writer's words and null where it carries none (`docs/design.md`, 「Recall」). Both are set by a
@@ -267,9 +274,9 @@ null where it was not among the nearest), `fusedScore` (its Reciprocal Rank Fusi
   `persona` or `episode` row, a `pending` row, and a row written after `sessionOpenedAt` are never in it. A
   choice's `score` is its relevance, a core row's as well.
 - **A row's `recallCondition` is words a turn may say.** Where the turn's words hold at least the rules'
-  `condition_share` of a row's `recallCondition`, that situation is said and the row is carried: it is a
-  candidate of the searched part and its relevance is ln N for the N live memories of the brain, the most a cue
-  set gives, so it enters the block unless the budget or a subject's cap has filled it. A row whose condition the turn does
+  `condition_share` of a row's `recallCondition`, that situation is said and the row is carried: it is a candidate
+  of the searched part and its relevance is ln N for the N live memories of the brain, the most a cue set gives,
+  so it enters the block unless the budget or a subject's cap has filled it. A row whose condition the turn does
   not say, or which carries none, is reached by its stems and its subjects.
 - **A `releaseCondition` the turn holds ends the row.** Where at least the rules' `condition_share` of a live
   `active` row's `releaseCondition` is among the turn's words, that situation has come true: the row is never
@@ -326,13 +333,14 @@ takes the base layer alone; a named layer that does not stand is 404.
 | Route | Does | Answers |
 |---|---|---|
 | `GET /export` | the brain, or the layers `layers` names (comma-separated) with the subjects and live rows they hold, as a brain file | 200, `application/vnd.sqlite3`; 404 for a layer that does not stand |
-| `POST /injections` | reads the brain file in the body (`application/vnd.sqlite3`) into the brain: a layer is reused by its name, a subject by its type and key, a live row whose key a live row of the brain holds supersedes it unless it is the same, every other live row is added; nothing is overwritten | 201, `subjectsAdded`, `layersAdded`, `memoriesAdded`, `memoriesSuperseded`; 400 for a body that is no brain file, of another shape, holding a live row whose key is no key or whose type is `sheet`, or, read into an org brain, holding a subject of type `person`; nothing of such a file is read in |
+| `POST /injections` | reads the brain file in the body (`application/vnd.sqlite3`) into the brain: a layer is reused by its name, a subject by its type and key, a live row whose key a live row of the brain holds supersedes it unless it is the same, every other live row is added; nothing is overwritten | 201, `subjectsAdded`, `layersAdded`, `memoriesAdded`, `memoriesSuperseded`; 400 for a body that is no brain file, of another shape, holding a live row whose key is no key or whose type is `sheet`, or, read into an org brain, holding a live row that links a subject of type `person` and is not shared, or is shared and links none; nothing of such a file is read in |
 
 The file is a SQLite database of the tables `brain_file` (`shape`, `exported_at`, `name`), `subjects`,
-`layers`, `memories` and `memory_subjects`, its ids local to the file; this brain writes shape 4 and reads
-shapes 1 to 4, a shape-1 file's rows carrying no condition, a file of shape 1 or 2 a storage strength, which
-is not read, and a file of shape 1 to 3 no mark. Read into an agent's brain, a row's marks are false; read
-into an org brain, a row of a file with no marks is internal-only and not locked.
+`layers`, `memories` and `memory_subjects`, its ids local to the file; this brain writes shape 5 and reads
+shapes 1 to 5, a shape-1 file's rows carrying no condition, a file of shape 1 or 2 a storage strength, which
+is not read, a file of shape 1 to 3 no mark and a file of shape 4 no `shared` mark. Read into an agent's brain,
+a row's marks are false; read into an org brain, a row of a file with no marks is internal-only, not locked and
+not shared, and a row of a shape-4 file is not shared.
 
 ## The console bundle
 
@@ -366,10 +374,10 @@ layer's own bundle build.
   screen uses where the `Owner-Role` header allows `administrator`, and no other route. The OpenAPI document
   states each route's reach for the console's token under `x-console`, `open`, `screen` or `closed`, and marks
   the routes the service's token does not reach with `x-console-only`.
-- **The routes the screen uses:** `GET /brains` and `GET /brains/{brainId}`; under a brain, the reads of
-  subjects and a subject's sheet, layers, memories, lineages, types and tallies, the persona and the export; the writes of
-  subjects, layers, memories, versions, moves, restorations, confirmations and learnings, and the similar
-  ask; and `GET /events`.
+- **The routes the screen uses:** `GET /brains` and `GET /brains/{brainId}`; under a brain, the reads of subjects
+  and a subject's sheet, layers, memories, lineages, types and tallies, the persona and the export; the writes of
+  subjects, layers, memories, versions, moves, restorations, confirmations and learnings, and the similar ask; and
+  `GET /events`.
 
 ## Splitting sheets
 
@@ -385,13 +393,54 @@ person is a subject」).
   The bracket is taken off the text, except where its date is a span (`<date>~<date>`), which the text keeps
   as `[<date>~<date>]` ahead of its words. Where no date is read, the fact's `validFrom` is the sheet's.
 - **Each fact carries the sheet's** subjects, layer, importance, status (`active` or `pending`), the two
-  conditions and labels, with the labels `splitFrom` (the sheet's id), `section` (the words of the nearest heading above it, where
-  one stands) and `prefix` (the bracket as it stood, where one did); its `actorName` is `migration`.
+  conditions and labels, with the labels `splitFrom` (the sheet's id), `section` (the words of the nearest heading
+  above it, where one stands) and `prefix` (the bracket as it stood, where one did); its `actorName` is
+  `migration`.
 - **The sheet is then moved to `done`** with the reason `split into facts`, in the same transaction as its
   facts, so a sheet is split whole or not at all, and a sheet already split, being `done`, is not read again.
 - **It prints ids and counts alone,** never a text: a line per sheet, `sheet <id> brain <id> subjects
   <ids> lines <n> facts <n> headings <n> empty <n>`, then a line per brain, `brain <id> sheets <n> facts <n>
   skipped <n>`. `--dry-run` prints the same and writes nothing.
+
+## Declaring the chain's kinds
+
+`bmo-brain --config <file> chain declare` declares the brain's two kinds of the delegation chain, `brain.global`
+and `brain.organisation` (`docs/design.md`, 「The layers a reading takes」), on the account service with `PUT
+/chain/kinds/{key}` and `declaredBy` `brain` (bmo-web's `docs/accounts.md`, 「A setting kind」), prints one line a
+kind, `declared <key>`, and ends 0; the first refusal ends it 1, saying the status and the account service's
+words. Each is a flag, `narrowing`, true by default, with rules, at the levels `platform` and `unit`, written by
+`manage`. The account service is the one `WEB_ADDRESS` names with the token `WEB_TOKEN`, or the file
+`WEB_TOKEN_FILE` names, each read from the command's environment and else from `env/web.env` under the
+configuration's data root, a file of `KEY=VALUE` lines whose value stands verbatim after its first `=`. Where
+neither names an address, it declares nothing, says so and ends 0, as a deployment with no account service
+resolves every kind to its default. A deployment runs it after the service is up.
+
+## Raising candidates
+
+`bmo-brain --config <file> base candidates --from <brainId> [--pass-over-types <types>] [--pass-over-keys
+<prefixes>] [--limit <n>] [--dry-run]` reads the database the configuration names, not the routes, and raises the
+candidates of the base from the source brain named (`docs/design.md`, 「Raising a memory to the base」).
+
+- **What it reads:** the source's live `tip`, `check` and `knowledge` memories, oldest first, at most `--limit`
+  of them where it is given. A memory is passed over where it links a subject of type `person` or `room`, or of a
+  type `--pass-over-types` names (comma-separated), or a subject whose key begins with a prefix
+  `--pass-over-keys` names (comma-separated, case set aside), and where a row of the base, under any status,
+  already names its lineage as its source's.
+- **What it asks:** each memory left goes to the classifier (「Configuration」) as one chat completion, the
+  question in the system message and the memory's type, words and recall condition as the user's, and is a
+  candidate where the answer's first word is `yes`. An ask that fails, or an answer that is neither yes nor no,
+  leaves the memory unjudged, counted, for a later run. Without a classifier, nothing is judged and every memory
+  left is counted as unjudged.
+- **What it writes:** the base where none stands, kind `org`, both keys `platform`, named `base`; then each
+  candidate as a first version there, `pending`, its source's type, text, conditions and importance, its subjects
+  but the `episode` ones, the labels `sourceBrainId`, `sourceMemoryId`, `sourceLineageId`, `candidateModel` and
+  `candidateReason` (the model's sentence), not locked, not internal-only and not shared, under the standing
+  `head` and the `actorName` `base-review`. Each candidate is its own transaction.
+- **What it prints:** ids and counts alone, never a text. A line per candidate, `candidate <source id> base
+  <base id or ->`, then one line of counts, `considered <n> person-or-room <n> type <n> key <n> raised <n> judged
+  <n> fits <n> does-not-fit <n> unjudged <n> written <n>`, and a line per subject type that passed a memory
+  over, `passed-over <type> <n>`. `--dry-run` asks the classifier and prints the same, and writes nothing; with
+  `--limit` it judges that many alone.
 
 ## Its tool
 
@@ -409,11 +458,17 @@ host's call protocol states.
   under the data root the record's `BMO_DATA_DIR` names, else the deployment's conventional data root under
   the home the host passes through, which `bmo-brain --config <file> tool-env` writes
   from the configuration before a deployment flips.
-- **It finds the agent's brain** by `BMO_BRAIN_AGENT` in the record's variables, the chat agent a run works
-  for where its record names one, else the turn's agent, `BMO_TURN_AGENT`, else the record's holder: the one
-  brain of the kind `agent` registered for that agent key, so an org brain never stands for an agent. The turn's room, `BMO_TURN_CHAT`, is the room
-  a write links where the call names none; a call's own `room` is a string or a number, both read as the
-  room's key.
+- **It finds the agent's brain** by `BMO_BRAIN_AGENT` in the record's variables, the chat agent a run works for
+  where its record names one, else the turn's agent, `BMO_TURN_AGENT`, else the record's holder: the one brain of
+  the kind `agent` registered for that agent key, so an org brain never stands for an agent. The turn's room,
+  `BMO_TURN_CHAT`, is the room a write links where the call names none; a call's own `room` is a string or a
+  number, both read as the room's key.
+- **It reads the base beside the agent's brain** for `brain_list` and `brain_similar` (`docs/design.md`, 「The
+  layers a reading takes」), unless the record's `BMO_BRAIN_BASE` is `off`, which the session's issuer writes
+  where the delegation chain's `brain.global` resolves false for the person the session acts for. The base's
+  answer is the same ask of the base, its live `active` rows alone, less the rows whose `sourceBrainId` label
+  names the agent's brain, and stands under `base` beside the agent's own; where no base stands it is empty, and
+  where the base cannot be read the agent's own answer stands alone. Every write stays the agent's own brain's.
 - **Its entries,** each one call: `brain_episode` (`POST /brains/{brainId}/memories`, type `episode`),
   `brain_similar` (`POST …/similar`), `brain_learn` (`POST …/learnings`), `brain_move`
   (`PATCH …/memories/{memoryId}`), `brain_list` (`GET …/memories`), `brain_unconsolidated`

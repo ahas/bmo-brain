@@ -3,7 +3,8 @@
 //! told to stop; `embed` embeds every live row lacking a vector of the configuration's model; `health` ends 0 only
 //! where the service its configuration names answers ready; `mcp` serves the harness tools over MCP on
 //! standard input and output; `openapi` prints the OpenAPI document; `sheets split` splits the live sheet rows
-//! of the configuration's database into facts.
+//! of the configuration's database into facts; `chain declare` declares the brain's kinds of the delegation
+//! chain; `base candidates` raises the candidates of the base from a source brain.
 
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -61,6 +62,45 @@ enum Verb {
   Sheets {
     #[command(subcommand)]
     word: SheetsWord,
+  },
+  /// The brain's kinds of the delegation chain.
+  Chain {
+    #[command(subcommand)]
+    word: ChainWord,
+  },
+  /// The base every agent may read.
+  Base {
+    #[command(subcommand)]
+    word: BaseWord,
+  },
+}
+
+#[derive(Subcommand)]
+enum ChainWord {
+  /// Declares whether the base and the org brains are read, on the account service.
+  Declare,
+}
+
+#[derive(Subcommand)]
+enum BaseWord {
+  /// Raises the candidates of the base from a source brain: sifted by subject, judged by the classifier and
+  /// written as pending rows; prints ids and counts alone.
+  Candidates {
+    /// The source brain.
+    #[arg(long, value_name = "brainId")]
+    from: i64,
+    /// The subject types a memory is passed over for, beside a person and a room; comma-separated.
+    #[arg(long, value_name = "types", value_delimiter = ',')]
+    pass_over_types: Vec<String>,
+    /// The beginnings of subject keys a memory is passed over for, case set aside; comma-separated.
+    #[arg(long, value_name = "prefixes", value_delimiter = ',')]
+    pass_over_keys: Vec<String>,
+    /// Reads at most this many memories of the source, the oldest.
+    #[arg(long)]
+    limit: Option<usize>,
+    /// Judges and prints the same, and writes nothing.
+    #[arg(long)]
+    dry_run: bool,
   },
 }
 
@@ -217,6 +257,55 @@ async fn sheets_split(config: &Config, dry_run: bool) -> Result<(), String> {
   Ok(())
 }
 
+/// The kinds declared on the account service the environment or the data root names; nothing where none is
+/// named.
+async fn chain_declare(config: &Config) -> Result<(), String> {
+  match bmo_brain::chain::account_service(config.data_root.as_deref())? {
+    None => {
+      println!("no account service is named; nothing declared");
+      Ok(())
+    }
+    Some(service) => {
+      for key in bmo_brain::chain::declare(&service).await? {
+        println!("declared {key}");
+      }
+      Ok(())
+    }
+  }
+}
+
+/// The candidates of the base raised, or judged alone in a dry run, as lines of ids and counts.
+async fn base_candidates(config: &Config, run: bmo_brain::base::Run) -> Result<(), String> {
+  let store = Store::lazy(&config.database)?.by(config.rules.clone());
+  let came = bmo_brain::base::raise(&store, config.classifier.as_ref(), &run).await?;
+  for (source, written) in &came.candidates {
+    let base = written.map_or_else(|| "-".to_owned(), |id| id.to_string());
+    println!("candidate {source} base {base}");
+  }
+  let sifted = &came.sifted;
+  println!(
+    "considered {} person-or-room {} type {} key {} raised {} judged {} fits {} does-not-fit {} unjudged {} \
+     written {}",
+    sifted.considered,
+    sifted.person_or_room,
+    sifted.by_type,
+    sifted.by_key,
+    sifted.raised,
+    came.judged,
+    came.fits,
+    came.does_not_fit,
+    came.unjudged,
+    came.written
+  );
+  for (kind, count) in &sifted.passed_over {
+    println!("passed-over {kind} {count}");
+  }
+  for failure in &came.failures {
+    eprintln!("bmo-brain: {failure}");
+  }
+  Ok(())
+}
+
 #[tokio::main]
 async fn main() -> ExitCode {
   let Command { config, verb } = Command::parse();
@@ -252,6 +341,36 @@ async fn main() -> ExitCode {
       word: SheetsWord::Split { dry_run },
     } => match configured(config.as_ref()) {
       Ok(config) => sheets_split(&config, dry_run).await,
+      Err(why) => Err(why),
+    },
+    Verb::Chain {
+      word: ChainWord::Declare,
+    } => match configured(config.as_ref()) {
+      Ok(config) => chain_declare(&config).await,
+      Err(why) => Err(why),
+    },
+    Verb::Base {
+      word:
+        BaseWord::Candidates {
+          from,
+          pass_over_types,
+          pass_over_keys,
+          limit,
+          dry_run,
+        },
+    } => match configured(config.as_ref()) {
+      Ok(config) => {
+        let run = bmo_brain::base::Run {
+          from,
+          pass_over: bmo_brain::store::base::PassOver {
+            types: pass_over_types,
+            key_prefixes: pass_over_keys,
+          },
+          limit,
+          dry_run,
+        };
+        base_candidates(&config, run).await
+      }
       Err(why) => Err(why),
     },
   };

@@ -187,7 +187,8 @@
       "bubbles": "气泡图",
       "list": "记忆",
       "map": "思维导图",
-      "timeline": "版本时间线"
+      "timeline": "版本时间线",
+      "review": "审核"
     },
     "heading": {
       "brain_view": "{brain}的{view}",
@@ -204,7 +205,8 @@
     "unhonoured": {
       "timeline": "版本时间线显示的是一条已打开记忆的各个版本，因此不受层、对象、类型和筛选条件的限制。",
       "order": "此视图按自身顺序排列，因此不使用排序。",
-      "prompt": "提示词原文属于整个层，因此不受筛选条件限制。"
+      "prompt": "提示词原文属于整个层，因此不受筛选条件限制。",
+      "review": "审核按提出的顺序列出所有候选，因此不受层、对象、类型和筛选的限制。"
     },
     "type_name": {
       "episode": "事件",
@@ -219,12 +221,25 @@
       "check": "检查项",
       "followup": "后续事项",
       "promise": "约定",
-      "state": "状态"
+      "state": "状态",
+      "tip": "技巧"
     },
     "subject_type": {
       "person": "人物",
       "room": "房间",
       "episode": "事件"
+    },
+    "review": {
+      "empty": "没有待审核的候选。",
+      "failed": "未能保存，候选保持原样。",
+      "raise": "设为全局",
+      "keep": "留在 {brain}",
+      "keep_short": "保留",
+      "drop": "丢弃",
+      "keep_effect": "不设为全局，只保留 {brain} 中的原记忆。",
+      "drop_effect": "{brain} 中的原记忆也会移为不正确，任何地方都不再读取它。",
+      "source": "{brain} #{id}",
+      "open_source": "打开原记忆"
     }
   }
 }

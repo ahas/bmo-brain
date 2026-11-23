@@ -12,7 +12,9 @@ use sqlx::{FromRow, PgConnection, Postgres, QueryBuilder};
 
 use super::brains::{brain_of, event_scope, given, layer_of, subject_found_or_made, subjects_of};
 use super::misses::Asked;
-use super::orgs::{Marks, PROPOSAL, heads_only, proposes};
+use super::orgs::{
+  About, Given, Marks, PROPOSAL, about_row, heads_only, judged, people_among, person_rule, proposes,
+};
 use super::sheets::{SHEET, written_type};
 use super::vectors::fuse;
 use super::{Fault, Held, Store, TEXT_MOST, holding, limit, listed, now, publish, text};
@@ -24,7 +26,7 @@ pub const RESERVED_TYPES: [&str; 9] =
 pub(crate) const MEMORY_COLUMNS: &str = "id, brain_id, key, type, text, layer_id, position, status, lineage_id, \
   superseded_by, superseded_at, valid_from, valid_to, recall_condition, release_condition, importance, hits, \
   hit_times, last_hit_at, last_confirmed_at, consolidated_at, actor_name, reason, labels, locked, internal_only, \
-  created_at";
+  shared, created_at";
 
 #[derive(FromRow, Clone)]
 pub(crate) struct MemoryRow {
@@ -55,6 +57,7 @@ pub(crate) struct MemoryRow {
   pub labels: Json<Labels>,
   pub locked: bool,
   pub internal_only: bool,
+  pub shared: bool,
   pub created_at: i64,
 }
 
@@ -94,6 +97,7 @@ impl MemoryRow {
       labels: self.labels.0,
       locked: self.locked,
       internal_only: self.internal_only,
+      shared: self.shared,
       created_at: self.created_at,
     })
   }
@@ -371,9 +375,15 @@ impl Store {
       )));
     }
     let brain = brain_of(&mut *tx, brain_id).await?;
-    let marks = Marks::set(&brain, body.locked, body.internal_only, Marks::FIRST)?;
-    // A member's word in an org brain is a proposal, whatever type it names (docs/design.md, 「Org brains」).
-    let kind = if proposes(&brain, body.standing) { PROPOSAL } else { body.kind.as_str() };
+    let marks = Marks::set(
+      &brain,
+      Given {
+        locked: body.locked,
+        internal_only: body.internal_only,
+        shared: body.shared,
+      },
+      Marks::FIRST,
+    )?;
     if let Some(layer) = body.layer_id {
       layer_of(&mut *tx, brain_id, layer).await?;
     }
@@ -417,14 +427,26 @@ impl Store {
     };
     let status = if live.is_some() { MemoryStatus::Superseded } else { status };
     let subject_ids = resolve_subjects(&mut *tx, brain_id, &body.subject_ids, &body.subjects, at).await?;
+    let about = About {
+      people: people_among(&mut *tx, &subject_ids).await?,
+      shared: marks.shared,
+    };
+    person_rule(&brain, &about)?;
+    // A member's word in an org brain is a proposal, whatever type it names (docs/design.md, 「Org brains」).
+    let kind = if proposes(&brain, judged(body.standing, &[&about])) {
+      PROPOSAL
+    } else {
+      body.kind.as_str()
+    };
     let position = match body.position {
       Some(position) => position,
       None => next_position(&mut *tx, brain_id, body.layer_id).await?,
     };
     let id: i64 = sqlx::query_scalar(
       "INSERT INTO memories (brain_id, key, type, text, layer_id, position, status, lineage_id, valid_from, \
-       recall_condition, release_condition, importance, actor_name, labels, created_at, locked, internal_only) \
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 0, $8, $9, $10, $11, $12, $13, $14, $15, $16) RETURNING id",
+       recall_condition, release_condition, importance, actor_name, labels, created_at, locked, internal_only, \
+       shared) \
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 0, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17) RETURNING id",
     )
     .bind(brain_id)
     .bind(&body.key)
@@ -442,6 +464,7 @@ impl Store {
     .bind(at)
     .bind(marks.locked)
     .bind(marks.internal_only)
+    .bind(marks.shared)
     .fetch_one(&mut *tx)
     .await?;
     match live {
@@ -504,7 +527,6 @@ impl Store {
     }
     let importance = body.importance.map(Some).map(importance).transpose()?;
     let brain = brain_of(&mut *tx, brain_id).await?;
-    heads_only(&brain, body.standing, "version")?;
     let old = self.row_of(&mut *tx, brain_id, id, true).await?;
     let status = old.status()?;
     if !status.is_live() {
@@ -513,7 +535,15 @@ impl Store {
         status.name()
       )));
     }
-    let marks = Marks::set(&brain, body.locked, body.internal_only, Marks::of(&old))?;
+    let marks = Marks::set(
+      &brain,
+      Given {
+        locked: body.locked,
+        internal_only: body.internal_only,
+        shared: body.shared,
+      },
+      Marks::of(&old),
+    )?;
     if body.kind.is_none() {
       written_type(&old.kind)?;
     }
@@ -549,6 +579,13 @@ impl Store {
         .await?
       }
     };
+    let was = about_row(&mut *tx, &old).await?;
+    let about = About {
+      people: people_among(&mut *tx, &subject_ids).await?,
+      shared: marks.shared,
+    };
+    heads_only(&brain, judged(body.standing, &[&was, &about]), "version")?;
+    person_rule(&brain, &about)?;
     let valid_from = body.valid_from.unwrap_or(at);
     let recall_condition = body.recall_condition.clone().unwrap_or_else(|| old.recall_condition.clone());
     let release_condition = body.release_condition.clone().unwrap_or_else(|| old.release_condition.clone());
@@ -560,9 +597,9 @@ impl Store {
     let new_id: i64 = sqlx::query_scalar(
       "INSERT INTO memories (brain_id, key, type, text, layer_id, position, status, lineage_id, valid_from, \
        recall_condition, release_condition, importance, hits, hit_times, last_hit_at, last_confirmed_at, \
-       actor_name, labels, created_at, locked, internal_only) \
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21) \
-       RETURNING id",
+       actor_name, labels, created_at, locked, internal_only, shared) \
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, \
+       $22) RETURNING id",
     )
     .bind(brain_id)
     .bind(&old.key)
@@ -585,6 +622,7 @@ impl Store {
     .bind(at)
     .bind(marks.locked)
     .bind(marks.internal_only)
+    .bind(marks.shared)
     .fetch_one(&mut *tx)
     .await?;
     sqlx::query("UPDATE memories SET superseded_by = $2, superseded_at = $3 WHERE id = $1")
@@ -631,7 +669,6 @@ impl Store {
       return Err(Fault::BadRequest("memoryIds names fewer than two memories.".to_owned()));
     }
     let brain = brain_of(&mut *tx, brain_id).await?;
-    heads_only(&brain, body.standing, "merge")?;
     if let Some(layer) = body.layer_id {
       layer_of(&mut *tx, brain_id, layer).await?;
     }
@@ -698,8 +735,28 @@ impl Store {
     let carried = Marks {
       locked: merged.iter().any(|row| row.locked),
       internal_only: merged.iter().any(|row| row.internal_only),
+      shared: merged.iter().any(|row| row.shared),
     };
-    let marks = Marks::set(&brain, body.locked, body.internal_only, carried)?;
+    let marks = Marks::set(
+      &brain,
+      Given {
+        locked: body.locked,
+        internal_only: body.internal_only,
+        shared: body.shared,
+      },
+      carried,
+    )?;
+    let mut touched = Vec::with_capacity(merged.len() + 1);
+    for row in &merged {
+      touched.push(about_row(&mut *tx, row).await?);
+    }
+    let about = About {
+      people: people_among(&mut *tx, &subject_ids).await?,
+      shared: marks.shared,
+    };
+    touched.push(about.clone());
+    heads_only(&brain, judged(body.standing, &touched.iter().collect::<Vec<_>>()), "merge")?;
+    person_rule(&brain, &about)?;
     let recall_condition = match &body.recall_condition {
       Some(words) => {
         text("recallCondition", words, super::CONDITION_MOST)?;
@@ -723,9 +780,9 @@ impl Store {
     let new_id: i64 = sqlx::query_scalar(
       "INSERT INTO memories (brain_id, key, type, text, layer_id, position, status, lineage_id, valid_from, \
        recall_condition, release_condition, importance, hits, hit_times, last_hit_at, last_confirmed_at, \
-       actor_name, labels, created_at, locked, internal_only) \
-       VALUES ($1, $2, $3, $4, $5, $6, 'active', 0, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19) \
-       RETURNING id",
+       actor_name, labels, created_at, locked, internal_only, shared) \
+       VALUES ($1, $2, $3, $4, $5, $6, 'active', 0, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, \
+       $20) RETURNING id",
     )
     .bind(brain_id)
     .bind(&body.key)
@@ -746,6 +803,7 @@ impl Store {
     .bind(at)
     .bind(marks.locked)
     .bind(marks.internal_only)
+    .bind(marks.shared)
     .fetch_one(&mut *tx)
     .await?;
     sqlx::query("UPDATE memories SET lineage_id = id WHERE id = $1")
@@ -772,7 +830,10 @@ impl Store {
   /// version first and moves that version.
   pub async fn memory_move(&self, brain_id: i64, id: i64, body: &MemoryMove) -> Held<Memory> {
     let mut tx = self.begin().await?;
-    heads_only(&brain_of(&mut tx, brain_id).await?, body.standing, "move")?;
+    let brain = brain_of(&mut tx, brain_id).await?;
+    let row = self.row_of(&mut tx, brain_id, id, true).await?;
+    let about = about_row(&mut tx, &row).await?;
+    heads_only(&brain, judged(body.standing, &[&about]), "move")?;
     let memory = match &body.text {
       None => self.move_in(&mut tx, brain_id, id, body).await?,
       Some(words) if body.status == MemoryStatus::Retracted => {
@@ -806,6 +867,7 @@ impl Store {
           labels: None,
           locked: None,
           internal_only: None,
+          shared: None,
           standing: body.standing,
         };
         let written = self.version_in(&mut tx, brain_id, id, &version, at).await?;
@@ -867,8 +929,10 @@ impl Store {
     }
     let at = now();
     let mut tx = self.begin().await?;
-    heads_only(&brain_of(&mut tx, brain_id).await?, body.standing, "restoration")?;
+    let brain = brain_of(&mut tx, brain_id).await?;
     let closed = self.row_of(&mut tx, brain_id, id, true).await?;
+    let about = about_row(&mut tx, &closed).await?;
+    heads_only(&brain, judged(body.standing, &[&about]), "restoration")?;
     if closed.kind == SHEET {
       return Err(Fault::Conflict(format!(
         "Memory {id} is a sheet; a person's sheet is rendered from their facts and is not restored."
@@ -913,9 +977,9 @@ impl Store {
     let new_id: i64 = sqlx::query_scalar(
       "INSERT INTO memories (brain_id, key, type, text, layer_id, position, status, lineage_id, valid_from, \
        recall_condition, release_condition, importance, hits, hit_times, last_hit_at, last_confirmed_at, \
-       consolidated_at, actor_name, labels, created_at, locked, internal_only) \
-       VALUES ($1, $2, $3, $4, $5, $6, 'active', $7, $8, $10, $11, $9, $12, $13, $14, $15, $16, $17, $18, $8, $19, $20) \
-       RETURNING id",
+       consolidated_at, actor_name, labels, created_at, locked, internal_only, shared) \
+       VALUES ($1, $2, $3, $4, $5, $6, 'active', $7, $8, $10, $11, $9, $12, $13, $14, $15, $16, $17, $18, $8, $19, $20, \
+       $21) RETURNING id",
     )
     .bind(brain_id)
     .bind(&closed.key)
@@ -937,6 +1001,7 @@ impl Store {
     .bind(&closed.labels)
     .bind(closed.locked)
     .bind(closed.internal_only)
+    .bind(closed.shared)
     .fetch_one(&mut *tx)
     .await?;
     link_subjects(&mut tx, new_id, &subject_ids).await?;

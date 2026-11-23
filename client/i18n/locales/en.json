@@ -187,7 +187,8 @@
       "bubbles": "Bubble chart",
       "list": "Memories",
       "map": "Mind map",
-      "timeline": "Version timeline"
+      "timeline": "Version timeline",
+      "review": "Review"
     },
     "heading": {
       "brain_view": "{brain} · {view}",
@@ -204,7 +205,8 @@
     "unhonoured": {
       "timeline": "The version timeline shows the versions of one open memory, so layers, subjects, types and filters do not narrow it.",
       "order": "This view keeps its own order, so the sort order is not used.",
-      "prompt": "The prompt source belongs to the whole layer, so filters do not narrow it."
+      "prompt": "The prompt source belongs to the whole layer, so filters do not narrow it.",
+      "review": "The review lists every candidate in the order raised, so layers, subjects, types and filters do not narrow it."
     },
     "type_name": {
       "episode": "Episode",
@@ -219,12 +221,25 @@
       "check": "Check",
       "followup": "Follow-up",
       "promise": "Promise",
-      "state": "State"
+      "state": "State",
+      "tip": "Tip"
     },
     "subject_type": {
       "person": "Person",
       "room": "Room",
       "episode": "Episode"
+    },
+    "review": {
+      "empty": "No candidates to review.",
+      "failed": "Not saved; the candidate stays as it was.",
+      "raise": "Make global",
+      "keep": "Keep in {brain}",
+      "keep_short": "Keep",
+      "drop": "Drop",
+      "keep_effect": "Not made global; only the original in {brain} stays.",
+      "drop_effect": "The original in {brain} is moved to not correct as well, so nothing reads it.",
+      "source": "{brain} #{id}",
+      "open_source": "Open the original"
     }
   }
 }

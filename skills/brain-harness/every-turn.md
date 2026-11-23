@@ -20,6 +20,9 @@ it as you read, in the turn itself. Nothing writes it for you.
     as `text` and the subject under `subjects`;
   - a document, a room's rule, a piece of knowledge, a person's whole sheet: `reference_search` with the words
     the entry would hold as `query`, then `reference_piece` with the `slug` and `group` it answers.
+- **`brain_list` and `brain_similar` also answer `base`:** the platform's shared memories the same ask finds,
+  general tips and checks every agent may read. Follow them as you follow your own, and never name one under
+  `confirms`, `strengthens` or `replaces`: you write your own brain alone.
 - **The brain is reached through these tools alone.** Never through its database, its files or its port: no
   query, no file read, no call of its address. What the tools do not answer, you do not know.
 - The recall also says whether a consolidation is due. When it is, do the consolidation (below) in this turn

@@ -23,6 +23,9 @@ pub struct Config {
   /// The embedding model the brain searches by meaning with; none where it searches by words alone.
   #[serde(default)]
   pub embedding: Option<crate::store::vectors::EmbeddingConfig>,
+  /// The chat model the candidates of the base are judged by; none where nothing is judged.
+  #[serde(default)]
+  pub classifier: Option<crate::base::ClassifierConfig>,
   /// The console the brain serves its bundle to; none where it serves none.
   #[serde(default)]
   pub console: Option<ConsoleConfig>,

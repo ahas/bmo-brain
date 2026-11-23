@@ -288,3 +288,94 @@ async fn the_executable_writes_an_episode_and_a_learning_into_the_agents_brain()
   assert_eq!(unknown["isError"], json!(true), "{unknown}");
   assert!(unknown["content"][0]["text"].as_str().unwrap().contains("no brain"));
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_reading_takes_the_base_in_beside_the_agents_brain_unless_the_record_turns_it_off() {
+  use bmo_brain_client::{BrainKind, Labels, MemoryStatus, NewMemory, Standing};
+
+  let served = Served::new().await;
+  let own = served
+    .client
+    .brain_add(&NewBrain {
+      account_key: "account-a".to_owned(),
+      agent_key: "agent-a".to_owned(),
+      name: None,
+      kind: None,
+    })
+    .await
+    .unwrap();
+  let base = served
+    .client
+    .brain_add(&NewBrain {
+      account_key: "platform".to_owned(),
+      agent_key: "platform".to_owned(),
+      name: Some("base".to_owned()),
+      kind: Some(BrainKind::Org),
+    })
+    .await
+    .unwrap();
+  let shared = |text: &str, status: MemoryStatus, source: Option<i64>| {
+    let mut labels = Labels::new();
+    if let Some(source) = source {
+      labels.insert("sourceBrainId".to_owned(), source.to_string());
+    }
+    NewMemory {
+      kind: "tip".to_owned(),
+      text: text.to_owned(),
+      status: Some(status),
+      actor_name: "writer-a".to_owned(),
+      labels,
+      internal_only: Some(false),
+      standing: Some(Standing::Head),
+      ..NewMemory::default()
+    }
+  };
+  let raised = served
+    .client
+    .memory_add(
+      base.id,
+      &shared("Run the formatter before the linter.", MemoryStatus::Active, Some(999)),
+    )
+    .await
+    .unwrap();
+  // A candidate still waiting, and a memory raised from the agent's own brain, are not handed to it.
+  for memory in [
+    shared("Run the formatter twice.", MemoryStatus::Pending, None),
+    shared("Run the formatter from the root.", MemoryStatus::Active, Some(own.id)),
+  ] {
+    served.client.memory_add(base.id, &memory).await.unwrap();
+  }
+  let learned = called(
+    &served,
+    "brain_learn",
+    json!({ "type": "tip", "text": "Run the formatter on save.", "source": "inferred" }),
+    "agent-a",
+    "",
+  );
+  assert_eq!(learned["isError"], json!(false), "{learned}");
+
+  let listed = called(&served, "brain_list", json!({ "words": "formatter" }), "agent-a", "");
+  let ids = |answer: &Value, part: &str| -> Vec<i64> {
+    answer["structuredContent"][part]
+      .as_array()
+      .unwrap()
+      .iter()
+      .map(|m| m["id"].as_i64().unwrap())
+      .collect()
+  };
+  assert_eq!(ids(&listed, "memories").len(), 1, "{listed}");
+  assert_eq!(ids(&listed, "base"), vec![raised.id], "{listed}");
+
+  let liked = called(&served, "brain_similar", json!({ "text": "run the formatter" }), "agent-a", "");
+  assert_eq!(ids(&liked, "base"), vec![raised.id], "{liked}");
+
+  let off = json!({
+    "holderName": "agent-a",
+    "namespaces": ["bmo"],
+    "capabilities": ["room.chat"],
+    "variables": { "BMO_TURN_AGENT": "agent-a", "BMO_BRAIN_BASE": "off" },
+  });
+  let without = called_under(&served, "brain_list", json!({ "words": "formatter" }), off);
+  assert_eq!(ids(&without, "base"), Vec::<i64>::new(), "{without}");
+  assert_eq!(ids(&without, "memories").len(), 1, "{without}");
+}

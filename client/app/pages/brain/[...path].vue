@@ -178,6 +178,7 @@ import BrainIndex from "../../components/BrainIndex.vue";
 import BrainLayerAdd from "../../components/BrainLayerAdd.vue";
 import BrainList from "../../components/BrainList.vue";
 import BrainMindmap from "../../components/BrainMindmap.vue";
+import BrainReview from "../../components/BrainReview.vue";
 import BrainRow from "../../components/BrainRow.vue";
 import BrainTeach from "../../components/BrainTeach.vue";
 import BrainTimeline from "../../components/BrainTimeline.vue";
@@ -185,6 +186,7 @@ import * as api from "../../domain/brain-api";
 import { EVERY_TYPE, EVERY_TYPE_BUT_EPISODES, ORDERS, STATUS_CHOICES, cleared, filterOf, honours, orderOf, pathOf, placeOf, queryOf, standing } from "../../domain/brain-place";
 import { subjectTypeName, typeName } from "../../domain/brain-names";
 import { ENGLISH, useReading } from "../../domain/brain-reading";
+import { isBase } from "../../domain/brain-review";
 import { useBrainStream } from "../../domain/brain-stream";
 
 import type { Brain, Layer, Memory, Subject, Tally, TypeCount } from "../../domain/brain-api";
@@ -355,6 +357,10 @@ const wordsInput = computed(() => ({
   onChange: (event: Event) => go({ q: (event.target as HTMLInputElement).value, memory: null })
 }));
 
+// Whether the brain chosen is the base, whose candidates the review view lists.
+const baseChosen = computed(() => isBase((brainList.value ?? []).find((brain) => brain.id === place.value.brainId)));
+
+// The views, the review among them only while the base is chosen.
 const viewItems = computed(() =>
   (
     [
@@ -362,9 +368,12 @@ const viewItems = computed(() =>
       ["map", "i-material-symbols-hub-outline"],
       ["bubbles", "i-material-symbols-bubble-chart-outline"],
       ["timeline", "i-material-symbols-timeline"],
-      ["book", "i-material-symbols-menu-book-outline"]
+      ["book", "i-material-symbols-menu-book-outline"],
+      ["review", "i-material-symbols-fact-check-outline"]
     ] as const
-  ).map(([value, icon]) => ({ value: value as View, label: t(`brain.view.${value}`), icon }))
+  )
+    .filter(([value]) => value !== "review" || baseChosen.value)
+    .map(([value, icon]) => ({ value: value as View, label: t(`brain.view.${value}`), icon }))
 );
 
 function countOf(tallied: Tally[], groups: string[]): number {
@@ -412,6 +421,8 @@ function subjectName(id: number): string {
 // Why a view does not honour a choice, in one line, or nothing where it does.
 function unhonoured(choice: Choice): string {
   if (honours(place.value.view, choice)) return "";
+
+  if (place.value.view === "review") return t("brain.unhonoured.review");
 
   return place.value.view === "timeline" ? t("brain.unhonoured.timeline") : t("brain.unhonoured.order");
 }
@@ -647,6 +658,8 @@ const viewPart = computed(() => {
       return BrainTimeline;
     case "book":
       return BrainBook;
+    case "review":
+      return baseChosen.value ? BrainReview : BrainList;
     default:
       return BrainList;
   }
@@ -656,7 +669,14 @@ const viewProps = computed(() => {
   const brainId = place.value.brainId ?? 0;
   const common = { brainId, heading: heading.value, changes: changes.value };
 
-  switch (place.value.view) {
+  switch (place.value.view === "review" && !baseChosen.value ? "list" : place.value.view) {
+    case "review":
+      return {
+        ...common,
+        brains: brainList.value ?? [],
+        onSource: (source: { brainId: number; memoryId: number }) =>
+          void router.push({ path: pathOf({ ...place.value, ...cleared(), brainId: source.brainId, view: "list" }), query: { memory: String(source.memoryId) } })
+      };
     case "map":
       return {
         ...common,

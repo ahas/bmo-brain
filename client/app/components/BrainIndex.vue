@@ -19,7 +19,7 @@
     />
     <div class="border-b border-default px-3 py-2 text-sm text-muted">
       <p>{{ t(`brain.index.${tab}_about`) }} {{ t("brain.index.again_clears") }}</p>
-      <p v-if="!usable" class="mt-1 text-warning">{{ t("brain.unhonoured.timeline") }}</p>
+      <p v-if="!usable" class="mt-1 text-warning">{{ place.view === "review" ? t("brain.unhonoured.review") : t("brain.unhonoured.timeline") }}</p>
     </div>
     <div class="border-b border-default p-2">
       <UInput v-model="words" icon="i-material-symbols-search" :placeholder="t('brain.label.index_search')" size="sm" class="w-full" />
@@ -302,7 +302,7 @@ async function movePiece(brainId: number, piece: Carried, target: number | "unfi
   }
 }
 
-// Whether the view open honours the index's choices; the version timeline honours none.
+// Whether the view open honours the index's choices; the version timeline and the review honour none.
 const usable = computed(() => honours(props.place.view, "layer"));
 
 // The tab holding the newest choice is the one open, and the chosen row is scrolled into sight.

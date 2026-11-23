@@ -1,12 +1,13 @@
 //! The brain's tool (docs/boundary-api.md, 「Its tool」): one call handed by the tool host on standard input,
 //! answered on standard output. It finds the brain through the data root's env file, the agent's brain by the
-//! turn's agent, and answers each entry with one call of the brain's client.
+//! turn's agent, and answers each entry with one call of the brain's client; a reading also asks the platform's
+//! base, unless the record turns it off.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use bmo_brain_client::{
-  BrainClient, BrainKind, BrainsQuery, ClientFailure, Consolidated, Fold, Learning, MemoriesQuery,
+  BrainClient, BrainKind, BrainsQuery, ClientFailure, Consolidated, Fold, Learning, MemoriesQuery, Memory,
   MemoryMove, MemoryStatus, NewMemory, SimilarAsk, Source, SubjectKey, UnconsolidatedQuery,
 };
 use serde::{Deserialize, Serialize};
@@ -21,6 +22,14 @@ pub const AGENT_VARIABLE: &str = "BMO_TURN_AGENT";
 /// The variable naming the chat agent a run works for, whose brain its calls read and write.
 pub const BRAIN_AGENT_VARIABLE: &str = "BMO_BRAIN_AGENT";
 pub const CHAT_VARIABLE: &str = "BMO_TURN_CHAT";
+/// The variable turning the base off for the session's readings, where it says `off`.
+pub const BASE_VARIABLE: &str = "BMO_BRAIN_BASE";
+
+/// The account key and the agent key the base is filed under, an org brain (docs/design.md, 「The base」).
+pub const BASE_KEY: &str = "platform";
+
+/// The label naming the brain a memory of the base was raised from.
+pub const SOURCE_BRAIN_LABEL: &str = "sourceBrainId";
 
 /// The env file under the data root the brain's `tool-env` verb writes, and its variables.
 pub const ENV_FILE: &str = "env/brain.env";
@@ -177,6 +186,108 @@ pub async fn brain_id(client: &BrainClient, agent: &str) -> Result<i64, String> 
   }
 }
 
+/// Whether the session's readings take the base in: unless the record says `off`.
+pub fn reads_base(session: &Session) -> bool {
+  session.variables.get(BASE_VARIABLE).is_none_or(|said| said.trim() != "off")
+}
+
+/// The base, where one stands; none where none does or it cannot be read.
+pub async fn base_id(client: &BrainClient) -> Option<i64> {
+  let page = client
+    .brains(&BrainsQuery {
+      kind: Some(BrainKind::Org),
+      account_key: Some(BASE_KEY.to_owned()),
+      agent_key: Some(BASE_KEY.to_owned()),
+      limit: Some(1),
+      ..Default::default()
+    })
+    .await
+    .ok()?;
+  page.items.first().map(|brain| brain.id)
+}
+
+/// Whether a memory of the base is one to hand this brain: active, and not raised from this brain, which holds
+/// its source.
+fn handed_from_base(memory: &Memory, brain: i64) -> bool {
+  memory.status == MemoryStatus::Active
+    && memory.labels.get(SOURCE_BRAIN_LABEL).is_none_or(|source| source != &brain.to_string())
+}
+
+fn listed_memory(m: &Memory) -> Value {
+  json!({
+    "id": m.id, "type": m.kind, "text": m.text, "status": m.status, "importance": m.importance,
+    "subjects": m.subjects, "validFrom": m.valid_from, "validTo": m.valid_to,
+    "recallCondition": m.recall_condition, "releaseCondition": m.release_condition,
+  })
+}
+
+fn liked_memory(m: &Memory) -> Value {
+  json!({
+    "id": m.id, "type": m.kind, "text": m.text, "importance": m.importance,
+    "subjects": m.subjects, "validFrom": m.valid_from, "status": m.status,
+  })
+}
+
+/// A subject of a brain found by its type and key: its id, none where the brain holds none, or why it was not read.
+async fn subject_in(
+  client: &BrainClient,
+  brain: i64,
+  named: &SubjectKey,
+) -> Result<Option<i64>, ClientFailure> {
+  let page = client
+    .subjects(
+      brain,
+      &bmo_brain_client::SubjectsQuery {
+        kind: Some(named.kind.clone()),
+        key: Some(named.key.clone()),
+        ..Default::default()
+      },
+    )
+    .await?;
+  Ok(page.items.first().map(|found| found.id))
+}
+
+/// The same list asked of the base, for the agent's brain: its active rows less those raised from that brain;
+/// none where no base stands, the list names a subject the base holds none of, or the base cannot be read.
+async fn base_listed(
+  client: &BrainClient,
+  brain: i64,
+  named: Option<&SubjectKey>,
+  query: &MemoriesQuery,
+) -> Vec<Value> {
+  let Some(base) = base_id(client).await else {
+    return vec![];
+  };
+  let subject_id = match named {
+    None => None,
+    Some(named) => match subject_in(client, base, named).await {
+      Ok(Some(id)) => Some(id),
+      Ok(None) | Err(_) => return vec![],
+    },
+  };
+  let asked = MemoriesQuery {
+    status: Some(MemoryStatus::Active.name().to_owned()),
+    subject_id,
+    ..query.clone()
+  };
+  match client.memories(base, &asked).await {
+    Ok(page) => page.items.iter().filter(|m| handed_from_base(m, brain)).map(listed_memory).collect(),
+    Err(_) => vec![],
+  }
+}
+
+/// The same ask of the base, for the agent's brain: its active rows less those raised from that brain; none
+/// where no base stands or it cannot be read.
+async fn base_liked(client: &BrainClient, brain: i64, ask: &SimilarAsk) -> Vec<Value> {
+  let Some(base) = base_id(client).await else {
+    return vec![];
+  };
+  match client.similar(base, ask).await {
+    Ok(likes) => likes.iter().filter(|m| handed_from_base(m, brain)).map(liked_memory).collect(),
+    Err(_) => vec![],
+  }
+}
+
 fn subject(kind: &str, key: &str) -> SubjectKey {
   SubjectKey {
     kind: kind.to_owned(),
@@ -290,6 +401,7 @@ pub async fn answer(handed: Handed) -> Result<Answer, String> {
             actor_name: ACTOR.to_owned(),
             labels: Default::default(),
             internal_only: None,
+            shared: None,
             locked: None,
             standing: None,
           },
@@ -301,25 +413,22 @@ pub async fn answer(handed: Handed) -> Result<Answer, String> {
       let Some(text) = string(arguments, "text") else {
         return Ok(Answer::refusal("text is required"));
       };
-      client
-        .similar(
-          brain,
-          &SimilarAsk {
-            text,
-            subjects: subjects(arguments, "subjects"),
-            limit: integer(arguments, "limit"),
-            as_of: None,
-          },
-        )
-        .await
-        .map(|likes| {
-          json!({
-            "memories": likes.iter().map(|m| json!({
-              "id": m.id, "type": m.kind, "text": m.text, "importance": m.importance,
-              "subjects": m.subjects, "validFrom": m.valid_from, "status": m.status,
-            })).collect::<Vec<_>>()
-          })
-        })
+      let ask = SimilarAsk {
+        text,
+        subjects: subjects(arguments, "subjects"),
+        limit: integer(arguments, "limit"),
+        as_of: None,
+      };
+      match client.similar(brain, &ask).await {
+        Ok(likes) => {
+          let base = if reads_base(session) { base_liked(&client, brain, &ask).await } else { vec![] };
+          Ok(json!({
+            "memories": likes.iter().map(liked_memory).collect::<Vec<_>>(),
+            "base": base,
+          }))
+        }
+        Err(why) => Err(why),
+      }
     }
     "brain_learn" => {
       let (Some(kind), Some(text), Some(source)) =
@@ -367,6 +476,7 @@ pub async fn answer(handed: Handed) -> Result<Answer, String> {
             actor_name: ACTOR.to_owned(),
             labels: Default::default(),
             internal_only: None,
+            shared: None,
             locked: None,
             standing: None,
           },
@@ -405,54 +515,47 @@ pub async fn answer(handed: Handed) -> Result<Answer, String> {
         .map(|m| json!({ "id": m.id, "status": m.status, "validTo": m.valid_to }))
     }
     "brain_list" => {
-      let subject_id = match arguments
+      let named = arguments
         .get("subject")
-        .and_then(|s| serde_json::from_value::<SubjectKey>(s.clone()).ok())
-      {
-        Some(named) => {
-          let page = client
-            .subjects(
-              brain,
-              &bmo_brain_client::SubjectsQuery {
-                kind: Some(named.kind),
-                key: Some(named.key),
-                ..Default::default()
-              },
-            )
-            .await;
-          match page {
-            Ok(page) => match page.items.first() {
-              Some(found) => Some(found.id),
-              None => return Ok(Answer::structured(json!({ "memories": [] }))),
-            },
-            Err(why) => return Ok(Answer::refusal(failed(why))),
+        .and_then(|s| serde_json::from_value::<SubjectKey>(s.clone()).ok());
+      let query = MemoriesQuery {
+        kind: string(arguments, "type"),
+        status: string(arguments, "status").filter(|s| MemoryStatus::named(s).is_some()),
+        key: string(arguments, "key"),
+        q: string(arguments, "words"),
+        situation: string(arguments, "situation"),
+        limit: integer(arguments, "limit"),
+        ..Default::default()
+      };
+      let base = if reads_base(session) {
+        base_listed(&client, brain, named.as_ref(), &query).await
+      } else {
+        vec![]
+      };
+      let subject_id = match &named {
+        Some(named) => match subject_in(&client, brain, named).await {
+          Ok(Some(id)) => Some(id),
+          Ok(None) => {
+            return Ok(Answer::structured(json!({ "memories": [], "more": false, "base": base })));
           }
-        }
+          Err(why) => return Ok(Answer::refusal(failed(why))),
+        },
         None => None,
       };
       client
         .memories(
           brain,
           &MemoriesQuery {
-            kind: string(arguments, "type"),
-            status: string(arguments, "status").filter(|s| MemoryStatus::named(s).is_some()),
             subject_id,
-            key: string(arguments, "key"),
-            q: string(arguments, "words"),
-            situation: string(arguments, "situation"),
-            limit: integer(arguments, "limit"),
-            ..Default::default()
+            ..query
           },
         )
         .await
         .map(|page| {
           json!({
-            "memories": page.items.iter().map(|m| json!({
-              "id": m.id, "type": m.kind, "text": m.text, "status": m.status, "importance": m.importance,
-              "subjects": m.subjects, "validFrom": m.valid_from, "validTo": m.valid_to,
-              "recallCondition": m.recall_condition, "releaseCondition": m.release_condition,
-            })).collect::<Vec<_>>(),
+            "memories": page.items.iter().map(listed_memory).collect::<Vec<_>>(),
             "more": page.more,
+            "base": base,
           })
         })
     }

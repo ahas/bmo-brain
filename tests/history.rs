@@ -27,6 +27,7 @@ fn memory(text: &str) -> NewMemory {
     actor_name: "writer-a".to_owned(),
     labels: labels(&[]),
     internal_only: None,
+    shared: None,
     locked: None,
     standing: None,
   }
@@ -370,6 +371,7 @@ async fn a_row_told_after_a_later_one_takes_its_place_behind_it() {
         actor_name: "writer-a".to_owned(),
         labels: labels(&[]),
         internal_only: None,
+        shared: None,
         locked: None,
         standing: None,
       },

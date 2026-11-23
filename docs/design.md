@@ -9,8 +9,8 @@ study those rest on (archive document 302).
 ## What the brain is
 
 A brain is one agent's long-term memory. The service keeps many brains, each owned by an account and
-belonging to one agent of that account, or to one unit of an organisation (「Org brains」), and serves them
-over HTTP. Everything an agent reads about the
+belonging to one agent of that account, to one unit of an organisation (「Org brains」), or to the platform
+as the base every agent may read (「The base」), and serves them over HTTP. Everything an agent reads about the
 world beside the conversation in front of it is a memory in its brain: episodes, facts, tips, rules,
 situation rules, its knowledge, its persona and its lore. Nothing an agent reads is a file, and nothing it
 reads about a person is a sheet kept apart: a person's standing sheet is rendered from their names and the
@@ -21,11 +21,11 @@ facts about them.
 - **A fact is one row, and a change is a new row.** A row is never deleted and never edited in place. A
   correction writes a new version that supersedes the old one, and a fact that no longer holds is closed and
   hidden, with the moment it stopped holding. Who changed what, and when, is read off the versions.
-- **The agent writes its memories as it reads.** The chat agent, the supervisor of its rooms, reads every
-  message of them anyway, so it decides at that moment what the brain learns and writes it through the
-  brain's tools; the discipline of a turn is a text the brain ships and the agent's system prompt carries. The brain supplies the
-  judgement's material, the live memories like a candidate, and does the judgement's mechanics: a confirmation,
-  a version, a closed fact, a new row, in one call. The brain runs no model and calls no unit.
+- **The agent writes its memories as it reads.** The chat agent, the supervisor of its rooms, reads every message
+  of them anyway, so it decides at that moment what the brain learns and writes it through the brain's tools; the
+  discipline of a turn is a text the brain ships and the agent's system prompt carries. The brain supplies the
+  judgement's material, the live memories like a candidate, and does the judgement's mechanics: a confirmation, a
+  version, a closed fact, a new row, in one call. The brain runs no model and calls no unit.
 - **Per turn it hands out a short block,** chosen by relevance to the turn under a token
   budget, never the whole store, and never anything that goes into a system prompt. The persona is the one
   exception: it is rendered on demand as the same bytes every time, so a prompt built on it keeps its cache.
@@ -49,9 +49,11 @@ The common wire format and the API design rules are bmo-chat's `docs/conventions
   owns the agent and the agent's key, and never answers one agent, of any account, from another agent's brain.
   An agent's key that stands under more than one account names no brain until the account is given, and an agent
   the service keeps no brain for has no memories to read; a caller answers it nothing rather than another
-  brain's. The one exception is the org brains: a caller that selects a turn's reference for an agent reads,
+  brain's. The one exception is the shared layers: a caller that selects a turn's reference for an agent reads,
   beside that agent's own brain, the org brains of the units the person the agent serves belongs to, and only
-  what stands there for that person (「Org brains」). No agent's brain is ever read for another agent.
+  what stands there for that person (「Org brains」), and the platform's base (「The base」), each where the
+  delegation chain lets that person read it (「The layers a reading takes」). No agent's brain is ever read for
+  another agent.
 - **The brains stand in one store,** the service's own PostgreSQL database, every row keyed by its brain,
   so one set of migrations serves every brain. The unit a brain moves in, is backed up in and is let go in
   is the brain itself, and its portable form is the brain file (「Export and injection」).
@@ -114,6 +116,7 @@ One row is one thing the agent remembers, in one version.
 | `labels` | the caller's own metadata, a map of strings |
 | `locked` | in an org brain, whether a lower unit may not override its topic (「Org brains」); off in an agent's brain |
 | `internalOnly` | in an org brain, whether it is kept from a room where someone outside the company sits; off in an agent's brain |
+| `shared` | in an org brain, whether it is a memory about a person that may be known inside the organisation (「Org brains」); off in an agent's brain |
 | `createdAt` | when this version was written |
 
 The two conditions are optional. A memory that carries neither is a permanent one: no situation has to be
@@ -149,10 +152,11 @@ No type is called `sheet`. A person's standing sheet is a rendering of their nam
   and the one that ends it, are the writer's like its words: a first version sets them, a new version changes
   them and takes the old version's where it gives none, and a merge carries them, while no route changes either
   on a row that stands.
-- **A correction is a new row in the same lineage.** The old row's `supersededBy` names the new one, its
-  `status` becomes `superseded`, its `validTo` the new row's `validFrom` and its `supersededAt` the moment the
-  new row was written. The new row carries the lineage id and names the row it replaced in `supersedes`. A reading hands out the newest row of a lineage that is `active`, and says for a row whose predecessor
-  was superseded in the last thirty days what the previous value was and until when.
+- **A correction is a new row in the same lineage.** The old row's `supersededBy` names the new one, its `status`
+  becomes `superseded`, its `validTo` the new row's `validFrom` and its `supersededAt` the moment the new row was
+  written. The new row carries the lineage id and names the row it replaced in `supersedes`. A reading hands out
+  the newest row of a lineage that is `active`, and says for a row whose predecessor was superseded in the last
+  thirty days what the previous value was and until when.
 - **A merge is one new row written over several.** Rows about the same thing, each a lineage of its own,
   are folded into one: the new row starts a lineage, and every merged row becomes `superseded` with its
   `supersededBy` naming the new row, its `validTo` the new row's `validFrom` and its `supersededAt` the moment
@@ -178,10 +182,10 @@ No type is called `sheet`. A person's standing sheet is a rendering of their nam
 - **The past is read as it stood.** A reading as of a moment answers the rows that held then: those whose span
   covers it, `validFrom` at or before it and `validTo` after it, or, with no `validTo`, not closed before it by
   their `supersededAt`, whatever their status now; a retracted row never held and is never answered.
-- **A closed lineage is restored by a new version,** never by reopening the closed row: the newest version
-  of a `done` or `invalidated` lineage (never a `retracted` one) is followed by a new `active` version in the same lineage, its text
-  the closed one's or the restorer's, and the closed row stays as it was, a record of the span it held for.
-  A lineage that holds a live version already has nothing to restore.
+- **A closed lineage is restored by a new version,** never by reopening the closed row: the newest version of a
+  `done` or `invalidated` lineage (never a `retracted` one) is followed by a new `active` version in the same
+  lineage, its text the closed one's or the restorer's, and the closed row stays as it was, a record of the span
+  it held for. A lineage that holds a live version already has nothing to restore.
 - **`pending` is one thing only:** a memory waiting for a person's approval. The agent never parks a
   memory as `pending` because it has one source (「Writing」), and it does not offer common knowledge for
   approval either: what members bring to the shared knowledge the agent collects and keeps on its own, as a
@@ -448,8 +452,9 @@ judged on the brain's own record.
 - **The brain file** is a brain, or part of one, as a SQLite database holding the three tables and the
   memory-subject links in the brain's own shape, each memory with its marks (「Org brains」), with the ids
   local to the file. It carries the version of the shape it was written in. Read into an agent's brain, a
-  row's marks are left off; read into an org brain from a file older than the marks, a row is internal-only
-  and not locked, as a write that names neither is.
+  row's marks are left off; read into an org brain from a file older than the marks, a row is internal-only,
+  not locked and not shared, as a write that names none is, and a file older than the `shared` mark reads its
+  rows unshared.
 - **Export** writes a brain file from a brain: the whole brain, or the layers named, with the subjects and
   the live rows those layers hold.
 - **Injection** reads a brain file into a brain it names. It overwrites nothing: a row whose `key` matches a
@@ -498,25 +503,33 @@ three tables, versions and reads; what differs is stated here.
   company's key and its `agentKey` the unit's, both as the caller gives them. The brain does not know the
   organisation: which unit stands under which, and who belongs where, is the caller's, which names a member's
   units in order when it reads for them.
-- **No memory about a person.** An org brain holds what holds for its whole unit; what is known of one
-  person, their standing, their circumstances, what they said in a conversation of their own, stays in
-  agents' brains, and nothing of an agent's brain is carried into an org brain. The brain holds this by its
-  shape: an org brain holds no subject of type `person`, so a write that names one, by its id or its key, a
-  subject made with that type, and a brain file holding one are refused whole, and no memory in it is about a
-  person. Whether a sentence speaks of someone is the writer's judgement, since the brain reads no meaning in
-  the words.
-- **A topic is what an org memory overrides by.** A memory that stands for its unit on a matter links a
-  subject of type `topic`, keyed by the caller's word for the matter (`working-hours`, `industry`). Where two
-  units on a member's path hold the same topic, the nearer one's stands: a team's working hours stand in
-  place of the company's for the team's members. A memory with no topic does not stand for anyone; a caller reads it as any memory is read, by its
-  words, its layer or its subjects, and tells by its brain which unit it is from.
-- **Two marks, each on the version.** `locked`: no lower unit overrides its topic, which is answered from the
+- **A person only as the organisation may know them.** An org brain holds what holds for its whole unit, and
+  of one person only what may be known of them across the organisation: their role, the duties they carry, how
+  they prefer to be reached. Such a memory links the person's subject, of type `person` and keyed by the
+  caller's id of them, and carries the mark `shared`. The brain holds this by its shape: a memory of an org
+  brain that links a subject of type `person` without the mark, a memory marked `shared` that links no person,
+  and a brain file holding either are refused whole. A subject of type `person` may stand in an org brain, as
+  a subject holds no fact.
+- **What stays personal.** A person's circumstances, their health, what they said in a conversation of their
+  own and any evaluation of them stay in agents' brains. Whether a sentence speaks of such a thing is the
+  writer's judgement, since the brain reads no meaning in the words; the mark and the writer's standing are
+  what it holds. Nothing of an agent's brain is carried into an org brain by the brain or by an agent of its
+  own accord: a head of the unit or the person themself writes it there.
+- **One company's people alone.** An org brain is keyed by its company, and a caller names in it only people of
+  that company, so nothing known of a person reaches another company's agents.
+- **A topic is what an org memory overrides by.** A memory that stands for its unit on a matter links a subject of
+  type `topic`, keyed by the caller's word for the matter (`working-hours`, `industry`). Where two units on a
+  member's path hold the same topic, the nearer one's stands: a team's working hours stand in place of the
+  company's for the team's members. A memory with no topic does not stand for anyone; a caller reads it as any
+  memory is read, by its words, its layer or its subjects, and tells by its brain which unit it is from.
+- **Three marks, each on the version.** `locked`: no lower unit overrides its topic, which is answered from the
   farthest unit on the path holding a locked memory of it, whatever a nearer unit holds (a security rule, a
   company policy). `internalOnly`: it is kept from a room where someone outside the company sits; it is on
-  where the writer does not say. A new version, the words a move to `done` ends on and the version a
-  retraction writes carry the marks of the version they follow where the writer gives none; a merge sets a
-  mark where any merged row carries it; a restoration takes the closed row's. An agent's brain takes neither
-  mark: its rows carry both off, and a write that sets one there is refused.
+  where the writer does not say. `shared`: it is a memory about a person that may be known inside the
+  organisation; it is off where the writer does not say. A new version, the words a move to `done` ends on and
+  the version a retraction writes carry the marks of the version they follow where the writer gives none; a
+  merge sets a mark where any merged row carries it; a restoration takes the closed row's. An agent's brain
+  takes no mark: its rows carry all three off, and a write that sets one there is refused.
 - **What stands for a member.** A caller reading for a member names the org brains of the member's units in
   order, the farthest first: the units where the member holds a second post, then the company, then each unit
   under it down to the member's own, so the member's own path wins a topic over a second post. For each topic
@@ -528,21 +541,97 @@ three tables, versions and reads; what differs is stated here.
   first, then by topic, and records no use; the caller decides what of it a turn carries.
 - **Who writes is the caller's check, and a member's word is a proposal.** The brain calls no unit, so before
   each write into an org brain its caller asks the service that keeps the organisation whether the writer
-  heads the unit (acting heads among them) or holds the unit's grant to write org memory, and names the
-  outcome on the write as its standing, `head` or `member`. A head's write is applied as in any brain, so a
-  head's own word is a fact at once, as the owner's is. A member's write, and a write that names no standing,
-  is a proposal: a first version or a learning is written as a `rumor` whatever type it names, closes nothing
-  and versions nothing, and any other write of a member, a version, a merge, a move or a restoration, is
-  refused. A head accepts a proposal by writing a version of it, or a learning that strengthens it, under a
-  type that is no `rumor`, and declines it by moving it to `invalidated`. An agent's brain reads no standing.
+  heads the unit (acting heads among them) or holds the unit's grant to write org memory, or is the person the
+  memory is about, and names the outcome on the write as its standing, `head`, `person` or `member`. A head's
+  write is applied as in any brain, so a head's own word is a fact at once, as the owner's is. The person's own
+  standing is a head's for a write whose memory is `shared` and about one person alone, the one the caller
+  checked, and a member's for any other, so a person sets down what the organisation may know of them and
+  nothing else. A member's write, and a write that names no standing, is a proposal: a first version or a
+  learning is written as a `rumor` whatever type it names, closes nothing and versions nothing, and any other
+  write of a member, a version, a merge, a move or a restoration, is refused. A head accepts a proposal by
+  writing a version of it, or a learning that strengthens it, under a type that is no `rumor`, and declines it
+  by moving it to `invalidated`. An agent's brain reads no standing.
 - **The brain whole is an administrative act.** Making an org brain, letting it go and injecting a brain file
   into it take no standing, as they take none for an agent's brain; its subjects and layers, which hold no
-  fact, are written as an agent brain's are, a person apart.
+  fact, are written as an agent brain's are.
+
+## The base
+
+The base is what holds for any agent anywhere: a general tip, a check worth running every time, a piece of
+reference knowledge bound to no one deployment, machine, person or room. It is the farthest link of the shared
+layers, above every company, and it is an org brain like any other, with no store of its own.
+
+- **Keyed by the platform.** The base is the org brain whose `accountKey` and `agentKey` are both `platform`.
+  No company or unit is keyed so, since a caller keys a company and a unit by their numbers. One base stands at
+  most, as one pair of keys names at most one brain.
+- **Read as the farthest unit.** A caller reading what stands for a member names the base first among the org
+  brains, ahead of the member's farthest unit, so a nearer unit's word on a topic stands in place of the base's
+  and a topic the base locks stands over every unit's (「Org brains」). Its memories with no topic are read as
+  any org memory's are, by their words, their recall condition and their subjects.
+- **Written by the platform's administrator alone.** Every write into it carries the standing `head`, which its
+  caller gives only to the platform's administrator, and its first versions come from a review (「Raising a
+  memory to the base」). It holds no memory about a person, and none of its memories is internal-only: it is
+  no company's, so it keeps nothing from a room.
+- **The base holds what its sources do not lose.** A memory raised into the base is a new row there, its
+  source's brain and memory named in its labels, and the source stays as it was in its own brain. A caller
+  reading the base for the brain a memory was raised from leaves that memory out, since the agent already
+  holds its source.
+
+## The layers a reading takes
+
+A reading for an agent stands in three layers, the nearest first: the agent's own brain, the org brains of the
+units the person it serves belongs to, the nearest unit first, and the base. Where two layers hold a memory of
+one topic, the nearer one's stands, and a topic locked above is not overridden below (「Org brains」).
+
+- **Whether a layer is read is the delegation chain's** (bmo-web's `docs/accounts.md`, 「The delegation
+  chain」), on two kinds the brain's deployment declares under the unit name `brain`:
+
+| Kind | What it says | Shape and mode | Default | Levels and writers |
+|---|---|---|---|---|
+| `brain.global` | whether the base is read for the people under a link | a flag, `narrowing`, with rules | read | the platform and units; `manage` |
+| `brain.organisation` | whether the org brains are read for the people under a link | a flag, `narrowing`, with rules | read | the platform and units; `manage` |
+
+  Each narrows, so a company that turns the base off turns it off for every unit under it, and no unit below
+  turns it on again; a unit may turn it off for itself alone.
+- **The caller resolves them, never the brain.** The brain calls no unit; the caller that selects a turn's
+  reference or hands a session its brain tools asks the chain for the person the agent serves, as it acts, and
+  names only the layers the chain leaves on. An agent's own brain is always read.
+- **The declaration** is `bmo-brain --config <file> chain declare` (`docs/boundary-api.md`, 「Configuration」), a
+  step of the deployment, so the kinds stand before any caller asks them.
+
+## Raising a memory to the base
+
+The base is filled from what agents have already learned, one memory at a time and never on its own: an
+administrator reviews each candidate and decides it.
+
+- **The candidates come from one source brain** the administrator names, and are its live `tip`, `check` and
+  `knowledge` memories. Every other type stands apart from the start: a person, a room, a conversation, an
+  episode and a persona piece are never candidates.
+- **Filtered by subject first.** A memory about a subject of type `person` or `room` is passed over, and so is
+  one about any other subject type, or any subject key beginning with a word, the command is told to pass over:
+  the caller's words for a repository, a machine or its own operation. A memory a candidate already stands for
+  in the base, under any status, is passed over too.
+- **Then judged by a model:** each memory left is asked of the chat model the configuration names (`[classifier]`)
+  whether it fits any agent of any organisation, as one question with the memory's words and its recall
+  condition, and a yes makes it a candidate. A model that does not answer leaves the memory for a later run.
+- **A candidate is a `pending` row of the base:** the memory's type, words, conditions, importance and kept
+  subjects, labelled with its source's brain, memory and lineage and the model that judged it with its reason,
+  written as the administrator's word. A pending row is never handed out.
+- **The administrator decides each** on the screen (「The screen」), one of three: raised, the candidate moved to
+  `active`, a memory of the base from then on; kept in its source, the candidate moved to `invalidated` with the
+  reason `kept-in-source`, the source untouched; or dropped, the candidate moved to `invalidated` with the reason
+  `dropped` and the source moved to `invalidated` in its own brain with the same reason, so it is read nowhere.
+  Nothing is deleted, and each decision is a status move the history keeps.
+- **The command** is `bmo-brain --config <file> base candidates` (`docs/boundary-api.md`, 「Raising candidates」);
+  with `--dry-run` it prints what it would come to and writes nothing.
 
 ## What the brain acts on by itself
 
 - **Its clock:** the pruning of its event window, and nothing else.
-- **No outgoing call.** The brain calls no unit and runs no model; what it holds is written by its callers.
+- **No outgoing call.** The brain calls no unit and runs no model; what it holds is written by its callers. Two
+  of its commands reach out, each an act of its deployment or its administrator rather than of the service: the
+  chain declaration (「The layers a reading takes」) and the candidates of the base (「Raising a memory to the
+  base」).
 
 Reminders, waits on events and watches are not the brain's: a wait is a tool run outside the brain, which
 runs the thing waited for, holds it, and wakes the agent with the memory it was told to carry. The brain
@@ -673,26 +762,26 @@ console bundle contract and served by the brain itself (`docs/boundary-api.md`, 
   new, and one learning with the source `owner` applies it. A piece placed at a position in a layer, a
   persona's, a lore's or a knowledge piece, is written as a memory into that layer.
 - **The reading language.** The brain's memories and its persona are English, and the person at the screen may
-  read another language. A toggle among the screen's actions chooses the reading language: the console's own locale by
-  default, or English. In a language other than English, a memory's text wherever it stands (the list, the row
-  view, the timeline, the layer view and the memories offered while teaching), a subject's summary and a persona
-  layer's prompt source are shown translated through the translator the console names, page by page as they
-  are shown; each translated text in the row view, the timeline, the summary and the prompt source says so on a
-  line above it, where one tap puts its English original in its place, and the toggle turns every text back to
-  English at once. The English stands while a
-  translation is on its way, so a translation never holds the English view back, and where one fails, or the
-  translator stays too busy to read a text and answers it untranslated, the English stays, without the
-  translated label or the link to an original, with one sentence saying so. Where the console names no
-  translator, the toggle does not stand and the screen reads English.
+  read another language. A toggle among the screen's actions chooses the reading language: the console's own
+  locale by default, or English. In a language other than English, a memory's text wherever it stands (the list,
+  the row view, the timeline, the layer view and the memories offered while teaching), a subject's summary and a
+  persona layer's prompt source are shown translated through the translator the console names, page by page as
+  they are shown; each translated text in the row view, the timeline, the summary and the prompt source says so on
+  a line above it, where one tap puts its English original in its place, and the toggle turns every text back to
+  English at once. The English stands while a translation is on its way, so a translation never holds the English
+  view back, and where one fails, or the translator stays too busy to read a text and answers it untranslated, the
+  English stays, without the translated label or the link to an original, with one sentence saying so. Where the
+  console names no translator, the toggle does not stand and the screen reads English.
 - **A subject's summary** (인물 요약 in the Korean pack) stands folded over the memories narrowed to that
   subject, headed by the subject's name, as the brain renders it from the facts about it (「A person is a
   subject」), and not at all where the subject has no fact.
 - **Writing in another language.** The brain's rows stay English: no word of another script reaches a row. Words
   typed in the console's own language to teach, to edit a text, or as a move's reason or the words a row ended on,
-  read as such by holding Hangul, kana or Han, are translated into English through the same translator before they are saved, and the screen shows the
-  English to confirm, with a label saying it was translated; the English, which the person may still change, is
-  what is saved. Where the translation fails, the words come back untranslated, or no translator is named, the
-  screen says so in one sentence and saves nothing until the words are English.
+  read as such by holding Hangul, kana or Han, are translated into English through the same translator before they
+  are saved, and the screen shows the English to confirm, with a label saying it was translated; the English,
+  which the person may still change, is what is saved. Where the translation fails, the words come back
+  untranslated, or no translator is named, the screen says so in one sentence and saves nothing until the words
+  are English.
 - **The layer view** (레이어 in the Korean pack) reads the persona and the lore like a book: the layer chosen in
   the index, the first where none is, its items in position order, each with a drag handle at its left,
   carried by the pointer to another place, a line marking where one will land, or moved up and down by their
@@ -709,8 +798,19 @@ console bundle contract and served by the brain itself (`docs/boundary-api.md`, 
   its vertical place the mean use and its size its count of memories under the filters, so the important
   memories that are seldom used stand at the lower right. A bubble narrows the list to its group, and a table
   shows the same figures.
-- **A mind map:** one subject at the centre, its memories under the filters around it coloured by layer, the most used
-  first and the rest folded into one count, and the other subjects those memories reach outside them. A
+- **The review** (검토 in the Korean pack): a view that stands only while the brain chosen is the base (「The base」),
+  and in the view's select only then. It lists the base's pending candidates (「Raising a memory to the base」),
+  oldest first, one item each: its status, its words, in the reading language as every memory's text is, its type,
+  and its source, the source brain's name and the memory's number, a press on which opens that memory in its own
+  brain, and the model's reason under its words. Each item carries three icon buttons at its end, each named by
+  its tooltip, 전역으로, `<source>`에 남김 (the source brain's name) and 버림: the first moves the candidate to `active` at
+  once; the other two grow a step of the item that asks first, saying what going through does, the last that the
+  source is invalidated in its own brain as well, its way out first and its way through last. A decided candidate
+  leaves the list, and a failed move leaves it standing with one sentence saying so. The heading counts the
+  candidates left; with none left the view says so. The filters, the index's choices and the order are not
+  honoured there, each with its line, since the review lists every candidate in the order they were raised.
+- **A mind map:** one subject at the centre, its memories under the filters around it coloured by layer, the most
+  used first and the rest folded into one count, and the other subjects those memories reach outside them. A
   memory opens its row; an outer subject comes to the centre.
 - **Live.** The screen reads the brain's event stream narrowed to the brain it shows, and reads again the
   rows and counts an event touches.

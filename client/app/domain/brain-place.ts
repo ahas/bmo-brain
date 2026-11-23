@@ -5,7 +5,7 @@ import type { MemoryFilter } from "./brain-api";
 // Where the screen stands, read from its address and written back to it (docs/design.md, 「The screen」): the
 // brain, the view, the filters and the memory open. An address handed on opens the same place.
 
-export const VIEWS = ["list", "map", "bubbles", "timeline", "book"] as const;
+export const VIEWS = ["list", "map", "bubbles", "timeline", "book", "review"] as const;
 export type View = (typeof VIEWS)[number];
 
 // The status choices of the toolbar: the live rows by default, each status, or every row.
@@ -132,12 +132,14 @@ export type Choice = (typeof CHOICES)[number];
 
 // What each view honours of the place's choices (docs/design.md, 「The screen」): the memory list every one; the
 // layer view, the map and the bubbles every one but the order, since each keeps an order of its own; the version
-// timeline none, since it shows one lineage. A choice a view does not honour is disabled there, never ignored.
+// timeline none, since it shows one lineage, and the review none, since it lists every candidate in the order they were
+// raised. A choice a view does not honour is disabled there, never ignored.
 export function honours(view: View, choice: Choice): boolean {
   switch (view) {
     case "list":
       return true;
     case "timeline":
+    case "review":
       return false;
     default:
       return choice !== "order";

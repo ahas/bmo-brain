@@ -821,6 +821,13 @@
             },
             "type": "array"
           },
+          "shared": {
+            "description": "In an org brain, whether it is a memory about a person that may be known inside the organisation; false\nwhere none is given.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "source": {
             "$ref": "#/components/schemas/Source"
           },
@@ -988,6 +995,11 @@
               "null"
             ]
           },
+          "shared": {
+            "default": false,
+            "description": "In an org brain, whether it is a memory about a person that may be known inside the organisation; false\nin an agent's brain.",
+            "type": "boolean"
+          },
           "status": {
             "$ref": "#/components/schemas/MemoryStatus"
           },
@@ -1074,6 +1086,7 @@
           "labels",
           "locked",
           "internalOnly",
+          "shared",
           "createdAt"
         ],
         "type": "object"
@@ -1153,6 +1166,13 @@
             "description": "The situation that ends it; the one every merged row shares where none is given.",
             "type": [
               "string",
+              "null"
+            ]
+          },
+          "shared": {
+            "description": "In an org brain, whether it is a memory about a person that may be known inside the organisation; set\nwhere any merged row carries it, where not given.",
+            "type": [
+              "boolean",
               "null"
             ]
           },
@@ -1379,6 +1399,13 @@
               "null"
             ]
           },
+          "shared": {
+            "description": "In an org brain, whether it is a memory about a person that may be known inside the organisation; the\nold version's where not given.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "standing": {
             "anyOf": [
               {
@@ -1561,6 +1588,13 @@
             "description": "The situation that ends it, in words.",
             "type": [
               "string",
+              "null"
+            ]
+          },
+          "shared": {
+            "description": "In an org brain, whether it is a memory about a person that may be known inside the organisation; false\nwhere none is given.",
+            "type": [
+              "boolean",
               "null"
             ]
           },
@@ -2215,6 +2249,11 @@
             "const": "head",
             "description": "A head of the unit, or a holder of its grant to write org memory.",
             "type": "string"
+          },
+          {
+            "const": "person",
+            "description": "The person the memory is about: a head's word for a shared memory about that one person, a member's\notherwise.",
+            "type": "string"
           }
         ]
       },
@@ -2539,6 +2578,11 @@
               "null"
             ]
           },
+          "shared": {
+            "default": false,
+            "description": "In an org brain, whether it is a memory about a person that may be known inside the organisation; false\nin an agent's brain.",
+            "type": "boolean"
+          },
           "status": {
             "$ref": "#/components/schemas/MemoryStatus"
           },
@@ -2633,6 +2677,7 @@
           "labels",
           "locked",
           "internalOnly",
+          "shared",
           "createdAt",
           "priority",
           "gain",
@@ -2671,7 +2716,7 @@
   "info": {
     "description": "An agent's long-term memory as a service. The service keeps many brains, each an account's and one agent's: subjects (what a memory is about, found by type and key), layers (the table of contents) and memories, one row a version, superseded and invalidated but never deleted. A turn asks recall for a block under a token budget; a persona is rendered as the same bytes until a piece changes; a brain moves in and out as a brain file. Nothing is held outside a brain. Bodies are JSON with camelCase keys, times are epoch milliseconds, lists are pages of items and more, and every failure is the error shape with its status. The harness plugin's tools, each a thin call of one route, are stated under x-tools.",
     "title": "bmo-brain",
-    "version": "0.1.0-rev.41"
+    "version": "0.1.0-rev.42"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -6374,6 +6419,13 @@
               "null"
             ]
           },
+          "shared": {
+            "description": "In an org brain, whether it is a memory about a person that may be known inside the organisation; false\nwhere none is given.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "standing": {
             "anyOf": [
               {
@@ -6555,6 +6607,13 @@
               "null"
             ]
           },
+          "shared": {
+            "description": "In an org brain, whether it is a memory about a person that may be known inside the organisation; set\nwhere any merged row carries it, where not given.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "standing": {
             "anyOf": [
               {
@@ -6688,6 +6747,13 @@
             "description": "The situation that ends it: the old version's where not given, and a null clears it.",
             "type": [
               "string",
+              "null"
+            ]
+          },
+          "shared": {
+            "description": "In an org brain, whether it is a memory about a person that may be known inside the organisation; the\nold version's where not given.",
+            "type": [
+              "boolean",
               "null"
             ]
           },
@@ -7128,6 +7194,13 @@
               "type": "integer"
             },
             "type": "array"
+          },
+          "shared": {
+            "description": "In an org brain, whether it is a memory about a person that may be known inside the organisation; false\nwhere none is given.",
+            "type": [
+              "boolean",
+              "null"
+            ]
           },
           "source": {
             "$ref": "#/components/schemas/Source"

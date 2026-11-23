@@ -35,6 +35,7 @@ fn memory(text: &str, importance: i64, subjects: &[SubjectKey]) -> NewMemory {
     actor_name: "writer-a".to_owned(),
     labels: labels(&[]),
     internal_only: None,
+    shared: None,
     locked: None,
     standing: None,
   }

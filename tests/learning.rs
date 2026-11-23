@@ -34,6 +34,7 @@ fn memory(kind: &str, text: &str, subjects: Vec<SubjectKey>) -> NewMemory {
     actor_name: "writer-a".to_owned(),
     labels: labels(&[]),
     internal_only: None,
+    shared: None,
     locked: None,
     standing: None,
   }
@@ -58,6 +59,7 @@ fn learning(kind: &str, text: &str, source: Source) -> Learning {
     actor_name: "agent-session".to_owned(),
     labels: labels(&[]),
     internal_only: None,
+    shared: None,
     locked: None,
     standing: None,
   }

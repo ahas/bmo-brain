@@ -187,7 +187,8 @@
       "bubbles": "버블 차트",
       "list": "기억",
       "map": "마인드맵",
-      "timeline": "버전 타임라인"
+      "timeline": "버전 타임라인",
+      "review": "검토"
     },
     "heading": {
       "brain_view": "{brain}의 {view}",
@@ -204,7 +205,8 @@
     "unhonoured": {
       "timeline": "버전 타임라인은 열린 기억 하나의 버전들을 보여 주므로 레이어·대상·유형과 필터로 좁혀지지 않습니다.",
       "order": "이 보기는 자기 순서로 놓으므로 정렬은 쓰이지 않습니다.",
-      "prompt": "프롬프트 원문은 레이어 전체의 것이라 필터로 좁혀지지 않습니다."
+      "prompt": "프롬프트 원문은 레이어 전체의 것이라 필터로 좁혀지지 않습니다.",
+      "review": "검토는 올라온 순서대로 모든 후보를 보여 주므로 레이어·대상·유형과 필터로 좁혀지지 않습니다."
     },
     "type_name": {
       "episode": "에피소드",
@@ -219,12 +221,25 @@
       "check": "점검",
       "followup": "후속 할 일",
       "promise": "약속",
-      "state": "상태"
+      "state": "상태",
+      "tip": "요령"
     },
     "subject_type": {
       "person": "인물",
       "room": "방",
       "episode": "에피소드"
+    },
+    "review": {
+      "empty": "검토할 후보가 없습니다.",
+      "failed": "저장하지 못해 후보를 그대로 두었습니다.",
+      "raise": "전역으로",
+      "keep": "{brain}에 남김",
+      "keep_short": "남김",
+      "drop": "버림",
+      "keep_effect": "전역으로 올리지 않고 {brain}의 원래 기억만 남깁니다.",
+      "drop_effect": "{brain}의 원래 기억도 맞지 않음으로 옮겨 어디에서도 읽히지 않습니다.",
+      "source": "{brain} #{id}",
+      "open_source": "원래 기억 열기"
     }
   }
 }

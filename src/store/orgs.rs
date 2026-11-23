@@ -1,18 +1,21 @@
-//! Org brains (docs/design.md, 「Org brains」): a unit's memory, holding no person, each memory carrying the
-//! marks `locked` and `internalOnly`, written by the unit's heads and proposed by its members, and read along a
-//! member's units as the topics that stand for them.
+//! Org brains (docs/design.md, 「Org brains」): a unit's memory, holding a person only as the organisation may
+//! know them, each memory carrying the marks `locked`, `internalOnly` and `shared`, written by the unit's heads
+//! and by the person a shared memory is about, proposed by its members, and read along a member's units as the
+//! topics that stand for them.
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use bmo_brain_client::{Audience, Brain, BrainKind, Memory, OrgTopic, OrgTopicsQuery, Standing};
+use bmo_brain_client::{
+  Audience, Brain, BrainKind, Memory, OrgTopic, OrgTopicsQuery, Standing, SubjectKey,
+};
 use sqlx::PgConnection;
 
 use super::brains::brain_of;
 use super::versions::{MEMORY_COLUMNS, MemoryRow};
 use super::{Fault, Held, Store, listed};
 
-/// The subject type an org brain holds none of.
-const PERSON: &str = "person";
+/// The subject type a shared memory of an org brain is about.
+pub(crate) const PERSON: &str = "person";
 
 /// The subject type an org memory overrides by.
 const TOPIC: &str = "topic";
@@ -23,24 +26,28 @@ pub(crate) const PROPOSAL: &str = "rumor";
 /// The most org brains one reading names.
 const UNITS_MOST: usize = 50;
 
-/// The two marks of an org memory, as one version carries them.
+/// The three marks of an org memory, as one version carries them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct Marks {
   pub locked: bool,
   pub internal_only: bool,
+  pub shared: bool,
 }
 
 impl Marks {
-  /// What a first version in an org brain carries where its writer says nothing: internal-only, not locked.
+  /// What a first version in an org brain carries where its writer says nothing: internal-only, not locked,
+  /// not shared.
   pub(crate) const FIRST: Self = Self {
     locked: false,
     internal_only: true,
+    shared: false,
   };
 
   /// What every row of an agent's brain carries.
   const NONE: Self = Self {
     locked: false,
     internal_only: false,
+    shared: false,
   };
 
   /// The marks a row carries.
@@ -48,25 +55,26 @@ impl Marks {
     Self {
       locked: row.locked,
       internal_only: row.internal_only,
+      shared: row.shared,
     }
   }
 
   /// The marks a write sets in this brain: each the one given, else the fallback's. An agent's brain takes
-  /// neither, and a write that sets one there is refused.
-  pub(crate) fn set(
-    brain: &Brain,
-    locked: Option<bool>,
-    internal_only: Option<bool>,
-    fallback: Self,
-  ) -> Held<Self> {
+  /// none, and a write that sets one there is refused.
+  pub(crate) fn set(brain: &Brain, given: Given, fallback: Self) -> Held<Self> {
     match brain.kind {
       BrainKind::Org => Ok(Self {
-        locked: locked.unwrap_or(fallback.locked),
-        internal_only: internal_only.unwrap_or(fallback.internal_only),
+        locked: given.locked.unwrap_or(fallback.locked),
+        internal_only: given.internal_only.unwrap_or(fallback.internal_only),
+        shared: given.shared.unwrap_or(fallback.shared),
       }),
-      BrainKind::Agent if locked == Some(true) || internal_only == Some(true) => {
+      BrainKind::Agent
+        if given.locked == Some(true)
+          || given.internal_only == Some(true)
+          || given.shared == Some(true) =>
+      {
         Err(Fault::BadRequest(format!(
-          "Brain {} is an agent's brain; locked and internalOnly mark an org brain's memories alone.",
+          "Brain {} is an agent's brain; locked, internalOnly and shared mark an org brain's memories alone.",
           brain.id
         )))
       }
@@ -84,10 +92,121 @@ impl Marks {
   }
 }
 
+/// The marks a write names, each none where it names none.
+#[derive(Debug, Clone, Copy, Default)]
+pub(crate) struct Given {
+  pub locked: Option<bool>,
+  pub internal_only: Option<bool>,
+  pub shared: Option<bool>,
+}
+
+/// What a memory is about as the person rule reads it: the person subjects it links, by id, and whether it is
+/// shared.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct About {
+  pub people: Vec<i64>,
+  pub shared: bool,
+}
+
+impl About {
+  /// The one person a shared memory is about alone, or none.
+  fn one_person(&self) -> Option<i64> {
+    match self.people.as_slice() {
+      [person] if self.shared => Some(*person),
+      _ => None,
+    }
+  }
+}
+
+/// The standing a write is judged by: the person a memory is about stands as a head where every memory the write
+/// touches is shared and about that one person alone, and as a member otherwise; every other standing as it is.
+pub(crate) fn judged(standing: Option<Standing>, touched: &[&About]) -> Option<Standing> {
+  if standing != Some(Standing::Person) {
+    return standing;
+  }
+  let people: Option<BTreeSet<i64>> = touched.iter().map(|about| about.one_person()).collect();
+  match people {
+    Some(people) if people.len() == 1 => Some(Standing::Head),
+    _ => Some(Standing::Member),
+  }
+}
+
+/// The standing a learning is judged by, from the subjects it names by key before they are made: the person a
+/// memory is about stands as a head for a shared memory naming that one person alone, and as a member otherwise.
+pub(crate) fn judged_by_keys(
+  standing: Option<Standing>,
+  subjects: &[SubjectKey],
+  shared: Option<bool>,
+) -> Option<Standing> {
+  if standing != Some(Standing::Person) {
+    return standing;
+  }
+  let people: BTreeSet<&str> = subjects
+    .iter()
+    .filter(|subject| subject.kind == PERSON)
+    .map(|subject| subject.key.as_str())
+    .collect();
+  if shared == Some(true) && people.len() == 1 {
+    Some(Standing::Head)
+  } else {
+    Some(Standing::Member)
+  }
+}
+
+/// The person subjects among these subjects, by id.
+pub(crate) async fn people_among(conn: &mut PgConnection, subject_ids: &[i64]) -> Held<Vec<i64>> {
+  if subject_ids.is_empty() {
+    return Ok(vec![]);
+  }
+  Ok(
+    sqlx::query_scalar("SELECT id FROM subjects WHERE id = ANY($1) AND type = $2 ORDER BY id")
+      .bind(subject_ids)
+      .bind(PERSON)
+      .fetch_all(&mut *conn)
+      .await?,
+  )
+}
+
+/// What a row stands about: the person subjects it links and its `shared` mark.
+pub(crate) async fn about_row(conn: &mut PgConnection, row: &MemoryRow) -> Held<About> {
+  let people: Vec<i64> = sqlx::query_scalar(
+    "SELECT s.id FROM memory_subjects ms JOIN subjects s ON s.id = ms.subject_id \
+     WHERE ms.memory_id = $1 AND s.type = $2 ORDER BY s.id",
+  )
+  .bind(row.id)
+  .bind(PERSON)
+  .fetch_all(&mut *conn)
+  .await?;
+  Ok(About {
+    people,
+    shared: row.shared,
+  })
+}
+
+/// The person rule of an org brain: a memory about a person is shared, and a shared memory is about a person.
+/// An agent's brain holds people freely and takes no mark.
+pub(crate) fn person_rule(brain: &Brain, about: &About) -> Held<()> {
+  if brain.kind != BrainKind::Org {
+    return Ok(());
+  }
+  match (about.people.is_empty(), about.shared) {
+    (false, false) => Err(Fault::BadRequest(format!(
+      "Brain {} is an org brain, which holds a memory about a person only where it is shared: what the \
+       organisation may know of them.",
+      brain.id
+    ))),
+    (true, true) => Err(Fault::BadRequest(format!(
+      "Brain {}: shared marks a memory about a person, and this memory links none.",
+      brain.id
+    ))),
+    _ => Ok(()),
+  }
+}
+
 /// Whether a write by this standing in this brain is a member's proposal: in an org brain, any write but a
-/// head's.
+/// head's. A person's standing is judged first (`judged`), and one left unjudged proposes.
 pub(crate) fn proposes(brain: &Brain, standing: Option<Standing>) -> bool {
-  brain.kind == BrainKind::Org && standing.unwrap_or_default() == Standing::Member
+  brain.kind == BrainKind::Org && standing.unwrap_or_default() != Standing::Head
 }
 
 /// A write an org brain takes from a head alone, refused to a member.
@@ -97,24 +216,6 @@ pub(crate) fn heads_only(brain: &Brain, standing: Option<Standing>, what: &str) 
       "Brain {} is an org brain, which takes a {what} from a head of its unit alone; a member proposes by a \
        first version or a learning.",
       brain.id
-    )));
-  }
-  Ok(())
-}
-
-/// A subject of type `person` refused in an org brain, which holds no memory about a person.
-pub(crate) async fn no_person_in(conn: &mut PgConnection, brain_id: i64, subject_type: &str) -> Held<()> {
-  if subject_type != PERSON {
-    return Ok(());
-  }
-  let kind: Option<String> = sqlx::query_scalar("SELECT kind FROM brains WHERE id = $1")
-    .bind(brain_id)
-    .fetch_optional(&mut *conn)
-    .await?;
-  if kind.as_deref() == Some(BrainKind::Org.name()) {
-    return Err(Fault::BadRequest(format!(
-      "Brain {brain_id} is an org brain, which holds no memory about a person; no subject of type person \
-       stands in it."
     )));
   }
   Ok(())

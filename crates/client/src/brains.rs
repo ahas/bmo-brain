@@ -42,6 +42,9 @@ pub enum Standing {
   Member,
   /// A head of the unit, or a holder of its grant to write org memory.
   Head,
+  /// The person the memory is about: a head's word for a shared memory about that one person, a member's
+  /// otherwise.
+  Person,
 }
 
 /// Whom a reading of an org brain is for.
@@ -341,6 +344,10 @@ pub struct Memory {
   /// agent's brain.
   #[serde(default)]
   pub internal_only: bool,
+  /// In an org brain, whether it is a memory about a person that may be known inside the organisation; false
+  /// in an agent's brain.
+  #[serde(default)]
+  pub shared: bool,
   pub created_at: i64,
 }
 
@@ -388,6 +395,10 @@ pub struct NewMemory {
   /// is given.
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub internal_only: Option<bool>,
+  /// In an org brain, whether it is a memory about a person that may be known inside the organisation; false
+  /// where none is given.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub shared: Option<bool>,
   /// Who writes into an org brain; `member` where none is given.
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub standing: Option<Standing>,
@@ -446,6 +457,10 @@ pub struct MemoryVersion {
   /// version's where not given.
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub internal_only: Option<bool>,
+  /// In an org brain, whether it is a memory about a person that may be known inside the organisation; the
+  /// old version's where not given.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub shared: Option<bool>,
   /// Who writes into an org brain; `member` where none is given.
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub standing: Option<Standing>,
@@ -494,6 +509,10 @@ pub struct MemoryMerge {
   /// merged row carries it, where not given.
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub internal_only: Option<bool>,
+  /// In an org brain, whether it is a memory about a person that may be known inside the organisation; set
+  /// where any merged row carries it, where not given.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub shared: Option<bool>,
   /// Who writes into an org brain; `member` where none is given.
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub standing: Option<Standing>,
@@ -959,6 +978,10 @@ pub struct Learning {
   /// is given.
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub internal_only: Option<bool>,
+  /// In an org brain, whether it is a memory about a person that may be known inside the organisation; false
+  /// where none is given.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub shared: Option<bool>,
   /// Who writes into an org brain; `member` where none is given.
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub standing: Option<Standing>,

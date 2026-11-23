@@ -9,7 +9,7 @@ use sqlx::PgConnection;
 
 use super::brains::{brain_of, given};
 use super::misses::Asked;
-use super::orgs::{PROPOSAL, heads_only, proposes};
+use super::orgs::{PROPOSAL, heads_only, judged_by_keys, proposes};
 use super::recall::Cues;
 use super::sheets::written_type;
 use super::vectors::fuse;
@@ -155,9 +155,10 @@ impl Store {
     let at = now();
     let mut tx = self.begin().await?;
     let brain = brain_of(&mut tx, brain_id).await?;
-    let proposal = proposes(&brain, body.standing);
+    let standing = judged_by_keys(body.standing, &body.subjects, body.shared);
+    let proposal = proposes(&brain, standing);
     if body.strengthens.is_some() {
-      heads_only(&brain, body.standing, "learning that strengthens a memory")?;
+      heads_only(&brain, standing, "learning that strengthens a memory")?;
     }
     let heard = proposal || body.source.is_heard();
     let mut learned = Learned {
@@ -255,6 +256,7 @@ impl Store {
             labels: Some(labels),
             locked: body.locked,
             internal_only: body.internal_only,
+            shared: body.shared,
             standing: body.standing,
           },
           at,
@@ -312,6 +314,7 @@ impl Store {
           labels,
           locked: body.locked,
           internal_only: body.internal_only,
+          shared: body.shared,
           standing: body.standing,
         },
         at,

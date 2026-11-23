@@ -116,6 +116,14 @@ set -eu
 "$HOME/.local/share/bmo-pocket/deploy/bin/bmo-pocket" put --service brain --placed --allow room.chat --allow brain.lessons tools/brain/.placed
 '''
 
+# The brain's kinds of the delegation chain declared on the account service the data root's env/web.env names,
+# once the service is up (docs/boundary-api.md, 「Declaring the chain's kinds」), so they stand before a caller
+# resolves them; with no account service named it declares nothing and passes.
+[[deploy.step]]
+id = "chain-declare"
+phase = "after-health"
+command = "bin/bmo-brain --config brain.toml chain declare"
+
 # The memory tool placed in its folder's .placed/, the folder the tool host reads: the executable the
 # release's bin/ holds, its manifest and the schemas beside it.
 [[deploy.step]]

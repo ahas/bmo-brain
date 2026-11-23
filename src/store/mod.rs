@@ -2,6 +2,7 @@
 //! in the same transaction as the change. Each resource is a module of its own; the routes and the clock both
 //! work through them.
 
+pub mod base;
 pub mod brains;
 pub mod consolidation;
 pub mod events;

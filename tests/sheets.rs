@@ -40,6 +40,7 @@ fn memory(kind: &str, text: &str) -> NewMemory {
     actor_name: "writer-a".to_owned(),
     labels: labels(&[]),
     internal_only: None,
+    shared: None,
     locked: None,
     standing: None,
   }
@@ -497,6 +498,7 @@ async fn no_write_takes_the_type_sheet() {
     actor_name: "writer-a".to_owned(),
     labels: labels(&[]),
     internal_only: None,
+    shared: None,
     locked: None,
     standing: None,
   };
@@ -566,6 +568,7 @@ async fn a_learning_is_dated_where_it_names_when_it_began() {
         actor_name: "writer-a".to_owned(),
         labels: labels(&[]),
         internal_only: None,
+        shared: None,
         locked: None,
         standing: None,
       },

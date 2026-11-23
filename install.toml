@@ -41,6 +41,14 @@ what = "The name an embedding model of 1024-dimension vectors is registered unde
 file = "install/inputs/brain.embedding-model"
 default = "embedding"
 
+# The name the chat model the base's candidates are judged by is registered under in the LLM gateway
+# (docs/boundary-api.md, 「Raising candidates」); only the administrator's command asks it.
+[[input]]
+name = "brain.classifier-model"
+what = "The name a chat model is registered under in agency's LLM gateway, as the gateway's model list shows it, which judges whether a memory fits any agent before it becomes a candidate of the base; leave the default where none is chosen yet."
+file = "install/inputs/brain.classifier-model"
+default = "classifier"
+
 [[database]]
 name = "bmo_brain"
 
@@ -63,6 +71,11 @@ calls = ["gate"]
 address = "http://127.0.0.1:{{port.agency.gateway}}"
 key_file = "{{data_root}}/env/llm-gateway.key"
 model = "{{input.brain.embedding-model}}"
+
+[classifier]
+address = "http://127.0.0.1:{{port.agency.gateway}}"
+key_file = "{{data_root}}/env/llm-gateway.key"
+model = "{{input.brain.classifier-model}}"
 '''
 
 # The console reaches the brain's screen with its own credential, and the organisations' memory tab with the

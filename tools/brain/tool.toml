@@ -28,7 +28,7 @@ unbounded = true
 namespace = "bmo"
 name = "brain_similar"
 title = "Likes of a candidate"
-description = "The live memories most like a candidate fact: read these and judge the candidate before brain_learn."
+description = "The live memories most like a candidate fact: read these and judge the candidate before brain_learn. Under base stand the platform's shared memories most like it, which you read but never write, strengthen or replace."
 input = "brain_similar.json"
 hints = { read_only = true }
 capabilities = ["room.chat"]
@@ -64,7 +64,7 @@ unbounded = true
 namespace = "bmo"
 name = "brain_list"
 title = "List memories"
-description = "Your brain's memories by type, status, subject, key, words, or the situation they are for."
+description = "Your brain's memories by type, status, subject, key, words, or the situation they are for. Under base stand the platform's shared memories the same ask finds, which you read but never write, strengthen or replace."
 input = "brain_list.json"
 hints = { read_only = true }
 capabilities = ["room.chat"]

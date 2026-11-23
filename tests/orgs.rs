@@ -1,6 +1,7 @@
 //! Org brains, through the served routes (docs/design.md, 「Org brains」): a unit's brain keyed by the company
-//! and the unit, holding no person, its memories marked locked and internal-only, written by heads and proposed
-//! by members, read along a member's units as the topics that stand for them, and carried in the brain file.
+//! and the unit, holding a person only in a shared memory, its memories marked locked, internal-only and shared,
+//! written by heads and by the person a shared memory is about and proposed by members, read along a member's
+//! units as the topics that stand for them, and carried in the brain file.
 
 use crate::support;
 
@@ -93,7 +94,7 @@ async fn an_org_brain_is_a_kind_of_its_own_at_a_pair_of_keys_no_agent_brain_hold
 }
 
 #[tokio::test]
-async fn an_org_brain_holds_no_person_and_marks_its_memories_where_an_agent_brain_takes_no_mark() {
+async fn an_org_brain_holds_a_person_in_a_shared_memory_alone_and_an_agent_brain_takes_no_mark() {
   let served = Served::new().await;
   let client = &served.client;
   let unit = brain(client, BrainKind::Org, "company-a", "unit-a").await;
@@ -109,8 +110,49 @@ async fn an_org_brain_holds_no_person_and_marks_its_memories_where_an_agent_brai
     key: "1".to_owned(),
     description: String::new(),
   };
-  assert_eq!(refused(client.subject_add(unit, &person).await), (400, "bad-request".to_owned()));
+  client.subject_add(unit, &person).await.unwrap();
   client.subject_add(agent, &person).await.unwrap();
+  let shared = client
+    .memory_add(
+      unit,
+      &NewMemory {
+        kind: "fact".to_owned(),
+        text: "The member leads the site team.".to_owned(),
+        subjects: vec![subject("person", "1")],
+        shared: Some(true),
+        actor_name: "writer-a".to_owned(),
+        standing: Some(Standing::Head),
+        ..NewMemory::default()
+      },
+    )
+    .await
+    .unwrap();
+  assert_eq!((shared.shared, shared.internal_only, shared.kind.as_str()), (true, true, "fact"));
+  // A version that takes the person away keeps the mark, and a shared memory about nobody is refused.
+  let unshared = MemoryVersion {
+    subjects: Some(vec![subject("topic", "industry")]),
+    actor_name: "writer-a".to_owned(),
+    standing: Some(Standing::Head),
+    ..MemoryVersion::default()
+  };
+  assert_eq!(
+    refused(client.memory_version(unit, shared.id, &unshared).await),
+    (400, "bad-request".to_owned())
+  );
+  let about_nobody = NewMemory {
+    shared: Some(true),
+    ..topic_fact("industry", "The company builds.")
+  };
+  assert_eq!(refused(client.memory_add(unit, &about_nobody).await), (400, "bad-request".to_owned()));
+  let shared_in_agent = NewMemory {
+    subjects: vec![subject("person", "1")],
+    shared: Some(true),
+    ..topic_fact("industry", "The member leads the site team.")
+  };
+  assert_eq!(
+    refused(client.memory_add(agent, &shared_in_agent).await),
+    (400, "bad-request".to_owned())
+  );
 
   let first = client.memory_add(unit, &topic_fact("industry", "The company builds.")).await.unwrap();
   assert_eq!((first.locked, first.internal_only), (false, true));
@@ -134,6 +176,7 @@ async fn an_org_brain_holds_no_person_and_marks_its_memories_where_an_agent_brai
       unit,
       &NewMemory {
         internal_only: Some(false),
+        shared: None,
         ..topic_fact("report-day", "Reports are due on Friday.")
       },
     )
@@ -165,6 +208,118 @@ async fn an_org_brain_holds_no_person_and_marks_its_memories_where_an_agent_brai
     .await
     .unwrap();
   assert_eq!((plain.locked, plain.internal_only, plain.kind.as_str()), (false, false, "fact"));
+}
+
+#[tokio::test]
+async fn the_person_a_shared_memory_is_about_writes_it_as_a_head_and_proposes_anything_else() {
+  let served = Served::new().await;
+  let client = &served.client;
+  let unit = brain(client, BrainKind::Org, "company-a", "unit-a").await;
+  let own = |text: &str| NewMemory {
+    kind: "fact".to_owned(),
+    text: text.to_owned(),
+    subjects: vec![subject("person", "1")],
+    shared: Some(true),
+    actor_name: "person-1".to_owned(),
+    standing: Some(Standing::Person),
+    ..NewMemory::default()
+  };
+  let written = client.memory_add(unit, &own("The member prefers mail to calls.")).await.unwrap();
+  assert_eq!((written.kind.as_str(), written.status), ("fact", MemoryStatus::Active));
+
+  // Their own word on a matter of the unit, or on two people, is a proposal.
+  let topic = NewMemory {
+    standing: Some(Standing::Person),
+    ..topic_fact("industry", "The company designs.")
+  };
+  assert_eq!(client.memory_add(unit, &topic).await.unwrap().kind, "rumor");
+  let two = NewMemory {
+    subjects: vec![subject("person", "1"), subject("person", "2")],
+    ..own("The two members share a desk.")
+  };
+  assert_eq!(client.memory_add(unit, &two).await.unwrap().kind, "rumor");
+
+  // They change and close their own shared memory; a version bringing in another person is refused.
+  let version = client
+    .memory_version(
+      unit,
+      written.id,
+      &MemoryVersion {
+        text: Some("The member prefers chat to calls.".to_owned()),
+        actor_name: "person-1".to_owned(),
+        standing: Some(Standing::Person),
+        ..MemoryVersion::default()
+      },
+    )
+    .await
+    .unwrap();
+  let widened = MemoryVersion {
+    subjects: Some(vec![subject("person", "1"), subject("person", "2")]),
+    actor_name: "person-1".to_owned(),
+    standing: Some(Standing::Person),
+    ..MemoryVersion::default()
+  };
+  assert_eq!(
+    refused(client.memory_version(unit, version.id, &widened).await),
+    (403, "forbidden".to_owned())
+  );
+  let moved = client
+    .memory_move(
+      unit,
+      version.id,
+      &MemoryMove {
+        status: MemoryStatus::Invalidated,
+        at: None,
+        actor_name: "person-1".to_owned(),
+        reason: None,
+        text: None,
+        standing: Some(Standing::Person),
+      },
+    )
+    .await
+    .unwrap();
+  assert_eq!(moved.status, MemoryStatus::Invalidated);
+  let head = client.memory_add(unit, &topic_fact("industry", "The company builds.")).await.unwrap();
+  let theirs = MemoryMove {
+    status: MemoryStatus::Invalidated,
+    at: None,
+    actor_name: "person-1".to_owned(),
+    reason: None,
+    text: None,
+    standing: Some(Standing::Person),
+  };
+  assert_eq!(refused(client.memory_move(unit, head.id, &theirs).await), (403, "forbidden".to_owned()));
+
+  // A learning of their own about themselves is their word too.
+  let learned = client
+    .learn(
+      unit,
+      &Learning {
+        kind: "fact".to_owned(),
+        text: "The member works from the site office.".to_owned(),
+        subjects: vec![subject("person", "1")],
+        importance: None,
+        source: Source::Own,
+        confirms: vec![],
+        strengthens: None,
+        replaces: vec![],
+        grounds: vec![],
+        valid_from: None,
+        recall_condition: None,
+        release_condition: None,
+        key: None,
+        layer_id: None,
+        actor_name: "person-1".to_owned(),
+        labels: Default::default(),
+        locked: None,
+        internal_only: None,
+        shared: Some(true),
+        standing: Some(Standing::Person),
+      },
+    )
+    .await
+    .unwrap();
+  assert_eq!(learned.written.unwrap().kind, "fact");
 }
 
 #[tokio::test]
@@ -210,6 +365,7 @@ async fn a_members_word_is_a_proposal_a_head_accepts_and_every_other_write_is_a_
         labels: Default::default(),
         locked: None,
         internal_only: None,
+        shared: None,
         standing: Some(Standing::Member),
       },
     )
@@ -239,6 +395,7 @@ async fn a_members_word_is_a_proposal_a_head_accepts_and_every_other_write_is_a_
     labels: Default::default(),
     locked: None,
     internal_only: None,
+    shared: None,
     standing: None,
   };
   assert_eq!(refused(client.learn(unit, &strengthening).await), forbidden);
@@ -319,6 +476,7 @@ async fn a_topic_stands_from_the_nearest_unit_unless_a_farther_one_locked_it() {
       &NewMemory {
         locked: Some(true),
         internal_only: Some(false),
+        shared: None,
         ..topic_fact("photos", "Site photos go to the company drive alone.")
       },
     )
@@ -333,6 +491,7 @@ async fn a_topic_stands_from_the_nearest_unit_unless_a_farther_one_locked_it() {
       second_post,
       &NewMemory {
         internal_only: Some(false),
+        shared: None,
         ..topic_fact("report-day", "Reports are due on Friday.")
       },
     )
@@ -400,7 +559,7 @@ async fn a_topic_stands_from_the_nearest_unit_unless_a_farther_one_locked_it() {
 }
 
 #[tokio::test]
-async fn a_brain_file_carries_the_marks_into_an_org_brain_and_no_person_in() {
+async fn a_brain_file_carries_the_marks_into_an_org_brain_and_a_person_in_a_shared_memory_alone() {
   let served = Served::new().await;
   let client = &served.client;
   let source = brain(client, BrainKind::Org, "company-a", "unit-a").await;
@@ -412,6 +571,7 @@ async fn a_brain_file_carries_the_marks_into_an_org_brain_and_no_person_in() {
       &NewMemory {
         locked: Some(true),
         internal_only: Some(false),
+        shared: None,
         ..topic_fact("photos", "Site photos go to the company drive alone.")
       },
     )
@@ -451,4 +611,33 @@ async fn a_brain_file_carries_the_marks_into_an_org_brain_and_no_person_in() {
     .unwrap();
   let with_a_person = client.export(agent, &ExportQuery::default()).await.unwrap();
   assert_eq!(refused(client.inject(target, with_a_person).await), (400, "bad-request".to_owned()));
+
+  client
+    .memory_add(
+      source,
+      &NewMemory {
+        kind: "fact".to_owned(),
+        text: "The member leads the site team.".to_owned(),
+        subjects: vec![subject("person", "1")],
+        shared: Some(true),
+        actor_name: "writer-a".to_owned(),
+        standing: Some(Standing::Head),
+        ..NewMemory::default()
+      },
+    )
+    .await
+    .unwrap();
+  let shared = client.export(source, &ExportQuery::default()).await.unwrap();
+  let other = brain(client, BrainKind::Org, "company-a", "unit-c").await;
+  client.inject(other, shared).await.unwrap();
+  let carried = client
+    .memories(other, &bmo_brain_client::MemoriesQuery::default())
+    .await
+    .unwrap()
+    .items
+    .into_iter()
+    .filter(|memory| memory.subjects.iter().any(|subject| subject.kind == "person"))
+    .map(|memory| memory.shared)
+    .collect::<Vec<_>>();
+  assert_eq!(carried, vec![true]);
 }

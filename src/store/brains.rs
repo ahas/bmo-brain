@@ -6,7 +6,6 @@ use bmo_brain_client::{
 };
 use sqlx::{FromRow, PgConnection, Postgres, QueryBuilder};
 
-use super::orgs::no_person_in;
 use super::{Fault, Held, Store, holding, limit, listed, now, page, publish, text};
 
 /// The longest a brain's name, a subject's or a layer's description is.
@@ -156,7 +155,6 @@ pub(crate) async fn subject_found_or_made(
 ) -> Held<(bool, Subject)> {
   given("type", &named.kind)?;
   given("key", &named.key)?;
-  no_person_in(&mut *conn, brain_id, &named.kind).await?;
   let standing: Option<SubjectRow> = sqlx::query_as(&format!(
     "SELECT {SUBJECT_COLUMNS} FROM subjects WHERE brain_id = $1 AND type = $2 AND key = $3"
   ))

@@ -3,6 +3,7 @@
 
 mod support;
 
+mod base;
 mod brains;
 mod consolidation;
 mod events;

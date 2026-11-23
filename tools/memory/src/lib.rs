@@ -591,6 +591,7 @@ async fn entry(client: &BrainClient, brain: i64, session: &Session, call: Call) 
             actor_name: ACTOR.to_owned(),
             labels: Default::default(),
             internal_only: None,
+            shared: None,
             locked: None,
             standing: None,
           },

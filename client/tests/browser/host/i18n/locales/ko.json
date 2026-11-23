@@ -9,6 +9,9 @@
     },
     "error": {
       "choices_find_failed": "검색하지 못했습니다"
+    },
+    "action": {
+      "cancel": "취소"
     }
   }
 }
