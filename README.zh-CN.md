@@ -36,7 +36,9 @@
 | `deploy/` | 服务的用户单元 `bmo-brain.service`，部署时从部署树链接 |
 | `tools/` | 供工具宿主使用的工具：大脑的 `brain/` 和记忆工具 `memory/`，各自包含清单、条目的 schema 以及可执行文件的 crate |
 
-testbed 的声明 `testbed.toml` 说明了 testbed 如何测试、检查、构建和部署本仓库。
+testbed 的声明 `testbed.toml` 说明了 testbed 如何测试、检查、构建和部署本仓库。安装声明 `install.toml`
+说明了在新机器上安装 brain 所需的内容，由 `bmo install` 读取；智能体按照索引的 INSTALL.md（`bmo install`，
+https://bmo.ahas.io/install.md）进行安装。
 
 ## 构建与测试
 

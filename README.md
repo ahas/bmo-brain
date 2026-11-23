@@ -45,6 +45,8 @@ Without `[embedding]` the brain searches by words alone. The model keeps its own
 | `tools/` | the tools for the tool host: the brain's, `brain/`, and the memory tool, `memory/`, each with its manifest, its entries' schemas and the crate of its executable |
 
 The testbed's declaration, `testbed.toml`, says how the testbed tests, checks, builds and deploys the repository.
+The install declaration, `install.toml`, says what installing the brain on a fresh machine needs, which `bmo install`
+reads: an agent installs it with the index's INSTALL.md (`bmo install`, https://bmo.ahas.io/install.md).
 
 ## Build and test
 
