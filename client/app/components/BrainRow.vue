@@ -1,7 +1,7 @@
 <template>
   <!-- One memory in one version (docs/design.md, 「The screen」): every field it has, its place in its
        lineage, the moves its status allows, and an edit saved as a new version. A superseded version opens
-       under a band leading to the live one. -->
+       under a band leading to the live one. An org brain's memory is read alone: no edit and no move stands. -->
   <div class="flex min-h-0 flex-1 flex-col">
     <div class="flex shrink-0 items-center gap-1 border-b border-default px-1 py-1">
       <UTooltip :text="t('brain.action.close_memory')">
@@ -66,7 +66,7 @@
           </div>
         </div>
 
-        <div v-if="!editing" class="flex flex-wrap gap-2">
+        <div v-if="!editing && !readOnly" class="flex flex-wrap gap-2">
           <UButton v-if="memory.status === 'pending'" size="sm" icon="i-material-symbols-check" :label="t('brain.action.approve')" :loading="busy" @click="move('active')" />
           <UButton v-if="live && memory.id === live.id" size="sm" color="neutral" variant="outline" icon="i-material-symbols-thumb-up-outline" :label="t('brain.action.confirm')" :loading="busy" @click="confirm" />
           <UButton v-if="isLive" size="sm" color="neutral" variant="outline" icon="i-material-symbols-task-alt" :label="t('brain.action.done')" @click="askMove('done')" />
@@ -190,6 +190,8 @@ const props = defineProps<{
   subjectNames: Map<number, string>;
   changes: number;
   narrow: boolean;
+  // Whether the memory is an org brain's, which the screen reads and never writes (docs/design.md, 「The screen」).
+  readOnly: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -254,7 +256,7 @@ const next = computed(() => versions.value[versionIndex.value + 1]);
 const newest = computed(() => versions.value[versions.value.length - 1]);
 const live = computed(() => versions.value.find((version) => version.status === "active" || version.status === "pending"));
 const isLive = computed(() => memory.value?.status === "active" || memory.value?.status === "pending");
-const editable = computed(() => isLive.value);
+const editable = computed(() => isLive.value && !props.readOnly);
 const restorable = computed(
   () =>
     memory.value !== null &&

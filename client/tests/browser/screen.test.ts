@@ -11,12 +11,14 @@ import type { Browser, Locator, Page, Route } from "playwright-core";
 // the mouse: a piece of the layer view carried to another place, a layer carried among the layers, and a piece
 // dropped on another layer, on the unfiled or on its own layer. And its selects, at a wide window and a phone's: a
 // list of more than seven choices opens with a search field, on an edge of its trigger and inside the window, one of
-// seven or fewer without. And the base's review, at a wide window and a phone's: each decision reachable and moving
-// its candidate, keeping and dropping asking in the item first, a candidate's source opening its memory in its own
-// brain, and the review standing for the base alone. And the last night's sleep, at a wide window and a phone's: its
-// card folded at the head of the memories, opened by a press, and its row opened from it. The screen stands alone on the host under `host/`, and the brain's routes are answered by
-// a stand-in holding one brain, which keeps every write, so what the screen wrote is read back and the screen read
-// again shows it. Skipped where the browser playwright-core pins is not on the machine.
+// seven or fewer without. And an org brain, at a wide window and a phone's: read and never written, one line saying
+// where it is written, the create button disabled and saying the same, and no carry, move, description, edit or status
+// move standing, while an agent's brain keeps its create button. And the last night's sleep, at a wide window and a
+// phone's: its card folded at the head of the memories, opened by a press, and its row opened from it. The screen
+// stands alone on the host under `host/`,
+// and the brain's routes are answered by a stand-in holding an agent's brain, which keeps every write, so what the
+// screen wrote is read back and the screen read again shows it, and the base beside it. Skipped where the browser
+// playwright-core pins is not on the machine.
 
 function browserReady(): boolean {
   try {
@@ -31,11 +33,11 @@ const CLIENT = new URL("../..", import.meta.url).pathname;
 const HOST = new URL("./host", import.meta.url).pathname;
 const RELAY = "/relay/brain";
 const WORDS = JSON.parse(readFileSync(new URL("../../i18n/locales/ko.json", import.meta.url), "utf8")) as {
-  brain: { title: Record<string, string>; label: Record<string, string>; action: Record<string, string>; review: Record<string, string> };
+  brain: { title: Record<string, string>; label: Record<string, string>; action: Record<string, string>; hint: Record<string, string> };
 };
 // The layer's words the host answers beside the screen's own (`host/i18n/`).
 const COMMON = JSON.parse(readFileSync(new URL("./host/i18n/locales/ko.json", import.meta.url), "utf8")) as {
-  common: { placeholder: { search: string }; action: { cancel: string } };
+  common: { placeholder: { search: string } };
 };
 
 // --- The stand-in brain ---
@@ -67,35 +69,12 @@ let layers: LayerRow[] = [];
 let rows: Row[] = [];
 let writes: Write[] = [];
 
-// The base, brain 2, and its candidates, each raised from a memory of brain 1 (docs/design.md, 「Raising a memory to the
-// base」): their statuses as the decisions move them, and the source memories' own.
-interface Candidate {
-  id: number;
-  text: string;
-  source: number;
-  status: string;
-}
+// The base, brain 2, an org brain the screen reads and never writes (docs/design.md, 「The screen」): one layer and one
+// memory in it.
+const ORG_TEXT = "Read the whole log before retrying a failed step.";
 
-let candidates: Candidate[] = [];
-let sources: Record<number, string> = {};
-
-function seedCandidates(): void {
-  candidates = [
-    { id: 101, text: "Run the formatter before the linter, so the linter reads the formatted text.", source: 7, status: "pending" },
-    { id: 102, text: "Pin a library's exact version where its minor releases break the build.", source: 8, status: "pending" },
-    { id: 103, text: "Read the whole log before retrying a failed step.", source: 5, status: "pending" }
-  ];
-  sources = { 5: "active", 7: "active", 8: "active" };
-  writes = [];
-}
-
-function candidateOf(candidate: Candidate): Record<string, unknown> {
-  return {
-    ...memoryOf({ id: candidate.id, type: "tip", text: candidate.text, layerId: null, position: 0, status: "active" }),
-    brainId: 2,
-    status: candidate.status,
-    labels: { sourceBrainId: "1", sourceMemoryId: String(candidate.source), candidateModel: "model-a", candidateReason: "It holds for any build." }
-  };
+function orgMemory(): Record<string, unknown> {
+  return { ...memoryOf({ id: 201, type: "tip", text: ORG_TEXT, layerId: 21, position: 1, status: "active" }), brainId: 2 };
 }
 
 function seed(): void {
@@ -198,25 +177,6 @@ async function answer(route: Route): Promise<void> {
 
     if (method === "POST" && version !== null) return json(route, memoryOf(versioned(Number(version[1]), body)));
 
-    const moved = /^\/brains\/([12])\/memories\/(\d+)$/.exec(path);
-
-    if (method === "PATCH" && moved !== null) {
-      const id = Number(moved[2]);
-      const status = String(body.status);
-
-      if (moved[1] === "1") {
-        sources[id] = status;
-
-        return json(route, memoryOf({ ...rows[0]!, id, status: "active" }));
-      }
-
-      const candidate = candidates.find((one) => one.id === id)!;
-
-      candidate.status = status;
-
-      return json(route, candidateOf(candidate));
-    }
-
     if (method === "PATCH" && layer !== null) {
       const changed = layers.find((one) => one.id === Number(layer[1]))!;
 
@@ -242,16 +202,19 @@ async function answer(route: Route): Promise<void> {
         more: false
       });
     case "/brains/2/layers":
+      return json(route, { items: [{ ...layerOf({ id: 21, name: "rules", position: 1 }), brainId: 2 }], more: false });
     case "/brains/2/subjects":
       return json(route, { items: [], more: false });
     case "/brains/2/types":
+      return json(route, [{ type: "tip", reserved: false, count: 1 }]);
     case "/brains/2/tallies":
       return json(route, []);
-    case "/brains/2/memories": {
-      const statuses = url.searchParams.get("status")?.split(",") ?? ["active", "pending"];
-
-      return json(route, { items: candidates.filter((one) => statuses.includes(one.status)).map(candidateOf), more: false });
-    }
+    case "/brains/2/memories":
+      return json(route, { items: [orgMemory()], more: false });
+    case "/brains/2/memories/201":
+      return json(route, orgMemory());
+    case "/brains/2/lineages/201":
+      return json(route, [orgMemory()]);
     case "/brains/1/layers":
       return json(route, { items: [...layers].sort(byPosition).map(layerOf), more: false });
     case "/brains/1/subjects":
@@ -628,79 +591,47 @@ describe.skipIf(!ready)("the brain's screen in a browser", () => {
     }, 60_000);
   });
 
-  describe("the base's candidates are reviewed one by one", () => {
-    beforeEach(seedCandidates);
+  describe("an org brain is read here and written on the organisation screen", () => {
+    beforeEach(seed);
 
-    const item = (id: number) => page.locator(`[data-candidate="${id}"]`);
+    const said = WORDS.brain.hint.org_read_only!;
+    const button = (name: string) => page.locator(`button[aria-label="${name}"]`);
 
-    // Whether a finger or the pointer pressing the control's middle reaches it once the list's motion has settled,
-    // nothing standing over it.
-    async function reachable(control: Locator): Promise<true | string> {
-      await control.scrollIntoViewIfNeeded();
-
-      return control.evaluate(async (element) => {
-        await Promise.all(document.getAnimations().map((animation) => animation.finished.catch(() => undefined)));
-
-        const box = element.getBoundingClientRect();
-        const top = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
-
-        return top !== null && (element === top || element.contains(top)) ? true : (top?.outerHTML.slice(0, 160) ?? "nothing");
-      });
-    }
-
-    for (const viewport of [{ width: 1280, height: 900 }, NARROW]) {
-      test(`at ${viewport.width} wide, each decision moves its candidate, and keeping and dropping ask in the item first`, async () => {
+    for (const viewport of [WIDE, NARROW]) {
+      test(`at ${viewport.width} wide, the base stands read-only, its line and its create button saying where it is written`, async () => {
         await page.setViewportSize(viewport);
-        await page.goto(`${origin}/brain/2/review`, { waitUntil: "load" });
-        await page.waitForSelector("[data-candidate]");
-        expect(await page.locator("[data-candidate]").count()).toBe(3);
-        expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-        for (const id of [101, 102, 103]) {
-          for (const decision of ["raise", "keep", "drop"]) {
-            expect({ id, decision, reachable: await reachable(item(id).locator(`[data-decide="${decision}"]`)) }).toEqual({ id, decision, reachable: true });
-          }
+        await page.goto(`${origin}/brain/2/book`, { waitUntil: "load" });
+        await piece(ORG_TEXT).waitFor();
+        await page.locator("p", { hasText: said }).first().waitFor();
+        expect(await button(said).isDisabled()).toBe(true);
+        expect(await button(WORDS.brain.action.create!).count()).toBe(0);
+
+        // The layer view's piece is neither carried nor moved, and the index carries and describes nothing.
+        expect(await piece(ORG_TEXT).getAttribute("draggable")).toBe("false");
+        expect(await button(WORDS.brain.action.up!).count()).toBe(0);
+        expect(await button(WORDS.brain.action.down!).count()).toBe(0);
+        if (viewport === WIDE) {
+          expect(await layerRow("rules").getAttribute("draggable")).toBe("false");
+          expect(await button(WORDS.brain.action.describe!).count()).toBe(0);
         }
 
-        await item(101).locator('[data-decide="raise"]').click();
-        await item(101).waitFor({ state: "detached" });
-        expect(candidates[0]!.status).toBe("active");
-
-        // Keeping grows the item's own step; its way out leaves everything as it was.
-        await item(102).locator('[data-decide="keep"]').click();
-        await item(102).locator("[data-asking]").waitFor();
-        expect(await reachable(item(102).locator("[data-confirm]"))).toBe(true as const);
-        await item(102).getByRole("button", { name: COMMON.common.action.cancel, exact: true }).click();
-        await item(102).locator("[data-asking]").waitFor({ state: "detached" });
-        expect(candidates[1]!.status).toBe("pending");
-        await item(102).locator('[data-decide="keep"]').click();
-        await item(102).locator("[data-confirm]").click();
-        await item(102).waitFor({ state: "detached" });
-        expect([candidates[1]!.status, sources[8]]).toEqual(["invalidated", "active"]);
-        expect(writes.find((write) => write.path === "/brains/2/memories/102")?.body.reason).toBe("kept-in-source");
-
-        // Dropping moves the source in its own brain first, then the candidate.
-        await item(103).locator('[data-decide="drop"]').click();
-        await item(103).locator("[data-confirm]").click();
-        await item(103).waitFor({ state: "detached" });
-        expect([candidates[2]!.status, sources[5]]).toEqual(["invalidated", "invalidated"]);
-        expect(writes.filter((write) => write.method === "PATCH").map((write) => write.path).slice(-2)).toEqual(["/brains/1/memories/5", "/brains/2/memories/103"]);
-        await page.getByText(WORDS.brain.review!.empty!, { exact: true }).waitFor();
+        // The memory open holds no edit and no status move.
+        await page.goto(`${origin}/brain/2/list?memory=201`, { waitUntil: "load" });
+        await button(WORDS.brain.action.all_versions!).waitFor();
+        expect(await button(WORDS.brain.action.edit!).count()).toBe(0);
+        for (const move of ["approve", "confirm", "done", "invalidate", "retract", "restore"]) {
+          expect({ move, shown: await page.getByRole("button", { name: WORDS.brain.action[move]!, exact: true }).count() }).toEqual({ move, shown: 0 });
+        }
+        expect(writes).toEqual([]);
       }, 60_000);
     }
 
-    test("a candidate's source opens that memory in its own brain", async () => {
+    test("an agent's brain keeps its create button and says nothing of the organisation screen", async () => {
       await page.setViewportSize(WIDE);
-      await page.goto(`${origin}/brain/2/review`, { waitUntil: "load" });
-      await item(102).locator("[data-source]").click();
-      await until(() => new URL(page.url()).pathname === "/brain/1", "the source's brain");
-      expect(new URL(page.url()).searchParams.get("memory")).toBe("8");
-    }, 60_000);
-
-    test("the review stands for the base alone", async () => {
-      await page.setViewportSize(WIDE);
-      await page.goto(`${origin}/brain/1/review`, { waitUntil: "load" });
-      await page.locator("h2").first().waitFor();
-      expect(await page.locator("[data-review]").count()).toBe(0);
+      await page.goto(`${origin}/brain/1/list`, { waitUntil: "load" });
+      await page.getByText("unfiled one").first().waitFor();
+      expect(await button(WORDS.brain.action.create!).isDisabled()).toBe(false);
+      expect(await page.locator("p", { hasText: said }).count()).toBe(0);
     }, 60_000);
   });
 });

@@ -2,7 +2,8 @@
   <!-- The layer view (docs/design.md, 「The screen」): the layer chosen in the index, the first where none is, its
        items in position order narrowed by the type, the subject, the status and the words, moved up and down as
        new versions. A layer holding persona items shows its prompt source, the very bytes the brain hands a
-       system prompt, which no filter narrows; a layer is exported as a brain file. -->
+       system prompt, which no filter narrows; a layer is exported as a brain file. An org brain's pieces are read
+       alone: none is carried or moved. -->
   <div class="flex min-h-0 flex-1 flex-col">
     <BrainHeading v-bind="heading" :title="title" :count="current === undefined && layer !== 'unfiled' ? null : pieces.length" :notes="notes">
       <template #tools>
@@ -26,18 +27,18 @@
           <li
             v-for="(piece, index) in pieces"
             :key="piece.id"
-            :draggable="!busy"
+            :draggable="!busy && !readOnly"
             data-piece
-            class="group flex cursor-grab items-start gap-2 border-b border-default p-4 active:cursor-grabbing"
-            :class="[landing === index ? LINE_BEFORE : '', landing === pieces.length && index === pieces.length - 1 ? LINE_AFTER : '', carrying === index ? 'opacity-50' : '']"
+            class="group flex items-start gap-2 border-b border-default p-4"
+            :class="[readOnly ? '' : 'cursor-grab active:cursor-grabbing', landing === index ? LINE_BEFORE : '', landing === pieces.length && index === pieces.length - 1 ? LINE_AFTER : '', carrying === index ? 'opacity-50' : '']"
             @dragstart="carry($event, index)"
             @dragend="setDown"
           >
-            <UIcon name="i-material-symbols-drag-indicator" class="size-5 shrink-0 text-muted" aria-hidden="true" />
+            <UIcon v-if="!readOnly" name="i-material-symbols-drag-indicator" class="size-5 shrink-0 text-muted" aria-hidden="true" />
             <span class="w-8 shrink-0 text-sm text-muted tabular-nums">{{ piece.position }}</span>
             <button type="button" class="min-w-0 flex-1 text-start text-sm whitespace-pre-wrap hover:text-primary" @click="emit('open', piece.id)">{{ reader.shown(piece.text) }}</button>
             <span class="shrink-0 text-sm text-muted">{{ typeName(t, te, piece.type) }}</span>
-            <div class="flex shrink-0 items-center opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 pointer-coarse:opacity-100">
+            <div v-if="!readOnly" class="flex shrink-0 items-center opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 pointer-coarse:opacity-100">
               <UTooltip :text="t('brain.action.up')">
                 <UButton size="xs" color="neutral" variant="ghost" icon="i-material-symbols-keyboard-arrow-up" :aria-label="t('brain.action.up')" :disabled="index === 0 || busy" @click="swap(index, index - 1)" />
               </UTooltip>
@@ -74,6 +75,8 @@ const props = defineProps<{
   layer: number | "unfiled" | null;
   filter: MemoryFilter;
   changes: number;
+  // Whether the layer is an org brain's, which the screen reads and never writes (docs/design.md, 「The screen」).
+  readOnly: boolean;
 }>();
 
 const emit = defineEmits<{ open: [id: number]; changed: [] }>();
@@ -155,6 +158,8 @@ const carrying = ref<number | null>(null);
 const landing = ref<number | null>(null);
 
 function carry(event: DragEvent, index: number): void {
+  if (props.readOnly) return;
+
   const piece = pieces.value[index];
 
   if (piece !== undefined) event.dataTransfer?.setData(PIECE_DRAG, JSON.stringify({ id: piece.id, type: piece.type, layerId: piece.layerId ?? null } satisfies Carried));
@@ -202,7 +207,7 @@ async function dropped(event: DragEvent): Promise<void> {
 
 // Positions written as new versions, asked first where a persona item is among them.
 async function write(positions: { id: number; position: number }[]): Promise<void> {
-  if (positions.length === 0) return;
+  if (positions.length === 0 || props.readOnly) return;
 
   const persona = positions.some((one) => pieces.value.find((piece) => piece.id === one.id)?.type === "persona");
 

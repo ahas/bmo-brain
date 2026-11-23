@@ -2,7 +2,8 @@
   <!-- The brain screen (docs/design.md, 「The screen」): one brain at a time. Where there is room the index,
        the view and the memory open stand side by side behind splitters, each scrolling on its own; on a
        phone the view is the body, the index rises from the bottom edge and a memory stands over the view.
-       The brain, the view, the filters and the memory open are the address. -->
+       The brain, the view, the filters and the memory open are the address. An org brain is read here and never
+       written: it is written on the console's organisation screen. -->
   <UDashboardPanel id="brain" :ui="{ body: 'p-0 sm:p-0 gap-0 sm:gap-0 overflow-y-hidden [&>*]:max-w-none' }">
     <!-- Under a console that offers its title bar the screen draws none of its own (bmo-ui's
          `docs/console-bundles.md`, "The title bar"). Either bar holds the name alone: the screen's actions and its
@@ -102,8 +103,13 @@
           <ActionGroup class="ms-auto" :actions="screenActions" />
           <!-- The screen's one create button, its last cell, and on a phone floating over the view instead; its
                press and its key drop the menu of what it makes. -->
-          <UDropdownMenu :items="createItems" :disabled="place.brainId === null" :content="createMenu">
-            <CreateButton ref="create" :class="{ 'ms-auto': screenActions.length === 0 }" :label="t('brain.action.create')" :disabled="place.brainId === null" />
+          <UDropdownMenu :items="createItems" :disabled="!creatable" :content="createMenu">
+            <CreateButton
+              ref="create"
+              :class="{ 'ms-auto': screenActions.length === 0 }"
+              :label="orgChosen ? t('brain.hint.org_read_only') : t('brain.action.create')"
+              :disabled="!creatable"
+            />
           </UDropdownMenu>
         </ToolBar>
 
@@ -153,14 +159,14 @@
         </USplitter>
 
         <BrainTeach
-          v-if="place.brainId !== null"
+          v-if="place.brainId !== null && !orgChosen"
           v-model:open="teachOpen"
           :brain-id="place.brainId"
           :layers="layerList"
           :narrow="narrow"
           @taught="taught"
         />
-        <BrainLayerAdd v-if="place.brainId !== null" v-model:open="layerAddOpen" :brain-id="place.brainId" @added="reread" />
+        <BrainLayerAdd v-if="place.brainId !== null && !orgChosen" v-model:open="layerAddOpen" :brain-id="place.brainId" @added="reread" />
       </div>
     </template>
   </UDashboardPanel>
@@ -178,7 +184,6 @@ import BrainIndex from "../../components/BrainIndex.vue";
 import BrainLayerAdd from "../../components/BrainLayerAdd.vue";
 import BrainList from "../../components/BrainList.vue";
 import BrainMindmap from "../../components/BrainMindmap.vue";
-import BrainReview from "../../components/BrainReview.vue";
 import BrainRow from "../../components/BrainRow.vue";
 import BrainTeach from "../../components/BrainTeach.vue";
 import BrainTimeline from "../../components/BrainTimeline.vue";
@@ -186,7 +191,6 @@ import * as api from "../../domain/brain-api";
 import { EVERY_TYPE, EVERY_TYPE_BUT_EPISODES, ORDERS, STATUS_CHOICES, cleared, filterOf, honours, orderOf, pathOf, placeOf, queryOf, standing } from "../../domain/brain-place";
 import { subjectTypeName, typeName } from "../../domain/brain-names";
 import { ENGLISH, useReading } from "../../domain/brain-reading";
-import { isBase } from "../../domain/brain-review";
 import { useBrainStream } from "../../domain/brain-stream";
 
 import type { Brain, Layer, Memory, Subject, Tally, TypeCount } from "../../domain/brain-api";
@@ -357,10 +361,13 @@ const wordsInput = computed(() => ({
   onChange: (event: Event) => go({ q: (event.target as HTMLInputElement).value, memory: null })
 }));
 
-// Whether the brain chosen is the base, whose candidates the review view lists.
-const baseChosen = computed(() => isBase((brainList.value ?? []).find((brain) => brain.id === place.value.brainId)));
+// Whether the brain chosen is an org brain, the base among them, which the screen reads and never writes: it is
+// written on the console's organisation screen (docs/design.md, 「The screen」).
+const orgChosen = computed(() => (brainList.value ?? []).find((brain) => brain.id === place.value.brainId)?.kind === "org");
 
-// The views, the review among them only while the base is chosen.
+// Whether the create button makes anything: a brain is chosen and it is an agent's.
+const creatable = computed(() => place.value.brainId !== null && !orgChosen.value);
+
 const viewItems = computed(() =>
   (
     [
@@ -368,12 +375,9 @@ const viewItems = computed(() =>
       ["map", "i-material-symbols-hub-outline"],
       ["bubbles", "i-material-symbols-bubble-chart-outline"],
       ["timeline", "i-material-symbols-timeline"],
-      ["book", "i-material-symbols-menu-book-outline"],
-      ["review", "i-material-symbols-fact-check-outline"]
+      ["book", "i-material-symbols-menu-book-outline"]
     ] as const
-  )
-    .filter(([value]) => value !== "review" || baseChosen.value)
-    .map(([value, icon]) => ({ value: value as View, label: t(`brain.view.${value}`), icon }))
+  ).map(([value, icon]) => ({ value: value as View, label: t(`brain.view.${value}`), icon }))
 );
 
 function countOf(tallied: Tally[], groups: string[]): number {
@@ -422,8 +426,6 @@ function subjectName(id: number): string {
 function unhonoured(choice: Choice): string {
   if (honours(place.value.view, choice)) return "";
 
-  if (place.value.view === "review") return t("brain.unhonoured.review");
-
   return place.value.view === "timeline" ? t("brain.unhonoured.timeline") : t("brain.unhonoured.order");
 }
 
@@ -447,7 +449,8 @@ function choiceValue(choice: Choice): string {
   }
 }
 
-// The heading every view stands under: the brain and the view, each standing choice, and why any is not honoured.
+// The heading every view stands under: the brain and the view, each standing choice, why any is not honoured, and
+// where an org brain is written.
 const heading = computed<Heading>(() => {
   const brain = (brainList.value ?? []).find((found) => found.id === place.value.brainId);
   const view = t(`brain.view.${place.value.view}`);
@@ -458,7 +461,10 @@ const heading = computed<Heading>(() => {
     honoured: honours(place.value.view, choice),
     clear: () => go({ ...cleared(), ...keep(choice), memory: place.value.memory })
   }));
-  const notes = [...new Set(chips.filter((chip) => !chip.honoured).map((chip) => unhonoured(chip.choice as Choice)))];
+  const notes = [
+    ...(orgChosen.value ? [t("brain.hint.org_read_only")] : []),
+    ...new Set(chips.filter((chip) => !chip.honoured).map((chip) => unhonoured(chip.choice as Choice)))
+  ];
 
   return {
     title: t("brain.heading.brain_view", { brain: brain?.name || brain?.agentKey || "", view }),
@@ -637,7 +643,8 @@ const indexProps = computed(() => ({
   subjects: subjectList.value,
   subjectCounts: subjectCounts.value,
   types: typeList.value,
-  place: place.value
+  place: place.value,
+  readOnly: orgChosen.value
 }));
 
 const rowProps = computed(() => ({
@@ -645,7 +652,8 @@ const rowProps = computed(() => ({
   memoryId: place.value.memory ?? 0,
   layers: layerList.value,
   subjectNames: subjectNames.value,
-  changes: changes.value
+  changes: changes.value,
+  readOnly: orgChosen.value
 }));
 
 const viewPart = computed(() => {
@@ -658,8 +666,6 @@ const viewPart = computed(() => {
       return BrainTimeline;
     case "book":
       return BrainBook;
-    case "review":
-      return baseChosen.value ? BrainReview : BrainList;
     default:
       return BrainList;
   }
@@ -669,14 +675,7 @@ const viewProps = computed(() => {
   const brainId = place.value.brainId ?? 0;
   const common = { brainId, heading: heading.value, changes: changes.value };
 
-  switch (place.value.view === "review" && !baseChosen.value ? "list" : place.value.view) {
-    case "review":
-      return {
-        ...common,
-        brains: brainList.value ?? [],
-        onSource: (source: { brainId: number; memoryId: number }) =>
-          void router.push({ path: pathOf({ ...place.value, ...cleared(), brainId: source.brainId, view: "list" }), query: { memory: String(source.memoryId) } })
-      };
+  switch (place.value.view) {
     case "map":
       return {
         ...common,
@@ -709,6 +708,7 @@ const viewProps = computed(() => {
         layers: layerList.value,
         layer: place.value.layer,
         filter: filterOf(place.value),
+        readOnly: orgChosen.value,
         onOpen: openMemory,
         onChanged: reread
       };

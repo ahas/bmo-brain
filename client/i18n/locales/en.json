@@ -80,7 +80,8 @@
       "position": "Leave empty for the end of the layer",
       "reason": "The reason is kept on this row.",
       "subjects": "type:key, several separated by commas",
-      "translated_english": "This English was translated from your language. You can edit it, and this English is what is saved."
+      "translated_english": "This English was translated from your language. You can edit it, and this English is what is saved.",
+      "org_read_only": "An org brain is read here; it is written on the console's organization screen, Organization → Organization memory."
     },
     "index": {
       "layers": "Layers",
@@ -189,8 +190,7 @@
       "bubbles": "Bubble chart",
       "list": "Memories",
       "map": "Mind map",
-      "timeline": "Version timeline",
-      "review": "Review"
+      "timeline": "Version timeline"
     },
     "heading": {
       "brain_view": "{brain} · {view}",
@@ -207,8 +207,7 @@
     "unhonoured": {
       "timeline": "The version timeline shows the versions of one open memory, so layers, subjects, types and filters do not narrow it.",
       "order": "This view keeps its own order, so the sort order is not used.",
-      "prompt": "The prompt source belongs to the whole layer, so filters do not narrow it.",
-      "review": "The review lists every candidate in the order raised, so layers, subjects, types and filters do not narrow it."
+      "prompt": "The prompt source belongs to the whole layer, so filters do not narrow it."
     },
     "type_name": {
       "episode": "Episode",
@@ -230,18 +229,6 @@
       "person": "Person",
       "room": "Room",
       "episode": "Episode"
-    },
-    "review": {
-      "empty": "No candidates to review.",
-      "failed": "Not saved; the candidate stays as it was.",
-      "raise": "Make global",
-      "keep": "Keep in {brain}",
-      "keep_short": "Keep",
-      "drop": "Drop",
-      "keep_effect": "Not made global; only the original in {brain} stays.",
-      "drop_effect": "Dropping it also marks the original in {brain} as not correct, so nothing reads it any more.",
-      "source": "{brain} #{id}",
-      "open_source": "Open the original"
     }
   }
 }

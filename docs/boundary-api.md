@@ -386,8 +386,9 @@ layer's own bundle build.
   the routes the service's token does not reach with `x-console-only`.
 - **The routes the screen uses:** `GET /brains` and `GET /brains/{brainId}`; under a brain, the reads of subjects
   and a subject's sheet, layers, memories, lineages, types and tallies, the persona and the export; the writes of
-  subjects, layers, memories, versions, moves, restorations, confirmations and learnings, and the similar ask; and
-  `GET /events`.
+  subjects, layers, memories, versions, moves, restorations, confirmations and learnings, and the similar ask,
+  each in an agent's brain alone, since the screen shows an org brain read-only (`docs/design.md`, 「The
+  screen」); and `GET /events`.
 
 ## Splitting sheets
 

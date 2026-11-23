@@ -662,11 +662,14 @@ administrator reviews each candidate and decides it.
 - **A candidate is a `pending` row of the base:** the memory's type, words, conditions, importance and kept
   subjects, labelled with its source's brain, memory and lineage and the model that judged it with its reason,
   written as the administrator's word. A pending row is never handed out.
-- **The administrator decides each** on the screen (「The screen」), one of three: raised, the candidate moved to
+- **The administrator decides each** on the console's organisation screen with its 플랫폼 전체 node chosen
+  (bmo-web's `docs/web.md`, 「조직 기억」), whose server writes the decision with the brain's service token; the
+  brain's own screen shows the base read-only (「The screen」). Each is one of three: raised, the candidate moved to
   `active`, a memory of the base from then on; kept in its source, the candidate moved to `invalidated` with the
-  reason `kept-in-source`, the source untouched; or dropped, the candidate moved to `invalidated` with the reason
-  `dropped` and the source moved to `invalidated` in its own brain with the same reason, so it is read nowhere.
-  Nothing is deleted, and each decision is a status move the history keeps.
+  reason `kept-in-source`, the source untouched; or dropped, the source moved to `invalidated` in its own brain
+  with the reason `dropped` first, then the candidate moved to `invalidated` with the same reason, so it is read
+  nowhere. Every move into the base carries the standing `head` (「Org brains」). Nothing is deleted, and each
+  decision is a status move the history keeps.
 - **The command** is `bmo-brain --config <file> base candidates` (`docs/boundary-api.md`, 「Raising candidates」);
   with `--dry-run` it prints what it would come to and writes nothing.
 
@@ -693,7 +696,7 @@ misses it keeps (「What the brain counts」) are its own, let go with it.
 
 ## The screen
 
-The brain's console bundle is the screen where a person sees one agent's long-term memory and sets it
+The brain's console bundle is the screen where a person sees a brain's long-term memory and sets an agent's
 right. The agent never uses it: the agent reads and writes through the brain's tools, and the screen shows
 what came of that. What a person changes there takes the shape a tool's change takes, a new version or a
 status move, and nothing is deleted. The screen is built from `client/` as a browser module on bmo-ui's
@@ -705,6 +708,16 @@ console bundle contract and served by the brain itself (`docs/boundary-api.md`, 
 - **Who opens it.** An administrator, and no member. The brain does not know who sits at the screen: the
   console relays it with its own token and the reader's role, and the screen shows every brain the brain
   keeps. A write from the screen carries the screen's own `actorName`.
+- **An org brain is read here and written on the organisation screen.** Every brain of kind `org`, the base
+  among them, is chosen as any brain is and shown read-only: its memories, layers, subjects, versions and figures
+  read as an agent brain's do, and nothing on the screen writes into it. The create button stands disabled, its
+  tooltip saying why, so there is no teaching and no layer added; the row view holds no editing, no moves, no
+  confirmation and no restoration; the index changes no layer's or subject's description and carries no layer,
+  and no piece is dropped on a layer; the layer view's pieces are neither carried nor moved up and down. One
+  muted line under the heading of every view says that an org brain is read here and written on the console's
+  organisation screen, 조직 → 조직 기억 in the Korean pack (bmo-web's `docs/web.md`, 「조직 기억」), whose server
+  writes it with the brain's service token and the writer's standing. The rule is the screen's: the routes
+  answer an org brain's writes as 「Org brains」 states. An agent's brain is written here as stated below.
 - **One title bar, holding only the name.** The screen's route asks for the console's one title bar (bmo-ui's
   `docs/console-bundles.md`, 「The title bar」). Under a console that offers it, the screen draws no bar of its
   own; standing alone, it draws its own bar with the screen's name. Either way nothing but the name and its mark
@@ -717,8 +730,8 @@ console bundle contract and served by the brain itself (`docs/boundary-api.md`, 
   and adding a layer. On a wide screen it is the grey icon in a cell of its own at the toolbar's right end, its
   key `n` named in its tooltip; on a phone it floats at the bottom right, and every scrolling view and the memory
   open keep the layer's create room at their scrolling end, so their last line stands clear of it. It stands
-  disabled while no brain is chosen. Nothing else on the screen creates: no button in the index or the toolbar of
-  the screen's own.
+  disabled while no brain is chosen, and while an org brain is, its tooltip then saying where an org brain is
+  written. Nothing else on the screen creates: no button in the index or the toolbar of the screen's own.
 - **One brain at a time.** The toolbar's first control, on a phone the index's, chooses the brain among those
   `GET /brains` answers, each by its name. Two brains share nothing, so no list ever mixes them.
 - **Three panes.** The index on the left, the view in the middle and the memory open on the right. The right
@@ -847,17 +860,6 @@ console bundle contract and served by the brain itself (`docs/boundary-api.md`, 
   its vertical place the mean use and its size its count of memories under the filters, so the important
   memories that are seldom used stand at the lower right. A bubble narrows the list to its group, and a table
   shows the same figures.
-- **The review** (검토 in the Korean pack): a view that stands only while the brain chosen is the base (「The base」),
-  and in the view's select only then. It lists the base's pending candidates (「Raising a memory to the base」),
-  oldest first, one item each: its status, its words, in the reading language as every memory's text is, its type,
-  and its source, the source brain's name and the memory's number, a press on which opens that memory in its own
-  brain, and the model's reason under its words. Each item carries three icon buttons at its end, each named by
-  its tooltip, 전역으로, `<source>`에 남김 (the source brain's name) and 버림: the first moves the candidate to `active` at
-  once; the other two grow a step of the item that asks first, saying what going through does, the last that the
-  source is invalidated in its own brain as well, its way out first and its way through last. A decided candidate
-  leaves the list, and a failed move leaves it standing with one sentence saying so. The heading counts the
-  candidates left; with none left the view says so. The filters, the index's choices and the order are not
-  honoured there, each with its line, since the review lists every candidate in the order they were raised.
 - **A mind map:** one subject at the centre, its memories under the filters around it coloured by layer, the most
   used first and the rest folded into one count, and the other subjects those memories reach outside them. A
   memory opens its row; an outer subject comes to the centre.

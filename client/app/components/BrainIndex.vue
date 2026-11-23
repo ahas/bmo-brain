@@ -4,8 +4,9 @@
        one line saying what it lists. Choosing one narrows the view to it, and choosing it again clears it; the
        chosen row stands highlighted and in sight, and where the view honours no choice the rows say so. A layer's
        description and position are changed here, and a subject's description; a layer is added from the screen's
-       create button. A row's actions are icon buttons at its end, shown while the row is hovered or
-       focused and always on a coarse pointer; a row never grows a second line of buttons. -->
+       create button. An org brain is read-only here: its layers are not carried and nothing is described. A row's
+       actions are icon buttons at its end, shown while the row is hovered or focused and always on a coarse
+       pointer; a row never grows a second line of buttons. -->
   <div class="flex min-h-0 flex-1 flex-col">
     <!-- The three tabs share the column's width, each its short name whole at the column's default width; a column
          dragged narrower cuts a name, and the cut line's tooltip shows it whole. -->
@@ -19,7 +20,7 @@
     />
     <div class="border-b border-default px-3 py-2 text-sm text-muted">
       <p>{{ t(`brain.index.${tab}_about`) }} {{ t("brain.index.again_clears") }}</p>
-      <p v-if="!usable" class="mt-1 text-warning">{{ place.view === "review" ? t("brain.unhonoured.review") : t("brain.unhonoured.timeline") }}</p>
+      <p v-if="!usable" class="mt-1 text-warning">{{ t("brain.unhonoured.timeline") }}</p>
     </div>
     <div class="border-b border-default p-2">
       <UInput v-model="words" icon="i-material-symbols-search" :placeholder="t('brain.label.index_search')" size="sm" class="w-full" />
@@ -32,10 +33,11 @@
         <li
           v-for="(layer, index) in shownLayers"
           :key="layer.id"
-          :draggable="usable"
+          :draggable="usable && !readOnly"
           data-layer
-          class="group flex cursor-grab items-stretch hover:bg-elevated active:cursor-grabbing"
+          class="group flex items-stretch hover:bg-elevated"
           :class="[
+            readOnly ? '' : 'cursor-grab active:cursor-grabbing',
             { 'bg-primary/10 shadow-[inset_3px_0_0_var(--ui-primary)]': place.layer === layer.id },
             landing === index ? LINE_BEFORE : '',
             landing === shownLayers.length && index === shownLayers.length - 1 ? LINE_AFTER : '',
@@ -54,14 +56,15 @@
             :disabled="!usable"
             @click="emit('choose', { layer: place.layer === layer.id ? null : layer.id })"
           >
-            <UIcon name="i-material-symbols-drag-indicator" class="size-5 shrink-0 text-muted" aria-hidden="true" />
+            <span v-if="readOnly" class="size-5 shrink-0" aria-hidden="true" />
+            <UIcon v-else name="i-material-symbols-drag-indicator" class="size-5 shrink-0 text-muted" aria-hidden="true" />
             <div class="min-w-0 flex-1">
               <div class="truncate text-sm font-medium">{{ layer.name }}</div>
               <div v-if="layer.description" class="truncate text-sm text-muted">{{ layer.description }}</div>
             </div>
             <UBadge color="neutral" variant="soft" size="sm"><RollingNumber :value="layerCount(String(layer.id))" /></UBadge>
           </button>
-          <div class="flex items-center pe-2 ps-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 pointer-coarse:opacity-100">
+          <div v-if="!readOnly" class="flex items-center pe-2 ps-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 pointer-coarse:opacity-100">
             <UTooltip :text="t('brain.action.describe')">
               <UButton size="xs" color="neutral" variant="ghost" icon="i-material-symbols-edit-outline" :aria-label="t('brain.action.describe')" @click="describeLayer(layer)" />
             </UTooltip>
@@ -104,7 +107,7 @@
                 <UBadge color="neutral" variant="soft" size="sm"><RollingNumber :value="subjectCount(subject.id)" /></UBadge>
               </button>
               <div class="flex items-center gap-0.5 pe-2 ps-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 pointer-coarse:opacity-100">
-                <UTooltip :text="t('brain.action.describe')">
+                <UTooltip v-if="!readOnly" :text="t('brain.action.describe')">
                   <UButton size="xs" color="neutral" variant="ghost" icon="i-material-symbols-edit-outline" :aria-label="t('brain.action.describe')" @click="describeSubject(subject)" />
                 </UTooltip>
                 <UTooltip :text="t('brain.view.map')">
@@ -177,6 +180,8 @@ const props = defineProps<{
   subjectCounts: Tally[];
   types: TypeCount[];
   place: Place;
+  // Whether the brain chosen is an org brain, which the screen reads and never writes (docs/design.md, 「The screen」).
+  readOnly: boolean;
 }>();
 
 const emit = defineEmits<{ choose: [patch: Partial<Place>]; changed: [] }>();
@@ -218,7 +223,7 @@ function carriesPiece(event: DragEvent): boolean {
 }
 
 function pieceEnter(event: DragEvent, layer: number | "unfiled"): void {
-  if (carriesPiece(event)) pieceOver.value = layer;
+  if (carriesPiece(event) && !props.readOnly) pieceOver.value = layer;
 }
 
 function pieceLeave(event: DragEvent, layer: number | "unfiled"): void {
@@ -229,6 +234,8 @@ function pieceLeave(event: DragEvent, layer: number | "unfiled"): void {
 
 /** A layer carried: where among the layers it would be put down. A piece carried: the row under it takes it. */
 function layerOver(event: DragEvent): void {
+  if (props.readOnly) return;
+
   if (carriesPiece(event)) {
     event.preventDefault();
     if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
@@ -258,7 +265,7 @@ function layerLeft(event: DragEvent): void {
 async function layerDropped(event: DragEvent): Promise<void> {
   const brainId = props.brainId;
 
-  if (brainId === null) return;
+  if (brainId === null || props.readOnly) return;
 
   if (carriesPiece(event)) {
     event.preventDefault();
@@ -302,7 +309,7 @@ async function movePiece(brainId: number, piece: Carried, target: number | "unfi
   }
 }
 
-// Whether the view open honours the index's choices; the version timeline and the review honour none.
+// Whether the view open honours the index's choices; the version timeline honours none.
 const usable = computed(() => honours(props.place.view, "layer"));
 
 // The tab holding the newest choice is the one open, and the chosen row is scrolled into sight.
