@@ -3,6 +3,7 @@
 //! work through them.
 
 pub mod base;
+pub mod baseline;
 pub mod brains;
 pub mod consolidation;
 pub mod duplicates;
@@ -111,9 +112,9 @@ impl Store {
     self
   }
 
-  /// The migrations run.
+  /// The migrations run, from the baseline (docs/design.md, 「The schema」).
   pub async fn migrate(&self) -> Result<(), String> {
-    MIGRATOR.run(&self.pool).await.map_err(|why| why.to_string())
+    baseline::migrate(&self.pool).await
   }
 
   /// Why the store cannot answer, or nothing where it can.

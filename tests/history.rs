@@ -8,7 +8,7 @@ use bmo_brain_client::{
   BrainClient, EventsQuery, Learning, MemoriesQuery, MemoryMerge, MemoryMove, MemoryStatus, MemoryVersion,
   NewBrain, NewMemory, RecallAsk, SimilarAsk, Source, SubjectKey,
 };
-use support::{Bare, Served, labels};
+use support::{Served, labels};
 
 fn memory(text: &str) -> NewMemory {
   NewMemory {
@@ -109,57 +109,6 @@ async fn a_row_records_when_it_stopped_being_current() {
     "{:?}",
     moved.superseded_at
   );
-}
-
-#[tokio::test]
-async fn the_migration_gives_a_superseded_row_its_successors_moment() {
-  let bare = Bare::through(9).await;
-  let mut db = bare.connect().await;
-  let brain: i64 = sqlx::query_scalar(
-    "INSERT INTO brains (account_key, agent_key, name, created_at) VALUES ('account-a', 'agent-a', 'a', 1) \
-     RETURNING id",
-  )
-  .fetch_one(&mut db)
-  .await
-  .unwrap();
-  let insert = "INSERT INTO memories (brain_id, type, text, status, lineage_id, valid_from, importance, \
-    actor_name, labels, created_at) VALUES ($1, 'fact', $2, $3, 0, 1, 5, 'writer-a', '{}', $4) RETURNING id";
-  let old: i64 = sqlx::query_scalar(insert)
-    .bind(brain)
-    .bind("Old")
-    .bind("superseded")
-    .bind(100_i64)
-    .fetch_one(&mut db)
-    .await
-    .unwrap();
-  let new: i64 = sqlx::query_scalar(insert)
-    .bind(brain)
-    .bind("New")
-    .bind("active")
-    .bind(200_i64)
-    .fetch_one(&mut db)
-    .await
-    .unwrap();
-  let closed: i64 = sqlx::query_scalar(insert)
-    .bind(brain)
-    .bind("Closed")
-    .bind("invalidated")
-    .bind(300_i64)
-    .fetch_one(&mut db)
-    .await
-    .unwrap();
-  sqlx::query("UPDATE memories SET superseded_by = $2 WHERE id = $1")
-    .bind(old)
-    .bind(new)
-    .execute(&mut db)
-    .await
-    .unwrap();
-  bmo_brain::store::MIGRATOR.run(&mut db).await.unwrap();
-  let at: Vec<(i64, Option<i64>)> = sqlx::query_as("SELECT id, superseded_at FROM memories ORDER BY id")
-    .fetch_all(&mut db)
-    .await
-    .unwrap();
-  assert_eq!(at, [(old, Some(200)), (new, None), (closed, None)]);
 }
 
 #[tokio::test]

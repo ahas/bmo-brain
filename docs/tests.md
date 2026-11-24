@@ -5,8 +5,8 @@ A test that reaches the store does so over a PostgreSQL database of its own on t
 make them the same way, through one module of the service's test support.
 
 - **A template a binary, a copy a test.** The first test of a binary that asks makes a template and runs the
-  migrations into it; each test is handed a copy of it, or a blank database where it runs only the migrations
-  it reads past. A template is named `bmo_brain_test_tmpl_` followed by the binary's process id, every other
+  migrations into it; each test is handed a copy of it, or a blank database where it lays down what an install
+  already holds before the service migrates it. A template is named `bmo_brain_test_tmpl_` followed by the binary's process id, every other
   database `bmo_brain_test_copy_` followed by the process id and a count.
 - **A test's database is dropped when the test ends, and the test fails if it cannot be.** The drop first ends
   the suite role's own sessions on the database and then drops it without forcing: forcing needs the right to

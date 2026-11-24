@@ -5,11 +5,11 @@ mod scratch;
 
 use bmo_brain::api::console::Console;
 use bmo_brain::api::{Brain, Stopping, router};
-use bmo_brain::store::{MIGRATOR, Store};
+use bmo_brain::store::Store;
 use bmo_brain_client::BrainClient;
 use scratch::Scratch;
+use sqlx::PgConnection;
 use sqlx::postgres::PgPoolOptions;
-use sqlx::{Connection, PgConnection};
 use tokio::sync::watch;
 use tokio::task::JoinHandle;
 
@@ -118,33 +118,30 @@ impl Drop for Served {
   }
 }
 
-/// An empty database of the test's own, migrated by the migrations up to and including `through`, for a test
-/// that reads what a later migration makes of the rows it writes; dropped when the guard goes.
+/// An empty database of the test's own, not even the migrations' record in it, for a test that lays down what
+/// an install already holds before the service migrates it; dropped when the guard goes.
 pub struct Bare {
   scratch: Scratch,
 }
 
 impl Bare {
-  pub async fn through(through: i64) -> Bare {
-    let bare = Bare {
+  pub async fn blank() -> Bare {
+    Bare {
       scratch: Scratch::blank().await,
-    };
-    let mut db = bare.connect().await;
-    let early = sqlx::migrate::Migrator {
-      migrations: std::borrow::Cow::Owned(
-        MIGRATOR.iter().filter(|migration| migration.version <= through).cloned().collect(),
-      ),
-      ignore_missing: false,
-      locking: true,
-      no_tx: false,
-    };
-    early.run(&mut db).await.unwrap();
-    db.close().await.unwrap();
-    bare
+    }
   }
 
   pub async fn connect(&self) -> PgConnection {
     self.scratch.connect().await
+  }
+
+  /// A pool over the database, as the service holds one.
+  pub async fn pool(&self) -> sqlx::PgPool {
+    sqlx::postgres::PgPoolOptions::new()
+      .max_connections(2)
+      .connect_with(self.scratch.options())
+      .await
+      .unwrap()
   }
 }
 

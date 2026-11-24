@@ -698,6 +698,17 @@ session's loaded documents and its handoff note are the agency's session records
 caller's opaque scope, and no table stands beside the brains' own: a brain's count of its searches and the
 misses it keeps (「What the brain counts」) are its own, let go with it.
 
+## The schema
+
+- **The schema starts at the 1.0.0 baseline,** one migration that makes every table, index and sequence the
+  store holds and the event floor's one row. Every later change to the schema is a migration after it, run
+  by the service as it starts.
+- **An install from before 1.0.0 is taken as it stands.** A database whose record of migrations names every
+  migration of the last release before 1.0.0, and nothing else, already holds the baseline's schema: the
+  service rewrites that record to name the baseline alone, in one transaction, and touches no table and no
+  row. A database whose record names only part of them is refused at start, with the version it stopped
+  at; it is brought to the last release before 1.0.0 by that release first.
+
 ## The screen
 
 The brain's console bundle is the screen where a person sees a brain's long-term memory and sets an agent's

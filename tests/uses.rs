@@ -5,7 +5,7 @@
 use crate::support;
 
 use bmo_brain_client::{BrainClient, Hits, MemoriesQuery, NewBrain, NewMemory, RecallAsk, RecallPart};
-use support::{Bare, Served, labels};
+use support::{Served, labels};
 
 fn memory(kind: &str, text: &str) -> NewMemory {
   NewMemory {
@@ -152,41 +152,4 @@ async fn recall_puts_the_row_used_last_first_among_rows_that_score_the_same() {
     .unwrap();
   let after = client.recall(brain, &ask).await.unwrap();
   assert_eq!(searched(&after), [second.id, first.id], "{:?}", after.chosen);
-}
-
-#[tokio::test]
-async fn the_migration_lets_the_storage_strength_go_and_keeps_the_use() {
-  let bare = Bare::through(7).await;
-  let mut db = bare.connect().await;
-  let brain: i64 = sqlx::query_scalar(
-    "INSERT INTO brains (account_key, agent_key, name, created_at) VALUES ('account-a', 'agent-a', 'a', 1) \
-     RETURNING id",
-  )
-  .fetch_one(&mut db)
-  .await
-  .unwrap();
-  let row: i64 = sqlx::query_scalar(
-    "INSERT INTO memories (brain_id, type, text, status, lineage_id, valid_from, importance, hits, hit_times, \
-     last_hit_at, strength, actor_name, labels, created_at) \
-     VALUES ($1, 'fact', 'Used twice', 'active', 0, 1, 5, 2, '{10, 20}', 20, 3.5, 'writer-a', '{}', 1) RETURNING id",
-  )
-  .bind(brain)
-  .fetch_one(&mut db)
-  .await
-  .unwrap();
-  bmo_brain::store::MIGRATOR.run(&mut db).await.unwrap();
-  let kept: (i64, Vec<i64>, Option<i64>, String) =
-    sqlx::query_as("SELECT hits, hit_times, last_hit_at, text FROM memories WHERE id = $1")
-      .bind(row)
-      .fetch_one(&mut db)
-      .await
-      .unwrap();
-  assert_eq!(kept, (2, vec![10, 20], Some(20), "Used twice".to_owned()));
-  let gone: i64 = sqlx::query_scalar(
-    "SELECT COUNT(*) FROM information_schema.columns WHERE table_name = 'memories' AND column_name = 'strength'",
-  )
-  .fetch_one(&mut db)
-  .await
-  .unwrap();
-  assert_eq!(gone, 0);
 }
