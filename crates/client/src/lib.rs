@@ -13,6 +13,7 @@ pub use brains::{
   RecallAsk, RecallChoice, RecallPart, Recorded, Restoration, Rules, SheetQuery, Subject, SubjectChange,
   SubjectKey, SubjectRef, SubjectsQuery, TalliesQuery, Tally, TallyBy, TypeCount,
 };
+pub use brains::{BrainsHeld, OrgUnitQuery, RemovalCounts, Removed};
 pub use brains::{
   ConsolidationQuery, ConsolidationState, DuplicateCandidate, DuplicatesQuery, MissesQuery, OrgTopic,
   OrgTopicsQuery, SearchCount, SearchMiss, SimilarAsk, Source, Standing, UnconsolidatedEpisode,

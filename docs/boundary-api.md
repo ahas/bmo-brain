@@ -134,6 +134,22 @@ answered. The items go by their brain's place among those named, the first first
 records no use. The base, the org brain keyed `platform` and `platform` (`docs/design.md`, 「The base」), is named
 first where it is read, as the farthest unit.
 
+### Removing an account's or a unit's brains
+
+A caller deleting an account or an organisation unit for good lets go of the brains keyed to it (`docs/design.md`,
+「Whose a brain is」). The routes take the service's token alone; the console's is answered 403 `forbidden`. A key is 1 to 200 characters with no control character; any other is answered 400 `bad-request`.
+
+| Route | Does | Answers |
+|---|---|---|
+| `GET /accounts/{accountKey}/removal` | counts what the removal below would let go of now, changing nothing | 200, `{"counts": {"brains", "memories"}}` |
+| `DELETE /accounts/{accountKey}` | lets go of every brain of the kind `agent` keyed by the account, each whole, with a `brain.deleted` event each | 200, `{"removed": {"brains", "memories"}}` |
+| `GET /org-units/{unitKey}/removal?company={companyKey}` | counts the org brain keyed by the company and the unit | 200, `{"counts": {"brains", "memories"}}` |
+| `DELETE /org-units/{unitKey}?company={companyKey}` | lets go of that org brain whole | 200, `{"removed": {"brains", "memories"}}`; 409 `conflict` for the base's keys |
+
+`brains` counts the brains and `memories` every memory row they hold, each version a row. A removal is the same
+again where nothing stands: a second call answers zeros, so a removal broken half-way is finished by calling again.
+An org brain's removal never reaches the base, whose keys are refused.
+
 Every route below stands under `/brains/{brainId}` and answers 404 `not-found` for a brain that does not
 stand.
 

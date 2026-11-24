@@ -105,6 +105,35 @@ pub struct BrainsQuery {
   pub limit: Option<i64>,
 }
 
+/// What a removal of an account's or a unit's brains takes: the brains and every memory row they hold.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct BrainsHeld {
+  pub brains: i64,
+  pub memories: i64,
+}
+
+/// What a removal would take now, nothing changed.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct RemovalCounts {
+  pub counts: BrainsHeld,
+}
+
+/// What a removal took.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct Removed {
+  pub removed: BrainsHeld,
+}
+
+/// The company an organisation unit's removal names.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct OrgUnitQuery {
+  pub company: String,
+}
+
 /// Something a memory can be about, found by its type and key alone.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]

@@ -57,6 +57,10 @@ The common wire format and the API design rules are bmo-chat's `docs/conventions
 - **The brains stand in one store,** the service's own PostgreSQL database, every row keyed by its brain,
   so one set of migrations serves every brain. The unit a brain moves in, is backed up in and is let go in
   is the brain itself, and its portable form is the brain file (「Export and injection」).
+- **An account's brains go with the account.** Where a caller deletes an account for good, every agent
+  brain keyed by that account's key is let go of whole, and where it deletes an organisation unit, the org brain
+  keyed by its company and the unit is (`docs/boundary-api.md`, 「Removing an account's or a unit's
+  brains」). A brain of another key is never touched, and the base never goes this way.
 
 ## The three tables
 

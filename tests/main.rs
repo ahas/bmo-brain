@@ -14,6 +14,7 @@ mod misses;
 mod openapi;
 mod orgs;
 mod recall;
+mod removals;
 mod repository;
 mod screen;
 mod sheets;

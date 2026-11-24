@@ -171,6 +171,24 @@
         ],
         "type": "object"
       },
+      "BrainsHeld": {
+        "description": "What a removal of an account's or a unit's brains takes: the brains and every memory row they hold.",
+        "properties": {
+          "brains": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "memories": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "brains",
+          "memories"
+        ],
+        "type": "object"
+      },
       "Confirmations": {
         "description": "A source apart from a reading that confirmed memories.",
         "properties": {
@@ -1963,6 +1981,30 @@
         ],
         "type": "object"
       },
+      "RemovalCounts": {
+        "description": "What a removal would take now, nothing changed.",
+        "properties": {
+          "counts": {
+            "$ref": "#/components/schemas/BrainsHeld"
+          }
+        },
+        "required": [
+          "counts"
+        ],
+        "type": "object"
+      },
+      "Removed": {
+        "description": "What a removal took.",
+        "properties": {
+          "removed": {
+            "$ref": "#/components/schemas/BrainsHeld"
+          }
+        },
+        "required": [
+          "removed"
+        ],
+        "type": "object"
+      },
       "Rendered": {
         "description": "A rendering, the persona or a sheet, as a tool answers it.",
         "properties": {
@@ -2805,6 +2847,98 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/accounts/{accountKey}": {
+      "delete": {
+        "operationId": "removeAccountBrains",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "accountKey",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Removed"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "summary": "Let go of every agent brain keyed by the account, each whole; zeros where none stands.",
+        "tags": [
+          "brains"
+        ],
+        "x-codes": [
+          "bad-request",
+          "unauthorized",
+          "forbidden"
+        ],
+        "x-console": "closed"
+      }
+    },
+    "/accounts/{accountKey}/removal": {
+      "get": {
+        "operationId": "countAccountRemoval",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "accountKey",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemovalCounts"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "summary": "What letting go of every agent brain keyed by the account would take now, nothing changed.",
+        "tags": [
+          "brains"
+        ],
+        "x-codes": [
+          "bad-request",
+          "unauthorized",
+          "forbidden"
+        ],
+        "x-console": "closed"
+      }
+    },
     "/brains": {
       "get": {
         "operationId": "listBrains",
@@ -6034,6 +6168,122 @@
           "unauthorized",
           "forbidden",
           "not-found"
+        ],
+        "x-console": "closed"
+      }
+    },
+    "/org-units/{unitKey}": {
+      "delete": {
+        "operationId": "removeOrgUnitBrain",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "unitKey",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "company",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Removed"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        },
+        "summary": "Let go of the org brain keyed by the company and the unit, whole; zeros where none stands.",
+        "tags": [
+          "brains"
+        ],
+        "x-codes": [
+          "bad-request",
+          "unauthorized",
+          "forbidden",
+          "conflict"
+        ],
+        "x-console": "closed"
+      }
+    },
+    "/org-units/{unitKey}/removal": {
+      "get": {
+        "operationId": "countOrgUnitRemoval",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "unitKey",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "company",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemovalCounts"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        },
+        "summary": "What letting go of the org brain keyed by the company and the unit would take now, nothing changed.",
+        "tags": [
+          "brains"
+        ],
+        "x-codes": [
+          "bad-request",
+          "unauthorized",
+          "forbidden",
+          "conflict"
         ],
         "x-console": "closed"
       }

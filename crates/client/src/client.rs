@@ -12,6 +12,7 @@ use crate::brains::{
   RecallAsk, Recorded, Restoration, SearchMiss, SheetQuery, SimilarAsk, Subject, SubjectChange,
   SubjectsQuery, TalliesQuery, Tally, TypeCount, UnconsolidatedEpisode, UnconsolidatedQuery,
 };
+use crate::brains::{OrgUnitQuery, RemovalCounts, Removed};
 use crate::wire::{Event, EventsQuery, Health, Page, WireError};
 
 /// What a call came to short of the route's answer.
@@ -166,6 +167,32 @@ impl BrainClient {
   /// `DELETE /brains/{brainId}`
   pub async fn brain_let_go(&self, brain_id: i64) -> Answer<Brain> {
     Self::answered(self.request(Method::DELETE, &["brains", &brain_id.to_string()])).await
+  }
+
+  /// `GET /accounts/{accountKey}/removal`
+  pub async fn account_removal(&self, account_key: &str) -> Answer<RemovalCounts> {
+    Self::answered(self.request(Method::GET, &["accounts", account_key, "removal"])).await
+  }
+
+  /// `DELETE /accounts/{accountKey}`
+  pub async fn account_remove(&self, account_key: &str) -> Answer<Removed> {
+    Self::answered(self.request(Method::DELETE, &["accounts", account_key])).await
+  }
+
+  /// `GET /org-units/{unitKey}/removal`
+  pub async fn org_unit_removal(&self, unit_key: &str, company_key: &str) -> Answer<RemovalCounts> {
+    let query = OrgUnitQuery {
+      company: company_key.to_owned(),
+    };
+    Self::answered(self.get(&["org-units", unit_key, "removal"], &query)).await
+  }
+
+  /// `DELETE /org-units/{unitKey}`
+  pub async fn org_unit_remove(&self, unit_key: &str, company_key: &str) -> Answer<Removed> {
+    let query = OrgUnitQuery {
+      company: company_key.to_owned(),
+    };
+    Self::answered(self.request(Method::DELETE, &["org-units", unit_key]).query(&query)).await
   }
 
   /// `GET /brains/{brainId}/subjects`

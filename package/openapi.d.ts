@@ -4,6 +4,40 @@
  */
 
 export interface paths {
+    "/accounts/{accountKey}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Let go of every agent brain keyed by the account, each whole; zeros where none stands. */
+        delete: operations["removeAccountBrains"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/accounts/{accountKey}/removal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** What letting go of every agent brain keyed by the account would take now, nothing changed. */
+        get: operations["countAccountRemoval"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/brains": {
         parameters: {
             query?: never;
@@ -624,6 +658,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/org-units/{unitKey}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Let go of the org brain keyed by the company and the unit, whole; zeros where none stands. */
+        delete: operations["removeOrgUnitBrain"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/org-units/{unitKey}/removal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** What letting go of the org brain keyed by the company and the unit would take now, nothing changed. */
+        get: operations["countOrgUnitRemoval"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -657,6 +725,13 @@ export interface components {
             items: components["schemas"]["Brain"][];
             /** @description Whether anything stands past the last item. */
             more: boolean;
+        };
+        /** @description What a removal of an account's or a unit's brains takes: the brains and every memory row they hold. */
+        BrainsHeld: {
+            /** Format: int64 */
+            brains: number;
+            /** Format: int64 */
+            memories: number;
         };
         /** @description A source apart from a reading that confirmed memories. */
         Confirmations: {
@@ -1376,6 +1451,14 @@ export interface components {
             /** Format: int64 */
             recordedCount: number;
         };
+        /** @description What a removal would take now, nothing changed. */
+        RemovalCounts: {
+            counts: components["schemas"]["BrainsHeld"];
+        };
+        /** @description What a removal took. */
+        Removed: {
+            removed: components["schemas"]["BrainsHeld"];
+        };
         /** @description A rendering, the persona or a sheet, as a tool answers it. */
         Rendered: {
             text: string;
@@ -1870,6 +1953,56 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    removeAccountBrains: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                accountKey: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Removed"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    countAccountRemoval: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                accountKey: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RemovalCounts"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
     listBrains: {
         parameters: {
             query?: {
@@ -3223,6 +3356,62 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    removeOrgUnitBrain: {
+        parameters: {
+            query: {
+                company: string;
+            };
+            header?: never;
+            path: {
+                unitKey: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Removed"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    countOrgUnitRemoval: {
+        parameters: {
+            query: {
+                company: string;
+            };
+            header?: never;
+            path: {
+                unitKey: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RemovalCounts"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
         };
     };
 }

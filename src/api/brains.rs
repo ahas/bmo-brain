@@ -6,7 +6,7 @@ use axum::body::Bytes;
 use axum::extract::State;
 use axum::http::{StatusCode, header};
 use axum::response::{IntoResponse, Json, Response};
-use axum::routing::{get, post};
+use axum::routing::{delete, get, post};
 use bmo_brain_client::{
   Brain as BrainMember, BrainsQuery, Confirmations, Consolidated, ConsolidationQuery, ConsolidationState,
   DuplicateCandidate, DuplicatesQuery, ExportQuery, Fold, Folded, Hits, Injected, Layer, LayerChange,
@@ -15,6 +15,7 @@ use bmo_brain_client::{
   Recall, RecallAsk, Recorded, Restoration, SearchMiss, SheetQuery, SimilarAsk, Subject, SubjectChange,
   SubjectsQuery, TalliesQuery, Tally, TypeCount, UnconsolidatedEpisode, UnconsolidatedQuery,
 };
+use bmo_brain_client::{BrainKind, OrgUnitQuery, RemovalCounts, Removed};
 
 use super::{Answer, Body, Brain, Key, Query};
 
@@ -53,6 +54,41 @@ async fn brain_read(State(brain): State<Brain>, Key(id): Key<i64>) -> Answer<Jso
 
 async fn brain_let_go(State(brain): State<Brain>, Key(id): Key<i64>) -> Answer<Json<BrainMember>> {
   Ok(Json(brain.store.brain_let_go(id).await?))
+}
+
+async fn account_removal(
+  State(brain): State<Brain>,
+  Key(account): Key<String>,
+) -> Answer<Json<RemovalCounts>> {
+  Ok(Json(RemovalCounts {
+    counts: brain.store.brains_held(BrainKind::Agent, &account, None).await?,
+  }))
+}
+
+async fn account_remove(State(brain): State<Brain>, Key(account): Key<String>) -> Answer<Json<Removed>> {
+  Ok(Json(Removed {
+    removed: brain.store.brains_let_go(BrainKind::Agent, &account, None).await?,
+  }))
+}
+
+async fn org_unit_removal(
+  State(brain): State<Brain>,
+  Key(unit): Key<String>,
+  Query(query): Query<OrgUnitQuery>,
+) -> Answer<Json<RemovalCounts>> {
+  Ok(Json(RemovalCounts {
+    counts: brain.store.brains_held(BrainKind::Org, &query.company, Some(&unit)).await?,
+  }))
+}
+
+async fn org_unit_remove(
+  State(brain): State<Brain>,
+  Key(unit): Key<String>,
+  Query(query): Query<OrgUnitQuery>,
+) -> Answer<Json<Removed>> {
+  Ok(Json(Removed {
+    removed: brain.store.brains_let_go(BrainKind::Org, &query.company, Some(&unit)).await?,
+  }))
 }
 
 async fn subjects(
@@ -322,6 +358,10 @@ pub fn routes() -> Router<Brain> {
     .route("/brains", get(brains).post(brain_add))
     .route("/org-topics", get(org_topics))
     .route("/brains/{brainId}", get(brain_read).delete(brain_let_go))
+    .route("/accounts/{accountKey}/removal", get(account_removal))
+    .route("/accounts/{accountKey}", delete(account_remove))
+    .route("/org-units/{unitKey}/removal", get(org_unit_removal))
+    .route("/org-units/{unitKey}", delete(org_unit_remove))
     .route("/brains/{brainId}/subjects", get(subjects).post(subject_add))
     .route("/brains/{brainId}/subjects/{subjectId}", get(subject).patch(subject_change))
     .route("/brains/{brainId}/subjects/{subjectId}/sheet", get(sheet))

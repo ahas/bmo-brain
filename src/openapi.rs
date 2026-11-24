@@ -16,6 +16,7 @@ use bmo_brain_client::{
   DuplicatesQuery, Learned, Learning, MissesQuery, Restoration, SearchMiss, SimilarAsk, TalliesQuery,
   Tally, UnconsolidatedEpisode, UnconsolidatedQuery,
 };
+use bmo_brain_client::{OrgUnitQuery, RemovalCounts, Removed};
 use schemars::generate::{SchemaGenerator, SchemaSettings};
 use schemars::{JsonSchema, Schema};
 use serde_json::{Map, Value, json};
@@ -266,6 +267,54 @@ fn brain_routes(g: &mut SchemaGenerator) -> Vec<Route> {
       raw_body: None,
       answers: vec![(200, json_answer::<Brain>(g))],
       codes: vec![BadRequest, NotFound],
+    },
+    Route {
+      method: "get",
+      path: "/accounts/{accountKey}/removal",
+      id: "countAccountRemoval",
+      tag: "brains",
+      summary: "What letting go of every agent brain keyed by the account would take now, nothing changed.",
+      parameters: vec![named(g, "accountKey")],
+      body: None,
+      raw_body: None,
+      answers: vec![(200, json_answer::<RemovalCounts>(g))],
+      codes: vec![BadRequest],
+    },
+    Route {
+      method: "delete",
+      path: "/accounts/{accountKey}",
+      id: "removeAccountBrains",
+      tag: "brains",
+      summary: "Let go of every agent brain keyed by the account, each whole; zeros where none stands.",
+      parameters: vec![named(g, "accountKey")],
+      body: None,
+      raw_body: None,
+      answers: vec![(200, json_answer::<Removed>(g))],
+      codes: vec![BadRequest],
+    },
+    Route {
+      method: "get",
+      path: "/org-units/{unitKey}/removal",
+      id: "countOrgUnitRemoval",
+      tag: "brains",
+      summary: "What letting go of the org brain keyed by the company and the unit would take now, nothing changed.",
+      parameters: [vec![named(g, "unitKey")], query::<OrgUnitQuery>(g)].concat(),
+      body: None,
+      raw_body: None,
+      answers: vec![(200, json_answer::<RemovalCounts>(g))],
+      codes: vec![BadRequest, Conflict],
+    },
+    Route {
+      method: "delete",
+      path: "/org-units/{unitKey}",
+      id: "removeOrgUnitBrain",
+      tag: "brains",
+      summary: "Let go of the org brain keyed by the company and the unit, whole; zeros where none stands.",
+      parameters: [vec![named(g, "unitKey")], query::<OrgUnitQuery>(g)].concat(),
+      body: None,
+      raw_body: None,
+      answers: vec![(200, json_answer::<Removed>(g))],
+      codes: vec![BadRequest, Conflict],
     },
     Route {
       method: "get",

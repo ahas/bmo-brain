@@ -1,8 +1,8 @@
 //! The brains, their subjects and their layers (docs/design.md, 「Whose a brain is」 and 「The three tables」).
 
 use bmo_brain_client::{
-  Brain, BrainKind, BrainsQuery, Layer, LayerChange, LayersQuery, NewBrain, NewLayer, NewSubject, Page,
-  Subject, SubjectChange, SubjectKey, SubjectsQuery,
+  Brain, BrainKind, BrainsHeld, BrainsQuery, Layer, LayerChange, LayersQuery, NewBrain, NewLayer,
+  NewSubject, Page, Subject, SubjectChange, SubjectKey, SubjectsQuery,
 };
 use sqlx::{FromRow, PgConnection, Postgres, QueryBuilder};
 
@@ -117,6 +117,22 @@ pub(crate) fn given(field: &str, value: &str) -> Held<()> {
   text(field, value, 200)?;
   if value.chars().any(char::is_control) {
     return Err(Fault::BadRequest(format!("{field} holds a control character.")));
+  }
+  Ok(())
+}
+
+/// The keys a removal names, each a key a caller gives; an org removal never names the base's
+/// (docs/boundary-api.md, 「Removing an account's or a unit's brains」).
+fn keyed(kind: BrainKind, account_key: &str, agent_key: Option<&str>) -> Held<()> {
+  given("accountKey", account_key)?;
+  if let Some(agent_key) = agent_key {
+    given("agentKey", agent_key)?;
+  }
+  if kind == BrainKind::Org
+    && account_key == super::base::BASE_KEY
+    && agent_key == Some(super::base::BASE_KEY)
+  {
+    return Err(Fault::Conflict("The base is never let go of by a unit's removal.".to_owned()));
   }
   Ok(())
 }
@@ -277,6 +293,62 @@ impl Store {
     .await?;
     self.commit(tx).await?;
     Ok(brain)
+  }
+
+  /// What letting go of the brains of one kind keyed by `account_key` (and `agent_key`, where given) takes now.
+  pub async fn brains_held(
+    &self,
+    kind: BrainKind,
+    account_key: &str,
+    agent_key: Option<&str>,
+  ) -> Held<BrainsHeld> {
+    keyed(kind, account_key, agent_key)?;
+    let (brains, memories): (i64, i64) = sqlx::query_as(
+      "SELECT COUNT(*), COALESCE(SUM((SELECT COUNT(*) FROM memories m WHERE m.brain_id = b.id)), 0)::BIGINT \
+       FROM brains b WHERE b.kind = $1 AND b.account_key = $2 AND ($3::TEXT IS NULL OR b.agent_key = $3)",
+    )
+    .bind(kind.name())
+    .bind(account_key)
+    .bind(agent_key)
+    .fetch_one(&mut *self.connection().await?)
+    .await?;
+    Ok(BrainsHeld { brains, memories })
+  }
+
+  /// The brains of one kind keyed by `account_key` (and `agent_key`, where given) let go of whole, each with its
+  /// own `brain.deleted` event, in one transaction; where none stands, nothing is done and zeros are answered.
+  pub async fn brains_let_go(
+    &self,
+    kind: BrainKind,
+    account_key: &str,
+    agent_key: Option<&str>,
+  ) -> Held<BrainsHeld> {
+    keyed(kind, account_key, agent_key)?;
+    let mut tx = self.begin().await?;
+    let rows: Vec<(i64, i64)> = sqlx::query_as(
+      "SELECT b.id, (SELECT COUNT(*) FROM memories m WHERE m.brain_id = b.id) FROM brains b \
+       WHERE b.kind = $1 AND b.account_key = $2 AND ($3::TEXT IS NULL OR b.agent_key = $3) ORDER BY b.id FOR UPDATE",
+    )
+    .bind(kind.name())
+    .bind(account_key)
+    .bind(agent_key)
+    .fetch_all(&mut *tx)
+    .await?;
+    let mut held = BrainsHeld::default();
+    for (brain_id, memories) in rows {
+      sqlx::query("DELETE FROM brains WHERE id = $1").bind(brain_id).execute(&mut *tx).await?;
+      publish(
+        &mut tx,
+        "brain.deleted",
+        Some(&event_scope(brain_id)),
+        &serde_json::json!({ "id": brain_id }),
+      )
+      .await?;
+      held.brains += 1;
+      held.memories += memories;
+    }
+    self.commit(tx).await?;
+    Ok(held)
   }
 
   /// A page of a brain's subjects.
