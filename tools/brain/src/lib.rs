@@ -7,8 +7,9 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use bmo_brain_client::{
-  BrainClient, BrainKind, BrainsQuery, ClientFailure, Consolidated, Fold, Learning, MemoriesQuery, Memory,
-  MemoryMove, MemoryStatus, NewMemory, SimilarAsk, Source, SubjectKey, UnconsolidatedQuery,
+  BrainClient, BrainKind, BrainsQuery, ClientFailure, Consolidated, DuplicatesQuery, Fold, Learning,
+  MemoriesQuery, Memory, MemoryMerge, MemoryMove, MemoryStatus, NewMemory, SimilarAsk, Source, SubjectKey,
+  UnconsolidatedQuery,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -40,7 +41,7 @@ pub const TOKEN_VARIABLE: &str = "BRAIN_TOKEN";
 pub const ACTOR: &str = "agent-session";
 
 /// The entries the manifest declares, by their names.
-pub const ENTRIES: [&str; 8] = [
+pub const ENTRIES: [&str; 10] = [
   "brain_episode",
   "brain_similar",
   "brain_learn",
@@ -49,6 +50,8 @@ pub const ENTRIES: [&str; 8] = [
   "brain_unconsolidated",
   "brain_consolidated",
   "brain_fold",
+  "brain_duplicates",
+  "brain_merge",
 ];
 
 /// What the host hands the executable.
@@ -592,6 +595,55 @@ pub async fn answer(handed: Handed) -> Result<Answer, String> {
         .fold(brain, &Fold { session_key })
         .await
         .map(|folded| json!({ "clearedCount": folded.cleared_count }))
+    }
+    "brain_duplicates" => client
+      .duplicates(
+        brain,
+        &DuplicatesQuery {
+          limit: integer(arguments, "limit"),
+        },
+      )
+      .await
+      .map(|pairs| {
+        json!({
+          "pairs": pairs.iter().map(|pair| json!({
+            "first": listed_memory(&pair.first), "second": listed_memory(&pair.second),
+            "subjectIds": pair.subject_ids, "vectorSimilarity": pair.vector_similarity,
+            "wordShare": pair.word_share,
+          })).collect::<Vec<_>>()
+        })
+      }),
+    "brain_merge" => {
+      let (Some(kind), Some(text)) = (string(arguments, "type"), string(arguments, "text")) else {
+        return Ok(Answer::refusal("memory_ids, type and text are required"));
+      };
+      let memory_ids = integers(arguments, "memory_ids");
+      if memory_ids.len() < 2 {
+        return Ok(Answer::refusal("memory_ids names fewer than two memories"));
+      }
+      client
+        .memory_merge(
+          brain,
+          &MemoryMerge {
+            memory_ids,
+            kind,
+            text,
+            key: None,
+            layer_id: None,
+            position: None,
+            subject_ids: None,
+            subjects: None,
+            importance: integer(arguments, "importance"),
+            valid_from: None,
+            recall_condition: string(arguments, "recallCondition"),
+            release_condition: string(arguments, "releaseCondition"),
+            actor_name: ACTOR.to_owned(),
+            labels: None,
+            ..Default::default()
+          },
+        )
+        .await
+        .map(|m| json!({ "id": m.id, "type": m.kind, "status": m.status, "supersedes": m.supersedes }))
     }
     _ => unreachable!("the entry was checked against the list"),
   };

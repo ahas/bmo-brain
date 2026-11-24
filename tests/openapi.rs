@@ -8,7 +8,7 @@ use bmo_brain::openapi::{openapi, openapi_json};
 const ROOT: &str = env!("CARGO_MANIFEST_DIR");
 
 /// The routes docs/boundary-api.md states, by method and path.
-const ROUTES: [&str; 43] = [
+const ROUTES: [&str; 44] = [
   "get /health",
   "get /events",
   "get /discipline",
@@ -44,6 +44,7 @@ const ROUTES: [&str; 43] = [
   "post /brains/{brainId}/similar",
   "get /brains/{brainId}/unconsolidated",
   "get /brains/{brainId}/consolidation",
+  "get /brains/{brainId}/duplicates",
   "post /brains/{brainId}/consolidated",
   "get /brains/{brainId}/misses",
   "get /brains/{brainId}/persona",
@@ -55,7 +56,7 @@ const ROUTES: [&str; 43] = [
 ];
 
 /// The harness plugin's tools.
-pub const TOOLS: [&str; 23] = [
+pub const TOOLS: [&str; 24] = [
   "brain_brains",
   "brain_brain_add",
   "brain_subjects",
@@ -77,6 +78,7 @@ pub const TOOLS: [&str; 23] = [
   "brain_similar",
   "brain_unconsolidated",
   "brain_consolidated",
+  "brain_duplicates",
   "brain_persona",
   "brain_sheet",
 ];

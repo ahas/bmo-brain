@@ -886,6 +886,16 @@ pub struct Rules {
   pub tag_importance: i64,
   /// The sum of importance of unconsolidated episodes that triggers a consolidation.
   pub consolidation_threshold: i64,
+  /// How many days a live rumor stands neither used nor written before its rank in recall fades.
+  pub rumor_fade_days: i64,
+  /// What a faded rumor's fused score in recall is multiplied by.
+  pub rumor_fade_weight: f64,
+  /// The cosine at which two live rows about one subject are a duplicate candidate.
+  pub duplicate_similarity: f64,
+  /// The Jaccard overlap of their stems at which two live rows about one subject are a duplicate candidate.
+  pub duplicate_word_share: f64,
+  /// The newest rows of one subject compared for duplicate candidates.
+  pub duplicate_rows_per_subject: i64,
 }
 
 impl Default for Rules {
@@ -906,6 +916,11 @@ impl Default for Rules {
       condition_share: 0.5,
       tag_importance: 8,
       consolidation_threshold: 150,
+      rumor_fade_days: 30,
+      rumor_fade_weight: 0.5,
+      duplicate_similarity: 0.88,
+      duplicate_word_share: 0.6,
+      duplicate_rows_per_subject: 400,
     }
   }
 }
@@ -1087,6 +1102,43 @@ pub struct ConsolidationState {
   pub threshold: i64,
   /// Whether the sum has reached the threshold.
   pub consolidation_due: bool,
+  /// How many rows of the brain were written after the moment asked as `since`; absent where none was asked.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub written_since: Option<i64>,
+}
+
+/// What a reading of the consolidation state is asked with.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ConsolidationQuery {
+  /// A moment, in epoch milliseconds: the answer also counts the rows written after it.
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub since: Option<i64>,
+}
+
+/// Which duplicate candidates a reading answers.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct DuplicatesQuery {
+  /// Fifty where none is given, at most five hundred.
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub limit: Option<i64>,
+}
+
+/// A pair of live rows about one subject that may say one thing, with why it stands as a candidate.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct DuplicateCandidate {
+  /// The older row.
+  pub first: Memory,
+  /// The newer row.
+  pub second: Memory,
+  /// The subjects the two share.
+  pub subject_ids: Vec<i64>,
+  /// Their vectors' cosine; null where either holds no vector of the current model.
+  pub vector_similarity: Option<f64>,
+  /// The Jaccard overlap of their stems.
+  pub word_share: f64,
 }
 
 /// Episodes a consolidation read.

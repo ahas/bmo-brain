@@ -14,8 +14,9 @@ pub use brains::{
   SubjectKey, SubjectRef, SubjectsQuery, TalliesQuery, Tally, TallyBy, TypeCount,
 };
 pub use brains::{
-  ConsolidationState, MissesQuery, OrgTopic, OrgTopicsQuery, SearchCount, SearchMiss, SimilarAsk, Source,
-  Standing, UnconsolidatedEpisode, UnconsolidatedQuery,
+  ConsolidationQuery, ConsolidationState, DuplicateCandidate, DuplicatesQuery, MissesQuery, OrgTopic,
+  OrgTopicsQuery, SearchCount, SearchMiss, SimilarAsk, Source, Standing, UnconsolidatedEpisode,
+  UnconsolidatedQuery,
 };
 pub use client::{Answer, BrainClient, ClientFailure};
 /// The HTTP client a `BrainClient` calls through, for a caller that sets its own timeout or proxy.

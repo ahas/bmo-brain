@@ -5,6 +5,7 @@
 pub mod base;
 pub mod brains;
 pub mod consolidation;
+pub mod duplicates;
 pub mod events;
 pub mod files;
 pub mod learning;

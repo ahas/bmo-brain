@@ -13,7 +13,8 @@ import type { Browser, Locator, Page, Route } from "playwright-core";
 // list of more than seven choices opens with a search field, on an edge of its trigger and inside the window, one of
 // seven or fewer without. And the base's review, at a wide window and a phone's: each decision reachable and moving
 // its candidate, keeping and dropping asking in the item first, a candidate's source opening its memory in its own
-// brain, and the review standing for the base alone. The screen stands alone on the host under `host/`, and the brain's routes are answered by
+// brain, and the review standing for the base alone. And the last night's sleep, at a wide window and a phone's: its
+// card folded at the head of the memories, opened by a press, and its row opened from it. The screen stands alone on the host under `host/`, and the brain's routes are answered by
 // a stand-in holding one brain, which keeps every write, so what the screen wrote is read back and the screen read
 // again shows it. Skipped where the browser playwright-core pins is not on the machine.
 
@@ -46,6 +47,7 @@ interface Row {
   layerId: number | null;
   position: number;
   status: "active" | "superseded";
+  labels?: Record<string, string>;
 }
 
 interface LayerRow {
@@ -124,7 +126,7 @@ function memoryOf(row: Row): Record<string, unknown> {
     createdAt: AT,
     importance: 5,
     key: null,
-    labels: {},
+    labels: row.labels ?? {},
     lastConfirmedAt: null,
     lastUsedAt: null,
     lineageId: row.id,
@@ -151,8 +153,10 @@ function listed(query: URLSearchParams): Row[] {
   const statuses = query.get("status")?.split(",");
   const types = query.get("type")?.split(",");
   const layerId = query.get("layerId");
+  const label = query.get("label");
 
   return rows
+    .filter((row) => label === null || (row.labels ?? {})[label] !== undefined)
     .filter((row) => (statuses === undefined ? row.status === "active" : statuses.includes(row.status)))
     .filter((row) => types === undefined || types.includes(row.type))
     .filter((row) => (layerId !== null ? row.layerId === Number(layerId) : query.get("unfiled") !== "true" || row.layerId === null))
@@ -582,6 +586,46 @@ describe.skipIf(!ready)("the brain's screen in a browser", () => {
         expect(await search.count()).toBe(0);
       }, 60_000);
     }
+  });
+
+  describe("the last night's sleep stands at the head of the memories", () => {
+    beforeEach(() => {
+      seed();
+      rows.push({
+        id: 50,
+        type: "reflection",
+        text: "Slept: learned three facts, merged one pair, closed two promises.",
+        layerId: null,
+        position: 0,
+        status: "active",
+        labels: { sleep: "2026-11-24" }
+      });
+    });
+
+    for (const viewport of [WIDE, NARROW]) {
+      test(`at ${viewport.width} wide, the card opens to the summary and opens its row`, async () => {
+        await page.setViewportSize(viewport);
+        await page.goto(`${origin}/brain/1`, { waitUntil: "load" });
+        const card = page.locator("[data-sleep-card]");
+
+        await card.waitFor();
+        expect(await card.innerText()).toContain("2026-11-24");
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+        await card.getByRole("button").first().click();
+        await card.getByText("Slept: learned three facts", { exact: false }).waitFor();
+        await card.getByRole("button", { name: WORDS.brain.action.open_sleep!, exact: true }).click();
+        await until(() => new URL(page.url()).searchParams.get("memory") === "50", "the sleep's row");
+      }, 60_000);
+    }
+
+    test("a brain that has never slept shows no card", async () => {
+      seed();
+      await page.setViewportSize(WIDE);
+      await page.goto(`${origin}/brain/1`, { waitUntil: "load" });
+      await page.locator("h2").first().waitFor();
+      await Bun.sleep(300);
+      expect(await page.locator("[data-sleep-card]").count()).toBe(0);
+    }, 60_000);
   });
 
   describe("the base's candidates are reviewed one by one", () => {

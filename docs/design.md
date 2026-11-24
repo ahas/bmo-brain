@@ -235,14 +235,14 @@ Consolidation is the agent's pass outside any answer: it reads episodes not yet 
 the live facts about the same subjects, and writes semantic facts, reflections and corrections from them. It
 takes the episodes in the brain's priority order.
 
-- **Two triggers, and no others:** the sum of the importance of a brain's unconsolidated episodes reaching the
-  brain's threshold, and a session being folded or handed off. There is no nightly pass, no pass every N
-  turns and no periodic mode: the importance trigger is what stands in for one, the hand-off trigger is the
-  other mode.
+- **Three triggers, and no others:** the sum of the importance of a brain's unconsolidated episodes reaching the
+  brain's threshold, a session being folded or handed off, and the agent's sleep, once a day (「Sleep」). There is
+  no pass every N turns and no other periodic mode: the sleep is the one pass that comes by the clock, and it is
+  its caller's clock, never the brain's.
 - **The brain says when it is due:** every recall answers whether the importance threshold is reached, and so
   does a reading of the consolidation state alone, the same numbers reckoned the same way with nothing
   recorded, for a caller that wants to know without a recall; the agent consolidates in its turn when it is,
-  and at its fold. The brain reads the unconsolidated
+  at its fold, and in its sleep. The brain reads the unconsolidated
   episodes out in priority order and is told which it consolidated; it runs no pass of its own.
 - **Priority is the expected value of consolidating an episode,** after Mattar and Daw's (2018) value of a
   memory backup: priority = gain × (1 + need), highest first, reckoned at the reading from what the brain
@@ -271,25 +271,70 @@ takes the episodes in the brain's priority order.
   tag it follows, where one pulled it.
 - **What the agent writes passes the write judgement** like any fact, through the same call.
 
+## Sleep
+
+A sleep is the agent's own pass over its brain once a day, at a quiet hour, outside every session: it
+consolidates what is pending, folds duplicates together, closes what has ended and says what came of it. Its
+caller starts it on its own clock and runs it on the agent's road; the brain runs nothing for it and answers it
+only through the routes every caller reads (`docs/boundary-api.md`, 「Sleep」).
+
+- **Whether a brain needs one** is read from the consolidation state asked with the moment of the brain's last
+  sleep: the unconsolidated episodes, and how many rows were written after that moment. A brain with neither has
+  nothing to sleep on, and its sleep is passed over.
+- **It consolidates every pending episode,** as many readings of the unconsolidated episodes as it takes, each
+  through the write judgement and marked consolidated as a turn's consolidation is, under the token budget its
+  caller gives the run rather than a turn's cap.
+- **It folds duplicates together.** The brain answers the pairs of live rows that are candidates for one
+  (「Duplicate candidates」 below); the agent judges each pair and writes what it judges through the writes that
+  already stand: a merge of rows that say one thing, a new version where one says the other more fully, and for
+  a contradiction the newer or the better grounded row kept and the other invalidated. A pair it judges distinct
+  stays as it is.
+- **It closes what has ended,** never deleting: a live row of the types `state`, `followup` or `promise` whose
+  release condition the agent finds has come true is moved to `done`, with the moment it ended.
+- **It says what came of it** in one row: a `reflection` labelled `sleep` with the date the sleep ran for, in
+  English, naming what was learned, merged and closed. The newest such row is the brain's last sleep, the moment
+  its next sleep counts new rows from, and the screen shows it (「The screen」).
+
+### Duplicate candidates
+
+- **A candidate is a pair of live rows about one subject,** both `active` and neither an `episode` nor a
+  `persona`, that share at least one subject and stand close in meaning or in words: their vectors' cosine at
+  `duplicate_similarity` or above, or their stems' Jaccard overlap at `duplicate_word_share` or above. A pair is
+  answered once, whatever number of subjects they share, the older row first.
+- **The rows of one subject are compared among themselves,** the newest `duplicate_rows_per_subject` of them
+  where a subject holds more, so a subject linked to a great many rows bounds the work.
+- **Each pair is answered with its reasons:** the subjects they share, the cosine where both rows hold a vector of
+  the current model, and the word overlap. Pairs stand closest first, by the greater of the two, then by the older
+  row's id.
+- **A candidate is never a judgement.** The brain writes nothing for one; a pair of a fact and a name, or two
+  facts saying opposite things, is the agent's to read.
+
 ## Use
 
-The brain records how a memory is used and lets nothing fade by itself.
+The brain records how a memory is used. Nothing ends by itself, and one thing fades by itself: the rank of an
+old rumor nobody uses.
 
 - **Every use is recorded on the row:** a recall's hand-out, the agent's report of the rows it used, a
   confirmation, and an explicit read by key, subject, type or words, each a use at its moment. The row keeps
   how often it was used (`useCount`), when last (`lastUsedAt`), and the moments of its newest uses, at most
   `hit_times_kept` of them. A version carries the use of the version it follows.
 - **Nothing ends a memory but an event.** No strength, decay or threshold stands on a memory, and neither age
-  nor disuse drops it from a reading or from recall: a memory ends only when its release condition comes true,
-  a correction supersedes it, a merge folds it into another, or it is moved to `done` or `invalidated`.
+  nor disuse drops it from a reading or from recall: a memory ends only when a correction supersedes it, a merge
+  folds it into another, or it is moved to `done`, `invalidated` or `retracted`. A release condition come true is
+  such a move, made by the agent, in a turn or in its sleep (「Sleep」); the brain never judges one itself.
+- **An old rumor nobody uses loses rank, and only rank.** A live `rumor` neither used nor written within the last
+  `rumor_fade_days` stands in recall's searched part with its fused score multiplied by `rumor_fade_weight`, so a
+  fresher row of equal relevance goes before it. It stays a candidate, is handed out where it still wins its
+  place, and keeps its status; a use lifts the fade at once. No other type fades.
 - **Use orders, it never excludes.** Recall puts the row used last first among equally relevant and equally
   important rows (「Recall」); a reading of the screen orders by it where asked.
 - **The numbers are settings,** with placeholders until the owner's own conversation logs have fitted them:
   the importance threshold of consolidation, recall's length weighting (BM25's standard k1 and b) and its
   selection's balance, the per-subject cap, the core's cap of facts per speaker, the share of a condition's
-  words a turn holds before the condition matches, the token budget, the most use moments a row keeps, and
-  consolidation's tag importance and its window, the span of one session. The brain reads them from its
-  configuration and names each in its health answer.
+  words a turn holds before the condition matches, the token budget, the most use moments a row keeps,
+  consolidation's tag importance and its window, the span of one session, a rumor's fade and its weight, and the
+  closeness of a duplicate candidate in meaning and in words with the most rows of one subject compared. The
+  brain reads them from its configuration and names each in its health answer.
 
 ## Recall
 
@@ -772,6 +817,10 @@ console bundle contract and served by the brain itself (`docs/boundary-api.md`, 
   view back, and where one fails, or the translator stays too busy to read a text and answers it untranslated, the
   English stays, without the translated label or the link to an original, with one sentence saying so. Where the
   console names no translator, the toggle does not stand and the screen reads English.
+- **The last night's sleep** (지난밤 수면 in the Korean pack) stands as a card at the head of the memories, folded,
+  for the brain chosen: the newest live `reflection` labelled `sleep` (「Sleep」), headed by the date it slept for and
+  how long ago it was written, its words in the reading language as every memory's text is, and a press that opens
+  the row. A brain that has never slept shows no card, and the card stands whatever the filters.
 - **A subject's summary** (인물 요약 in the Korean pack) stands folded over the memories narrowed to that
   subject, headed by the subject's name, as the brain renders it from the facts about it (「A person is a
   subject」), and not at all where the subject has no fact.

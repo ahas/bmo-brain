@@ -12,6 +12,7 @@
          the pane and scrolls its own rows, or under a subject's sheet takes its own height while the pane scrolls
          both; where it does not, they stand stacked. -->
     <div v-else ref="scroller" class="flex min-h-0 min-w-0 flex-1 flex-col pb-(--bmo-create-room)" :class="tableFills ? '' : 'overflow-y-auto'">
+      <BrainSleep :brain-id="brainId" :changes="changes" @open="emit('open', $event)" />
       <BrainSheet v-if="subjectId !== null" :brain-id="brainId" :subject-id="subjectId" :name="subjectNames.get(subjectId) ?? ''" :changes="changes" />
       <p v-if="failure" class="p-4 text-sm text-error">{{ failure }}</p>
       <p v-else-if="memories.length === 0" class="p-6 text-center text-sm text-muted">{{ t("brain.status.nothing") }}</p>
@@ -70,6 +71,7 @@
 <script setup lang="ts">
 import BrainHeading from "./BrainHeading.vue";
 import BrainSheet from "./BrainSheet.vue";
+import BrainSleep from "./BrainSleep.vue";
 import { typeName } from "../domain/brain-names";
 import BrainStatus from "./BrainStatus.vue";
 import { useReading } from "../domain/brain-reading";

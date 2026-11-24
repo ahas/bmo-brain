@@ -91,6 +91,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/brains/{brainId}/duplicates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The pairs of live rows about one subject close in meaning or words, the candidates of a merge. */
+        get: operations["listDuplicates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/brains/{brainId}/export": {
         parameters: {
             query?: never;
@@ -714,6 +731,30 @@ export interface components {
              * @description The sum of the importance of the brain's unconsolidated episodes.
              */
             unconsolidatedImportance: number;
+            /**
+             * Format: int64
+             * @description How many rows of the brain were written after the moment asked as `since`; absent where none was asked.
+             */
+            writtenSince?: number | null;
+        };
+        /** @description A pair of live rows about one subject that may say one thing, with why it stands as a candidate. */
+        DuplicateCandidate: {
+            /** @description The older row. */
+            first: components["schemas"]["Memory"];
+            /** @description The newer row. */
+            second: components["schemas"]["Memory"];
+            /** @description The subjects the two share. */
+            subjectIds: number[];
+            /**
+             * Format: double
+             * @description Their vectors' cosine; null where either holds no vector of the current model.
+             */
+            vectorSimilarity: number | null;
+            /**
+             * Format: double
+             * @description The Jaccard overlap of their stems.
+             */
+            wordShare: number;
         };
         /** @description The embedding model the brain searches by meaning with, and what its vectors and asks came to. */
         EmbeddingHealth: {
@@ -1394,6 +1435,24 @@ export interface components {
             core_fact_cap: number;
             /**
              * Format: int64
+             * @description The newest rows of one subject compared for duplicate candidates.
+             * @default 400
+             */
+            duplicate_rows_per_subject: number;
+            /**
+             * Format: double
+             * @description The cosine at which two live rows about one subject are a duplicate candidate.
+             * @default 0.88
+             */
+            duplicate_similarity: number;
+            /**
+             * Format: double
+             * @description The Jaccard overlap of their stems at which two live rows about one subject are a duplicate candidate.
+             * @default 0.6
+             */
+            duplicate_word_share: number;
+            /**
+             * Format: int64
              * @description How many moments of use a row keeps, its newest.
              * @default 64
              */
@@ -1422,6 +1481,18 @@ export interface components {
              * @default 60
              */
             rrf_k: number;
+            /**
+             * Format: int64
+             * @description How many days a live rumor stands neither used nor written before its rank in recall fades.
+             * @default 30
+             */
+            rumor_fade_days: number;
+            /**
+             * Format: double
+             * @description What a faded rumor's fused score in recall is multiplied by.
+             * @default 0.5
+             */
+            rumor_fade_weight: number;
             /**
              * Format: int64
              * @description The span of one session, in milliseconds: the window around a tag in the consolidation order.
@@ -1970,7 +2041,10 @@ export interface operations {
     };
     readConsolidation: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description A moment, in epoch milliseconds: the answer also counts the rows written after it. */
+                since?: number | null;
+            };
             header?: never;
             path: {
                 brainId: number;
@@ -1986,6 +2060,35 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ConsolidationState"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listDuplicates: {
+        parameters: {
+            query?: {
+                /** @description Fifty where none is given, at most five hundred. */
+                limit?: number | null;
+            };
+            header?: never;
+            path: {
+                brainId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DuplicateCandidate"][];
                 };
             };
             400: components["responses"]["BadRequest"];

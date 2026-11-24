@@ -181,6 +181,14 @@ fn fused_before(a: &Weighed, b: &Weighed) -> std::cmp::Ordering {
     .then(a.memory.id.cmp(&b.memory.id))
 }
 
+/// Whether a row is an old rumor nobody uses: a `rumor` neither used nor written within the rules' fade span
+/// before the moment, whose rank fades (docs/design.md, 「Use」).
+fn faded(memory: &Memory, rules: &Rules, at: i64) -> bool {
+  let span = rules.rumor_fade_days.max(0).saturating_mul(24 * 60 * 60 * 1_000);
+  let touched = memory.last_used_at.unwrap_or(memory.created_at).max(memory.created_at);
+  memory.kind == "rumor" && at.saturating_sub(touched) >= span
+}
+
 impl Store {
   /// A row weighed for the turn: what the cues spread to it, the most a cue set gives where the turn says its
   /// condition.
@@ -352,6 +360,9 @@ impl Store {
     let fused = fuse(&[&word_list, &vector_list], self.rules.rrf_k);
     for weighed in &mut standing {
       weighed.fused = fused.get(&weighed.memory.id).copied().unwrap_or(0.0);
+      if faded(&weighed.memory, &self.rules, at) {
+        weighed.fused *= self.rules.rumor_fade_weight;
+      }
     }
     standing.sort_by(fused_before);
 

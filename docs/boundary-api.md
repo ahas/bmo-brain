@@ -43,7 +43,7 @@ the platform's `bmo` hands it no command.
 | embedding | `[embedding]` | the embedding model the brain searches by meaning with (`docs/design.md`, 「Vectors」), none where it is not named: `address`, the LLM gateway's base address, whose `/v1/embeddings` it asks; `key_file`, the file holding the gateway's bearer key, read at each ask; `model`, the model name, `embedding` where none is given; `dims`, the vectors' length, 1024; `batch`, the most texts one ask carries, 32; `max_tokens`, where a text is cut by a conservative count (a CJK or Hangul character one token, any other three characters one), 480; `query_instruction`, the instruction a query is embedded after, `Given a question, retrieve memories that answer it`, none where it is empty |
 | classifier | `[classifier]` | the chat model the candidates of the base are judged by (`docs/design.md`, 「Raising a memory to the base」), none where it is not named: `address`, the LLM gateway's base address, whose `/v1/chat/completions` it asks; `key_file`, the file holding the gateway's bearer key, read at each ask; `model`, the registration's name; `max_tokens`, the answer's ceiling, 400; `concurrency`, how many asks stand at once, 4 |
 | data root | `data_root` | the data root whose `env/brain.env` the brain's tool reads the service's address and token from; the `tool-env` verb writes it |
-| rules | `[rules]` | the numbers the brain reads by (`docs/design.md`), each with a default: `budget_tokens`, `vector_candidates` (how many rows nearest in meaning join a search's candidates, 40), `rrf_k` (the rank offset of Reciprocal Rank Fusion, 60), `bm25_k1` (how far a matched stem's weight saturates with a row's length, 1.2), `bm25_b` (how much a row's length relative to the brain's mean weighs on a matched stem, 0.75), `mmr_lambda` (the weight recall's selection gives relevance against overlap with the rows already in, 0.7), `subject_cap`, `core_fact_cap` (the most facts of one speaker's sheet the core of a recall carries, 8), `hit_times_kept` (the most use moments a memory keeps, 64), `same_session_ms` (the span of one session, an hour: the window around a tag in the consolidation order), `tag_importance` (the importance at which an unconsolidated episode tags its room's episodes around it, 8), `misses_kept` (the most misses of its searches by words a brain keeps, the newest, 5000), `previous_value_days`, `condition_share` (the share of a condition's words a turn holds before it matches, 0.5), `consolidation_threshold` |
+| rules | `[rules]` | the numbers the brain reads by (`docs/design.md`), each with a default: `budget_tokens`, `vector_candidates` (how many rows nearest in meaning join a search's candidates, 40), `rrf_k` (the rank offset of Reciprocal Rank Fusion, 60), `bm25_k1` (how far a matched stem's weight saturates with a row's length, 1.2), `bm25_b` (how much a row's length relative to the brain's mean weighs on a matched stem, 0.75), `mmr_lambda` (the weight recall's selection gives relevance against overlap with the rows already in, 0.7), `subject_cap`, `core_fact_cap` (the most facts of one speaker's sheet the core of a recall carries, 8), `hit_times_kept` (the most use moments a memory keeps, 64), `same_session_ms` (the span of one session, an hour: the window around a tag in the consolidation order), `tag_importance` (the importance at which an unconsolidated episode tags its room's episodes around it, 8), `misses_kept` (the most misses of its searches by words a brain keeps, the newest, 5000), `previous_value_days`, `condition_share` (the share of a condition's words a turn holds before it matches, 0.5), `consolidation_threshold`, `rumor_fade_days` (how long a live rumor stands neither used nor written before its rank fades, 30), `rumor_fade_weight` (what a faded rumor's fused score is multiplied by, 0.5), `duplicate_similarity` (the cosine at which two rows about one subject are a duplicate candidate, 0.88), `duplicate_word_share` (the stems' overlap at which they are, 0.6), `duplicate_rows_per_subject` (the newest rows of one subject compared, 400) |
 
 Deployed, the file stands under the data root as `env/brain.toml`, and each release links to it as `brain.toml`.
 The service runs as the user unit `deploy/bmo-brain.service`, the repository's one service: a deployment restarts
@@ -302,7 +302,7 @@ material and its mechanics.
 | `POST /similar` | `text`, `subjects` (each `type` and `key`), `limit` (10 where none, at most 50), `asOf` (a moment: the rows that held then, as `GET /memories` reads it, in place of the live ones, searched by words alone): the live memories most like the candidate, neither an `episode` nor a `persona`: those about one of its subjects or holding one of its stems, ranked by the relevance recall reckons with the candidate's stems and subjects as the cues, and the `vector_candidates` nearest its text in meaning, the two lists fused by Reciprocal Rank Fusion and ordered by the fused score, then by `id`, highest first | 200, a list |
 | `POST /learnings` | a learning applied whole in one transaction: `type`, `text`, `subjects`, `importance`, `source` (`own`, `owner`, `told`, `inferred`), `confirms` (ids confirmed), `strengthens` (an id given a new version with the text), `replaces` (ids invalidated, unless the source is heard), `grounds` (episode ids linked as subjects of type `episode`), `validFrom` (when it began holding; now where none), `key`, `layerId`, `recallCondition`, `releaseCondition`, `actorName`, `labels`, `locked`, `internalOnly`, `standing`; where the new row's `validFrom` is earlier than that of every row it would close, the one it strengthens or all it replaces, it closes none and is written already superseded by the one of them that began first, `validTo` that row's `validFrom`, with the reason `earlier-than-live` | 201: `confirmedCount`, `invalidatedIds`, `written` (the version written, or null where the learning only confirms), `versioned`; 400 for a ground that is no episode; 409 where `strengthens` names a row that is not live |
 | `GET /unconsolidated` | the active `episode` rows not yet consolidated, in priority order (`docs/design.md`, 「Consolidation」), the first `limit` of them (60 where none, at most 500); each the memory with `priority` (gain × (1 + need)), `gain` (importance × (1 + novelty), novelty one less the greatest share of the episode's stems a live row of its subjects holds), `need` and `taggedBy` (the tag it was read out after, or null) beside it | 200, a list |
-| `GET /consolidation` | the consolidation state, the same numbers a recall answers reckoned the same way, nothing recorded: `unconsolidatedImportance` (the sum of the importance of the unconsolidated episodes), `unconsolidatedCount` (how many they are), `threshold` (the rules' `consolidation_threshold`) and `consolidationDue` (whether the sum has reached it) | 200; 404 |
+| `GET /consolidation` | the consolidation state, the same numbers a recall answers reckoned the same way, nothing recorded: `unconsolidatedImportance` (the sum of the importance of the unconsolidated episodes), `unconsolidatedCount` (how many they are), `threshold` (the rules' `consolidation_threshold`) and `consolidationDue` (whether the sum has reached it); asked with `since` (a moment), also `writtenSince`, how many rows of the brain, of any type and status, were written after it | 200; 400 for a `since` that is no moment; 404 |
 | `POST /consolidated` | `episodeIds`: marks them consolidated | 200, `recordedCount` |
 
 A `told` or `inferred` learning of type `fact` is written as a `rumor`, and replaces nothing. Its `source` is
@@ -310,6 +310,16 @@ kept in the row's labels. The recall answer carries `unconsolidatedImportance`, 
 the unconsolidated episodes, and `consolidationDue`, whether it has reached the brain's threshold.
 
 The skill ships the discipline a chat agent's system prompt carries, `skills/brain-harness/every-turn.md`.
+
+### Sleep
+
+The agent's sleep (`docs/design.md`, 「Sleep」) reads the consolidation state with `since`, the unconsolidated
+episodes, the memories and the duplicate candidates, and writes through the learnings, the merges and the moves
+above; its summary is a `reflection` written with the label `sleep` set to the date. One route is its own:
+
+| Route | Does | Answers |
+|---|---|---|
+| `GET /duplicates` | the duplicate candidates (`docs/design.md`, 「Duplicate candidates」), closest first, the first `limit` of them (50 where none, at most 500): each `first` and `second` (the two memories, the older first), `subjectIds` (the subjects they share), `vectorSimilarity` (their cosine, or null where either holds no vector of the current model) and `wordShare` (the Jaccard overlap of their stems) | 200, a list; 400 for a `limit` out of its bounds; 404 |
 
 ### Misses
 
@@ -452,7 +462,10 @@ host's call protocol states.
 - **A run that works for a chat agent reads its brain and writes its lessons** through the narrower form the
   `brain.lessons` capability holds of three entries: `brain_list` whole, `brain_similar` whole, and
   `brain_learn` without `room`, `grounds` or `validFrom`, since such a run stands in no room and keeps no
-  episode of its own. Every other entry is the chat agent's alone.
+  episode of its own.
+- **A chat agent's sleep is a turn of the chat agent's own** (`docs/design.md`, 「Sleep」), outside every room: it
+  reads and writes through the same entries, `brain_duplicates` and `brain_merge` among them, and since it
+  stands in no room a learning links none unless it names one.
 
 - **It finds the brain** by `BRAIN_ADDRESS` and `BRAIN_TOKEN` in its own environment, else in `env/brain.env`
   under the data root the record's `BMO_DATA_DIR` names, else the deployment's conventional data root under
@@ -472,8 +485,9 @@ host's call protocol states.
 - **Its entries,** each one call: `brain_episode` (`POST /brains/{brainId}/memories`, type `episode`),
   `brain_similar` (`POST …/similar`), `brain_learn` (`POST …/learnings`), `brain_move`
   (`PATCH …/memories/{memoryId}`), `brain_list` (`GET …/memories`), `brain_unconsolidated`
-  (`GET …/unconsolidated`), `brain_consolidated` (`POST …/consolidated`) and `brain_fold`
-  (`POST …/folds`, the session key the record's `BMO_RUN_NAME`). It writes as `agent-session`.
+  (`GET …/unconsolidated`), `brain_consolidated` (`POST …/consolidated`), `brain_fold`
+  (`POST …/folds`, the session key the record's `BMO_RUN_NAME`), `brain_duplicates` (`GET …/duplicates`) and
+  `brain_merge` (`POST …/merges`). It writes as `agent-session`.
 - **Its fold is keyed by the turn's run, not the session.** `brain_fold` reports under the record's
   `BMO_RUN_NAME`, the run's name, which the agency gives every turn of a chat session afresh
   (`chat:<room>:<moment>`), while the marks a recall keeps are cleared by the key the receiver reports a fold
@@ -550,6 +564,7 @@ reads what a turn should know with `brain_recall`, writes what it learns with `b
 | `brain_similar` | `POST /brains/{brainId}/similar` |
 | `brain_unconsolidated` | `GET /brains/{brainId}/unconsolidated` |
 | `brain_consolidated` | `POST /brains/{brainId}/consolidated` |
+| `brain_duplicates` | `GET /brains/{brainId}/duplicates` |
 | `brain_persona` | `GET /brains/{brainId}/persona` |
 | `brain_sheet` | `GET /brains/{brainId}/subjects/{subjectId}/sheet` |
 

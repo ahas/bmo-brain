@@ -12,7 +12,8 @@ use axum::routing::post;
 use bmo_brain::store::Store;
 use bmo_brain::store::vectors::EmbeddingConfig;
 use bmo_brain_client::{
-  BrainClient, MemoriesQuery, NewBrain, NewMemory, Recall, RecallAsk, RecallPart, SimilarAsk,
+  BrainClient, DuplicatesQuery, MemoriesQuery, NewBrain, NewMemory, Recall, RecallAsk, RecallPart,
+  SimilarAsk, SubjectKey,
 };
 use serde_json::{Value, json};
 
@@ -457,4 +458,34 @@ async fn a_gateway_that_refuses_every_ask_records_no_row_as_refused() {
   // Once it takes texts again, the row is embedded.
   gateway.gate.limit.store(0, Ordering::SeqCst);
   assert_eq!(served.store.embed_backlog().await, Ok(1));
+}
+
+#[tokio::test]
+async fn two_rows_about_one_subject_close_in_meaning_are_a_duplicate_candidate_with_their_cosine() {
+  let gateway = Gateway::new().await;
+  let served = Served::embedding(gateway.config("stand-in")).await;
+  let client = &served.client;
+  let brain = brain_of(client).await;
+  let person = SubjectKey {
+    kind: "person".to_owned(),
+    key: "person:a".to_owned(),
+  };
+  let about = |text: &str| NewMemory {
+    subjects: vec![person.clone()],
+    ..memory(text)
+  };
+  let first = client.memory_add(brain, &about("Member drives the automobile")).await.unwrap();
+  let second = client.memory_add(brain, &about("Member drives the car")).await.unwrap();
+  client.memory_add(brain, &about("Member grows tomatoes")).await.unwrap();
+  served.store.embed_backlog().await.unwrap();
+
+  let pairs = client.duplicates(brain, &DuplicatesQuery::default()).await.unwrap();
+
+  // Two of four stems shared, under the word share; the same concept in meaning, over the cosine.
+  assert_eq!(
+    pairs.iter().map(|p| (p.first.id, p.second.id)).collect::<Vec<_>>(),
+    [(first.id, second.id)]
+  );
+  assert!((pairs[0].word_share - 0.5).abs() < 1e-9, "{:?}", pairs[0]);
+  assert!(pairs[0].vector_similarity.is_some_and(|cosine| cosine > 0.99), "{:?}", pairs[0]);
 }

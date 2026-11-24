@@ -12,8 +12,9 @@ use bmo_brain_client::{
   Recall, RecallAsk, Recorded, SheetQuery, Subject, SubjectChange, SubjectsQuery, TypeCount, WireError,
 };
 use bmo_brain_client::{
-  ConsoleManifest, ConsoleWords, Consolidated, ConsolidationState, Learned, Learning, MissesQuery,
-  Restoration, SearchMiss, SimilarAsk, TalliesQuery, Tally, UnconsolidatedEpisode, UnconsolidatedQuery,
+  ConsoleManifest, ConsoleWords, Consolidated, ConsolidationQuery, ConsolidationState, DuplicateCandidate,
+  DuplicatesQuery, Learned, Learning, MissesQuery, Restoration, SearchMiss, SimilarAsk, TalliesQuery,
+  Tally, UnconsolidatedEpisode, UnconsolidatedQuery,
 };
 use schemars::generate::{SchemaGenerator, SchemaSettings};
 use schemars::{JsonSchema, Schema};
@@ -609,10 +610,30 @@ fn brain_routes(g: &mut SchemaGenerator) -> Vec<Route> {
       id: "readConsolidation",
       tag: "writing",
       summary: "Whether a consolidation is due, the numbers a recall answers, read alone with nothing recorded.",
-      parameters: brain(g),
+      parameters: {
+        let mut parameters = brain(g);
+        parameters.extend(query::<ConsolidationQuery>(g));
+        parameters
+      },
       body: None,
       raw_body: None,
       answers: vec![(200, json_answer::<ConsolidationState>(g))],
+      codes: vec![BadRequest, NotFound],
+    },
+    Route {
+      method: "get",
+      path: "/brains/{brainId}/duplicates",
+      id: "listDuplicates",
+      tag: "writing",
+      summary: "The pairs of live rows about one subject close in meaning or words, the candidates of a merge.",
+      parameters: {
+        let mut parameters = brain(g);
+        parameters.extend(query::<DuplicatesQuery>(g));
+        parameters
+      },
+      body: None,
+      raw_body: None,
+      answers: vec![(200, json_answer::<Vec<DuplicateCandidate>>(g))],
       codes: vec![BadRequest, NotFound],
     },
     Route {

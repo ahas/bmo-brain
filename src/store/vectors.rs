@@ -485,6 +485,15 @@ impl Store {
     near
   }
 
+  /// The unit vectors the index holds of these rows under the current model; a row holding none is absent.
+  pub(crate) fn units_of(&self, ids: &[i64]) -> std::collections::HashMap<i64, Vec<f32>> {
+    let index = self.vectors.index.read().unwrap_or_else(|poisoned| poisoned.into_inner());
+    ids
+      .iter()
+      .filter_map(|id| index.get(id).map(|entry| (*id, entry.unit.clone())))
+      .collect()
+  }
+
   /// These rows let go of the index: they are no longer live.
   pub(crate) fn forget_vectors(&self, ids: &[i64]) {
     if ids.is_empty() {

@@ -34,7 +34,8 @@
       "up": "Move up",
       "clear_all": "Clear all choices",
       "clear": "Clear {what}",
-      "close_memory": "Close memory"
+      "close_memory": "Close memory",
+      "open_sleep": "Open the sleep record"
     },
     "error": {
       "conflict": "Another writer changed this memory after you read it. The new version is shown, and your words are kept.",
@@ -135,7 +136,8 @@
       "memory_head": "Memory #{id} · {type}",
       "shown_count": "{n}",
       "first_layer": "{name} (first layer)",
-      "chosen": "Chosen"
+      "chosen": "Chosen",
+      "sleep_of": "Last night's sleep — {date} · {ago}"
     },
     "order": {
       "desc_validFrom": "Newest first",

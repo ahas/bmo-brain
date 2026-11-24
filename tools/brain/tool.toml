@@ -102,3 +102,23 @@ input = "brain_fold.json"
 hints = { idempotent = true }
 capabilities = ["room.chat"]
 unbounded = true
+
+[[entry]]
+namespace = "bmo"
+name = "brain_duplicates"
+title = "Duplicate candidates"
+description = "Pairs of your live memories about one subject that stand close in meaning or words, closest first: judge each pair, then merge them with brain_merge, write the fuller one with brain_learn's strengthens, invalidate the older or worse grounded of a contradiction with brain_move, or leave a distinct pair as it is."
+input = "brain_duplicates.json"
+hints = { read_only = true }
+capabilities = ["room.chat"]
+unbounded = true
+
+[[entry]]
+namespace = "bmo"
+name = "brain_merge"
+title = "Merge memories"
+description = "Write one memory, its text in English, over two or more live memories that say one thing: each is superseded by it, and it keeps the most use they had earned."
+input = "brain_merge.json"
+hints = { idempotent = false }
+capabilities = ["room.chat"]
+unbounded = true

@@ -34,7 +34,8 @@
       "up": "上へ",
       "clear_all": "選択をすべて解除",
       "clear": "{what}の選択を解除",
-      "close_memory": "記憶を閉じる"
+      "close_memory": "記憶を閉じる",
+      "open_sleep": "睡眠の記録を開く"
     },
     "error": {
       "conflict": "読み込んだ後に別の書き手がこの記憶を変更しました。新しいバージョンを表示し、書きかけの文章は残しておきます。",
@@ -135,7 +136,8 @@
       "memory_head": "記憶 #{id} · {type}",
       "shown_count": "{n}件",
       "first_layer": "{name}（最初のレイヤー）",
-      "chosen": "選択中"
+      "chosen": "選択中",
+      "sleep_of": "昨夜の睡眠 — {date} · {ago}"
     },
     "order": {
       "desc_validFrom": "新しい順",

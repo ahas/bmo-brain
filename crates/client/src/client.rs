@@ -5,12 +5,12 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 
 use crate::brains::{
-  Brain, BrainsQuery, Confirmations, Consolidated, ConsolidationState, ExportQuery, Fold, Folded, Hits,
-  Injected, Layer, LayerChange, LayersQuery, Learned, Learning, MemoriesQuery, Memory, MemoryMerge,
-  MemoryMove, MemoryVersion, MissesQuery, NewBrain, NewLayer, NewMemory, NewSubject, OrgTopic,
-  OrgTopicsQuery, PersonaQuery, Recall, RecallAsk, Recorded, Restoration, SearchMiss, SheetQuery,
-  SimilarAsk, Subject, SubjectChange, SubjectsQuery, TalliesQuery, Tally, TypeCount, UnconsolidatedEpisode,
-  UnconsolidatedQuery,
+  Brain, BrainsQuery, Confirmations, Consolidated, ConsolidationQuery, ConsolidationState,
+  DuplicateCandidate, DuplicatesQuery, ExportQuery, Fold, Folded, Hits, Injected, Layer, LayerChange,
+  LayersQuery, Learned, Learning, MemoriesQuery, Memory, MemoryMerge, MemoryMove, MemoryVersion,
+  MissesQuery, NewBrain, NewLayer, NewMemory, NewSubject, OrgTopic, OrgTopicsQuery, PersonaQuery, Recall,
+  RecallAsk, Recorded, Restoration, SearchMiss, SheetQuery, SimilarAsk, Subject, SubjectChange,
+  SubjectsQuery, TalliesQuery, Tally, TypeCount, UnconsolidatedEpisode, UnconsolidatedQuery,
 };
 use crate::wire::{Event, EventsQuery, Health, Page, WireError};
 
@@ -345,6 +345,24 @@ impl BrainClient {
   /// `GET /brains/{brainId}/consolidation`
   pub async fn consolidation(&self, brain_id: i64) -> Answer<ConsolidationState> {
     Self::answered(self.request(Method::GET, &["brains", &brain_id.to_string(), "consolidation"])).await
+  }
+
+  /// `GET /brains/{brainId}/consolidation`, asked with the moment the rows written after it are counted from.
+  pub async fn consolidation_since(
+    &self,
+    brain_id: i64,
+    query: &ConsolidationQuery,
+  ) -> Answer<ConsolidationState> {
+    Self::answered(self.get(&["brains", &brain_id.to_string(), "consolidation"], query)).await
+  }
+
+  /// `GET /brains/{brainId}/duplicates`
+  pub async fn duplicates(
+    &self,
+    brain_id: i64,
+    query: &DuplicatesQuery,
+  ) -> Answer<Vec<DuplicateCandidate>> {
+    Self::answered(self.get(&["brains", &brain_id.to_string(), "duplicates"], query)).await
   }
 
   /// `GET /brains/{brainId}/misses`

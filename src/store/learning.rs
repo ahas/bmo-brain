@@ -328,9 +328,25 @@ impl Store {
 
   /// Whether a consolidation is due, as a recall says it: the same sum and threshold, read alone, nothing
   /// recorded.
-  pub async fn consolidation(&self, brain_id: i64) -> Held<bmo_brain_client::ConsolidationState> {
+  pub async fn consolidation(
+    &self,
+    brain_id: i64,
+    since: Option<i64>,
+  ) -> Held<bmo_brain_client::ConsolidationState> {
     let mut conn = self.connection().await?;
     brain_of(&mut conn, brain_id).await?;
+    let written_since = match since {
+      None => None,
+      Some(since) => Some(
+        sqlx::query_scalar::<_, i64>(
+          "SELECT COUNT(*) FROM memories WHERE brain_id = $1 AND created_at > $2",
+        )
+        .bind(brain_id)
+        .bind(since)
+        .fetch_one(&mut *conn)
+        .await?,
+      ),
+    };
     let unconsolidated_importance = self.unconsolidated_importance(&mut conn, brain_id).await?;
     let unconsolidated_count: i64 = sqlx::query_scalar(
       "SELECT COUNT(*) FROM memories WHERE brain_id = $1 AND type = 'episode' AND status = 'active' \
@@ -345,6 +361,7 @@ impl Store {
       unconsolidated_count,
       threshold,
       consolidation_due: unconsolidated_importance >= threshold,
+      written_since,
     })
   }
 

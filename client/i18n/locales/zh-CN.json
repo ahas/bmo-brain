@@ -34,7 +34,8 @@
       "up": "上移",
       "clear_all": "清除全部选择",
       "clear": "清除{what}选择",
-      "close_memory": "关闭记忆"
+      "close_memory": "关闭记忆",
+      "open_sleep": "打开睡眠记录"
     },
     "error": {
       "conflict": "在你读取之后，另一位写入者修改了这条记忆。现在显示新版本，你正在写的内容会保留。",
@@ -135,7 +136,8 @@
       "memory_head": "记忆 #{id} · {type}",
       "shown_count": "{n} 条",
       "first_layer": "{name}（第一层）",
-      "chosen": "已选"
+      "chosen": "已选",
+      "sleep_of": "昨夜睡眠 — {date} · {ago}"
     },
     "order": {
       "desc_validFrom": "最新优先",

@@ -8,12 +8,12 @@ use axum::http::{StatusCode, header};
 use axum::response::{IntoResponse, Json, Response};
 use axum::routing::{get, post};
 use bmo_brain_client::{
-  Brain as BrainMember, BrainsQuery, Confirmations, Consolidated, ConsolidationState, ExportQuery, Fold,
-  Folded, Hits, Injected, Layer, LayerChange, LayersQuery, Learned, Learning, MemoriesQuery, Memory,
-  MemoryMerge, MemoryMove, MemoryVersion, MissesQuery, NewBrain, NewLayer, NewMemory, NewSubject, OrgTopic,
-  OrgTopicsQuery, Page, PersonaQuery, Recall, RecallAsk, Recorded, Restoration, SearchMiss, SheetQuery,
-  SimilarAsk, Subject, SubjectChange, SubjectsQuery, TalliesQuery, Tally, TypeCount, UnconsolidatedEpisode,
-  UnconsolidatedQuery,
+  Brain as BrainMember, BrainsQuery, Confirmations, Consolidated, ConsolidationQuery, ConsolidationState,
+  DuplicateCandidate, DuplicatesQuery, ExportQuery, Fold, Folded, Hits, Injected, Layer, LayerChange,
+  LayersQuery, Learned, Learning, MemoriesQuery, Memory, MemoryMerge, MemoryMove, MemoryVersion,
+  MissesQuery, NewBrain, NewLayer, NewMemory, NewSubject, OrgTopic, OrgTopicsQuery, Page, PersonaQuery,
+  Recall, RecallAsk, Recorded, Restoration, SearchMiss, SheetQuery, SimilarAsk, Subject, SubjectChange,
+  SubjectsQuery, TalliesQuery, Tally, TypeCount, UnconsolidatedEpisode, UnconsolidatedQuery,
 };
 
 use super::{Answer, Body, Brain, Key, Query};
@@ -241,8 +241,20 @@ async fn unconsolidated(
   Ok(Json(brain.store.unconsolidated(id, query.limit).await?))
 }
 
-async fn consolidation(State(brain): State<Brain>, Key(id): Key<i64>) -> Answer<Json<ConsolidationState>> {
-  Ok(Json(brain.store.consolidation(id).await?))
+async fn consolidation(
+  State(brain): State<Brain>,
+  Key(id): Key<i64>,
+  Query(query): Query<ConsolidationQuery>,
+) -> Answer<Json<ConsolidationState>> {
+  Ok(Json(brain.store.consolidation(id, query.since).await?))
+}
+
+async fn duplicates(
+  State(brain): State<Brain>,
+  Key(id): Key<i64>,
+  Query(query): Query<DuplicatesQuery>,
+) -> Answer<Json<Vec<DuplicateCandidate>>> {
+  Ok(Json(brain.store.duplicates(id, query.limit).await?))
 }
 
 async fn misses(
@@ -332,6 +344,7 @@ pub fn routes() -> Router<Brain> {
     .route("/brains/{brainId}/unconsolidated", get(unconsolidated))
     .route("/brains/{brainId}/consolidation", get(consolidation))
     .route("/brains/{brainId}/consolidated", post(consolidated))
+    .route("/brains/{brainId}/duplicates", get(duplicates))
     .route("/brains/{brainId}/misses", get(misses))
     .route("/brains/{brainId}/persona", get(persona))
     .route("/brains/{brainId}/export", get(export))

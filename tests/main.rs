@@ -17,5 +17,6 @@ mod recall;
 mod repository;
 mod screen;
 mod sheets;
+mod sleep;
 mod uses;
 mod vectors;

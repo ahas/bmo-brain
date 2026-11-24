@@ -100,6 +100,61 @@ async fn a_run_working_for_a_chat_agent_reads_and_writes_that_agents_brain() {
   assert_eq!(memories.len(), 1, "{found}");
 }
 
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_sleep_reads_the_duplicate_candidates_and_merges_a_pair_into_one_row() {
+  let served = Served::new().await;
+
+  served
+    .client
+    .brain_add(&NewBrain {
+      account_key: "account-a".to_owned(),
+      agent_key: "agent-a".to_owned(),
+      name: None,
+      kind: None,
+    })
+    .await
+    .unwrap();
+
+  // The agent's own turn outside every room: no room in its record.
+  let session = json!({
+    "holderName": "agent-a",
+    "namespaces": ["bmo"],
+    "capabilities": ["room.chat"],
+    "variables": { "BMO_TURN_AGENT": "agent-a", "BMO_RUN_NAME": "sleep-1" },
+  });
+  let person = json!([{ "type": "person", "key": "person:a" }]);
+  for text in ["The member keeps bees behind the barn.", "The member keeps bees behind the old barn."] {
+    let learned = called_under(
+      &served,
+      "brain_learn",
+      json!({ "type": "fact", "text": text, "source": "own", "subjects": person }),
+      session.clone(),
+    );
+
+    assert_eq!(learned["isError"], json!(false), "{learned}");
+  }
+
+  let found = called_under(&served, "brain_duplicates", json!({}), session.clone());
+  let pairs = found["structuredContent"]["pairs"].as_array().unwrap().clone();
+
+  assert_eq!(pairs.len(), 1, "{found}");
+
+  let ids = [pairs[0]["first"]["id"].clone(), pairs[0]["second"]["id"].clone()];
+  let merged = called_under(
+    &served,
+    "brain_merge",
+    json!({ "memory_ids": ids, "type": "fact", "text": "The member keeps bees behind the old barn." }),
+    session.clone(),
+  );
+
+  assert_eq!(merged["isError"], json!(false), "{merged}");
+  assert_eq!(merged["structuredContent"]["supersedes"].as_array().unwrap().len(), 2, "{merged}");
+
+  let after = called_under(&served, "brain_duplicates", json!({}), session);
+
+  assert_eq!(after["structuredContent"]["pairs"], json!([]), "{after}");
+}
+
 /// A migrated database of this test's own, served on a port of its own; the database is dropped with the guard.
 struct Served {
   base: String,

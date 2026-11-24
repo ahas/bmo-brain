@@ -338,6 +338,14 @@
             "description": "The sum of the importance of the brain's unconsolidated episodes.",
             "format": "int64",
             "type": "integer"
+          },
+          "writtenSince": {
+            "description": "How many rows of the brain were written after the moment asked as `since`; absent where none was asked.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
           }
         },
         "required": [
@@ -345,6 +353,48 @@
           "unconsolidatedCount",
           "threshold",
           "consolidationDue"
+        ],
+        "type": "object"
+      },
+      "DuplicateCandidate": {
+        "description": "A pair of live rows about one subject that may say one thing, with why it stands as a candidate.",
+        "properties": {
+          "first": {
+            "$ref": "#/components/schemas/Memory",
+            "description": "The older row."
+          },
+          "second": {
+            "$ref": "#/components/schemas/Memory",
+            "description": "The newer row."
+          },
+          "subjectIds": {
+            "description": "The subjects the two share.",
+            "items": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "vectorSimilarity": {
+            "description": "Their vectors' cosine; null where either holds no vector of the current model.",
+            "format": "double",
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "wordShare": {
+            "description": "The Jaccard overlap of their stems.",
+            "format": "double",
+            "type": "number"
+          }
+        },
+        "required": [
+          "first",
+          "second",
+          "subjectIds",
+          "vectorSimilarity",
+          "wordShare"
         ],
         "type": "object"
       },
@@ -2003,6 +2053,24 @@
             "format": "int64",
             "type": "integer"
           },
+          "duplicate_rows_per_subject": {
+            "default": 400,
+            "description": "The newest rows of one subject compared for duplicate candidates.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "duplicate_similarity": {
+            "default": 0.88,
+            "description": "The cosine at which two live rows about one subject are a duplicate candidate.",
+            "format": "double",
+            "type": "number"
+          },
+          "duplicate_word_share": {
+            "default": 0.6,
+            "description": "The Jaccard overlap of their stems at which two live rows about one subject are a duplicate candidate.",
+            "format": "double",
+            "type": "number"
+          },
           "hit_times_kept": {
             "default": 64,
             "description": "How many moments of use a row keeps, its newest.",
@@ -2030,6 +2098,18 @@
           "rrf_k": {
             "default": 60.0,
             "description": "The rank offset `k` of Reciprocal Rank Fusion.",
+            "format": "double",
+            "type": "number"
+          },
+          "rumor_fade_days": {
+            "default": 30,
+            "description": "How many days a live rumor stands neither used nor written before its rank in recall fades.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "rumor_fade_weight": {
+            "default": 0.5,
+            "description": "What a faded rumor's fused score in recall is multiplied by.",
             "format": "double",
             "type": "number"
           },
@@ -2073,7 +2153,12 @@
           "previous_value_days",
           "condition_share",
           "tag_importance",
-          "consolidation_threshold"
+          "consolidation_threshold",
+          "rumor_fade_days",
+          "rumor_fade_weight",
+          "duplicate_similarity",
+          "duplicate_word_share",
+          "duplicate_rows_per_subject"
         ],
         "type": "object"
       },
@@ -2716,7 +2801,7 @@
   "info": {
     "description": "An agent's long-term memory as a service. The service keeps many brains, each an account's and one agent's: subjects (what a memory is about, found by type and key), layers (the table of contents) and memories, one row a version, superseded and invalidated but never deleted. A turn asks recall for a block under a token budget; a persona is rendered as the same bytes until a piece changes; a brain moves in and out as a brain file. Nothing is held outside a brain. Bodies are JSON with camelCase keys, times are epoch milliseconds, lists are pages of items and more, and every failure is the error shape with its status. The harness plugin's tools, each a thin call of one route, are stated under x-tools.",
     "title": "bmo-brain",
-    "version": "0.1.0-rev.42"
+    "version": "0.1.0-rev.43"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -3101,6 +3186,20 @@
               "format": "int64",
               "type": "integer"
             }
+          },
+          {
+            "description": "A moment, in epoch milliseconds: the answer also counts the rows written after it.",
+            "in": "query",
+            "name": "since",
+            "required": false,
+            "schema": {
+              "description": "A moment, in epoch milliseconds: the answer also counts the rows written after it.",
+              "format": "int64",
+              "type": [
+                "integer",
+                "null"
+              ]
+            }
           }
         ],
         "responses": {
@@ -3128,6 +3227,74 @@
           }
         },
         "summary": "Whether a consolidation is due, the numbers a recall answers, read alone with nothing recorded.",
+        "tags": [
+          "writing"
+        ],
+        "x-codes": [
+          "bad-request",
+          "unauthorized",
+          "forbidden",
+          "not-found"
+        ],
+        "x-console": "closed"
+      }
+    },
+    "/brains/{brainId}/duplicates": {
+      "get": {
+        "operationId": "listDuplicates",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "brainId",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Fifty where none is given, at most five hundred.",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "description": "Fifty where none is given, at most five hundred.",
+              "format": "int64",
+              "type": [
+                "integer",
+                "null"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DuplicateCandidate"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "summary": "The pairs of live rows about one subject close in meaning or words, the candidates of a merge.",
         "tags": [
           "writing"
         ],
@@ -7378,6 +7545,38 @@
         "$ref": "#/components/schemas/Recorded"
       },
       "route": "POST /brains/{brainId}/consolidated"
+    },
+    {
+      "description": "The pairs of live memories about one subject close in meaning or words: judge each and merge, version or close.",
+      "input": {
+        "description": "A brain and what a route of it takes.",
+        "properties": {
+          "brainId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "limit": {
+            "description": "Fifty where none is given, at most five hundred.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "brainId"
+        ],
+        "type": "object"
+      },
+      "name": "brain_duplicates",
+      "output": {
+        "items": {
+          "$ref": "#/components/schemas/DuplicateCandidate"
+        },
+        "type": "array"
+      },
+      "route": "GET /brains/{brainId}/duplicates"
     },
     {
       "description": "The persona rendered as text.",

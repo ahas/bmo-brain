@@ -34,7 +34,8 @@
       "up": "위로",
       "clear_all": "선택 모두 풀기",
       "clear": "{what} 선택 풀기",
-      "close_memory": "기억 닫기"
+      "close_memory": "기억 닫기",
+      "open_sleep": "수면 기록 열기"
     },
     "error": {
       "conflict": "읽은 뒤에 다른 쓰는 이가 이 기억을 바꿨습니다. 새 버전을 보여 드리고, 쓰던 글은 남겨 둡니다.",
@@ -135,7 +136,8 @@
       "memory_head": "기억 #{id} · {type}",
       "shown_count": "{n}개",
       "first_layer": "{name} (첫 레이어)",
-      "chosen": "선택"
+      "chosen": "선택",
+      "sleep_of": "지난밤 수면 — {date} · {ago}"
     },
     "order": {
       "desc_validFrom": "새것 먼저",

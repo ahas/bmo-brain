@@ -10,7 +10,7 @@ use bmo_brain_client::{
   MemoryMerge, MemoryMove, MemoryVersion, NewBrain, NewLayer, NewMemory, NewSubject, PersonaQuery,
   RecallAsk, SheetQuery, SubjectsQuery,
 };
-use bmo_brain_client::{Consolidated, Learning, SimilarAsk, UnconsolidatedQuery};
+use bmo_brain_client::{Consolidated, DuplicatesQuery, Learning, SimilarAsk, UnconsolidatedQuery};
 use schemars::generate::SchemaGenerator;
 use schemars::{JsonSchema, Schema};
 use serde::de::DeserializeOwned;
@@ -343,6 +343,14 @@ pub fn tools() -> Vec<BrainTool> {
       "POST /brains/{brainId}/consolidated",
       |client, Within { brain_id, body }: Within<Consolidated>| async move {
         client.consolidated(brain_id, &body).await
+      },
+    ),
+    tool(
+      "brain_duplicates",
+      "The pairs of live memories about one subject close in meaning or words: judge each and merge, version or close.",
+      "GET /brains/{brainId}/duplicates",
+      |client, Within { brain_id, body }: Within<DuplicatesQuery>| async move {
+        client.duplicates(brain_id, &body).await
       },
     ),
     tool(
