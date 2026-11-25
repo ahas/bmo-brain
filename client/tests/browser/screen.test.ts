@@ -671,6 +671,16 @@ describe.skipIf(!ready)("the brain's screen in a browser", () => {
         // The pack holds no words for a button that loads more, and the foot holds no button.
         expect(WORDS.brain.action.more).toBeUndefined();
         expect(await page.locator("[data-next-page-foot] button").count()).toBe(0);
+        // In the table, the last row of data draws no line under it while the foot follows it.
+        if (viewport === WIDE) {
+          const line = await page.evaluate(() => {
+            const rows = [...document.querySelectorAll("[data-memory-table] tbody tr:not([data-next-page-foot])")];
+
+            return getComputedStyle(rows[rows.length - 1]!).borderBottomWidth;
+          });
+
+          expect(line).toBe("0px");
+        }
 
         const box = await memory("paged 1").first().boundingBox();
 
