@@ -191,7 +191,7 @@ fn body<Body: JsonSchema>(generator: &mut SchemaGenerator) -> Option<Schema> {
   Some(generator.subschema_for::<Body>())
 }
 
-use ErrorCode::{BadRequest, Conflict, Gone, Locked, NotFound};
+use ErrorCode::{BadRequest, Conflict, Gone, NotFound};
 
 fn brain_routes(g: &mut SchemaGenerator) -> Vec<Route> {
   let brain = |g: &mut SchemaGenerator| vec![id(g, "brainId")];
@@ -539,7 +539,7 @@ fn brain_routes(g: &mut SchemaGenerator) -> Vec<Route> {
       body: body::<MemoryMove>(g),
       raw_body: None,
       answers: vec![(200, json_answer::<Memory>(g))],
-      codes: vec![BadRequest, NotFound, Conflict, Locked],
+      codes: vec![BadRequest, NotFound, Conflict],
     },
     Route {
       method: "post",
@@ -551,7 +551,7 @@ fn brain_routes(g: &mut SchemaGenerator) -> Vec<Route> {
       body: body::<MemoryVersion>(g),
       raw_body: None,
       answers: vec![(201, json_answer::<Memory>(g))],
-      codes: vec![BadRequest, NotFound, Conflict, Locked],
+      codes: vec![BadRequest, NotFound, Conflict],
     },
     Route {
       method: "post",
@@ -563,7 +563,7 @@ fn brain_routes(g: &mut SchemaGenerator) -> Vec<Route> {
       body: body::<MemoryMerge>(g),
       raw_body: None,
       answers: vec![(201, json_answer::<Memory>(g))],
-      codes: vec![BadRequest, NotFound, Conflict, Locked],
+      codes: vec![BadRequest, NotFound, Conflict],
     },
     Route {
       method: "post",
@@ -575,7 +575,7 @@ fn brain_routes(g: &mut SchemaGenerator) -> Vec<Route> {
       body: body::<Restoration>(g),
       raw_body: None,
       answers: vec![(201, json_answer::<Memory>(g))],
-      codes: vec![BadRequest, NotFound, Conflict, Locked],
+      codes: vec![BadRequest, NotFound, Conflict],
     },
     Route {
       method: "get",
@@ -679,7 +679,7 @@ fn brain_routes(g: &mut SchemaGenerator) -> Vec<Route> {
       body: body::<Learning>(g),
       raw_body: None,
       answers: vec![(201, json_answer::<Learned>(g))],
-      codes: vec![BadRequest, NotFound, Conflict, Locked],
+      codes: vec![BadRequest, NotFound, Conflict],
     },
     Route {
       method: "post",
@@ -814,7 +814,7 @@ fn brain_routes(g: &mut SchemaGenerator) -> Vec<Route> {
       body: None,
       raw_body: Some("application/vnd.sqlite3"),
       answers: vec![(201, json_answer::<Injected>(g))],
-      codes: vec![BadRequest, NotFound, Locked],
+      codes: vec![BadRequest, NotFound, Conflict],
     },
   ]
 }

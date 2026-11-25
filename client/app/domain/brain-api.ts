@@ -228,17 +228,11 @@ export function changeSubject(brainId: number, id: number, description: string):
   return $fetch<Subject>(under(brainId, `/subjects/${id}`), { method: "PATCH", body: { description } });
 }
 
-// Whether a refusal is the brain's conflict: a version written over a row someone else moved first.
-export function isConflict(error: unknown): boolean {
-  const data = (error as { data?: { code?: string } } | null)?.data;
+// The code the brain answered a refusal with, read the one way every failure of its routes is shaped: `code`
+// beside the English sentence. A console hands the service's own failure body on as it wrote it, so this reads
+// alike whether the screen reaches the brain through a relay or at its address directly.
+export function refusalCode(error: unknown): string | null {
+  const code = (error as { data?: { code?: unknown } } | null)?.data?.code;
 
-  return data?.code === "conflict";
-}
-
-// Whether a refusal is the brain's lock: a service of the deployment left this row and keeps it from every
-// other writer, and only that service's own act ends it (docs/design.md, 「What a holder leaves」).
-export function isLocked(error: unknown): boolean {
-  const data = (error as { data?: { code?: string } } | null)?.data;
-
-  return data?.code === "locked";
+  return typeof code === "string" ? code : null;
 }

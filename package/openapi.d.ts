@@ -2040,7 +2040,7 @@ export interface components {
                 "application/json": components["schemas"]["WireError"];
             };
         };
-        /** @description `conflict`: the member's state does not allow the change */
+        /** @description `conflict`: the member's state does not allow the change, which includes a row a holder keeps */
         Conflict: {
             headers: {
                 [name: string]: unknown;
@@ -2069,15 +2069,6 @@ export interface components {
         };
         /** @description `gone`: the stream was resumed from before the oldest event kept */
         Gone: {
-            headers: {
-                [name: string]: unknown;
-            };
-            content: {
-                "application/json": components["schemas"]["WireError"];
-            };
-        };
-        /** @description `locked`: a holder keeps the member from change, and only its own act ends it */
-        Locked: {
             headers: {
                 [name: string]: unknown;
             };
@@ -2514,7 +2505,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
-            409: components["responses"]["Locked"];
+            409: components["responses"]["Conflict"];
         };
     };
     listLayers: {
@@ -2673,18 +2664,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
-            /**
-             * @description - `conflict`: the member's state does not allow the change
-             *     - `locked`: a holder keeps the member from change, and only its own act ends it
-             */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["WireError"];
-                };
-            };
+            409: components["responses"]["Conflict"];
         };
     };
     readLineage: {
@@ -2869,18 +2849,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
-            /**
-             * @description - `conflict`: the member's state does not allow the change
-             *     - `locked`: a holder keeps the member from change, and only its own act ends it
-             */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["WireError"];
-                };
-            };
+            409: components["responses"]["Conflict"];
         };
     };
     restoreMemory: {
@@ -2912,18 +2881,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
-            /**
-             * @description - `conflict`: the member's state does not allow the change
-             *     - `locked`: a holder keeps the member from change, and only its own act ends it
-             */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["WireError"];
-                };
-            };
+            409: components["responses"]["Conflict"];
         };
     };
     writeMemoryVersion: {
@@ -2955,18 +2913,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
-            /**
-             * @description - `conflict`: the member's state does not allow the change
-             *     - `locked`: a holder keeps the member from change, and only its own act ends it
-             */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["WireError"];
-                };
-            };
+            409: components["responses"]["Conflict"];
         };
     };
     mergeMemories: {
@@ -2997,18 +2944,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
-            /**
-             * @description - `conflict`: the member's state does not allow the change
-             *     - `locked`: a holder keeps the member from change, and only its own act ends it
-             */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["WireError"];
-                };
-            };
+            409: components["responses"]["Conflict"];
         };
     };
     listMisses: {

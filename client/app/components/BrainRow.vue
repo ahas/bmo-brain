@@ -397,13 +397,12 @@ async function saveEdit(): Promise<void> {
     emit("changed");
     emit("open", written.id);
   } catch (error) {
-    // A refusal the screen names keeps the words being written and reads the row again: another writer moved
-    // the row first, or a service of the deployment left it and keeps it from every other writer.
-    if (refuse(error)) {
-      const kept = { ...draft };
-      const english = draftWords.english.value;
+    // The words being written stand through a refusal and the read that follows it.
+    const kept = { ...draft };
+    const english = draftWords.english.value;
+    const refusal = await refuse(error);
 
-      await read();
+    if (refusal !== null) {
       Object.assign(draft, kept);
       await nextTick();
       draftWords.english.value = english;
@@ -435,16 +434,21 @@ function askMove(status: MemoryStatus): void {
   moving.value = true;
 }
 
-// A refusal the screen has words of its own for: a service of the deployment keeps this row, or another
-// writer moved it first. Where the refusal is neither, the island tells the failure as it does anywhere.
-function refuse(error: unknown): boolean {
-  const key = api.isLocked(error) ? "brain.error.held" : api.isConflict(error) ? "brain.error.conflict" : null;
+// The one place a write from this row answers the brain's refusal of it. Every write whose row no longer
+// stands as the screen took it is refused under one code, so whose row it has become is read off the row
+// itself rather than from the failure: a row a service of the deployment left is kept from here, and one
+// another writer moved is shown as it now stands. Where the failure refuses nothing about this row, nothing
+// is said here and the caller tells it as a failure to save.
+async function refuse(error: unknown): Promise<"held" | "moved" | null> {
+  if (api.refusalCode(error) !== "conflict") return null;
 
-  if (key === null) return false;
+  await read();
 
-  island.say({ tone: "warning", title: t(key) });
+  const held = heldBy.value !== null;
 
-  return true;
+  island.say({ tone: "warning", title: t(held ? "brain.error.held" : "brain.error.conflict") });
+
+  return held ? "held" : "moved";
 }
 
 async function move(status: MemoryStatus): Promise<void> {
@@ -470,7 +474,12 @@ async function move(status: MemoryStatus): Promise<void> {
     if (moved.id !== found.id) emit("open", moved.id);
     else await read();
   } catch (error) {
-    if (!refuse(error)) island.fail(error, t("brain.error.save"));
+    // A row a service keeps is moved by nothing here, so the ask for the move goes with the refusal that found
+    // it. A row another writer moved keeps the ask open over the version now shown.
+    const refusal = await refuse(error);
+
+    if (refusal === "held") moving.value = false;
+    else if (refusal === null) island.fail(error, t("brain.error.save"));
   } finally {
     busy.value = false;
   }
@@ -489,7 +498,7 @@ async function restore(): Promise<void> {
     emit("changed");
     emit("open", restored.id);
   } catch (error) {
-    if (!refuse(error)) island.fail(error, t("brain.error.save"));
+    if ((await refuse(error)) === null) island.fail(error, t("brain.error.save"));
   } finally {
     busy.value = false;
   }
@@ -507,7 +516,7 @@ async function confirm(): Promise<void> {
     island.say({ tone: "success", title: t("brain.status.confirmed") });
     await read();
   } catch (error) {
-    if (!refuse(error)) island.fail(error, t("brain.error.save"));
+    if ((await refuse(error)) === null) island.fail(error, t("brain.error.save"));
   } finally {
     busy.value = false;
   }

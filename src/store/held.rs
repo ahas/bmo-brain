@@ -43,7 +43,7 @@ pub(crate) fn held(row: &MemoryRow, what: &str) -> Held<()> {
   let Some(holder) = &row.held_by else {
     return Ok(());
   };
-  Err(Fault::Locked(format!(
+  Err(Fault::Conflict(format!(
     "Memory {id} is held by {holder:?}, which {what} may neither change nor close; only that holder's next \
      declaration or a withdrawal of its key ends it.",
     id = row.id

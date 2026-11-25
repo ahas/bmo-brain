@@ -909,10 +909,13 @@ console bundle contract and served by the brain itself (`docs/boundary-api.md`, 
 - **Editing in place.** An edit of a live row's text, type, layer, position, subjects, importance or labels
   is saved as a new version. An edit is made over the version read: where another writer wrote a version in
   between, the brain refuses it with a conflict, and the screen shows the new version and keeps the words
-  being written. A closed version, an episode's text, the fields the brain sets (ids, lineage, `validTo`,
-  the use, the moments) and a subject's type and key and a layer's name are not editable. A layer is added
-  from the create button, by its name and description; its description and position, and a subject's
-  description, are changed in place in the index.
+  being written. Every write the row view makes meets a refusal the same way: it reads the row again and says
+  in the reader's own language what the row now stands for, that a service of the deployment left it and keeps
+  it from here where a holder's key stands on it, and that another writer moved it first where none does; a
+  refusal of any other kind is told as a failure to save. A closed version, an episode's text, the fields the
+  brain sets (ids, lineage, `validTo`, the use, the moments) and a subject's type and key and a layer's name
+  are not editable. A layer is added from the create button, by its name and description; its description and
+  position, and a subject's description, are changed in place in the index.
 - **Teaching.** A person teaches through the write judgement: the screen shows the live memories most like
   the words to teach, at most ten, the person judges them as a duplicate, a strengthening, a contradiction or
   new, and one learning with the source `owner` applies it. A piece placed at a position in a layer, a

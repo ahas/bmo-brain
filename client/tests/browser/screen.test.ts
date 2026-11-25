@@ -129,6 +129,7 @@ function seed(): void {
   writes = [];
   reads = [];
   failNextPage = false;
+  keptFrom = null;
   failNextSubjectPage = false;
 }
 
@@ -233,17 +234,20 @@ function json(route: Route, body: unknown): Promise<void> {
   return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) });
 }
 
-// The row the stand-in keeps from a writer, as a row a service left is kept: the version is refused with the
-// brain's own lock, naming the holder (docs/design.md, 「What a holder leaves」).
+// The row the stand-in keeps from a writer, kept as a row a service left is kept: the write is refused with the
+// brain's conflict, its sentence naming the holder, and from that moment the row answers `heldBy`, as a row does
+// once its holder has declared it (docs/design.md, 「What a holder leaves」).
 let keptFrom: number | null = null;
 
 function refusal(route: Route, id: number): Promise<void> {
+  rows.find((row) => row.id === id)!.heldBy = "application-a";
+
   return route.fulfill({
     status: 409,
     contentType: "application/json",
     body: JSON.stringify({
-      code: "locked",
-      error: `Memory ${id} is held by "application-a", which version may neither change nor close.`
+      code: "conflict",
+      error: `Memory ${id} is held by "application-a", which move may neither change nor close.`
     })
   });
 }
@@ -1146,6 +1150,10 @@ describe.skipIf(!ready)("the brain's screen in a browser", () => {
       await page.getByText(KEEPING).first().waitFor();
 
       await page.getByText(KEEPING).first().click();
+      const rowReads = () => reads.filter((read) => read.path.endsWith("/memories/91")).length;
+
+      await until(() => rowReads() > 0, "the row read on being opened");
+      const readOnOpen = rowReads();
 
       // The row's own control for the act, with nothing typed: what is asked is the write the service refuses.
       await page.getByRole("button", { name: WORDS.brain.action.approve!, exact: true }).click();
@@ -1156,13 +1164,24 @@ describe.skipIf(!ready)("the brain's screen in a browser", () => {
         () => writes.some((write) => write.method === "PATCH" && write.path.endsWith("/memories/91")),
         "the move the row offered"
       );
-      // The refusal reached the screen and the row stands as it was: the screen took the move back and read
-      // the row again rather than leaving a change that never happened standing.
-      await until(() => writes.some((write) => write.method === "PATCH" && write.path.endsWith("/memories/91")), "the refusal");
-      await page.reload({ waitUntil: "load" });
-      await page.getByText(KEEPING).first().waitFor();
 
-      keptFrom = null;
+      // The refusal reaches the reader in the screen's own words, on the island a console stands its notices on.
+      // Whose row it is comes from the row read back, so this says a service of the deployment keeps it rather
+      // than that the save failed.
+      const notice = () => page.locator('[role="status"]').allInnerTexts();
+
+      await until(async () => (await notice()).join(" ").includes(WORDS.brain.error.held), "the refusal in the screen's own words");
+      expect((await notice()).join(" "), "the refusal is not told as a failure to save").not.toContain(WORDS.brain.error.save);
+
+      // And the row stands as the brain keeps it: read again after the refusal, marked as its holder's, and
+      // offering no move the screen would only be refused for.
+      await until(() => rowReads() > readOnOpen, "the row read back after the refusal");
+      const note = page.locator("[data-held-note]");
+      await note.waitFor();
+      expect(await note.innerText()).toContain("application-a");
+      const approve = page.getByRole("button", { name: WORDS.brain.action.approve!, exact: true });
+
+      expect(await approve.count(), "the move a held row no longer offers").toBe(0);
     }, 90_000);
   });
 });

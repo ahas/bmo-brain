@@ -85,7 +85,6 @@ impl From<Fault> for ApiError {
       Fault::Forbidden(_) => ErrorCode::Forbidden,
       Fault::NotFound(_) => ErrorCode::NotFound,
       Fault::Conflict(_) => ErrorCode::Conflict,
-      Fault::Locked(_) => ErrorCode::Locked,
       Fault::Gone(_) => ErrorCode::Gone,
       Fault::Failed(_) => ErrorCode::Failed,
     };

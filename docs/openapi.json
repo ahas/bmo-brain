@@ -19,7 +19,7 @@
             }
           }
         },
-        "description": "`conflict`: the member's state does not allow the change"
+        "description": "`conflict`: the member's state does not allow the change, which includes a row a holder keeps"
       },
       "Failed": {
         "content": {
@@ -50,16 +50,6 @@
           }
         },
         "description": "`gone`: the stream was resumed from before the oldest event kept"
-      },
-      "Locked": {
-        "content": {
-          "application/json": {
-            "schema": {
-              "$ref": "#/components/schemas/WireError"
-            }
-          }
-        },
-        "description": "`locked`: a holder keeps the member from change, and only its own act ends it"
       },
       "NoRoute": {
         "content": {
@@ -3927,7 +3917,7 @@
             "$ref": "#/components/responses/NotFound"
           },
           "409": {
-            "$ref": "#/components/responses/Locked"
+            "$ref": "#/components/responses/Conflict"
           }
         },
         "summary": "Read a brain file into the brain: keyed rows supersede, the rest are added, nothing overwritten.",
@@ -3939,7 +3929,7 @@
           "unauthorized",
           "forbidden",
           "not-found",
-          "locked"
+          "conflict"
         ],
         "x-console": "closed"
       }
@@ -4277,14 +4267,7 @@
             "$ref": "#/components/responses/NotFound"
           },
           "409": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/WireError"
-                }
-              }
-            },
-            "description": "- `conflict`: the member's state does not allow the change\n- `locked`: a holder keeps the member from change, and only its own act ends it"
+            "$ref": "#/components/responses/Conflict"
           }
         },
         "summary": "Apply a learning whole: confirm, version, close and write by its judgement and source.",
@@ -4296,8 +4279,7 @@
           "unauthorized",
           "forbidden",
           "not-found",
-          "conflict",
-          "locked"
+          "conflict"
         ],
         "x-console": "screen"
       }
@@ -4835,14 +4817,7 @@
             "$ref": "#/components/responses/NotFound"
           },
           "409": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/WireError"
-                }
-              }
-            },
-            "description": "- `conflict`: the member's state does not allow the change\n- `locked`: a holder keeps the member from change, and only its own act ends it"
+            "$ref": "#/components/responses/Conflict"
           }
         },
         "summary": "Move a memory's status: approved, done or invalidated.",
@@ -4854,8 +4829,7 @@
           "unauthorized",
           "forbidden",
           "not-found",
-          "conflict",
-          "locked"
+          "conflict"
         ],
         "x-console": "screen"
       }
@@ -4917,14 +4891,7 @@
             "$ref": "#/components/responses/NotFound"
           },
           "409": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/WireError"
-                }
-              }
-            },
-            "description": "- `conflict`: the member's state does not allow the change\n- `locked`: a holder keeps the member from change, and only its own act ends it"
+            "$ref": "#/components/responses/Conflict"
           }
         },
         "summary": "Restore a done or invalidated lineage: a new active version after its newest, closed one.",
@@ -4936,8 +4903,7 @@
           "unauthorized",
           "forbidden",
           "not-found",
-          "conflict",
-          "locked"
+          "conflict"
         ],
         "x-console": "screen"
       }
@@ -4999,14 +4965,7 @@
             "$ref": "#/components/responses/NotFound"
           },
           "409": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/WireError"
-                }
-              }
-            },
-            "description": "- `conflict`: the member's state does not allow the change\n- `locked`: a holder keeps the member from change, and only its own act ends it"
+            "$ref": "#/components/responses/Conflict"
           }
         },
         "summary": "Write a new version of a memory, superseding the one named.",
@@ -5018,8 +4977,7 @@
           "unauthorized",
           "forbidden",
           "not-found",
-          "conflict",
-          "locked"
+          "conflict"
         ],
         "x-console": "screen"
       }
@@ -5072,14 +5030,7 @@
             "$ref": "#/components/responses/NotFound"
           },
           "409": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/WireError"
-                }
-              }
-            },
-            "description": "- `conflict`: the member's state does not allow the change\n- `locked`: a holder keeps the member from change, and only its own act ends it"
+            "$ref": "#/components/responses/Conflict"
           }
         },
         "summary": "Write one memory over several live ones, superseding each of them.",
@@ -5091,8 +5042,7 @@
           "unauthorized",
           "forbidden",
           "not-found",
-          "conflict",
-          "locked"
+          "conflict"
         ],
         "x-console": "closed"
       }
