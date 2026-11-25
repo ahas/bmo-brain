@@ -222,7 +222,7 @@ const INDEX_PAGE = 50;
 
 const route = useRoute();
 const router = useRouter();
-const { t, te, tm } = useI18n();
+const { t, te } = useI18n();
 // Whether the console this screen stands in offers its title bar, under the key the layer names for it. Only its
 // presence is read: the screen lays nothing into it.
 const bar = inject<object | null>("bmo-console-title-bar", null);
@@ -252,7 +252,7 @@ const indexTab = ref<IndexTab>("layers");
 const indexWords = ref("");
 // The names the reader's language gives the types, sent with the words so a type is found by the name it shows
 // (docs/design.md, 「The screen」, "Names in the reader's language").
-const typeNames = computed(() => typeSearchNames(t, tm, te));
+const typeNames = computed(() => typeSearchNames(t, te));
 const layerMore = ref(false);
 const subjectMore = ref(false);
 // The type filter's own first page, read at the brain for the choices it opens with, and the chosen type among them.
