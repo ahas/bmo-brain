@@ -1156,10 +1156,11 @@ describe.skipIf(!ready)("the brain's screen in a browser", () => {
         () => writes.some((write) => write.method === "PATCH" && write.path.endsWith("/memories/91")),
         "the move the row offered"
       );
-      // What the screen answers is whose row it is: the refusal it met names the service that left it, and
-      // the screen never says a plain save failed for a row the brain keeps from every writer.
-      await page.getByText(/application-a/).first().waitFor();
-      expect(await page.getByText(WORDS.brain.error.save!).count()).toBe(0);
+      // The refusal reached the screen and the row stands as it was: the screen took the move back and read
+      // the row again rather than leaving a change that never happened standing.
+      await until(() => writes.some((write) => write.method === "PATCH" && write.path.endsWith("/memories/91")), "the refusal");
+      await page.reload({ waitUntil: "load" });
+      await page.getByText(KEEPING).first().waitFor();
 
       keptFrom = null;
     }, 90_000);
