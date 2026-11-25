@@ -663,11 +663,13 @@ caller gives, reads nothing in it, and lets that key alone, and nothing else, en
   knows what the holder left. Each brain holds its own row of a declared set, found by the key the holder
   gave it; the copies are read, used and closed together by the holder's acts, and never apart.
 - **Nobody changes a held row while it stands.** A version, a merge naming one, a status move, a
-  restoration of its lineage, a learning that strengthens or replaces it, an injection that would stand a
-  row over its key, and the release of a condition a turn says all reach a held row and are refused, the
-  sentence naming the holder. Its words, its type, its subjects, its conditions and its importance are the
-  holder's, not the agent's whose brain holds them, not a person's at the screen, not another holder's. What
-  a held row is used for is recorded like any other row's: a hand-out and a confirmation change nothing.
+  restoration of its lineage, a learning that strengthens or replaces it and an injection that would stand a
+  row over its key all reach a held row and are refused, the sentence naming the holder. A turn's release
+  condition never reaches one either: a turn ends only the brain's own rows, and a held row whose release
+  condition a turn says is handed to the turn all the same (「Recall」). Its words, its type, its subjects,
+  its conditions and its importance are the holder's, not the agent's whose brain holds them, not a person's
+  at the screen, not another holder's. What a held row is used for is recorded like any other row's: a
+  hand-out and a confirmation change nothing.
 - **A withdrawal is the other act that ends one,** the act that takes a holder's words out of the
   deployment: it names the holder's key and closes every live row of that key in every brain, `invalidated`
   with the reason `holder-withdrawn`, and touches no other row. It answers what it closed and is the same
