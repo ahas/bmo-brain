@@ -10,8 +10,7 @@ use sqlx::PgConnection;
 const BASELINE: &str = include_str!("../migrations/0001_baseline.sql");
 
 // The record every migrated database holds.
-const MIGRATED: [(i64, &str); 3] =
-  [(1, "baseline"), (2, "imported closing labels"), (3, "held by")];
+const MIGRATED: [(i64, &str); 3] = [(1, "baseline"), (2, "imported closing labels"), (3, "held by")];
 
 // The record an install from before 1.0.0 holds once every migration of its last release ran.
 const BEFORE: &[(i64, &str)] = &[
@@ -31,6 +30,24 @@ const BEFORE: &[(i64, &str)] = &[
   (14, "org brains"),
   (15, "shared mark"),
 ];
+
+// What the migration after the closing labels adds to the laid schema: the holder's key on a memory row and
+// the index that reads one holder's rows together (`migrations/0003_held_by.sql` states both). A database laid
+// from the baseline alone, or installed before it and left as it stands, is compared with those two additions
+// standing, because the migration after them is what every path ends with.
+fn with_holder(laid: &str) -> String {
+  laid
+    .to_owned()
+    .replace(
+      "memories.shared boolean NO false, memory_subjects",
+      "memories.shared boolean NO false, memories.held_by text YES , memory_subjects",
+    )
+    .replace(
+      "CREATE INDEX memories_by_layer",
+      "CREATE INDEX memories_by_holder ON public.memories USING btree (held_by, brain_id, id) \
+       WHERE (held_by IS NOT NULL), CREATE INDEX memories_by_layer",
+    )
+}
 
 // The record's table as the migrator makes it.
 const RECORD: &str = "CREATE TABLE _sqlx_migrations (version BIGINT PRIMARY KEY, description TEXT NOT NULL, \
@@ -113,7 +130,7 @@ async fn a_blank_database_gets_the_baseline_whole() {
   let laid = Bare::blank().await;
   let mut plain = laid.connect().await;
   sqlx::raw_sql(BASELINE).execute(&mut plain).await.unwrap();
-  assert_eq!(shape(&mut db).await, shape(&mut plain).await);
+  assert_eq!(shape(&mut db).await, with_holder(&shape(&mut plain).await));
 }
 
 #[tokio::test]
@@ -124,7 +141,7 @@ async fn an_install_at_the_last_release_before_the_baseline_only_has_its_record_
 
   Store::over(bare.pool().await).migrate().await.unwrap();
   assert_eq!(recorded(&mut db).await, migrated());
-  assert_eq!(shape(&mut db).await, before);
+  assert_eq!(shape(&mut db).await, with_holder(&before));
   let brains: Vec<String> =
     sqlx::query_scalar("SELECT agent_key FROM brains").fetch_all(&mut db).await.unwrap();
   assert_eq!(brains, ["agent-a"]);
@@ -132,7 +149,7 @@ async fn an_install_at_the_last_release_before_the_baseline_only_has_its_record_
   // A second start finds the baseline recorded and changes nothing.
   Store::over(bare.pool().await).migrate().await.unwrap();
   assert_eq!(recorded(&mut db).await, migrated());
-  assert_eq!(shape(&mut db).await, before);
+  assert_eq!(shape(&mut db).await, with_holder(&before));
 }
 
 #[tokio::test]
@@ -146,8 +163,10 @@ async fn an_install_short_of_the_last_release_before_the_baseline_is_refused() {
 
 // Every column of every memory, the labels apart, and the labels, ordered by id.
 async fn memories(db: &mut PgConnection) -> (Vec<String>, Vec<serde_json::Value>) {
+  // The row as it stood before the migration, its labels aside and the holder's key aside: the key is the
+  // column a later migration gives every row, and it stands null on every row written before a holder came.
   let rest: Vec<String> =
-    sqlx::query_scalar("SELECT (to_jsonb(m) - 'labels')::text FROM memories m ORDER BY id")
+    sqlx::query_scalar("SELECT (to_jsonb(m) - 'labels' - 'held_by')::text FROM memories m ORDER BY id")
       .fetch_all(&mut *db)
       .await
       .unwrap();

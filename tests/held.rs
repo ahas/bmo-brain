@@ -436,9 +436,24 @@ async fn a_withdrawal_closes_every_row_of_its_key_and_touches_nothing_else() {
   let closed = client.holder_withdraw("holder-a").await.unwrap();
   assert_eq!((closed.closed.brains, closed.closed.memories), (2, 2));
 
-  // What was withdrawn is closed for its reason in every brain, and nothing else moved.
+  // What was withdrawn is closed for its reason in every brain, and nothing else moved: the other holder's
+  // row stands where it stood, since a withdrawal ends its own key alone.
   for brain in [first, second] {
-    assert!(held_of(client, brain).await.is_empty());
+    let left: Vec<_> = held_of(client, brain)
+      .await
+      .into_iter()
+      .filter(|row| row.0.as_deref() == Some("holder-a"))
+      .collect();
+    assert!(left.is_empty(), "every row of the withdrawn key is closed: {left:?}");
+    assert_eq!(
+      held_of(client, brain)
+        .await
+        .iter()
+        .filter(|row| row.0.as_deref() == Some("holder-b"))
+        .count(),
+      1,
+      "the other holder's row stands untouched"
+    );
     let past = client
       .memories(
         brain,
@@ -451,19 +466,32 @@ async fn a_withdrawal_closes_every_row_of_its_key_and_touches_nothing_else() {
       .unwrap();
     assert_eq!(past.items[0].reason.as_deref(), Some("holder-withdrawn"));
   }
-  assert_eq!(held_of(client, first).await.len(), 0);
+  assert_eq!(
+    held_of(client, first)
+      .await
+      .iter()
+      .filter(|row| row.0.as_deref() == Some("holder-a"))
+      .count(),
+    0,
+    "nothing of the withdrawn key is left standing"
+  );
   assert_eq!(own_of(client, first).await, vec!["the brain's own row".to_owned()]);
   let left = client
     .memories(
       second,
       &MemoriesQuery {
         held: Some(true),
+        status: Some("active,pending".to_owned()),
         ..Default::default()
       },
     )
     .await
     .unwrap();
-  assert_eq!(left.items[0].held_by.as_deref(), Some("holder-b"), "another holder stands");
+  assert_eq!(
+    left.items.iter().map(|row| row.held_by.clone()).collect::<Vec<_>>(),
+    vec![Some("holder-b".to_owned())],
+    "another holder's live row stands, and the withdrawn one is not among the live reads"
+  );
 
   // A closed held row is not restored, and the withdrawal is the same again where nothing stands.
   let restored = refused(
