@@ -193,7 +193,7 @@ async fn a_declaration_stands_its_set_in_every_agents_brain_and_repeating_it_is_
       memories: set,
     })
     .await;
-  assert!(matches!(again, Ok(_)), "the repeat answers the standing set");
+  assert!(again.is_ok(), "the repeat answers the standing set");
 
   // The holders that stand are listed by key.
   let holders = client.holders(&HoldersQuery::default()).await.unwrap();
