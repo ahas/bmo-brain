@@ -708,6 +708,10 @@ misses it keeps (「What the brain counts」) are its own, let go with it.
 - **The schema starts at the 1.0.0 baseline,** one migration that makes every table, index and sequence the
   store holds and the event floor's one row. Every later change to the schema is a migration after it, run
   by the service as it starts.
+- **A memory's labels are the caller's, and the store holds no closing mark among them.** A row's close is its
+  status, `validTo`, `supersededAt` and reason. The migration after the baseline removes, once, the labels rows
+  imported from an earlier memory store carried for their close, `done_text`, `down_reason` and `down_at`, from
+  every row of every brain, closed rows included, and changes nothing else; no caller writes or reads them.
 - **An install from before 1.0.0 is taken as it stands.** A database whose record of migrations names every
   migration of the last release before 1.0.0, and nothing else, already holds the baseline's schema: the
   service rewrites that record to name the baseline alone, in one transaction, and touches no table and no
