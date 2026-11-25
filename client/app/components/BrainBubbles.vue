@@ -58,11 +58,20 @@ import * as api from "../domain/brain-api";
 import { groupColour } from "../domain/brain-colour";
 import { typeName } from "../domain/brain-names";
 
-import type { Layer, MemoryFilter, Tally } from "../domain/brain-api";
+import type { MemoryFilter, Tally } from "../domain/brain-api";
 import type { Heading } from "../domain/brain-heading";
 import type { Place } from "../domain/brain-place";
 
-const props = defineProps<{ brainId: number; heading: Heading; by: "type" | "layer"; layers: Layer[]; filter: MemoryFilter; changes: number }>();
+const props = defineProps<{
+  brainId: number;
+  heading: Heading;
+  by: "type" | "layer";
+  layerNames: Map<number, string>;
+  // Reads the names of the layers the chart groups, for those the index's pages do not carry.
+  onNames: (ids: number[]) => void;
+  filter: MemoryFilter;
+  changes: number;
+}>();
 
 const emit = defineEmits<{ by: [by: "type" | "layer"]; narrow: [patch: Partial<Place>] }>();
 
@@ -86,6 +95,7 @@ const byItems = computed(() => [
 async function read(): Promise<void> {
   try {
     tallied.value = await api.tallies(props.brainId, props.by, props.filter);
+    if (props.by === "layer") props.onNames(tallied.value.map((tally) => tally.group).filter((group) => group !== null).map(Number));
   } catch (error) {
     island.fail(error, t("brain.error.read"));
   }
@@ -99,7 +109,7 @@ const groups = computed(() =>
   tallied.value.map((tally) => {
     const key = tally.group ?? "";
     const name =
-      props.by === "type" ? typeName(t, te, key) : tally.group === null ? t("brain.label.unfiled") : (props.layers.find((layer) => String(layer.id) === key)?.name ?? `#${key}`);
+      props.by === "type" ? typeName(t, te, key) : tally.group === null ? t("brain.label.unfiled") : (props.layerNames.get(Number(key)) ?? `#${key}`);
 
     return {
       key,

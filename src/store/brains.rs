@@ -376,7 +376,22 @@ impl Store {
       sql.push(" AND key = ").push_bind(key.clone());
     }
     if let Some(words) = &query.q {
-      sql.push(" AND description ILIKE ").push_bind(holding(words));
+      // The words a person searches its list by stand anywhere of what the list calls it by.
+      let pattern = holding(words);
+      sql
+        .push(" AND (key ILIKE ")
+        .push_bind(pattern.clone())
+        .push(" OR type ILIKE ")
+        .push_bind(pattern.clone())
+        .push(" OR description ILIKE ")
+        .push_bind(pattern.clone())
+        .push(
+          " OR (SELECT nm.text FROM memories nm JOIN memory_subjects nms ON nms.memory_id = nm.id \
+           WHERE nms.subject_id = subjects.id AND nm.type = 'name' AND nm.status = 'active' \
+           ORDER BY nm.valid_from DESC, nm.id DESC LIMIT 1) ILIKE ",
+        )
+        .push_bind(pattern)
+        .push(")");
     }
     if let Some(ids) = ids {
       sql.push(" AND id = ANY(").push_bind(ids).push(")");
@@ -457,6 +472,15 @@ impl Store {
       "SELECT id, brain_id, name, description, position, created_at FROM layers WHERE brain_id = ",
     );
     sql.push_bind(brain_id);
+    if let Some(words) = &query.q {
+      let pattern = holding(words);
+      sql
+        .push(" AND (name ILIKE ")
+        .push_bind(pattern.clone())
+        .push(" OR description ILIKE ")
+        .push_bind(pattern)
+        .push(")");
+    }
     // The page walks the order the list stands in, position then id, from past the layer last seen.
     if let Some(after) = query.after {
       sql

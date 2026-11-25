@@ -1,12 +1,14 @@
 <template>
   <!-- The index (docs/design.md, 「The screen」): the layers in position order with their live counts and the
        unfiled last, the subjects grouped by type and called by their names, and the types in use, each tab with
-       one line saying what it lists. Choosing one narrows the view to it, and choosing it again clears it; the
-       chosen row stands highlighted and in sight, and where the view honours no choice the rows say so. A layer's
-       description and position are changed here, and a subject's description; a layer is added from the screen's
-       create button. An org brain is read-only here: its layers are not carried and nothing is described. A row's
-       actions are icon buttons at its end, shown while the row is hovered or focused and always on a coarse
-       pointer; a row never grows a second line of buttons. -->
+       one line saying what it lists. Each list is read fifty at a time, the next page as the index's end comes
+       into view (bmo-ui's NextPageFoot), and the search box above narrows it at the brain. Choosing one narrows
+       the view to it, and choosing it again clears it; the chosen row stands highlighted and in sight, and where
+       the view honours no choice the rows say so. A layer's description and position are changed here, and a
+       subject's description; a layer is added from the screen's create button. An org brain is read-only here:
+       its layers are not carried and nothing is described. A row's actions are icon buttons at its end, shown
+       while the row is hovered or focused and always on a coarse pointer; a row never grows a second line of
+       buttons. -->
   <div class="flex min-h-0 flex-1 flex-col">
     <!-- The three tabs share the column's width, each its short name whole at the column's default width; a column
          dragged narrower cuts a name, and the cut line's tooltip shows it whole. -->
@@ -26,85 +28,97 @@
       <UInput v-model="words" icon="i-material-symbols-search" :placeholder="t('brain.label.index_search')" size="sm" class="w-full" />
     </div>
 
-    <div ref="scroller" class="min-h-0 flex-1 overflow-y-auto" :class="{ 'pointer-events-none opacity-50': !usable }" :aria-disabled="!usable">
+    <div ref="scroller" data-index-scroller class="min-h-0 flex-1 overflow-y-auto" :class="{ 'pointer-events-none opacity-50': !usable }" :aria-disabled="!usable">
       <!-- A layer is carried by the pointer to another place among the layers, a line marking where it will land; a
-           piece of the layer view dropped on a layer, or on the unfiled, moves there as a new version. -->
-      <ul v-if="tab === 'layers'" ref="layerList" class="flex flex-col py-1" @dragover="layerOver" @dragleave="layerLeft" @drop="layerDropped">
-        <li
-          v-for="(layer, index) in shownLayers"
-          :key="layer.id"
-          :draggable="usable && !readOnly"
-          data-layer
-          class="group flex items-stretch hover:bg-elevated"
-          :class="[
-            readOnly ? '' : 'cursor-grab active:cursor-grabbing',
-            { 'bg-primary/10 shadow-[inset_3px_0_0_var(--ui-primary)]': place.layer === layer.id },
-            landing === index ? LINE_BEFORE : '',
-            landing === shownLayers.length && index === shownLayers.length - 1 ? LINE_AFTER : '',
-            pieceOver === layer.id ? 'bg-primary/10 ring-1 ring-primary ring-inset' : ''
-          ]"
-          :data-chosen="place.layer === layer.id || undefined"
-          @dragstart="carryLayer($event, index)"
-          @dragend="setLayerDown"
-          @dragenter="pieceEnter($event, layer.id)"
-          @dragleave="pieceLeave($event, layer.id)"
-        >
-          <button
-            type="button"
-            class="flex min-w-0 flex-1 items-start gap-2 py-3 ps-3 text-start"
-            :aria-pressed="place.layer === layer.id"
-            :disabled="!usable"
-            @click="emit('choose', { layer: place.layer === layer.id ? null : layer.id })"
+           piece of the layer view dropped on a layer, or on the unfiled, moves there as a new version. Carrying stands
+           while every layer is read and no words narrow the list, so a landing is always between two layers known. -->
+      <template v-if="tab === 'layers'">
+        <div ref="layerList" @dragover="layerOver" @dragleave="layerLeft" @drop="layerDropped">
+          <MovingList tag="ul" class="flex flex-col py-1">
+          <li
+            v-for="(layer, index) in layers"
+            :key="layer.id"
+            :draggable="carriable"
+            data-layer
+            class="group flex items-stretch hover:bg-elevated"
+            :class="[
+              carriable ? 'cursor-grab active:cursor-grabbing' : '',
+              { 'bg-primary/10 shadow-[inset_3px_0_0_var(--ui-primary)]': place.layer === layer.id },
+              landing === index ? LINE_BEFORE : '',
+              landing === layers.length && index === layers.length - 1 ? LINE_AFTER : '',
+              pieceOver === layer.id ? 'bg-primary/10 ring-1 ring-primary ring-inset' : ''
+            ]"
+            :data-chosen="place.layer === layer.id || undefined"
+            @dragstart="carryLayer($event, index)"
+            @dragend="setLayerDown"
+            @dragenter="pieceEnter($event, layer.id)"
+            @dragleave="pieceLeave($event, layer.id)"
           >
-            <span v-if="readOnly" class="size-5 shrink-0" aria-hidden="true" />
-            <UIcon v-else name="i-material-symbols-drag-indicator" class="size-5 shrink-0 text-muted" aria-hidden="true" />
-            <div class="min-w-0 flex-1">
-              <div class="truncate text-sm font-medium">{{ layer.name }}</div>
-              <div v-if="layer.description" class="truncate text-sm text-muted">{{ layer.description }}</div>
+            <button
+              type="button"
+              class="flex min-w-0 flex-1 items-start gap-2 py-3 ps-3 text-start active:bg-elevated"
+              :aria-pressed="place.layer === layer.id"
+              :disabled="!usable"
+              @click="emit('choose', { layer: place.layer === layer.id ? null : layer.id })"
+            >
+              <span v-if="readOnly" class="size-5 shrink-0" aria-hidden="true" />
+              <UIcon v-else name="i-material-symbols-drag-indicator" class="size-5 shrink-0 text-muted" aria-hidden="true" />
+              <div class="min-w-0 flex-1">
+                <div class="truncate text-sm font-medium"><SearchText :text="layer.name" :query="words" /></div>
+                <div v-if="layer.description" class="truncate text-sm text-muted"><SearchText :text="layer.description" :query="words" /></div>
+              </div>
+              <UBadge v-bind="COUNT_BADGE" color="neutral"><RollingNumber :value="layerCount(String(layer.id))" /></UBadge>
+            </button>
+            <div v-if="!readOnly" class="flex items-center pe-2 ps-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 pointer-coarse:opacity-100">
+              <UTooltip :text="t('brain.action.describe')">
+                <UButton size="xs" color="neutral" variant="ghost" icon="i-material-symbols-edit-outline" :aria-label="t('brain.action.describe')" @click="describeLayer(layer)" />
+              </UTooltip>
             </div>
-            <UBadge color="neutral" variant="soft" size="sm"><RollingNumber :value="layerCount(String(layer.id))" /></UBadge>
-          </button>
-          <div v-if="!readOnly" class="flex items-center pe-2 ps-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 pointer-coarse:opacity-100">
-            <UTooltip :text="t('brain.action.describe')">
-              <UButton size="xs" color="neutral" variant="ghost" icon="i-material-symbols-edit-outline" :aria-label="t('brain.action.describe')" @click="describeLayer(layer)" />
-            </UTooltip>
-          </div>
-        </li>
-        <li data-unfiled @dragenter="pieceEnter($event, 'unfiled')" @dragleave="pieceLeave($event, 'unfiled')">
-          <button
-            type="button"
-            class="flex w-full items-center gap-2 px-3 py-3 text-start hover:bg-elevated"
-            :class="[{ 'bg-primary/10 shadow-[inset_3px_0_0_var(--ui-primary)]': place.layer === 'unfiled' }, pieceOver === 'unfiled' ? 'bg-primary/10 ring-1 ring-primary ring-inset' : '']"
-            :data-chosen="place.layer === 'unfiled' || undefined"
-            :aria-pressed="place.layer === 'unfiled'"
-            :disabled="!usable"
-            @click="emit('choose', { layer: place.layer === 'unfiled' ? null : 'unfiled' })"
-          >
-            <!-- No handle, since the unfiled is not carried; its name keeps the layers' column. -->
-            <span class="size-5 shrink-0" aria-hidden="true" />
-            <span class="min-w-0 flex-1 truncate text-sm text-muted">{{ t("brain.label.unfiled") }}</span>
-            <UBadge color="neutral" variant="soft" size="sm"><RollingNumber :value="layerCount(null)" /></UBadge>
-          </button>
-        </li>
-      </ul>
+          </li>
+          <li key="unfiled" data-unfiled @dragenter="pieceEnter($event, 'unfiled')" @dragleave="pieceLeave($event, 'unfiled')">
+            <button
+              type="button"
+              class="flex w-full items-center gap-2 px-3 py-3 text-start hover:bg-elevated active:bg-elevated"
+              :class="[{ 'bg-primary/10 shadow-[inset_3px_0_0_var(--ui-primary)]': place.layer === 'unfiled' }, pieceOver === 'unfiled' ? 'bg-primary/10 ring-1 ring-primary ring-inset' : '']"
+              :data-chosen="place.layer === 'unfiled' || undefined"
+              :aria-pressed="place.layer === 'unfiled'"
+              :disabled="!usable"
+              @click="emit('choose', { layer: place.layer === 'unfiled' ? null : 'unfiled' })"
+            >
+              <!-- No handle, since the unfiled is not carried; its name keeps the layers' column. -->
+              <span class="size-5 shrink-0" aria-hidden="true" />
+              <span class="min-w-0 flex-1 truncate text-sm text-muted">{{ t("brain.label.unfiled") }}</span>
+              <UBadge v-bind="COUNT_BADGE" color="neutral"><RollingNumber :value="layerCount(null)" /></UBadge>
+            </button>
+          </li>
+          </MovingList>
+        </div>
+        <NextPageFoot
+          :more="more.layers"
+          :next="() => next('layers')"
+          :busy="busy.layers"
+          :failed-words="t('brain.error.read')"
+          :loading-label="t('brain.status.loading')"
+        />
+      </template>
 
       <div v-else-if="tab === 'subjects'" class="flex flex-col py-1">
         <section v-for="[kind, members] in subjectGroups" :key="kind">
-          <h3 class="px-3 pt-3 pb-1 text-sm font-semibold text-muted">{{ subjectTypeName(t, te, kind) }}</h3>
-          <ul>
-            <li v-for="subject in members" :key="subject.id" class="group flex items-stretch hover:bg-elevated" :class="{ 'bg-primary/10 shadow-[inset_3px_0_0_var(--ui-primary)]': place.subject === subject.id }" :data-chosen="place.subject === subject.id || undefined">
+          <h3 class="px-3 pt-3 pb-1 text-sm font-semibold text-muted"><SearchText :text="subjectTypeName(t, te, kind)" :query="words" /></h3>
+          <MovingList tag="ul">
+            <li v-for="subject in members" :key="subject.id" data-subject class="group flex items-stretch hover:bg-elevated" :class="{ 'bg-primary/10 shadow-[inset_3px_0_0_var(--ui-primary)]': place.subject === subject.id }" :data-chosen="place.subject === subject.id || undefined">
               <button
                 type="button"
-                class="flex min-w-0 flex-1 items-start gap-2 py-2 ps-3 text-start"
+                class="flex min-w-0 flex-1 items-start gap-2 py-2 ps-3 text-start active:bg-elevated"
                 :aria-pressed="place.subject === subject.id"
                 :disabled="!usable"
                 @click="emit('choose', { subject: place.subject === subject.id ? null : subject.id })"
               >
                 <div class="min-w-0 flex-1">
-                  <div class="truncate text-sm font-medium">{{ subject.name ?? subject.key }}</div>
-                  <div class="truncate text-sm text-muted">{{ subject.key }}<template v-if="subject.description"> · {{ subject.description }}</template></div>
+                  <div class="truncate text-sm font-medium"><SearchText :text="subject.name ?? subject.key" :query="words" /></div>
+                  <div class="truncate text-sm text-muted"><SearchText :text="subject.key" :query="words" /><template v-if="subject.description"> · <SearchText :text="subject.description" :query="words" /></template></div>
                 </div>
-                <UBadge color="neutral" variant="soft" size="sm"><RollingNumber :value="subjectCount(subject.id)" /></UBadge>
+                <UBadge v-bind="COUNT_BADGE" color="neutral"><RollingNumber :value="subjectCount(subject.id)" /></UBadge>
               </button>
               <div class="flex items-center gap-0.5 pe-2 ps-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 pointer-coarse:opacity-100">
                 <UTooltip v-if="!readOnly" :text="t('brain.action.describe')">
@@ -115,28 +129,45 @@
                 </UTooltip>
               </div>
             </li>
-          </ul>
+          </MovingList>
         </section>
-        <p v-if="subjectGroups.length === 0" class="p-4 text-sm text-muted">{{ t("brain.status.nothing") }}</p>
+        <p v-if="subjectGroups.length === 0 && !busy.subjects && !more.subjects" class="p-4 text-sm text-muted">{{ t("brain.status.nothing") }}</p>
+        <NextPageFoot
+          :more="more.subjects"
+          :next="() => next('subjects')"
+          :busy="busy.subjects"
+          :failed-words="t('brain.error.read')"
+          :loading-label="t('brain.status.loading')"
+        />
       </div>
 
-      <ul v-else class="flex flex-col py-1">
-        <li v-for="type in shownTypes" :key="type.type">
-          <button
-            type="button"
-            class="flex w-full items-center gap-2 px-3 py-2 text-start hover:bg-elevated"
-            :class="{ 'bg-primary/10 shadow-[inset_3px_0_0_var(--ui-primary)]': place.type === type.type }"
-            :data-chosen="place.type === type.type || undefined"
-            :aria-pressed="place.type === type.type"
-            :disabled="!usable"
-            @click="emit('choose', { type: place.type === type.type ? EVERY_TYPE_BUT_EPISODES : type.type })"
-          >
-            <span class="min-w-0 flex-1 truncate text-sm">{{ typeName(t, te, type.type) }}</span>
-            <UBadge v-if="type.reserved" color="primary" variant="soft" size="sm" :label="t('brain.label.reserved')" />
-            <UBadge color="neutral" variant="soft" size="sm"><RollingNumber :value="type.count" /></UBadge>
-          </button>
-        </li>
-      </ul>
+      <template v-else>
+        <MovingList tag="ul" class="flex flex-col py-1">
+          <li v-for="type in types" :key="type.type" data-type>
+            <button
+              type="button"
+              class="flex w-full items-center gap-2 px-3 py-2 text-start hover:bg-elevated active:bg-elevated"
+              :class="{ 'bg-primary/10 shadow-[inset_3px_0_0_var(--ui-primary)]': place.type === type.type }"
+              :data-chosen="place.type === type.type || undefined"
+              :aria-pressed="place.type === type.type"
+              :disabled="!usable"
+              @click="emit('choose', { type: place.type === type.type ? EVERY_TYPE_BUT_EPISODES : type.type })"
+            >
+              <span class="min-w-0 flex-1 truncate text-sm"><SearchText :text="typeName(t, te, type.type)" :query="words" /></span>
+              <UBadge v-if="type.reserved" color="primary" variant="soft" size="sm" :label="t('brain.label.reserved')" />
+              <UBadge v-bind="COUNT_BADGE" color="neutral"><RollingNumber :value="type.count" /></UBadge>
+            </button>
+          </li>
+        </MovingList>
+        <p v-if="types.length === 0 && !busy.types && !more.types" class="p-4 text-sm text-muted">{{ t("brain.status.nothing") }}</p>
+        <NextPageFoot
+          :more="more.types"
+          :next="() => next('types')"
+          :busy="busy.types"
+          :failed-words="t('brain.error.read')"
+          :loading-label="t('brain.status.loading')"
+        />
+      </template>
     </div>
 
     <UModal v-model:open="editing" :title="t('brain.action.describe')">
@@ -162,6 +193,7 @@
 
 <script setup lang="ts">
 import { useIsland } from "bmo-ui/app/domain/island";
+import { COUNT_BADGE } from "bmo-ui/app/domain/numbers";
 import * as api from "../domain/brain-api";
 import { subjectTypeName, typeName } from "../domain/brain-names";
 import { EVERY_TYPE_BUT_EPISODES, honours } from "../domain/brain-place";
@@ -171,6 +203,8 @@ import { carriedTo, PIECE_DRAG } from "../domain/brain-order";
 import type { Layer, Subject, Tally, TypeCount } from "../domain/brain-api";
 import type { Carried } from "../domain/brain-order";
 import type { Place } from "../domain/brain-place";
+
+type Tab = "layers" | "subjects" | "types";
 
 const props = defineProps<{
   brainId: number | null;
@@ -182,6 +216,12 @@ const props = defineProps<{
   place: Place;
   // Whether the brain chosen is an org brain, which the screen reads and never writes (docs/design.md, 「The screen」).
   readOnly: boolean;
+  // Whether more stands past the last member of each list, whether a page is on its way, and how one more is read.
+  more: Record<Tab, boolean>;
+  busy: Record<Tab, boolean>;
+  next: (tab: Tab) => Promise<void>;
+  // Bumped when a first page lands or a chosen member stands in a list, never as a next page lands.
+  reveal: number;
 }>();
 
 const emit = defineEmits<{ choose: [patch: Partial<Place>]; changed: [] }>();
@@ -189,10 +229,8 @@ const emit = defineEmits<{ choose: [patch: Partial<Place>]; changed: [] }>();
 const { t, te } = useI18n();
 const island = useIsland(t);
 
-type Tab = "layers" | "subjects" | "types";
-
-const tab = ref<Tab>("layers");
-const words = ref("");
+const tab = defineModel<Tab>("tab", { default: "layers" });
+const words = defineModel<string>("words", { default: "" });
 const scroller = ref<HTMLElement | null>(null);
 const layerList = ref<HTMLElement | null>(null);
 
@@ -208,8 +246,9 @@ const landing = ref<number | null>(null);
 const pieceOver = ref<number | "unfiled" | null>(null);
 
 function carryLayer(event: DragEvent, index: number): void {
+  if (!carriable.value) return;
   if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
-  event.dataTransfer?.setData("text/plain", shownLayers.value[index]?.name ?? "");
+  event.dataTransfer?.setData("text/plain", props.layers[index]?.name ?? "");
   carrying.value = index;
 }
 
@@ -243,11 +282,11 @@ function layerOver(event: DragEvent): void {
     return;
   }
 
-  if (carrying.value === null || layerList.value === null) return;
+  if (!carriable.value || carrying.value === null || layerList.value === null) return;
 
   event.preventDefault();
 
-  const rows = [...layerList.value.querySelectorAll<HTMLElement>(":scope > [data-layer]")];
+  const rows = [...layerList.value.querySelectorAll<HTMLElement>("[data-layer]")];
   const at = rows.findIndex((row) => {
     const box = row.getBoundingClientRect();
 
@@ -283,13 +322,13 @@ async function layerDropped(event: DragEvent): Promise<void> {
   const from = carrying.value;
   const land = landing.value;
 
-  if (from === null || land === null) return;
+  if (!carriable.value || from === null || land === null) return;
 
   event.preventDefault();
   setLayerDown();
 
   try {
-    for (const one of carriedTo(shownLayers.value, from, land)) await api.changeLayer(brainId, one.id, { position: one.position });
+    for (const one of carriedTo(props.layers, from, land)) await api.changeLayer(brainId, one.id, { position: one.position });
     emit("changed");
   } catch (error) {
     island.fail(error, t("brain.error.save"));
@@ -311,6 +350,9 @@ async function movePiece(brainId: number, piece: Carried, target: number | "unfi
 
 // Whether the view open honours the index's choices; the version timeline honours none.
 const usable = computed(() => honours(props.place.view, "layer"));
+// A layer is carried only while every layer is read and no words narrow the list, so a landing always stands between
+// two layers known to the screen.
+const carriable = computed(() => usable.value && !props.readOnly && !props.more.layers && words.value.trim() === "");
 
 // The tab holding the newest choice is the one open, and the chosen row is scrolled into sight.
 watch(
@@ -329,27 +371,24 @@ watch(
 
 watch(tab, () => void nextTick(() => scroller.value?.querySelector("[data-chosen]")?.scrollIntoView({ block: "nearest" })));
 
+// A chosen row that lands as a first page or an ensured member is brought into sight; a next page under a reader
+// scrolled down moves nothing.
+watch(
+  () => props.reveal,
+  () => void nextTick(() => scroller.value?.querySelector("[data-chosen]")?.scrollIntoView({ block: "nearest" }))
+);
+
 const tabs = computed(() => [
   { value: "layers", label: t("brain.index.layers") },
   { value: "subjects", label: t("brain.index.subjects") },
   { value: "types", label: t("brain.index.types") }
 ]);
 
-function holds(texts: (string | null | undefined)[]): boolean {
-  const asked = words.value.trim().toLocaleLowerCase();
-
-  return asked === "" || texts.some((text) => (text ?? "").toLocaleLowerCase().includes(asked));
-}
-
-const shownLayers = computed(() => props.layers.filter((layer) => holds([layer.name, layer.description])));
-const shownTypes = computed(() => props.types.filter((type) => holds([type.type])));
-
+// The subjects of the pages read, grouped by type. The words narrow the list at the brain, so no row here is filtered.
 const subjectGroups = computed(() => {
   const groups = new Map<string, Subject[]>();
 
   for (const subject of props.subjects) {
-    if (!holds([subject.type, subject.key, subject.description, subject.name])) continue;
-
     groups.set(subject.type, [...(groups.get(subject.type) ?? []), subject]);
   }
 

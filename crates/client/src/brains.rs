@@ -187,7 +187,7 @@ pub struct SubjectsQuery {
   pub kind: Option<String>,
   #[serde(skip_serializing_if = "Option::is_none")]
   pub key: Option<String>,
-  /// Words the description holds, in any case.
+  /// Words the key, the type, the name or the description holds, in any case.
   #[serde(skip_serializing_if = "Option::is_none")]
   pub q: Option<String>,
   /// The subjects these ids name, comma-separated.
@@ -238,6 +238,9 @@ pub struct LayerChange {
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct LayersQuery {
+  /// Words the name or the description holds, in any case.
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub q: Option<String>,
   #[serde(skip_serializing_if = "Option::is_none")]
   pub after: Option<i64>,
   #[serde(skip_serializing_if = "Option::is_none")]
@@ -691,6 +694,11 @@ pub struct TalliesQuery {
   /// Words the recall condition holds, in any case: the rows a situation calls for.
   #[serde(skip_serializing_if = "Option::is_none")]
   pub situation: Option<String>,
+  /// The groups to count, comma-separated: a status or a type by its word, a layer or a subject by its id.
+  /// Where none is given every group is counted; the group of the rows in no layer or about no subject is
+  /// counted only where none is named.
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub groups: Option<String>,
 }
 
 /// One group of a tally.
@@ -739,6 +747,20 @@ pub struct Confirmations {
 #[serde(rename_all = "camelCase")]
 pub struct Recorded {
   pub recorded_count: i64,
+}
+
+/// Which types to list.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct TypesQuery {
+  /// Words the type holds, in any case.
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub q: Option<String>,
+  /// The type the page read last ended on; the next page begins past it, in the order the list stands in.
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub after: Option<String>,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub limit: Option<i64>,
 }
 
 /// A type in use in a brain, and how many rows carry it.

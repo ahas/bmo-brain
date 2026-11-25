@@ -9,7 +9,8 @@ use bmo_brain_client::{
   Brain, BrainsQuery, Confirmations, ErrorCode, Event, EventsQuery, ExportQuery, Fold, Folded, Health,
   Hits, Injected, Layer, LayerChange, LayersQuery, MemoriesQuery, Memory, MemoryMerge, MemoryMove,
   MemoryVersion, NewBrain, NewLayer, NewMemory, NewSubject, OrgTopic, OrgTopicsQuery, Page, PersonaQuery,
-  Recall, RecallAsk, Recorded, SheetQuery, Subject, SubjectChange, SubjectsQuery, TypeCount, WireError,
+  Recall, RecallAsk, Recorded, SheetQuery, Subject, SubjectChange, SubjectsQuery, TypeCount, TypesQuery,
+  WireError,
 };
 use bmo_brain_client::{
   ConsoleManifest, ConsoleWords, Consolidated, ConsolidationQuery, ConsolidationState, DuplicateCandidate,
@@ -567,10 +568,14 @@ fn brain_routes(g: &mut SchemaGenerator) -> Vec<Route> {
       id: "listTypes",
       tag: "brain-memories",
       summary: "The types in use, counted, the reserved ones first.",
-      parameters: brain(g),
+      parameters: {
+        let mut parameters = brain(g);
+        parameters.extend(query::<TypesQuery>(g));
+        parameters
+      },
       body: None,
       raw_body: None,
-      answers: vec![(200, json_answer::<Vec<TypeCount>>(g))],
+      answers: vec![(200, json_answer::<Page<TypeCount>>(g))],
       codes: vec![BadRequest, NotFound],
     },
     Route {

@@ -12,6 +12,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use bmo_brain_client::{
   BrainClient, ExportQuery, Learning, MemoriesQuery, MemoryMerge, MemoryMove, MemoryStatus, MemoryVersion,
   NewBrain, NewMemory, NewSubject, RecallAsk, RecallPart, Restoration, SheetQuery, Source, SubjectKey,
+  TypesQuery,
 };
 use support::{Served, TOKEN, labels, refused};
 use tokio::process::Command;
@@ -540,7 +541,15 @@ async fn no_write_takes_the_type_sheet() {
     refused(client.memory_restore(brain, sheet, &restored).await),
     (409, "conflict".to_owned())
   );
-  assert!(!client.types(brain).await.unwrap().iter().any(|t| t.kind == "sheet" && t.reserved));
+  assert!(
+    !client
+      .types(brain, &TypesQuery::default())
+      .await
+      .unwrap()
+      .items
+      .iter()
+      .any(|t| t.kind == "sheet" && t.reserved)
+  );
 }
 
 #[tokio::test]

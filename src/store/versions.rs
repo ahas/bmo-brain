@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 
 use bmo_brain_client::{
   Confirmations, Hits, Labels, MemoriesQuery, Memory, MemoryMerge, MemoryMove, MemoryStatus, MemoryVersion,
-  NewMemory, Page, Restoration, SubjectKey, SubjectRef, TypeCount,
+  NewMemory, Page, Restoration, SubjectKey, SubjectRef, TypeCount, TypesQuery,
 };
 use sqlx::types::Json;
 use sqlx::{FromRow, PgConnection, Postgres, QueryBuilder};
@@ -17,7 +17,7 @@ use super::orgs::{
 };
 use super::sheets::{SHEET, written_type};
 use super::vectors::fuse;
-use super::{Fault, Held, Store, TEXT_MOST, holding, limit, listed, now, publish, text};
+use super::{Fault, Held, Store, TEXT_MOST, holding, limit, listed, now, page, publish, text};
 
 /// The types code depends on the meaning of.
 pub const RESERVED_TYPES: [&str; 9] =
@@ -1148,24 +1148,40 @@ impl Store {
     Ok(confirmed)
   }
 
-  /// The types in use in a brain, with the count of live memories each, the reserved ones first: a type whose
-  /// rows are all closed is not in use.
-  pub async fn types(&self, brain_id: i64) -> Held<Vec<TypeCount>> {
+  /// The types in use in a brain, with the count of live memories each, the reserved ones first and every other
+  /// by its name: a type whose rows are all closed is not in use. A page of that list, `after` the type the
+  /// page read last ended on.
+  pub async fn types(&self, brain_id: i64, query: &TypesQuery) -> Held<Page<TypeCount>> {
+    let limit = limit(query.limit)?;
     let mut conn = self.connection().await?;
     brain_of(&mut conn, brain_id).await?;
-    let counted: Vec<(String, i64)> = sqlx::query_as(
-      "SELECT type, COUNT(*) FROM memories WHERE brain_id = $1 AND status IN ('active', 'pending') \
-       GROUP BY type ORDER BY type",
-    )
-    .bind(brain_id)
-    .fetch_all(&mut *conn)
-    .await?;
+    let mut sql = QueryBuilder::<Postgres>::new("SELECT type, COUNT(*) FROM memories WHERE brain_id = ");
+    sql.push_bind(brain_id);
+    sql.push(" AND status IN ('active', 'pending')");
+    if let Some(words) = query.q.as_deref().map(str::trim).filter(|words| !words.is_empty()) {
+      sql.push(" AND type ILIKE ").push_bind(holding(words));
+    }
+    sql.push(" GROUP BY type ORDER BY type");
+    let counted: Vec<(String, i64)> = sql.build_query_as().fetch_all(&mut *conn).await?;
+    let asked = query.q.as_deref().map(str::trim).filter(|words| !words.is_empty());
+    let named = |kind: &str| asked.is_none_or(|words| kind.to_lowercase().contains(&words.to_lowercase()));
+    // Where a type stands in the list: the reserved ones first, in the order code depends on them, then every
+    // other by its name. The same key cuts the page, so a page walks the order the list stands in.
+    fn rank(kind: &str) -> (usize, &str) {
+      (
+        RESERVED_TYPES.iter().position(|name| *name == kind).unwrap_or(RESERVED_TYPES.len()),
+        kind,
+      )
+    }
+    // A reserved type stands whether or not a live row carries it, and its count is the live rows that do.
     let mut types: Vec<TypeCount> = RESERVED_TYPES
       .iter()
-      .map(|name| TypeCount {
-        kind: (*name).to_owned(),
-        count: counted.iter().find(|(kind, _)| kind == name).map_or(0, |(_, count)| *count),
+      .copied()
+      .filter(|kind| named(kind))
+      .map(|kind| TypeCount {
+        count: counted.iter().find(|(name, _)| name.as_str() == kind).map_or(0, |(_, count)| *count),
         reserved: true,
+        kind: kind.to_owned(),
       })
       .collect();
     types.extend(counted.into_iter().filter(|(kind, _)| !RESERVED_TYPES.contains(&kind.as_str())).map(
@@ -1175,7 +1191,13 @@ impl Store {
         reserved: false,
       },
     ));
-    Ok(types)
+    types.sort_by(|first, second| rank(&first.kind).cmp(&rank(&second.kind)));
+    // The page stands past the type it read last, in the order the list stands in.
+    let from = query
+      .after
+      .as_deref()
+      .map_or(0, |seen| types.partition_point(|held| rank(&held.kind) <= rank(seen.trim())));
+    Ok(page(types.into_iter().skip(from).collect(), limit))
   }
 }
 

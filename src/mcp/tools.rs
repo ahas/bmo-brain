@@ -8,7 +8,7 @@ use std::pin::Pin;
 use bmo_brain_client::{
   BrainClient, BrainsQuery, ClientFailure, Confirmations, Fold, Hits, LayersQuery, MemoriesQuery,
   MemoryMerge, MemoryMove, MemoryVersion, NewBrain, NewLayer, NewMemory, NewSubject, PersonaQuery,
-  RecallAsk, SheetQuery, SubjectsQuery,
+  RecallAsk, SheetQuery, SubjectsQuery, TypesQuery,
 };
 use bmo_brain_client::{Consolidated, DuplicatesQuery, Learning, SimilarAsk, UnconsolidatedQuery};
 use schemars::generate::SchemaGenerator;
@@ -301,7 +301,7 @@ pub fn tools() -> Vec<BrainTool> {
       "brain_types",
       "The types in use, counted, the reserved ones first.",
       "GET /brains/{brainId}/types",
-      |client, BrainId { brain_id }| async move { client.types(brain_id).await },
+      |client, Within { brain_id, body }: Within<TypesQuery>| async move { client.types(brain_id, &body).await },
     ),
     tool(
       "brain_recall",

@@ -7,7 +7,7 @@ use crate::support;
 use bmo_brain_client::{
   BrainClient, BrainsQuery, Confirmations, ExportQuery, Fold, Hits, LayersQuery, MemoriesQuery,
   MemoryMerge, MemoryMove, MemoryStatus, MemoryVersion, NewBrain, NewLayer, NewMemory, NewSubject,
-  PersonaQuery, RecallAsk, RecallPart, SubjectKey, SubjectsQuery,
+  PersonaQuery, RecallAsk, RecallPart, SubjectKey, SubjectsQuery, TypesQuery,
 };
 use support::{Served, labels, refused};
 
@@ -204,6 +204,7 @@ async fn the_layer_page_walks_the_list_in_position_order_past_the_layer_last_see
       .layers(
         brain,
         &LayersQuery {
+          q: None,
           after,
           limit: Some(1),
         },
@@ -494,7 +495,7 @@ async fn the_types_in_use_count_their_live_rows_with_the_reserved_ones_first() {
   client.memory_move(brain, done.id, &closing(MemoryStatus::Done)).await.unwrap();
   let gone = client.memory_add(brain, &memory("retired", "E")).await.unwrap();
   client.memory_move(brain, gone.id, &closing(MemoryStatus::Invalidated)).await.unwrap();
-  let types = client.types(brain).await.unwrap();
+  let types = client.types(brain, &TypesQuery::default()).await.unwrap().items;
   let fact = types.iter().find(|t| t.kind == "fact").unwrap();
   let tip = types.iter().find(|t| t.kind == "tip").unwrap();
   // The superseded version and the closed rows count for nothing, and a type whose rows are all closed is not in
@@ -505,6 +506,86 @@ async fn the_types_in_use_count_their_live_rows_with_the_reserved_ones_first() {
   assert!(
     types.iter().position(|t| t.kind == "episode").unwrap()
       < types.iter().position(|t| t.kind == "tip").unwrap()
+  );
+}
+
+#[tokio::test]
+async fn the_types_are_paged_in_their_own_order_by_the_type_last_seen_and_narrowed_by_words() {
+  let served = Served::new().await;
+  let client = &served.client;
+  let brain = brain_of(client, "agent-a").await;
+  for kind in ["zebra", "alpha", "beta"] {
+    client.memory_add(brain, &memory(kind, kind)).await.unwrap();
+  }
+  let mut walked = vec![];
+  let mut after = None;
+  loop {
+    let page = client
+      .types(
+        brain,
+        &TypesQuery {
+          after,
+          limit: Some(3),
+          ..TypesQuery::default()
+        },
+      )
+      .await
+      .unwrap();
+    assert!(page.items.len() <= 3);
+    walked.extend(page.items.iter().map(|type_count| type_count.kind.clone()));
+    if !page.more {
+      break;
+    }
+    after = Some(page.items.last().unwrap().kind.clone());
+  }
+  // The reserved ones first, in the order code depends on them, then every other by its name.
+  assert_eq!(
+    walked,
+    [
+      "episode",
+      "fact",
+      "rumor",
+      "situation",
+      "rule",
+      "name",
+      "persona",
+      "lore",
+      "knowledge",
+      "alpha",
+      "beta",
+      "zebra"
+    ]
+  );
+  // The first page past the type a page ended on stands from there.
+  let second = client
+    .types(
+      brain,
+      &TypesQuery {
+        after: Some("episode".to_owned()),
+        limit: Some(2),
+        ..TypesQuery::default()
+      },
+    )
+    .await
+    .unwrap();
+  assert_eq!(
+    second.items.iter().map(|type_count| type_count.kind.as_str()).collect::<Vec<_>>(),
+    ["fact", "rumor"]
+  );
+  // Words the type holds narrow the list, a reserved type with no live row standing as it does.
+  let found = client
+    .types(
+      brain,
+      &TypesQuery {
+        q: Some("alp".to_owned()),
+        ..TypesQuery::default()
+      },
+    )
+    .await
+    .unwrap();
+  assert_eq!(
+    found.items.iter().map(|type_count| type_count.kind.as_str()).collect::<Vec<_>>(),
+    ["alpha"]
   );
 }
 

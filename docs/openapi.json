@@ -2590,6 +2590,26 @@
         ],
         "type": "object"
       },
+      "TypeCountPage": {
+        "description": "One page of a list, oldest first.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TypeCount"
+            },
+            "type": "array"
+          },
+          "more": {
+            "description": "Whether anything stands past the last item.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "items",
+          "more"
+        ],
+        "type": "object"
+      },
       "UnconsolidatedEpisode": {
         "description": "An unconsolidated episode as a consolidation reads it: the memory, and why it stands where it does in the\norder.",
         "properties": {
@@ -3733,6 +3753,19 @@
               "format": "int64",
               "type": [
                 "integer",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "Words the name or the description holds, in any case.",
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "description": "Words the name or the description holds, in any case.",
+              "type": [
+                "string",
                 "null"
               ]
             }
@@ -5115,12 +5148,12 @@
             }
           },
           {
-            "description": "Words the description holds, in any case.",
+            "description": "Words the key, the type, the name or the description holds, in any case.",
             "in": "query",
             "name": "q",
             "required": false,
             "schema": {
-              "description": "Words the description holds, in any case.",
+              "description": "Words the key, the type, the name or the description holds, in any case.",
               "type": [
                 "string",
                 "null"
@@ -5496,6 +5529,19 @@
             }
           },
           {
+            "description": "The groups to count, comma-separated: a status or a type by its word, a layer or a subject by its id.\nWhere none is given every group is counted; the group of the rows in no layer or about no subject is\ncounted only where none is named.",
+            "in": "query",
+            "name": "groups",
+            "required": false,
+            "schema": {
+              "description": "The groups to count, comma-separated: a status or a type by its word, a layer or a subject by its id.\nWhere none is given every group is counted; the group of the rows in no layer or about no subject is\ncounted only where none is named.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
             "description": "The rows these ids name, comma-separated.",
             "in": "query",
             "name": "ids",
@@ -5699,6 +5745,44 @@
               "format": "int64",
               "type": "integer"
             }
+          },
+          {
+            "description": "The type the page read last ended on; the next page begins past it, in the order the list stands in.",
+            "in": "query",
+            "name": "after",
+            "required": false,
+            "schema": {
+              "description": "The type the page read last ended on; the next page begins past it, in the order the list stands in.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int64",
+              "type": [
+                "integer",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "Words the type holds, in any case.",
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "description": "Words the type holds, in any case.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
           }
         ],
         "responses": {
@@ -5706,10 +5790,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/TypeCount"
-                  },
-                  "type": "array"
+                  "$ref": "#/components/schemas/TypeCountPage"
                 }
               }
             },
@@ -6493,7 +6574,7 @@
             ]
           },
           "q": {
-            "description": "Words the description holds, in any case.",
+            "description": "Words the key, the type, the name or the description holds, in any case.",
             "type": [
               "string",
               "null"
@@ -6571,6 +6652,13 @@
             "format": "int64",
             "type": [
               "integer",
+              "null"
+            ]
+          },
+          "q": {
+            "description": "Words the name or the description holds, in any case.",
+            "type": [
+              "string",
               "null"
             ]
           }
@@ -7406,11 +7494,32 @@
     {
       "description": "The types in use, counted, the reserved ones first.",
       "input": {
-        "description": "One brain, by its id.",
+        "description": "A brain and what a route of it takes.",
         "properties": {
+          "after": {
+            "description": "The type the page read last ended on; the next page begins past it, in the order the list stands in.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "brainId": {
             "format": "int64",
             "type": "integer"
+          },
+          "limit": {
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "q": {
+            "description": "Words the type holds, in any case.",
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "required": [
@@ -7420,10 +7529,7 @@
       },
       "name": "brain_types",
       "output": {
-        "items": {
-          "$ref": "#/components/schemas/TypeCount"
-        },
-        "type": "array"
+        "$ref": "#/components/schemas/TypeCountPage"
       },
       "route": "GET /brains/{brainId}/types"
     },

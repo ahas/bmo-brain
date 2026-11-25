@@ -10,7 +10,7 @@ use crate::brains::{
   LayersQuery, Learned, Learning, MemoriesQuery, Memory, MemoryMerge, MemoryMove, MemoryVersion,
   MissesQuery, NewBrain, NewLayer, NewMemory, NewSubject, OrgTopic, OrgTopicsQuery, PersonaQuery, Recall,
   RecallAsk, Recorded, Restoration, SearchMiss, SheetQuery, SimilarAsk, Subject, SubjectChange,
-  SubjectsQuery, TalliesQuery, Tally, TypeCount, UnconsolidatedEpisode, UnconsolidatedQuery,
+  SubjectsQuery, TalliesQuery, Tally, TypeCount, TypesQuery, UnconsolidatedEpisode, UnconsolidatedQuery,
 };
 use crate::brains::{OrgUnitQuery, RemovalCounts, Removed};
 use crate::wire::{Event, EventsQuery, Health, Page, WireError};
@@ -312,8 +312,8 @@ impl BrainClient {
   }
 
   /// `GET /brains/{brainId}/types`
-  pub async fn types(&self, brain_id: i64) -> Answer<Vec<TypeCount>> {
-    Self::answered(self.request(Method::GET, &["brains", &brain_id.to_string(), "types"])).await
+  pub async fn types(&self, brain_id: i64, query: &TypesQuery) -> Answer<Page<TypeCount>> {
+    Self::answered(self.get(&["brains", &brain_id.to_string(), "types"], query)).await
   }
 
   /// `GET /brains/{brainId}/tallies`

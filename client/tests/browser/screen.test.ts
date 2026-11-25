@@ -36,7 +36,13 @@ const CLIENT = new URL("../..", import.meta.url).pathname;
 const HOST = new URL("./host", import.meta.url).pathname;
 const RELAY = "/relay/brain";
 const WORDS = JSON.parse(readFileSync(new URL("../../i18n/locales/ko.json", import.meta.url), "utf8")) as {
-  brain: { title: Record<string, string>; label: Record<string, string>; action: Record<string, string>; hint: Record<string, string> };
+  brain: {
+    title: Record<string, string>;
+    label: Record<string, string>;
+    action: Record<string, string>;
+    hint: Record<string, string>;
+    index: Record<string, string>;
+  };
 };
 // The layer's words the host answers beside the screen's own (`host/i18n/`).
 const COMMON = JSON.parse(readFileSync(new URL("./host/i18n/locales/ko.json", import.meta.url), "utf8")) as {
@@ -61,6 +67,14 @@ interface LayerRow {
   position: number;
 }
 
+interface SubjectRow {
+  id: number;
+  type: string;
+  key: string;
+  description: string;
+  name?: string;
+}
+
 interface Write {
   method: string;
   path: string;
@@ -74,11 +88,14 @@ interface Read {
 
 const AT = 1_790_000_000_000;
 let layers: LayerRow[] = [];
+let subjects: SubjectRow[] = [];
 let rows: Row[] = [];
 let writes: Write[] = [];
 let reads: Read[] = [];
 // Whether the next page asked is answered with a failure, once.
 let failNextPage = false;
+// Whether the next page of a subject list is answered with a failure, once.
+let failNextSubjectPage = false;
 
 // The base, brain 2, an org brain the screen reads and never writes (docs/design.md, 「The screen」): one layer and one
 // memory in it.
@@ -104,9 +121,11 @@ function seed(): void {
     { id: 7, type: "fact", text: "note one", layerId: 3, position: 1, status: "active" },
     { id: 8, type: "fact", text: "unfiled one", layerId: null, position: 0, status: "active" }
   ];
+  subjects = [];
   writes = [];
   reads = [];
   failNextPage = false;
+  failNextSubjectPage = false;
 }
 
 function memoryOf(row: Row): Record<string, unknown> {
@@ -140,6 +159,33 @@ function layerOf(layer: LayerRow): Record<string, unknown> {
 }
 
 const byPosition = <T extends { id: number; position: number }>(a: T, b: T) => a.position - b.position || a.id - b.id;
+
+// A page of a list, past the member its cursor names, as the brain answers it.
+function pageOf<T>(items: T[], query: URLSearchParams, cursor: (one: T) => number | string): { items: T[]; more: boolean } {
+  const after = query.get("after");
+  const from = after === null ? 0 : items.findIndex((one) => String(cursor(one)) === after) + 1;
+  const limit = Number(query.get("limit") ?? "50");
+
+  return { items: items.slice(from, from + limit), more: items.length > from + limit };
+}
+
+// The type list as the brain orders it: the reserved ones first, in the order code depends on them, then every other
+// by its name, a reserved type with no live row among them.
+const RESERVED_TYPES = ["episode", "fact", "rumor", "situation", "rule", "name", "persona", "lore", "knowledge"];
+
+function typesOf(): { type: string; reserved: boolean; count: number }[] {
+  const counted = new Map<string, number>();
+
+  for (const row of rows) if (row.status === "active" || row.status === "pending") counted.set(row.type, (counted.get(row.type) ?? 0) + 1);
+
+  return [
+    ...RESERVED_TYPES.map((type) => ({ type, reserved: true, count: counted.get(type) ?? 0 })),
+    ...[...counted.keys()]
+      .filter((type) => !RESERVED_TYPES.includes(type))
+      .sort()
+      .map((type) => ({ type, reserved: false, count: counted.get(type)! }))
+  ];
+}
 
 // The order grammar of the brain's memory list (docs/boundary-api.md, 「Memories」): a field, ascending, or
 // descending with a leading `-`. A stand-in that took any word for it would pass a screen asking in a key the
@@ -242,7 +288,7 @@ async function answer(route: Route): Promise<void> {
     case "/brains/2/subjects":
       return json(route, { items: [], more: false });
     case "/brains/2/types":
-      return json(route, [{ type: "tip", reserved: false, count: 1 }]);
+      return json(route, { items: [{ type: "tip", reserved: false, count: 1 }], more: false });
     case "/brains/2/tallies":
       return json(route, []);
     case "/brains/2/memories":
@@ -251,12 +297,38 @@ async function answer(route: Route): Promise<void> {
       return json(route, orgMemory());
     case "/brains/2/lineages/201":
       return json(route, [orgMemory()]);
-    case "/brains/1/layers":
-      return json(route, { items: [...layers].sort(byPosition).map(layerOf), more: false });
-    case "/brains/1/subjects":
-      return json(route, { items: [], more: false });
-    case "/brains/1/types":
-      return json(route, [...new Set(rows.map((row) => row.type))].map((type) => ({ type, reserved: type === "persona", count: 1 })));
+    case "/brains/1/layers": {
+      const q = (url.searchParams.get("q") ?? "").toLowerCase();
+      const found = [...layers].sort(byPosition).filter((layer) => q === "" || layer.name.toLowerCase().includes(q));
+      const page = pageOf(found, url.searchParams, (layer) => layer.id);
+
+      return json(route, { items: page.items.map(layerOf), more: page.more });
+    }
+    case "/brains/1/subjects": {
+      const q = (url.searchParams.get("q") ?? "").toLowerCase();
+      const ids = url.searchParams.get("ids")?.split(",").map(Number);
+      const found = subjects
+        .filter((subject) => ids === undefined || ids.includes(subject.id))
+        .filter(
+          (subject) =>
+            q === "" ||
+            [subject.type, subject.key, subject.description, subject.name ?? ""].some((text) => text.toLowerCase().includes(q))
+        );
+
+      if (url.searchParams.get("after") !== null && failNextSubjectPage) {
+        failNextSubjectPage = false;
+
+        return route.fulfill({ status: 400, contentType: "application/json", body: JSON.stringify({ message: "unavailable" }) });
+      }
+
+      return json(route, pageOf(found, url.searchParams, (subject) => subject.id));
+    }
+    case "/brains/1/types": {
+      const q = (url.searchParams.get("q") ?? "").toLowerCase();
+      const found = typesOf().filter((type) => q === "" || type.type.toLowerCase().includes(q));
+
+      return json(route, pageOf(found, url.searchParams, (type) => type.type));
+    }
     case "/brains/1/tallies":
       return json(route, []);
     case "/brains/1/memories": {
@@ -324,6 +396,10 @@ async function open(place: string): Promise<void> {
   await page.goto(`${origin}/brain/1/book${place}`, { waitUntil: "load" });
   await page.waitForSelector("[data-piece]");
   await page.waitForSelector("[data-layer]");
+  // The index's items unfold as its first page lands; a pointer taken to a row mid-unfold lands on another.
+  await page.locator("[data-index-scroller]").evaluate((element) =>
+    Promise.all(element.getAnimations({ subtree: true }).map((animation) => animation.finished.catch(() => undefined)))
+  );
 }
 
 const piece = (text: string) => page.locator("[data-piece]", { hasText: text });
@@ -369,7 +445,16 @@ async function openFilters(): Promise<void> {
   if (await chosen(WORDS.brain.label.status!).isVisible()) return;
 
   await page.getByRole("button", { name: WORDS.brain.action.filters!, exact: true }).click();
-  await chosen(WORDS.brain.label.status!).waitFor();
+
+  const status = chosen(WORDS.brain.label.status!);
+
+  await status.waitFor();
+  // The popover places what it holds as it settles; a list opened against a trigger still moving stands off it.
+  await status.evaluate((element) => {
+    const content = (element as HTMLElement).closest("[data-slot='content']") ?? element;
+
+    return Promise.all(content.getAnimations({ subtree: true }).map((animation) => animation.finished.catch(() => undefined)));
+  });
 }
 
 type Box = { x: number; y: number; width: number; height: number };
@@ -716,6 +801,157 @@ describe.skipIf(!ready)("the brain's screen in a browser", () => {
       await retry.click();
       await memory("paged 70").waitFor();
       expect(nextPages().length).toBe(2);
+    }, 60_000);
+  });
+
+  describe("the index's lists are read a page at a time as the index's end comes into view", () => {
+    const index = () => page.locator("[data-index-scroller]");
+    const layerRows = () => page.locator("[data-layer]");
+    const subjectRows = () => page.locator("[data-subject]");
+    const typeRows = () => page.locator("[data-type]");
+    const indexReads = (path: string) => reads.filter((read) => read.path === path);
+
+    // The wheel turned over the index until the row stands, as a reader scrolling to the end does.
+    async function scrollIndexTo(shown: () => Promise<boolean>): Promise<void> {
+      const box = (await index().boundingBox())!;
+
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+      await until(async () => {
+        await page.mouse.wheel(0, 1600);
+
+        return shown();
+      }, "the index's end");
+    }
+
+    test("the layers open with fifty and the next come as the index is scrolled to its end", async () => {
+      seed();
+      for (let n = 1; n <= 70; n++) layers.push({ id: 100 + n, name: `layer-${String(n).padStart(2, "0")}`, position: 100 + n });
+      await page.setViewportSize(WIDE);
+      await page.goto(`${origin}/brain/1/list`, { waitUntil: "load" });
+      await layerRows().first().waitFor();
+      expect(await layerRows().count()).toBe(50);
+
+      const first = indexReads("/brains/1/layers");
+
+      expect(first.length).toBe(1);
+      expect(first[0]!.query.get("limit")).toBe("50");
+      expect(first[0]!.query.get("after")).toBeNull();
+
+      await scrollIndexTo(async () => (await page.locator("[data-layer]", { hasText: "layer-70" }).count()) > 0);
+      expect(await layerRows().count()).toBe(73);
+
+      const next = indexReads("/brains/1/layers");
+
+      expect(next.length).toBe(2);
+      expect(next[1]!.query.get("after")).not.toBeNull();
+    }, 60_000);
+
+    test("the subjects open with fifty and the next come as the index is scrolled to its end", async () => {
+      seed();
+      for (let n = 1; n <= 70; n++) {
+        subjects.push({ id: 200 + n, type: n % 2 === 0 ? "person" : "room", key: `s-${String(n).padStart(2, "0")}`, description: "" });
+      }
+      await page.setViewportSize(WIDE);
+      await page.goto(`${origin}/brain/1/list`, { waitUntil: "load" });
+      // The screen is alive once its index has read the layers; a tab pressed before that stands on no handler.
+      await layerRows().first().waitFor();
+      await page.getByRole("tab", { name: WORDS.brain.index.subjects! }).click();
+      await subjectRows().first().waitFor();
+      expect(await subjectRows().count()).toBe(50);
+
+      const first = indexReads("/brains/1/subjects");
+
+      expect(first.length).toBe(1);
+      expect(first[0]!.query.get("limit")).toBe("50");
+      expect(first[0]!.query.get("after")).toBeNull();
+
+      await scrollIndexTo(async () => (await subjectRows().filter({ hasText: "s-70" }).count()) > 0);
+      expect(await subjectRows().count()).toBe(70);
+      expect(indexReads("/brains/1/subjects").length).toBe(2);
+    }, 60_000);
+
+    test("the types open with a bounded page and the next come as the index is scrolled to its end", async () => {
+      seed();
+      rows = [];
+      for (let n = 1; n <= 70; n++) {
+        rows.push({ id: 300 + n, type: `kind-${String(n).padStart(2, "0")}`, text: `kind ${n}`, layerId: null, position: 0, status: "active" });
+      }
+      await page.setViewportSize(WIDE);
+      await page.goto(`${origin}/brain/1/list`, { waitUntil: "load" });
+      await layerRows().first().waitFor();
+      await page.getByRole("tab", { name: WORDS.brain.index.types! }).click();
+      await typeRows().first().waitFor();
+      // The first page holds fifty rows, nine of them reserved and none in use, so forty-one stand.
+      expect(await typeRows().count()).toBe(41);
+
+      const first = indexReads("/brains/1/types");
+
+      expect(first.length).toBe(1);
+      expect(first[0]!.query.get("limit")).toBe("50");
+      expect(first[0]!.query.get("after")).toBeNull();
+
+      await scrollIndexTo(async () => (await page.locator("[data-type]", { hasText: "kind-70" }).count()) > 0);
+      expect(await typeRows().count()).toBe(70);
+      expect(indexReads("/brains/1/types").length).toBe(2);
+    }, 60_000);
+
+    test("the index's search narrows a list at the brain, a page at a time", async () => {
+      seed();
+      for (let n = 1; n <= 70; n++) {
+        subjects.push({
+          id: 200 + n,
+          type: "person",
+          key: `s-${String(n).padStart(2, "0")}`,
+          description: n === 37 ? "the sought subject" : ""
+        });
+      }
+      await page.setViewportSize(WIDE);
+      await page.goto(`${origin}/brain/1/list`, { waitUntil: "load" });
+      await layerRows().first().waitFor();
+      await page.getByRole("tab", { name: WORDS.brain.index.subjects! }).click();
+      await subjectRows().first().waitFor();
+      await page.getByPlaceholder(WORDS.brain.label.index_search!).fill("sought");
+      await until(async () => (await subjectRows().count()) === 1, "the searched subject");
+      expect(indexReads("/brains/1/subjects").at(-1)!.query.get("q")).toBe("sought");
+    }, 60_000);
+
+    test("the type filter's choices are found at the brain for the words typed", async () => {
+      seed();
+      rows.push({ id: 400, type: "alpha-type", text: "alpha", layerId: null, position: 0, status: "active" });
+      await page.setViewportSize(WIDE);
+      await page.goto(`${origin}/brain/1/list`, { waitUntil: "load" });
+      await layerRows().first().waitFor();
+      await page.getByText("unfiled one").first().waitFor();
+      await openFilters();
+      await chosen(WORDS.brain.label.type!).click();
+      await page.getByPlaceholder(COMMON.common.placeholder.search, { exact: true }).fill("alpha");
+      await until(
+        () => reads.some((read) => read.path === "/brains/1/types" && read.query.get("q") === "alpha"),
+        "the type filter's search"
+      );
+      await page.getByRole("option", { name: /alpha-type/ }).first().waitFor();
+    }, 60_000);
+
+    test("a page of a list that fails keeps what was read and is read again from its retry", async () => {
+      seed();
+      for (let n = 1; n <= 70; n++) {
+        subjects.push({ id: 200 + n, type: "person", key: `s-${String(n).padStart(2, "0")}`, description: "" });
+      }
+      await page.setViewportSize(WIDE);
+      await page.goto(`${origin}/brain/1/list`, { waitUntil: "load" });
+      await layerRows().first().waitFor();
+      await page.getByRole("tab", { name: WORDS.brain.index.subjects! }).click();
+      await subjectRows().first().waitFor();
+      failNextSubjectPage = true;
+
+      const retry = index().locator("[data-next-page-foot]").getByRole("button", { name: COMMON.common.action.retry, exact: true });
+
+      await scrollIndexTo(async () => (await retry.count()) > 0);
+      expect(await index().locator("[data-next-page-foot] [role=alert]").innerText()).toContain("unavailable");
+      expect(await subjectRows().count()).toBe(50);
+
+      await retry.click();
+      await until(async () => (await subjectRows().count()) === 70, "the rest of the subjects");
     }, 60_000);
   });
 

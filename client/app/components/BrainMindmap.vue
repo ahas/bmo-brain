@@ -4,7 +4,7 @@
        subjects those memories reach. A memory opens its row; an outer subject comes to the centre, every
        point moving to its new place at once. -->
   <div class="flex min-h-0 flex-1 flex-col">
-    <BrainHeading v-bind="heading" :title="subjectId === null ? heading.title : `${heading.title} · ${nameOf(subjectId)}`" :count="subjectId === null ? null : memories.length" :notes="subjectId === null ? [...heading.notes, t('brain.heading.map_needs_subject')] : heading.notes" />
+    <BrainHeading v-bind="heading" :title="subjectId === null ? heading.title : `${heading.title} · ${nameOf(subjectId) ?? `#${subjectId}`}`" :count="subjectId === null ? null : memories.length" :notes="subjectId === null ? [...heading.notes, t('brain.heading.map_needs_subject')] : heading.notes" />
     <div v-if="subjectId === null" class="flex flex-col gap-2 p-4">
       <p class="text-sm text-muted">{{ t("brain.status.map_choose") }}</p>
       <div class="flex flex-wrap gap-1">
@@ -33,7 +33,7 @@ import * as api from "../domain/brain-api";
 import { groupColour } from "../domain/brain-colour";
 import { subjectTypeName } from "../domain/brain-names";
 
-import type { Layer, Memory, MemoryFilter, Subject } from "../domain/brain-api";
+import type { Memory, MemoryFilter, Subject } from "../domain/brain-api";
 import type { Heading } from "../domain/brain-heading";
 
 const props = defineProps<{
@@ -42,7 +42,9 @@ const props = defineProps<{
   subjectId: number | null;
   filter: MemoryFilter;
   subjects: Subject[];
-  layers: Layer[];
+  layerNames: Map<number, string>;
+  // Reads the names of the layers the memories hold, for those the index's pages do not carry.
+  onNames: (page: Memory[]) => void;
   changes: number;
 }>();
 
@@ -66,6 +68,7 @@ async function read(): Promise<void> {
     const live = await api.memoriesNamed(props.brainId, { ...props.filter, subjectId: props.subjectId });
 
     memories.value = live.sort((a, b) => b.useCount - a.useCount || b.importance - a.importance);
+    props.onNames(live);
   } catch (error) {
     island.fail(error, t("brain.error.read"));
   }
@@ -86,10 +89,12 @@ interface Point {
   from: { x: number; y: number };
 }
 
-function nameOf(id: number): string {
+// A subject's name where the index's pages carry it, else nothing: a reached subject beyond them is called by the
+// type and key its memory carries.
+function nameOf(id: number): string | undefined {
   const subject = props.subjects.find((found) => found.id === id);
 
-  return subject === undefined ? `#${id}` : (subject.name ?? `${subjectTypeName(t, te, subject.type)} ${subject.key}`);
+  return subject === undefined ? undefined : (subject.name ?? `${subjectTypeName(t, te, subject.type)} ${subject.key}`);
 }
 
 function short(text: string): string {
@@ -104,29 +109,39 @@ const points = computed<Point[]>(() => {
   const folded = memories.value.length - shown.length;
   const ring = shown.length + (folded > 0 ? 1 : 0);
   const all: Point[] = [
-    { key: `s${props.subjectId}`, kind: "centre", id: props.subjectId, ...centre, r: 22, colour: "var(--ui-primary)", label: nameOf(props.subjectId), title: nameOf(props.subjectId), from: centre }
+    {
+      key: `s${props.subjectId}`,
+      kind: "centre",
+      id: props.subjectId,
+      ...centre,
+      r: 22,
+      colour: "var(--ui-primary)",
+      label: nameOf(props.subjectId) ?? `#${props.subjectId}`,
+      title: nameOf(props.subjectId) ?? `#${props.subjectId}`,
+      from: centre
+    }
   ];
-  const reached = new Map<number, { x: number; y: number }>();
+  const reached = new Map<number, { x: number; y: number; name: string }>();
 
   shown.forEach((memory, index) => {
     const angle = (2 * Math.PI * index) / Math.max(1, ring) - Math.PI / 2;
     const at = { x: Math.cos(angle) * INNER, y: Math.sin(angle) * INNER };
-    const layer = props.layers.find((found) => found.id === memory.layerId);
-
     all.push({
       key: `m${memory.id}`,
       kind: "memory",
       id: memory.id,
       ...at,
       r: 6 + memory.importance,
-      colour: groupColour(layer?.name ?? "unfiled"),
+      colour: groupColour((memory.layerId === null ? undefined : props.layerNames.get(memory.layerId)) ?? "unfiled"),
       label: short(memory.text),
       title: memory.text,
       from: centre
     });
 
     for (const subject of memory.subjects) {
-      if (subject.id !== props.subjectId && subject.type !== "episode" && !reached.has(subject.id)) reached.set(subject.id, at);
+      if (subject.id !== props.subjectId && subject.type !== "episode" && !reached.has(subject.id)) {
+        reached.set(subject.id, { ...at, name: `${subjectTypeName(t, te, subject.type)} ${subject.key}` });
+      }
     }
   });
 
@@ -149,6 +164,7 @@ const points = computed<Point[]>(() => {
 
   [...reached.entries()].forEach(([id, from], index) => {
     const angle = (2 * Math.PI * index) / Math.max(1, reached.size) - Math.PI / 2 + Math.PI / Math.max(2, reached.size);
+    const name = nameOf(id) ?? from.name;
 
     all.push({
       key: `s${id}`,
@@ -158,9 +174,9 @@ const points = computed<Point[]>(() => {
       y: Math.sin(angle) * OUTER,
       r: 12,
       colour: "var(--ui-secondary)",
-      label: short(nameOf(id)),
-      title: nameOf(id),
-      from
+      label: short(name),
+      title: name,
+      from: { x: from.x, y: from.y }
     });
   });
 

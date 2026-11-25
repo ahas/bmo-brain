@@ -75,16 +75,33 @@ export function brains(): Promise<Brain[]> {
   return whole<Brain>(brainAddress("/brains"));
 }
 
-export function layers(brainId: number): Promise<Layer[]> {
-  return whole<Layer>(under(brainId, "/layers"));
+// The words a list is narrowed by and the page it stands at: `after` the member the page read last ended on, the
+// layer's or the subject's id, or a type's word.
+interface PagedList {
+  q?: string;
+  after?: number | string | null;
+  limit?: number;
+  [name: string]: string | number | boolean | null | undefined;
 }
 
-export function subjects(brainId: number, ids?: number[]): Promise<Subject[]> {
-  return whole<Subject>(under(brainId, "/subjects"), { ids: ids?.join(",") });
+export function layerPage(brainId: number, query: PagedList): Promise<Page<Layer>> {
+  return $fetch<Page<Layer>>(under(brainId, "/layers"), { query: asked(query) });
 }
 
-export function types(brainId: number): Promise<TypeCount[]> {
-  return $fetch<TypeCount[]>(under(brainId, "/types"));
+export function layer(brainId: number, id: number): Promise<Layer> {
+  return $fetch<Layer>(under(brainId, `/layers/${id}`));
+}
+
+export function subjectPage(brainId: number, query: PagedList & { ids?: string }): Promise<Page<Subject>> {
+  return $fetch<Page<Subject>>(under(brainId, "/subjects"), { query: asked(query) });
+}
+
+export function subject(brainId: number, id: number): Promise<Subject> {
+  return $fetch<Subject>(under(brainId, `/subjects/${id}`));
+}
+
+export function typePage(brainId: number, query: PagedList): Promise<Page<TypeCount>> {
+  return $fetch<Page<TypeCount>>(under(brainId, "/types"), { query: asked(query) });
 }
 
 // The filters the memory list and the tallies share, as the routes take them.
@@ -122,8 +139,8 @@ export function memoriesNamed(brainId: number, filter: MemoryFilter): Promise<Me
   return whole<Memory>(under(brainId, "/memories"), { ...filter, ...UNRECORDED });
 }
 
-export function tallies(brainId: number, by: TallyBy, filter: MemoryFilter): Promise<Tally[]> {
-  return $fetch<Tally[]>(under(brainId, "/tallies"), { query: asked({ ...filter, by }) });
+export function tallies(brainId: number, by: TallyBy, filter: MemoryFilter, groups?: string): Promise<Tally[]> {
+  return $fetch<Tally[]>(under(brainId, "/tallies"), { query: asked({ ...filter, by, groups }) });
 }
 
 export function memory(brainId: number, id: number): Promise<Memory> {

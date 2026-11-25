@@ -796,11 +796,18 @@ console bundle contract and served by the brain itself (`docs/boundary-api.md`, 
   the tab head saying what it lists and that choosing one narrows the view. The layers, in position order,
   each with its description and its count of live memories, the unfiled last; the subjects, grouped by type,
   each called by its newest active `name` memory or else by its type and key; the types in use, the reserved
-  ones first, each with its count of live memories. A chosen row stands highlighted and is scrolled into
-  sight, the tab holding it is the one open, and choosing it again clears it. A layer is carried by the
-  pointer, a drag handle at its left, to another place among the layers, a line marking where it will land,
-  and a piece of the layer view dropped on another layer, or on the unfiled, the row under it highlighted,
-  moves there as a new version after its last piece, a persona piece asked first; dropped on its own layer, it
+  ones first, each with its count of live memories. Each list is read a page of fifty at a time, the next
+  page as the index's end comes into view (bmo-ui's `NextPageFoot`, its `docs/design.md`, 「Lists」):
+  placeholder rows stand while a page is on its way, a page that fails leaves the rows already read and
+  stands its reason with a retry in their place, and nothing stands under the last row. The search box above
+  the lists narrows each at the brain by the words, a page at a time. The counts beside the rows are read for
+  the groups on screen alone, a layer's or a subject's by its id, and the unfiled's on its own. A chosen row
+  stands highlighted and is scrolled into sight, the tab holding it is the one open, and choosing it again
+  clears it; a choice standing past the pages read is read by its id, so its name stands and its row is
+  brought into sight. A layer is carried by the pointer, a drag handle at its left, to another place among
+  the layers, a line marking where it will land, while every layer is read and no words narrow the list; a
+  piece of the layer view dropped on another layer, or on the unfiled, the row under it highlighted, moves
+  there as a new version after its last piece, a persona piece asked first; dropped on its own layer, it
   writes nothing. While a piece stands over the index, the layer view shows no line of its own.
 - **Every choice narrows the view, or says why it cannot.** A layer, a subject or a type chosen in the index,
   and every toolbar filter, narrows whatever the view shows: the memories, the layer's items, the memories

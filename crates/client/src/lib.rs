@@ -11,7 +11,7 @@ pub use brains::{
   Injected, Layer, LayerChange, LayersQuery, Learned, Learning, MemoriesQuery, Memory, MemoryMerge,
   MemoryMove, MemoryStatus, MemoryVersion, NewBrain, NewLayer, NewMemory, NewSubject, PersonaQuery, Recall,
   RecallAsk, RecallChoice, RecallPart, Recorded, Restoration, Rules, SheetQuery, Subject, SubjectChange,
-  SubjectKey, SubjectRef, SubjectsQuery, TalliesQuery, Tally, TallyBy, TypeCount,
+  SubjectKey, SubjectRef, SubjectsQuery, TalliesQuery, Tally, TallyBy, TypeCount, TypesQuery,
 };
 pub use brains::{BrainsHeld, OrgUnitQuery, RemovalCounts, Removed};
 pub use brains::{

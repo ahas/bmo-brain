@@ -1744,6 +1744,12 @@ export interface components {
             reserved: boolean;
             type: string;
         };
+        /** @description One page of a list, oldest first. */
+        TypeCountPage: {
+            items: components["schemas"]["TypeCount"][];
+            /** @description Whether anything stands past the last item. */
+            more: boolean;
+        };
         /**
          * @description An unconsolidated episode as a consolidation reads it: the memory, and why it stands where it does in the
          *     order.
@@ -2358,6 +2364,8 @@ export interface operations {
             query?: {
                 after?: number | null;
                 limit?: number | null;
+                /** @description Words the name or the description holds, in any case. */
+                q?: string | null;
             };
             header?: never;
             path: {
@@ -2915,7 +2923,7 @@ export interface operations {
                 ids?: string | null;
                 key?: string | null;
                 limit?: number | null;
-                /** @description Words the description holds, in any case. */
+                /** @description Words the key, the type, the name or the description holds, in any case. */
                 q?: string | null;
                 type?: string | null;
             };
@@ -3080,6 +3088,12 @@ export interface operations {
                 by: components["schemas"]["TallyBy"];
                 /** @description Types left out, comma-separated. */
                 excludeTypes?: string | null;
+                /**
+                 * @description The groups to count, comma-separated: a status or a type by its word, a layer or a subject by its id.
+                 *     Where none is given every group is counted; the group of the rows in no layer or about no subject is
+                 *     counted only where none is named.
+                 */
+                groups?: string | null;
                 /** @description The rows these ids name, comma-separated. */
                 ids?: string | null;
                 key?: string | null;
@@ -3126,7 +3140,13 @@ export interface operations {
     };
     listTypes: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The type the page read last ended on; the next page begins past it, in the order the list stands in. */
+                after?: string | null;
+                limit?: number | null;
+                /** @description Words the type holds, in any case. */
+                q?: string | null;
+            };
             header?: never;
             path: {
                 brainId: number;
@@ -3141,7 +3161,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["TypeCount"][];
+                    "application/json": components["schemas"]["TypeCountPage"];
                 };
             };
             400: components["responses"]["BadRequest"];

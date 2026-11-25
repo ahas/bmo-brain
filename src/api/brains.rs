@@ -13,7 +13,7 @@ use bmo_brain_client::{
   LayersQuery, Learned, Learning, MemoriesQuery, Memory, MemoryMerge, MemoryMove, MemoryVersion,
   MissesQuery, NewBrain, NewLayer, NewMemory, NewSubject, OrgTopic, OrgTopicsQuery, Page, PersonaQuery,
   Recall, RecallAsk, Recorded, Restoration, SearchMiss, SheetQuery, SimilarAsk, Subject, SubjectChange,
-  SubjectsQuery, TalliesQuery, Tally, TypeCount, UnconsolidatedEpisode, UnconsolidatedQuery,
+  SubjectsQuery, TalliesQuery, Tally, TypeCount, TypesQuery, UnconsolidatedEpisode, UnconsolidatedQuery,
 };
 use bmo_brain_client::{BrainKind, OrgUnitQuery, RemovalCounts, Removed};
 
@@ -224,8 +224,12 @@ async fn confirmations(
   Ok(created(Recorded { recorded_count }))
 }
 
-async fn types(State(brain): State<Brain>, Key(id): Key<i64>) -> Answer<Json<Vec<TypeCount>>> {
-  Ok(Json(brain.store.types(id).await?))
+async fn types(
+  State(brain): State<Brain>,
+  Key(id): Key<i64>,
+  Query(query): Query<TypesQuery>,
+) -> Answer<Json<Page<TypeCount>>> {
+  Ok(Json(brain.store.types(id, &query).await?))
 }
 
 async fn tallies(

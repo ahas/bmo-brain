@@ -50,7 +50,7 @@
               <UInput v-model.number="draft.importance" type="number" :min="1" :max="10" class="w-full" />
             </UFormField>
             <UFormField :label="t('brain.field.layer')">
-              <ChoiceSelect v-model="draft.layer" :items="layerItems" value-key="value" class="w-full" />
+              <ChoiceSelect v-model="draft.layer" :items="layerItems" :find="findLayers" value-key="value" class="w-full" />
             </UFormField>
             <UFormField :label="t('brain.field.position')">
               <UInput v-model.number="draft.position" type="number" class="w-full" />
@@ -269,13 +269,51 @@ const grounds = computed(() => memory.value?.subjects.filter((subject) => subjec
 const source = computed(() => memory.value?.labels.source ?? null);
 const labelPairs = computed(() => Object.entries(memory.value?.labels ?? {}).filter(([name]) => name !== "source"));
 
+// The memory's own layer stands in the picker even where it lies past the pages the index had read.
+const ownLayer = ref<Layer | null>(null);
+
+watch(
+  () => [props.brainId, props.memoryId, props.layers, memory.value?.layerId] as const,
+  async () => {
+    const id = memory.value?.layerId;
+
+    if (id === null || id === undefined || props.layers.some((layer) => layer.id === id)) {
+      ownLayer.value = null;
+      return;
+    }
+
+    try {
+      ownLayer.value = await api.layer(props.brainId, id);
+    } catch {
+      ownLayer.value = null;
+    }
+  },
+  { immediate: true }
+);
+
 const layerItems = computed(() => [
   { value: NO_LAYER, label: t("brain.label.unfiled") },
-  ...props.layers.map((layer) => ({ value: String(layer.id), label: layer.name }))
+  ...[...props.layers, ...(ownLayer.value === null ? [] : [ownLayer.value])]
+    .filter((layer, index, all) => all.findIndex((one) => one.id === layer.id) === index)
+    .map((layer) => ({ value: String(layer.id), label: layer.name }))
 ]);
 
+// The layers the picker finds at the brain for the words typed, past the pages the index had read.
+async function findLayers(words: string): Promise<{ value: string; label: string }[]> {
+  try {
+    const page = await api.layerPage(props.brainId, { q: words.trim(), limit: 50 });
+
+    return [
+      { value: NO_LAYER, label: t("brain.label.unfiled") },
+      ...page.items.map((layer) => ({ value: String(layer.id), label: layer.name }))
+    ];
+  } catch {
+    return [];
+  }
+}
+
 function layerName(id: number): string {
-  return props.layers.find((layer) => layer.id === id)?.name ?? `#${id}`;
+  return props.layers.find((layer) => layer.id === id)?.name ?? (ownLayer.value?.id === id ? ownLayer.value.name : `#${id}`);
 }
 
 function stamp(at: number): string {

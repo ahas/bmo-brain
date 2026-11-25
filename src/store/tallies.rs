@@ -9,7 +9,7 @@ use sqlx::{FromRow, Postgres, QueryBuilder};
 
 use super::brains::brain_of;
 use super::versions::Filter;
-use super::{Held, Store};
+use super::{Held, Store, listed};
 
 #[derive(FromRow)]
 struct Counted {
@@ -56,12 +56,26 @@ impl Store {
       TallyBy::Layer => ("m.layer_id::text", ""),
       TallyBy::Subject => ("ms.subject_id::text", " LEFT JOIN memory_subjects ms ON ms.memory_id = m.id"),
     };
+    let asked = listed(query.groups.as_deref());
     let mut sql = QueryBuilder::<Postgres>::new(format!(
       "SELECT {grouped} AS grouped, m.importance, m.hits, m.last_hit_at, m.valid_from \
        FROM (SELECT * FROM memories WHERE brain_id = "
     ));
     sql.push_bind(brain_id);
     filter.push(&mut sql);
+    // A caller that names the groups it is standing on asks for those alone: the brain narrows the rows to them
+    // before counting, rather than counting every group of the brain and handing the rest back to be dropped.
+    if !asked.is_empty() {
+      match query.by {
+        TallyBy::Status => sql.push(" AND status = ANY(").push_bind(asked).push(")"),
+        TallyBy::Type => sql.push(" AND type = ANY(").push_bind(asked).push(")"),
+        TallyBy::Layer => sql.push(" AND layer_id::text = ANY(").push_bind(asked).push(")"),
+        TallyBy::Subject => sql
+          .push(" AND id IN (SELECT memory_id FROM memory_subjects WHERE subject_id::text = ANY(")
+          .push_bind(asked)
+          .push("))"),
+      };
+    }
     sql.push(format!(") m{joined}"));
     let rows: Vec<Counted> = sql.build_query_as().fetch_all(&mut *conn).await?;
     let mut groups: BTreeMap<Option<String>, Sums> = BTreeMap::new();

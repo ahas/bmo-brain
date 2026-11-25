@@ -65,8 +65,10 @@ kill.
   only the console bundle and what the screen uses (「The console bundle」), and any other route is answered
   403 `forbidden` to it.
 - **Pages.** A list answers `{"items": [...], "more": boolean}`, oldest first by the member's `id` where its
-  route names no other order, and is paged by `after`, the last `id` seen, the page continuing past that
-  member in the order the list stands in, and `limit` (50 where none is given, at most 500).
+  route names no other order, and is paged by `after` and `limit` (50 where none is given, at most 500).
+  `after` names the member the page read last ended on, and the next page begins past that member in the order
+  the list stands in: the member's `id` where the list stands by `id`, or the word the list stands in order of
+  where it has no `id` (`GET /types` pages by type name).
 - **Times** are epoch milliseconds. **Ids** are signed 64-bit integers the brain assigns.
 - **Strings.** `text` of a memory is not blank and at most 64000 characters, and a `recallCondition` or
   `releaseCondition` not blank and at most 1000. Anything outside is answered 400 `bad-request`.
@@ -162,7 +164,7 @@ the text of its newest `active` one, or null where it has none.
 
 | Route | Does | Answers |
 |---|---|---|
-| `GET /subjects` | lists by `type`, `key`, `q` (words the description holds) and `ids` (comma-separated ids) | 200, a page |
+| `GET /subjects` | lists by `type`, `key`, `q` (words the key, the type, the description or the newest active `name` holds) and `ids` (comma-separated ids) | 200, a page |
 | `POST /subjects` | `type`, `key`, `description`: makes the subject, or finds the one standing and sets its description where one is given | 201 where new, 200 where it stood |
 | `GET /subjects/{subjectId}` | reads one | 200; 404 |
 | `PATCH /subjects/{subjectId}` | sets `description` | 200; 404 |
@@ -183,7 +185,7 @@ A layer is a heading in the brain's table of contents: `id`, `brainId`, `name` (
 
 | Route | Does | Answers |
 |---|---|---|
-| `GET /layers` | lists them | 200, a page |
+| `GET /layers` | lists them, by `q` (words the name or the description holds) | 200, a page |
 | `POST /layers` | `name`, `description`, `position` (after the last where none is given): makes the layer, or finds the one standing at its name | 201 where new, 200 where it stood |
 | `GET /layers/{layerId}` | reads one | 200; 404 |
 | `PATCH /layers/{layerId}` | sets `description` or `position` | 200; 404 |
@@ -251,8 +253,8 @@ moves a caller's word may make:
 | `GET /lineages/{lineageId}` | every version of a lineage, oldest first | 200, a list; 404 |
 | `POST /hits` | records a hand-out, or the rows the agent used: `memoryIds`, `actorName`, `sessionKey` (which marks the rows for that session), `at`; a use of each row | 201, `recordedCount` |
 | `POST /confirmations` | records confirmations: `memoryIds`, `actorName`, `at`; a use of each row and its `lastConfirmedAt` set, nothing else | 201, `recordedCount` |
-| `GET /types` | the types in use, each `type`, `count` (its live memories, `active` and `pending`) and `reserved`, the reserved ones first; a type with no live memory is in use only where it is reserved, with the count 0, and the closed rows of every type stay readable through `GET /memories` and `GET /tallies` by status | 200, a list |
-| `GET /tallies` | the memories `GET /memories` would list under the same filters (paging and order aside), grouped `by` `status`, `type`, `layer` or `subject`: each group's `group` (the status, the type, or the layer's or subject's id in decimal; null for the rows in no layer or about no subject), `count`, `importance` and `useCount` (each the group's mean), `lastUsedAt` (the latest use among the group's rows, or null) and `latestValidFrom`, the largest groups first; a row about several subjects counts in each | 200, a list |
+| `GET /types` | the types in use, each `type`, `count` (its live memories, `active` and `pending`) and `reserved`, the reserved ones first then each by its name; a type with no live memory is in use only where it is reserved, with the count 0, and the closed rows of every type stay readable through `GET /memories` and `GET /tallies` by status; `q` (words the type holds) narrows it, and its `after` is the type the last page ended on | 200, a page |
+| `GET /tallies` | the memories `GET /memories` would list under the same filters (paging and order aside), grouped `by` `status`, `type`, `layer` or `subject`: each group's `group` (the status, the type, or the layer's or subject's id in decimal; null for the rows in no layer or about no subject), `count`, `importance` and `useCount` (each the group's mean), `lastUsedAt` (the latest use among the group's rows, or null) and `latestValidFrom`, the largest groups first; a row about several subjects counts in each; `groups` (comma-separated) counts those groups alone, a status or a type by its word and a layer or a subject by its id, and counts the null group only where none is named | 200, a list |
 
 `order` is a field the list is ordered by, `id` (where none is given), `position` (by layer position, then
 `id`), `validFrom`, `importance` or `useCount`, each ascending, or descending with a leading `-`; ties go by

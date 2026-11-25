@@ -27,7 +27,7 @@
         </UFormField>
         <div v-else class="grid grid-cols-2 gap-3">
           <UFormField :label="t('brain.field.layer')">
-            <ChoiceSelect v-model="layer" :items="layerItems" value-key="value" class="w-full" />
+            <ChoiceSelect v-model="layer" :items="layerItems" :find="findLayers" value-key="value" class="w-full" />
           </UFormField>
           <UFormField :label="t('brain.field.position')" :hint="t('brain.hint.position')">
             <UInput v-model="position" type="number" class="w-full" />
@@ -106,6 +106,17 @@ const judgements = computed(() =>
 );
 
 const layerItems = computed(() => props.layers.map((found) => ({ value: String(found.id), label: found.name })));
+
+// The layers the picker finds at the brain for the words typed, past the pages the index had read.
+async function findLayers(words: string): Promise<{ value: string; label: string }[]> {
+  try {
+    const page = await api.layerPage(props.brainId, { q: words.trim(), limit: 50 });
+
+    return page.items.map((found) => ({ value: String(found.id), label: found.name }));
+  } catch {
+    return [];
+  }
+}
 
 watch(open, (opened) => {
   if (!opened) return;

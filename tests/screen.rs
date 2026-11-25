@@ -61,6 +61,7 @@ fn tallies(by: TallyBy) -> TalliesQuery {
     label: None,
     q: None,
     situation: None,
+    groups: None,
   }
 }
 
@@ -362,6 +363,52 @@ async fn a_tally_counts_the_rows_of_each_group_under_the_lists_filters() {
     .map(|tally| (tally.group.as_deref(), tally.count, tally.importance))
     .collect();
   assert_eq!(groups, [(Some("fact"), 2, 6.0), (Some("lore"), 1, 2.0)]);
+  // A caller that names the groups it stands on is answered those alone, and the group of the rows in no
+  // layer or about no subject only where none is named.
+  let narrowed = client
+    .tallies(
+      brain,
+      &TalliesQuery {
+        groups: Some("fact".to_owned()),
+        ..tallies(TallyBy::Type)
+      },
+    )
+    .await
+    .unwrap();
+  assert_eq!(
+    narrowed.iter().map(|tally| (tally.group.as_deref(), tally.count)).collect::<Vec<_>>(),
+    [(Some("fact"), 2)]
+  );
+  let layer_key = layer.id.to_string();
+  let one_layer = client
+    .tallies(
+      brain,
+      &TalliesQuery {
+        status: Some("active,pending".to_owned()),
+        groups: Some(layer_key.clone()),
+        ..tallies(TallyBy::Layer)
+      },
+    )
+    .await
+    .unwrap();
+  assert_eq!(
+    one_layer.iter().map(|tally| (tally.group.as_deref(), tally.count)).collect::<Vec<_>>(),
+    [(Some(layer_key.as_str()), 1)]
+  );
+  let unfiled = client
+    .tallies(
+      brain,
+      &TalliesQuery {
+        unfiled: Some(true),
+        ..tallies(TallyBy::Layer)
+      },
+    )
+    .await
+    .unwrap();
+  assert_eq!(
+    unfiled.iter().map(|tally| (tally.group.as_deref(), tally.count)).collect::<Vec<_>>(),
+    [(None, 1)]
+  );
   let live = client
     .tallies(
       brain,
@@ -372,7 +419,6 @@ async fn a_tally_counts_the_rows_of_each_group_under_the_lists_filters() {
     )
     .await
     .unwrap();
-  let layer_key = layer.id.to_string();
   let groups: Vec<(Option<&str>, i64)> =
     live.iter().map(|tally| (tally.group.as_deref(), tally.count)).collect();
   assert_eq!(groups, [(None, 1), (Some(layer_key.as_str()), 1)]);
@@ -603,6 +649,30 @@ async fn a_subject_is_called_by_its_newest_active_name_and_listed_by_ids() {
   assert_eq!(client.subject(brain, person_id).await.unwrap().name.as_deref(), Some("The writer"));
   client.memory_move(brain, newer.id, &moved(MemoryStatus::Invalidated)).await.unwrap();
   assert_eq!(client.subject(brain, person_id).await.unwrap().name.as_deref(), Some("Writer A"));
+
+  // The words reach the name the subject is called by, the newest active one, and no name it no longer carries.
+  let by_name = client
+    .subjects(
+      brain,
+      &SubjectsQuery {
+        q: Some("The writer".to_owned()),
+        ..SubjectsQuery::default()
+      },
+    )
+    .await
+    .unwrap();
+  assert!(by_name.items.is_empty(), "{:?}", by_name.items);
+  let by_active = client
+    .subjects(
+      brain,
+      &SubjectsQuery {
+        q: Some("Writer A".to_owned()),
+        ..SubjectsQuery::default()
+      },
+    )
+    .await
+    .unwrap();
+  assert_eq!(by_active.items.iter().map(|subject| subject.id).collect::<Vec<_>>(), [person_id]);
 
   let named = client
     .subjects(

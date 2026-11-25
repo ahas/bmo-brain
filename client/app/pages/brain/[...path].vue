@@ -75,6 +75,7 @@
                       value-key="value"
                       :aria-label="t('brain.label.type')"
                       :disabled="!honours(place.view, 'type')"
+                      :find="findTypes"
                       class="w-full"
                       @update:model-value="go({ type: String($event) })"
                     />
@@ -127,7 +128,7 @@
               <UFormField :label="t('brain.label.brain')" class="px-3 pb-3">
                 <ChoiceSelect v-bind="brainSelect" class="w-full" />
               </UFormField>
-              <BrainIndex v-bind="indexProps" @choose="indexOpen = false; choose($event)" @changed="reread" />
+              <BrainIndex v-bind="indexProps" v-model:tab="indexTab" v-model:words="indexWords" @choose="indexOpen = false; choose($event)" @changed="reread" />
             </template>
           </UDrawer>
         </div>
@@ -143,7 +144,7 @@
         >
           <template #index>
             <div class="flex min-h-0 min-w-0 flex-1 flex-col">
-              <BrainIndex v-bind="indexProps" @choose="choose" @changed="reread" />
+              <BrainIndex v-bind="indexProps" v-model:tab="indexTab" v-model:words="indexWords" @choose="choose" @changed="reread" />
             </div>
           </template>
           <template #view>
@@ -216,6 +217,8 @@ const TWO_SIDES: SplitterItem[] = [
 ];
 
 const PAGE = 50;
+// The first page of an index list, and the most the index reads at once.
+const INDEX_PAGE = 50;
 
 const route = useRoute();
 const router = useRouter();
@@ -242,6 +245,33 @@ const layerCounts = ref<Tally[]>([]);
 const subjectCounts = ref<Tally[]>([]);
 const statusCounts = ref<Tally[]>([]);
 const typeCounts = ref<Tally[]>([]);
+// The index's three lists, each read a page at a time: whether a list stands loaded, whether a page is on its way,
+// whether more stands past its last page, the cursor the last page ended on, and the words it was read under.
+type IndexTab = "layers" | "subjects" | "types";
+const indexTab = ref<IndexTab>("layers");
+const indexWords = ref("");
+const layerMore = ref(false);
+const subjectMore = ref(false);
+// The type filter's own first page, read at the brain for the choices it opens with, and the chosen type among them.
+const choiceTypes = ref<TypeCount[]>([]);
+const typeMore = ref(false);
+const layerBusy = ref(false);
+const subjectBusy = ref(false);
+const typeBusy = ref(false);
+const layerLoaded = ref(false);
+const subjectLoaded = ref(false);
+const typeLoaded = ref(false);
+const layerCursor = ref<number | null>(null);
+const subjectCursor = ref<number | null>(null);
+const typeCursor = ref<string | null>(null);
+// The words each list was read under, so a tab opened after the search changed reads it afresh.
+const wordsOf: Record<IndexTab, string> = { layers: "", subjects: "", types: "" };
+// Bumped when a first page lands or a chosen member stands in a list, so the index brings the chosen row into sight
+// then, and never as a next page lands under a reader scrolled down.
+const reveal = ref(0);
+// The names of the layers and the subjects the memories on screen hold, read for those the index's pages do not carry.
+const namedLayers = ref(new Map<number, string>());
+const namedSubjects = ref(new Map<number, string>());
 const memories = ref<Memory[] | null>(null);
 const more = ref(false);
 const listFailure = ref("");
@@ -393,9 +423,9 @@ const statusItems = computed(() =>
 );
 
 const typeItems = computed(() => {
-  const all = typeCounts.value.reduce((sum, tally) => sum + tally.count, 0);
+  const all = statusCounts.value.reduce((sum, tally) => sum + tally.count, 0);
   const episodes = countOf(typeCounts.value, ["episode"]);
-  const named = typeList.value.map((type) => ({
+  const named = choiceTypes.value.map((type) => ({
     value: type.type,
     label: `${typeName(t, te, type.type)} · ${countOf(typeCounts.value, [type.type]).toLocaleString()}`
   }));
@@ -406,6 +436,46 @@ const typeItems = computed(() => {
     ...named
   ];
 });
+
+// The type filter's choices found at the brain for the words typed, each with the count of the memories the other
+// filters narrow it to: the road the picker searches by, past the first page the list stands on.
+async function findTypes(words: string): Promise<{ value: string; label: string; description?: string }[]> {
+  const brainId = place.value.brainId;
+  const asked = words.trim();
+
+  if (brainId === null || asked === "") return [];
+
+  // A reserved type is shown by its name in the reader's language, so the choices read already are searched by that
+  // name; the road adds the types the brain finds by their own word, which is the word a type of the writer's has.
+  const countOf = (kind: string): string =>
+    (typeCounts.value.find((tally) => tally.group === kind)?.count ?? 0).toLocaleString();
+  const choice = (type: TypeCount, count: string) => {
+    const name = typeName(t, te, type.type);
+
+    return { value: type.type, label: `${name} · ${count}`, ...(name === type.type ? {} : { description: type.type }) };
+  };
+  const lower = asked.toLocaleLowerCase();
+  const local = choiceTypes.value
+    .filter((type) => typeName(t, te, type.type).toLocaleLowerCase().includes(lower))
+    .map((type) => choice(type, countOf(type.type)));
+
+  try {
+    const page = await api.typePage(brainId, { q: asked, limit: INDEX_PAGE });
+    const kinds = page.items.map((type) => type.type);
+    const counted =
+      kinds.length === 0 ? [] : await api.tallies(brainId, "type", filterOf(place.value, "type"), kinds.join(","));
+    const found = new Set(local.map((one) => one.value));
+
+    return [
+      ...local,
+      ...page.items
+        .filter((type) => !found.has(type.type))
+        .map((type) => choice(type, (counted.find((tally) => tally.group === type.type)?.count ?? 0).toLocaleString()))
+    ];
+  } catch {
+    return local;
+  }
+}
 
 const orderItems = computed(() => ORDERS.map((order) => ({ value: order, label: t(`brain.order.${order.replace("-", "desc_")}`) })));
 
@@ -510,41 +580,367 @@ async function readBrains(): Promise<void> {
   }
 }
 
-// The index: the layers, the subjects and the types, with their live counts.
-async function readIndex(brainId: number): Promise<void> {
-  const live = { status: "active,pending" };
+// The index's lists are a person's view of a brain, read fifty at a time and the next fifty as the index's end
+// comes into view (bmo-ui's NextPageFoot). Each page's groups are counted alone, and a chosen member standing past
+// the pages read is read by its id so its name and its row stand.
+
+const TABS: IndexTab[] = ["layers", "subjects", "types"];
+
+function shownOf(tab: IndexTab): { length: number } {
+  return tab === "layers" ? layerList.value : tab === "subjects" ? subjectList.value : typeList.value;
+}
+
+function busyOf(tab: IndexTab) {
+  return tab === "layers" ? layerBusy : tab === "subjects" ? subjectBusy : typeBusy;
+}
+
+function loadedOf(tab: IndexTab) {
+  return tab === "layers" ? layerLoaded : tab === "subjects" ? subjectLoaded : typeLoaded;
+}
+
+// A count's groups merged into those already counted, the later read winning for a group.
+function mergeCounts(kept: Tally[], counted: Tally[]): Tally[] {
+  const byGroup = new Map(kept.map((tally) => [tally.group, tally]));
+
+  for (const tally of counted) byGroup.set(tally.group, tally);
+
+  return [...byGroup.values()];
+}
+
+function mergeById<T extends { id: number }>(kept: T[], added: T[]): T[] {
+  const byId = new Map(kept.map((one) => [one.id, one]));
+
+  for (const one of added) byId.set(one.id, one);
+
+  return [...byId.values()];
+}
+
+function mergeTypes(kept: TypeCount[], added: TypeCount[]): TypeCount[] {
+  const byKind = new Map(kept.map((one) => [one.type, one]));
+
+  for (const one of added) byKind.set(one.type, one);
+
+  return [...byKind.values()].sort(byType);
+}
+
+function byPosition(first: Layer, second: Layer): number {
+  return first.position - second.position || first.id - second.id;
+}
+
+function byId(first: Subject, second: Subject): number {
+  return first.id - second.id;
+}
+
+// The reserved types first, in the order the route gives them, then every other by its name.
+function byType(first: TypeCount, second: TypeCount): number {
+  if (first.reserved !== second.reserved) return first.reserved ? -1 : 1;
+
+  return first.reserved ? 0 : first.type.localeCompare(second.type);
+}
+
+// The types in use: a reserved type with no live row stands in the route's list but not the screen's, but for the
+// type the person narrowed the view to, which stands so the choice keeps its row.
+function usedTypes(types: TypeCount[]): TypeCount[] {
+  return types.filter((type) => type.count > 0 || type.type === place.value.type);
+}
+
+// The live rows of the layers and the subjects a page holds, and the unfiled's on its own.
+async function readLayerCounts(brainId: number, shown: Layer[]): Promise<void> {
+  const counted =
+    shown.length === 0
+      ? []
+      : await api.tallies(brainId, "layer", { status: "active,pending" }, shown.map((layer) => String(layer.id)).join(","));
+  const unfiled = await api.tallies(brainId, "layer", { status: "active,pending", unfiled: true });
+
+  layerCounts.value = mergeCounts(mergeCounts(layerCounts.value, counted), unfiled);
+}
+
+async function readSubjectCounts(brainId: number, shown: Subject[]): Promise<void> {
+  if (shown.length === 0) return;
+
+  const counted = await api.tallies(
+    brainId,
+    "subject",
+    { status: "active,pending" },
+    shown.map((subject) => String(subject.id)).join(",")
+  );
+
+  subjectCounts.value = mergeCounts(subjectCounts.value, counted);
+}
+
+const chosenLayer = (): number | null => (typeof place.value.layer === "number" ? place.value.layer : null);
+
+// A chosen member standing past the pages read is read by its id, so its name stands and its row is in sight.
+async function ensureLayer(brainId: number, id: number | null): Promise<void> {
+  if (id === null || layerList.value.some((layer) => layer.id === id)) return;
 
   try {
-    const [layers, subjects, types, byLayer, bySubject] = await Promise.all([
-      api.layers(brainId),
-      api.subjects(brainId),
-      api.types(brainId),
-      api.tallies(brainId, "layer", live),
-      api.tallies(brainId, "subject", live)
-    ]);
+    const found = await api.layer(brainId, id);
 
-    layerList.value = layers;
-    subjectList.value = subjects;
-    typeList.value = types.filter((type) => type.count > 0);
-    layerCounts.value = byLayer;
-    subjectCounts.value = bySubject;
-  } catch (error) {
-    island.fail(error, t("brain.error.read"));
+    layerList.value = mergeById(layerList.value, [found]).sort(byPosition);
+    reveal.value++;
+    await readLayerCounts(brainId, [found]);
+  } catch {
+    // A layer the brain no longer holds stands by its number in the heading.
   }
 }
 
-// The counts beside the status and type choices, each under every filter but its own.
-async function readCounts(brainId: number): Promise<void> {
+async function ensureSubject(brainId: number, id: number | null): Promise<void> {
+  if (id === null || subjectList.value.some((subject) => subject.id === id)) return;
+
   try {
-    const [byStatus, byType] = await Promise.all([
+    const page = await api.subjectPage(brainId, { ids: String(id) });
+    const found = page.items.find((subject) => subject.id === id);
+
+    if (found === undefined) return;
+
+    subjectList.value = mergeById(subjectList.value, [found]).sort(byId);
+    reveal.value++;
+    await readSubjectCounts(brainId, [found]);
+  } catch {
+    // A subject the brain no longer holds stands by its number in the heading.
+  }
+}
+
+function concrete(type: string): boolean {
+  return type !== EVERY_TYPE && type !== EVERY_TYPE_BUT_EPISODES && !type.startsWith("*");
+}
+
+async function ensureType(brainId: number, kind: string): Promise<void> {
+  if (!concrete(kind) || typeList.value.some((type) => type.type === kind)) return;
+
+  try {
+    const page = await api.typePage(brainId, { q: kind, limit: 500 });
+    const found = page.items.find((type) => type.type === kind);
+
+    if (found === undefined) return;
+
+    typeList.value = mergeTypes(typeList.value, [found]);
+    reveal.value++;
+  } catch {
+    // A type the brain no longer holds stands by its word in the heading.
+  }
+}
+
+// The chosen type stands among the filter's choices even where it lies past their first page.
+async function ensureChoiceType(brainId: number, kind: string): Promise<void> {
+  if (!concrete(kind) || choiceTypes.value.some((type) => type.type === kind)) return;
+
+  try {
+    const page = await api.typePage(brainId, { q: kind, limit: 500 });
+    const found = page.items.find((type) => type.type === kind);
+
+    if (found === undefined) return;
+
+    choiceTypes.value = mergeTypes(choiceTypes.value, [found]);
+    await readCounts(brainId);
+  } catch {
+    // The type's count stands at nothing where the brain no longer holds it.
+  }
+}
+
+// The type filter's first page, read at the brain for the choices it opens with.
+let filterEpoch = 0;
+async function readFilterTypes(brainId: number): Promise<void> {
+  const epoch = ++filterEpoch;
+
+  try {
+    const page = await api.typePage(brainId, { limit: INDEX_PAGE });
+
+    if (epoch !== filterEpoch) return;
+
+    choiceTypes.value = usedTypes(page.items);
+    await readCounts(brainId);
+    await ensureChoiceType(brainId, place.value.type);
+  } catch {
+    // The filter's list stands empty; its search still reaches every type.
+  }
+}
+
+// Each tab's reads are taken in turn: a read a newer one overtook leaves the list as the newer one found it, so a
+// brain changed or words typed while a page is on its way never has the older answer drawn over it.
+const tokens: Record<IndexTab, number> = { layers: 0, subjects: 0, types: 0 };
+
+function claims(tab: IndexTab): number {
+  return ++tokens[tab];
+}
+
+function current(tab: IndexTab, token: number): boolean {
+  return tokens[tab] === token;
+}
+
+function release(tab: IndexTab, token: number): void {
+  if (current(tab, token)) busyOf(tab).value = false;
+}
+
+// A list's first page, or as many members as were read already where the list is read again.
+async function readFirst(brainId: number, tab: IndexTab, wanted = INDEX_PAGE): Promise<void> {
+  const token = claims(tab);
+
+  busyOf(tab).value = true;
+
+  try {
+    if (tab === "layers") {
+      const page = await api.layerPage(brainId, { q: indexWords.value, limit: Math.min(wanted, 500) });
+
+      if (!current(tab, token)) return;
+
+      layerList.value = page.items;
+      layerMore.value = page.more;
+      layerCursor.value = page.items.at(-1)?.id ?? null;
+      layerLoaded.value = true;
+      wordsOf.layers = indexWords.value;
+      layerCounts.value = [];
+      await readLayerCounts(brainId, page.items);
+      if (!current(tab, token)) return;
+      await ensureLayer(brainId, chosenLayer());
+      reveal.value++;
+    } else if (tab === "subjects") {
+      const page = await api.subjectPage(brainId, { q: indexWords.value, limit: Math.min(wanted, 500) });
+
+      if (!current(tab, token)) return;
+
+      subjectList.value = page.items;
+      subjectMore.value = page.more;
+      subjectCursor.value = page.items.at(-1)?.id ?? null;
+      subjectLoaded.value = true;
+      wordsOf.subjects = indexWords.value;
+      subjectCounts.value = [];
+      await readSubjectCounts(brainId, page.items);
+      if (!current(tab, token)) return;
+      await ensureSubject(brainId, place.value.subject);
+      reveal.value++;
+    } else {
+      const page = await api.typePage(brainId, { q: indexWords.value, limit: Math.min(wanted, 500) });
+
+      if (!current(tab, token)) return;
+
+      typeList.value = usedTypes(page.items);
+      typeMore.value = page.more;
+      typeCursor.value = page.items.at(-1)?.type ?? null;
+      typeLoaded.value = true;
+      wordsOf.types = indexWords.value;
+      if (!current(tab, token)) return;
+      // The first page under no words is the type filter's own list, counted under the filters it opens with.
+      if (indexWords.value === "") {
+        choiceTypes.value = usedTypes(page.items);
+        await readCounts(brainId);
+        if (!current(tab, token)) return;
+        await ensureChoiceType(brainId, place.value.type);
+      }
+      await ensureType(brainId, place.value.type);
+      reveal.value++;
+    }
+  } catch (error) {
+    if (current(tab, token)) {
+      loadedOf(tab).value = false;
+      island.fail(error, t("brain.error.read"));
+    }
+  } finally {
+    release(tab, token);
+  }
+}
+
+// One page more, after the member the last page ended on; a failure is thrown to the foot, which keeps what was read
+// and stands its retry in place of the page.
+async function readNext(tab: IndexTab): Promise<void> {
+  const brainId = place.value.brainId;
+
+  if (brainId === null) return;
+
+  const token = claims(tab);
+
+  busyOf(tab).value = true;
+
+  try {
+    if (tab === "layers") {
+      const page = await api.layerPage(brainId, { q: indexWords.value, after: layerCursor.value, limit: INDEX_PAGE });
+
+      if (!current(tab, token)) return;
+
+      layerList.value = mergeById(layerList.value, page.items).sort(byPosition);
+      layerMore.value = page.more;
+      layerCursor.value = page.items.at(-1)?.id ?? layerCursor.value;
+      await readLayerCounts(brainId, page.items);
+    } else if (tab === "subjects") {
+      const page = await api.subjectPage(brainId, { q: indexWords.value, after: subjectCursor.value, limit: INDEX_PAGE });
+
+      if (!current(tab, token)) return;
+
+      subjectList.value = mergeById(subjectList.value, page.items).sort(byId);
+      subjectMore.value = page.more;
+      subjectCursor.value = page.items.at(-1)?.id ?? subjectCursor.value;
+      await readSubjectCounts(brainId, page.items);
+    } else {
+      const page = await api.typePage(brainId, { q: indexWords.value, after: typeCursor.value, limit: INDEX_PAGE });
+
+      if (!current(tab, token)) return;
+
+      typeList.value = usedTypes(mergeTypes(typeList.value, page.items));
+      typeMore.value = page.more;
+      typeCursor.value = page.items.at(-1)?.type ?? typeCursor.value;
+    }
+  } finally {
+    release(tab, token);
+  }
+}
+
+// A list taken back to nothing, so the tab that opens next reads it afresh; a read on its way is overtaken.
+function clearTab(tab: IndexTab): void {
+  tokens[tab]++;
+  busyOf(tab).value = false;
+
+  if (tab === "layers") {
+    layerList.value = [];
+    layerMore.value = false;
+    layerLoaded.value = false;
+    layerCursor.value = null;
+    layerCounts.value = [];
+  } else if (tab === "subjects") {
+    subjectList.value = [];
+    subjectMore.value = false;
+    subjectLoaded.value = false;
+    subjectCursor.value = null;
+    subjectCounts.value = [];
+  } else {
+    typeList.value = [];
+    typeMore.value = false;
+    typeLoaded.value = false;
+    typeCursor.value = null;
+  }
+}
+
+// The open tab reads its first page, under the words standing now; one not yet opened reads when it is.
+function ensureTab(brainId: number, tab: IndexTab): void {
+  if (loadedOf(tab).value && wordsOf[tab] === indexWords.value) return;
+
+  clearTab(tab);
+  void readFirst(brainId, tab);
+}
+
+// The counts beside the status and type choices, each under every filter but its own. The type choices' counts are
+// the filter's types' groups and the episodes' own, read for the groups the picker shows alone.
+let countsToken = 0;
+async function readCounts(brainId: number): Promise<void> {
+  const token = ++countsToken;
+  const typeFilter = filterOf(place.value, "type");
+  const kinds = choiceTypes.value.map((type) => type.type).join(",");
+  const episodes = api.tallies(brainId, "type", typeFilter, "episode");
+  const loaded = kinds === "" ? Promise.resolve<Tally[]>([]) : api.tallies(brainId, "type", typeFilter, kinds);
+
+  try {
+    const [byStatus, byEpisode, byType] = await Promise.all([
       api.tallies(brainId, "status", filterOf(place.value, "status")),
-      api.tallies(brainId, "type", filterOf(place.value, "type"))
+      episodes,
+      loaded
     ]);
 
+    if (token !== countsToken) return;
+
     statusCounts.value = byStatus;
-    typeCounts.value = byType;
+    typeCounts.value = mergeCounts(byEpisode, byType);
   } catch (error) {
-    island.fail(error, t("brain.error.read"));
+    if (token === countsToken) island.fail(error, t("brain.error.read"));
   }
 }
 
@@ -558,6 +954,8 @@ async function readList(brainId: number, keepLength = false): Promise<void> {
     memories.value = page.items;
     more.value = page.more;
     listFailure.value = "";
+    void nameLayers(brainId, page.items);
+    void nameSubjects(brainId, page.items);
   } catch (error) {
     listFailure.value = t("brain.error.read");
     island.fail(error, t("brain.error.read"));
@@ -576,9 +974,57 @@ async function readMore(): Promise<void> {
 
   memories.value = [...(memories.value ?? []), ...page.items];
   more.value = page.more;
+  void nameLayers(brainId, page.items);
+  void nameSubjects(brainId, page.items);
 }
 
-// What the brain said changed, read again where it stands; the list keeps the pages it had read.
+// The names of the layers named, read for those the index's pages do not carry.
+async function nameLayerIds(brainId: number, ids: number[]): Promise<void> {
+  const known = new Set([...layerList.value.map((layer) => layer.id), ...namedLayers.value.keys()]);
+  const wanted = [...new Set(ids)].filter((id) => !known.has(id));
+
+  if (wanted.length === 0) return;
+
+  try {
+    const found = await Promise.all(wanted.slice(0, 50).map((id) => api.layer(brainId, id).catch(() => null)));
+    const names = new Map(namedLayers.value);
+
+    for (const layer of found) if (layer !== null) names.set(layer.id, layer.name);
+    namedLayers.value = names;
+  } catch {
+    // A layer the brain no longer holds is shown by its number.
+  }
+}
+
+// The names of the layers a page of memories holds.
+async function nameLayers(brainId: number, page: Memory[]): Promise<void> {
+  await nameLayerIds(
+    brainId,
+    page.map((memory) => memory.layerId).filter((id): id is number => id !== null && id !== undefined)
+  );
+}
+
+// The names of the subjects a page of memories holds, read for those the index's pages do not carry.
+async function nameSubjects(brainId: number, page: Memory[]): Promise<void> {
+  const known = new Set([...subjectList.value.map((subject) => subject.id), ...namedSubjects.value.keys()]);
+  const wanted = [...new Set(page.flatMap((memory) => memory.subjects.map((subject) => subject.id)))].filter(
+    (id) => !known.has(id)
+  );
+
+  if (wanted.length === 0) return;
+
+  try {
+    const found = await api.subjectPage(brainId, { ids: wanted.join(","), limit: Math.min(wanted.length, 500) });
+    const names = new Map(namedSubjects.value);
+
+    for (const subject of found.items) names.set(subject.id, subject.name ?? `${subjectTypeName(t, te, subject.type)} ${subject.key}`);
+    namedSubjects.value = names;
+  } catch {
+    // A subject the brain no longer holds is shown by its key.
+  }
+}
+
+// What the brain said changed, read again where it stands; the open list keeps the pages it had read.
 function reread(): void {
   const brainId = place.value.brainId;
 
@@ -586,8 +1032,12 @@ function reread(): void {
 
   if (brainId === null) return;
 
-  void readIndex(brainId);
-  void readCounts(brainId);
+  const tab = indexTab.value;
+  const depth = Math.min(500, Math.max(INDEX_PAGE, shownOf(tab).length));
+
+  for (const other of TABS) if (other !== tab) clearTab(other);
+  void readFirst(brainId, tab, depth);
+  if (!(tab === "types" && indexWords.value === "")) void readFilterTypes(brainId);
   void readList(brainId, true);
 }
 
@@ -605,7 +1055,54 @@ watch(
     if (brainId === null) return;
 
     memories.value = null;
-    void readIndex(brainId);
+    namedLayers.value = new Map();
+    namedSubjects.value = new Map();
+    choiceTypes.value = [];
+    for (const tab of TABS) clearTab(tab);
+    // Each list opens with its first page, bounded; the rest comes as the index is scrolled.
+    void readFirst(brainId, "layers");
+    void readFirst(brainId, "subjects");
+    void readFirst(brainId, "types");
+    if (indexWords.value !== "") void readFilterTypes(brainId);
+  },
+  { immediate: true }
+);
+
+// The open tab reads its first page when it is opened, under the words standing then.
+watch(indexTab, (tab) => {
+  const brainId = place.value.brainId;
+
+  if (brainId !== null) ensureTab(brainId, tab);
+});
+
+// The words narrow the three lists at the brain; the open tab reads afresh once typing stands still.
+let wordsTimer: ReturnType<typeof setTimeout> | undefined;
+watch(indexWords, () => {
+  const brainId = place.value.brainId;
+
+  if (brainId === null) return;
+  if (wordsTimer !== undefined) clearTimeout(wordsTimer);
+  wordsTimer = setTimeout(() => {
+    // The brain may have changed under the words; the lists of the one standing read now.
+    if (place.value.brainId !== brainId) return;
+    // The open list reads under the new words; another tab reads when it is opened.
+    clearTab(indexTab.value);
+    void readFirst(brainId, indexTab.value);
+  }, 250);
+});
+
+// A chosen layer, subject or type standing past the pages read is read by its id.
+watch(
+  () => [place.value.layer, place.value.subject, place.value.type] as const,
+  () => {
+    const brainId = place.value.brainId;
+
+    if (brainId === null) return;
+
+    void ensureLayer(brainId, chosenLayer());
+    void ensureSubject(brainId, place.value.subject);
+    void ensureType(brainId, place.value.type);
+    void ensureChoiceType(brainId, place.value.type);
   },
   { immediate: true }
 );
@@ -627,7 +1124,23 @@ useBrainStream(() => place.value.brainId, reread);
 
 onMounted(() => void readBrains());
 
-const subjectNames = computed(() => new Map(subjectList.value.map((subject) => [subject.id, subject.name ?? `${subjectTypeName(t, te, subject.type)} ${subject.key}`])));
+const layerNames = computed(() => {
+  const names = new Map<number, string>();
+
+  for (const layer of layerList.value) names.set(layer.id, layer.name);
+  for (const [id, name] of namedLayers.value) names.set(id, name);
+
+  return names;
+});
+
+const subjectNames = computed(() => {
+  const names = new Map<number, string>();
+
+  for (const subject of subjectList.value) names.set(subject.id, subject.name ?? `${subjectTypeName(t, te, subject.type)} ${subject.key}`);
+  for (const [id, name] of namedSubjects.value) names.set(id, name);
+
+  return names;
+});
 
 const indexProps = computed(() => ({
   brainId: place.value.brainId,
@@ -637,7 +1150,11 @@ const indexProps = computed(() => ({
   subjectCounts: subjectCounts.value,
   types: typeList.value,
   place: place.value,
-  readOnly: orgChosen.value
+  readOnly: orgChosen.value,
+  more: { layers: layerMore.value, subjects: subjectMore.value, types: typeMore.value },
+  busy: { layers: layerBusy.value, subjects: subjectBusy.value, types: typeBusy.value },
+  next: readNext,
+  reveal: reveal.value
 }));
 
 const rowProps = computed(() => ({
@@ -675,7 +1192,8 @@ const viewProps = computed(() => {
         subjectId: place.value.subject,
         filter: filterOf(place.value),
         subjects: subjectList.value,
-        layers: layerList.value,
+        layerNames: layerNames.value,
+        onNames: (page: Memory[]) => void nameLayers(brainId, page),
         onOpen: openMemory,
         onCentre: (subject: number) => go({ subject }),
         onNarrow: (subject: number) => go({ subject, view: "list" })
@@ -685,7 +1203,8 @@ const viewProps = computed(() => {
         ...common,
         by: place.value.by,
         filter: filterOf(place.value),
-        layers: layerList.value,
+        layerNames: layerNames.value,
+        onNames: (ids: number[]) => void nameLayerIds(brainId, ids),
         onBy: (by: "type" | "layer") => go({ by }),
         onNarrow: (patch: Partial<Place>) => go({ ...patch, view: "list" })
       };
@@ -713,7 +1232,7 @@ const viewProps = computed(() => {
         more: more.value,
         next: readMore,
         failure: listFailure.value,
-        layers: layerList.value,
+        layerNames: layerNames.value,
         subjectNames: subjectNames.value,
         openId: place.value.memory,
         narrow: narrow.value,

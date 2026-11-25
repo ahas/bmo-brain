@@ -86,7 +86,7 @@ import { useReading } from "../domain/brain-reading";
 import { MEMORY_COLUMNS, STACK_BELOW_PX } from "../domain/brain-table";
 
 import type { TableColumn } from "@nuxt/ui";
-import type { Layer, Memory } from "../domain/brain-api";
+import type { Memory } from "../domain/brain-api";
 import type { MemoryColumnId } from "../domain/brain-table";
 import type { Heading } from "../domain/brain-heading";
 
@@ -98,7 +98,7 @@ const props = defineProps<{
   // Reads one more page into the memories; it throws where the page failed.
   next: () => Promise<void>;
   failure: string;
-  layers: Layer[];
+  layerNames: Map<number, string>;
   subjectNames: Map<number, string>;
   openId: number | null;
   narrow: boolean;
@@ -171,7 +171,7 @@ watch(
 function layerName(id: number | null | undefined): string {
   if (id === null || id === undefined) return "";
 
-  return props.layers.find((layer) => layer.id === id)?.name ?? `#${id}`;
+  return props.layerNames.get(id) ?? `#${id}`;
 }
 
 function day(at: number): string {
