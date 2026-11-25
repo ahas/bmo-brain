@@ -770,6 +770,10 @@ console bundle contract and served by the brain itself (`docs/boundary-api.md`, 
   own rows; under a subject's sheet it takes its own height and the view scrolls both. Where the pane is
   narrower than 588 pixels, as it is beside an open memory, the rows stand stacked as on a phone, with no names
   over them.
+- **The memories are read fifty at a time, the next fifty as the list's end comes into view** (bmo-ui's
+  `NextPageFoot`, its `docs/design.md`, 「Lists」): placeholder rows stand at the end while a page is on its way,
+  a page that fails leaves the memories already read and stands its reason with a retry in its place, and
+  nothing stands under the last memory. Nothing is pressed to read more.
 - **One toolbar** under the title bar carries the brain, the view, the words and one button opening the other
   filters (the status, the type, the order, the key and the label), with the screen's actions and its create
   button at its end,

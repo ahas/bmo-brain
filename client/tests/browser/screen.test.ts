@@ -15,7 +15,9 @@ import type { Browser, Locator, Page, Route } from "playwright-core";
 // where it is written, the create button disabled and saying the same, and no carry, move, description, edit or status
 // move standing, while an agent's brain keeps its create button. And the last night's sleep, at a wide window and a
 // phone's: its card folded at the head of the memories, opened by a press, and its row opened from it, read in the
-// newest-first order the brain's grammar has, the stand-in refusing any other. The screen
+// newest-first order the brain's grammar has, the stand-in refusing any other. And the memories read a page at a
+// time, at a wide window and a phone's: the next page read by the scroll alone, nothing to press and nothing under
+// the last page, and a page that fails keeping what was read and read again from its retry. The screen
 // stands alone on the host under `host/`,
 // and the brain's routes are answered by a stand-in holding an agent's brain, which keeps every write, so what the
 // screen wrote is read back and the screen read again shows it, and the base beside it. Skipped where the browser
@@ -38,7 +40,7 @@ const WORDS = JSON.parse(readFileSync(new URL("../../i18n/locales/ko.json", impo
 };
 // The layer's words the host answers beside the screen's own (`host/i18n/`).
 const COMMON = JSON.parse(readFileSync(new URL("./host/i18n/locales/ko.json", import.meta.url), "utf8")) as {
-  common: { placeholder: { search: string } };
+  common: { placeholder: { search: string }; action: { retry: string } };
 };
 
 // --- The stand-in brain ---
@@ -75,6 +77,8 @@ let layers: LayerRow[] = [];
 let rows: Row[] = [];
 let writes: Write[] = [];
 let reads: Read[] = [];
+// Whether the next page asked is answered with a failure, once.
+let failNextPage = false;
 
 // The base, brain 2, an org brain the screen reads and never writes (docs/design.md, 「The screen」): one layer and one
 // memory in it.
@@ -102,6 +106,7 @@ function seed(): void {
   ];
   writes = [];
   reads = [];
+  failNextPage = false;
 }
 
 function memoryOf(row: Row): Record<string, unknown> {
@@ -255,9 +260,20 @@ async function answer(route: Route): Promise<void> {
     case "/brains/1/tallies":
       return json(route, []);
     case "/brains/1/memories": {
+      // A page starts past the memory the cursor names, in the listed order, and says whether more stand past it.
       const items = listed(url.searchParams);
+      const after = url.searchParams.get("after");
+      const from = after === null ? 0 : items.findIndex((row) => row.id === Number(after)) + 1;
+      const limit = Number(url.searchParams.get("limit") ?? "50");
 
-      return json(route, { items: items.slice(0, Number(url.searchParams.get("limit") ?? "50")).map(memoryOf), more: false });
+      if (after !== null && failNextPage) {
+        failNextPage = false;
+
+        // A status the fetcher does not retry on its own, so the one failure reaches the screen.
+        return route.fulfill({ status: 400, contentType: "application/json", body: JSON.stringify({ message: "unavailable" }) });
+      }
+
+      return json(route, { items: items.slice(from, from + limit).map(memoryOf), more: items.length > from + limit });
     }
     case "/brains/1/persona":
       return route.fulfill({ status: 200, contentType: "text/plain", body: listed(new URLSearchParams("type=persona&layerId=1")).map((row) => row.text).join("\n\n") });
@@ -623,6 +639,73 @@ describe.skipIf(!ready)("the brain's screen in a browser", () => {
       await page.locator("h2").first().waitFor();
       await Bun.sleep(300);
       expect(await page.locator("[data-sleep-card]").count()).toBe(0);
+    }, 60_000);
+  });
+
+  describe("the memories are read a page at a time as the list's end comes into view", () => {
+    // Seventy memories past the eight seeded: a first page of fifty, and a second the scroll alone brings.
+    beforeEach(() => {
+      seed();
+      for (let n = 1; n <= 70; n++) rows.push({ id: 100 + n, type: "fact", text: `paged ${n}`, layerId: null, position: 0, status: "active" });
+    });
+
+    const memory = (text: string) => page.getByText(text, { exact: true });
+    const nextPages = () => reads.filter((read) => read.path === "/brains/1/memories" && read.query.get("after") !== null);
+
+    // The wheel turned over the list until the memory stands, as a reader scrolling to the end does.
+    async function scrollTo(text: string): Promise<void> {
+      await until(async () => {
+        await page.mouse.wheel(0, 1200);
+
+        return (await memory(text).count()) > 0;
+      }, `the memory "${text}"`);
+    }
+
+    for (const viewport of [WIDE, NARROW]) {
+      test(`at ${viewport.width} wide, scrolling to the end reads the next page, and nothing is left to press`, async () => {
+        await page.setViewportSize(viewport);
+        await page.goto(`${origin}/brain/1/list`, { waitUntil: "load" });
+        await memory("paged 1").waitFor();
+        expect(nextPages()).toEqual([]);
+        expect(await memory("paged 70").count()).toBe(0);
+        // The pack holds no words for a button that loads more, and the foot holds no button.
+        expect(WORDS.brain.action.more).toBeUndefined();
+        expect(await page.locator("[data-next-page-foot] button").count()).toBe(0);
+
+        const box = await memory("paged 1").first().boundingBox();
+
+        await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
+        await scrollTo("paged 70");
+        expect(nextPages().length).toBe(1);
+        // The last page holds nothing under it.
+        await until(async () => (await page.locator("[data-next-page-foot]").count()) === 0, "the foot gone at the end");
+      }, 60_000);
+    }
+
+    test("a page that fails keeps the memories read and is read again from its retry", async () => {
+      await page.setViewportSize(NARROW);
+      await page.goto(`${origin}/brain/1/list`, { waitUntil: "load" });
+      await memory("paged 1").waitFor();
+      failNextPage = true;
+
+      const box = await memory("paged 1").first().boundingBox();
+
+      await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
+
+      const retry = page.locator("[data-next-page-foot]").getByRole("button", { name: COMMON.common.action.retry, exact: true });
+
+      await until(async () => {
+        await page.mouse.wheel(0, 1200);
+
+        return (await retry.count()) > 0;
+      }, "the failed page's retry");
+      expect(await page.locator("[data-next-page-foot] [role=alert]").innerText()).toContain("unavailable");
+      expect(await memory("paged 49").count()).toBe(1);
+      expect(await memory("paged 50").count()).toBe(0);
+
+      await retry.click();
+      await memory("paged 70").waitFor();
+      expect(nextPages().length).toBe(2);
     }, 60_000);
   });
 

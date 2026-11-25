@@ -244,7 +244,6 @@ const statusCounts = ref<Tally[]>([]);
 const typeCounts = ref<Tally[]>([]);
 const memories = ref<Memory[] | null>(null);
 const more = ref(false);
-const loadingMore = ref(false);
 const listFailure = ref("");
 const indexOpen = ref(false);
 const teachOpen = ref(false);
@@ -565,24 +564,18 @@ async function readList(brainId: number, keepLength = false): Promise<void> {
   }
 }
 
+// One page more, after the last memory held, read as the list's foot comes into view; a failure is thrown to the foot,
+// which keeps the memories already read and offers the retry in the failed page's place.
 async function readMore(): Promise<void> {
   const brainId = place.value.brainId;
   const last = memories.value?.[memories.value.length - 1];
 
-  if (brainId === null || last === undefined || loadingMore.value) return;
+  if (brainId === null || last === undefined) return;
 
-  loadingMore.value = true;
+  const page = await api.memoryPage(brainId, filterOf(place.value), orderOf(place.value), last.id, PAGE);
 
-  try {
-    const page = await api.memoryPage(brainId, filterOf(place.value), orderOf(place.value), last.id, PAGE);
-
-    memories.value = [...(memories.value ?? []), ...page.items];
-    more.value = page.more;
-  } catch (error) {
-    island.fail(error, t("brain.error.read"));
-  } finally {
-    loadingMore.value = false;
-  }
+  memories.value = [...(memories.value ?? []), ...page.items];
+  more.value = page.more;
 }
 
 // What the brain said changed, read again where it stands; the list keeps the pages it had read.
@@ -718,15 +711,14 @@ const viewProps = computed(() => {
         count: listCount.value,
         memories: memories.value,
         more: more.value,
-        loadingMore: loadingMore.value,
+        next: readMore,
         failure: listFailure.value,
         layers: layerList.value,
         subjectNames: subjectNames.value,
         openId: place.value.memory,
         narrow: narrow.value,
         subjectId: place.value.subject,
-        onOpen: openMemory,
-        onMore: readMore
+        onOpen: openMemory
       };
   }
 });

@@ -36,6 +36,12 @@
         <template #status-cell="{ row }"><BrainStatus :status="row.original.status" /></template>
         <template #importance-cell="{ row }">{{ row.original.importance }}</template>
         <template #validFrom-cell="{ row }">{{ day(row.original.validFrom) }}</template>
+        <!-- The next page is read as the table's end comes into view inside its own scroll. -->
+        <template #body-bottom>
+          <NextPageFoot :more="more" :next="next" :span="columns.length" :failed-words="t('brain.error.read')" :loading-label="t('brain.status.loading')" list-class="flex flex-col">
+            <div class="flex h-8 items-center px-4"><SkeletonBar class="h-4 w-4/5" /></div>
+          </NextPageFoot>
+        </template>
       </DataTable>
 
       <MovingList v-else-if="stacked" tag="ul" class="flex flex-col">
@@ -60,10 +66,12 @@
           </button>
         </li>
       </MovingList>
-
-      <div v-if="more" class="flex shrink-0 justify-center p-3">
-        <UButton color="neutral" variant="outline" :loading="loadingMore" :label="t('brain.action.more')" @click="emit('more')" />
-      </div>
+      <NextPageFoot v-if="stacked" :more="more" :next="next" :failed-words="t('brain.error.read')" :loading-label="t('brain.status.loading')" list-class="flex flex-col">
+        <div class="flex flex-col gap-1 border-b border-default px-3 py-2">
+          <SkeletonLine width="w-1/3" />
+          <SkeletonLine width="w-full" />
+        </div>
+      </NextPageFoot>
     </div>
   </div>
 </template>
@@ -87,7 +95,8 @@ const props = defineProps<{
   count: number;
   memories: Memory[] | null;
   more: boolean;
-  loadingMore: boolean;
+  // Reads one more page into the memories; it throws where the page failed.
+  next: () => Promise<void>;
   failure: string;
   layers: Layer[];
   subjectNames: Map<number, string>;
@@ -98,7 +107,7 @@ const props = defineProps<{
   changes: number;
 }>();
 
-const emit = defineEmits<{ open: [id: number]; more: [] }>();
+const emit = defineEmits<{ open: [id: number] }>();
 
 const { t, te } = useI18n();
 
