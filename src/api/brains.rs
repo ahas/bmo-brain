@@ -16,6 +16,7 @@ use bmo_brain_client::{
   SubjectsQuery, TalliesQuery, Tally, TypeCount, TypesQuery, UnconsolidatedEpisode, UnconsolidatedQuery,
 };
 use bmo_brain_client::{BrainKind, OrgUnitQuery, RemovalCounts, Removed};
+use bmo_brain_client::{Declaration, Holder, HoldersQuery, WithdrawalCounts, Withdrawn};
 
 use super::{Answer, Body, Brain, Key, Query};
 
@@ -88,6 +89,37 @@ async fn org_unit_remove(
 ) -> Answer<Json<Removed>> {
   Ok(Json(Removed {
     removed: brain.store.brains_let_go(BrainKind::Org, &query.company, Some(&unit)).await?,
+  }))
+}
+
+/// A holder's whole set stood in every agent's brain: 201 where the act wrote or closed anything, 200 where
+/// every declared row already stood as declared.
+async fn declare(State(brain): State<Brain>, Body(body): Body<Declaration>) -> Answer<Response> {
+  let declared = brain.store.declare(&body).await?;
+  let changed = declared.written > 0 || declared.closed > 0;
+  let status = if changed { StatusCode::CREATED } else { StatusCode::OK };
+  Ok((status, Json(declared)).into_response())
+}
+
+async fn holders(
+  State(brain): State<Brain>,
+  Query(query): Query<HoldersQuery>,
+) -> Answer<Json<Page<Holder>>> {
+  Ok(Json(brain.store.holders(&query).await?))
+}
+
+async fn holder_removal(
+  State(brain): State<Brain>,
+  Key(holder): Key<String>,
+) -> Answer<Json<WithdrawalCounts>> {
+  Ok(Json(WithdrawalCounts {
+    counts: brain.store.holder_held(&holder).await?,
+  }))
+}
+
+async fn holder_withdraw(State(brain): State<Brain>, Key(holder): Key<String>) -> Answer<Json<Withdrawn>> {
+  Ok(Json(Withdrawn {
+    closed: brain.store.holder_withdraw(&holder).await?,
   }))
 }
 
@@ -366,6 +398,9 @@ pub fn routes() -> Router<Brain> {
     .route("/accounts/{accountKey}", delete(account_remove))
     .route("/org-units/{unitKey}/removal", get(org_unit_removal))
     .route("/org-units/{unitKey}", delete(org_unit_remove))
+    .route("/declarations", get(holders).post(declare))
+    .route("/holders/{holderKey}/removal", get(holder_removal))
+    .route("/holders/{holderKey}", delete(holder_withdraw))
     .route("/brains/{brainId}/subjects", get(subjects).post(subject_add))
     .route("/brains/{brainId}/subjects/{subjectId}", get(subject).patch(subject_change))
     .route("/brains/{brainId}/subjects/{subjectId}/sheet", get(sheet))

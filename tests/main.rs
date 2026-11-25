@@ -8,6 +8,7 @@ mod baseline;
 mod brains;
 mod consolidation;
 mod events;
+mod held;
 mod history;
 mod learning;
 mod mcp;

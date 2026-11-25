@@ -26,7 +26,7 @@ pub const RESERVED_TYPES: [&str; 9] =
 pub(crate) const MEMORY_COLUMNS: &str = "id, brain_id, key, type, text, layer_id, position, status, lineage_id, \
   superseded_by, superseded_at, valid_from, valid_to, recall_condition, release_condition, importance, hits, \
   hit_times, last_hit_at, last_confirmed_at, consolidated_at, actor_name, reason, labels, locked, internal_only, \
-  shared, created_at";
+  shared, held_by, created_at";
 
 #[derive(FromRow, Clone)]
 pub(crate) struct MemoryRow {
@@ -58,6 +58,7 @@ pub(crate) struct MemoryRow {
   pub locked: bool,
   pub internal_only: bool,
   pub shared: bool,
+  pub held_by: Option<String>,
   pub created_at: i64,
 }
 
@@ -98,6 +99,7 @@ impl MemoryRow {
       locked: self.locked,
       internal_only: self.internal_only,
       shared: self.shared,
+      held_by: self.held_by,
       created_at: self.created_at,
     })
   }
@@ -346,11 +348,12 @@ impl Store {
     body: &NewMemory,
     at: i64,
   ) -> Held<Memory> {
-    self.write_in(tx, brain_id, body, at, None).await
+    self.write_in(tx, brain_id, body, at, None, None).await
   }
 
   /// A memory written as a first version, or, behind the live row named or the live row holding its key where
-  /// it began earlier than that row, written already superseded by it (docs/design.md, 「Versions」).
+  /// it began earlier than that row, written already superseded by it (docs/design.md, 「Versions」). Only a
+  /// declaration writes a row `held_by` (「What a holder leaves」); every other writer gives nothing there.
   pub(crate) async fn write_in(
     &self,
     tx: &mut PgConnection,
@@ -358,6 +361,7 @@ impl Store {
     body: &NewMemory,
     at: i64,
     behind: Option<i64>,
+    held_by: Option<&str>,
   ) -> Held<Memory> {
     written_type(&body.kind)?;
     text("text", &body.text, TEXT_MOST)?;
@@ -445,8 +449,9 @@ impl Store {
     let id: i64 = sqlx::query_scalar(
       "INSERT INTO memories (brain_id, key, type, text, layer_id, position, status, lineage_id, valid_from, \
        recall_condition, release_condition, importance, actor_name, labels, created_at, locked, internal_only, \
-       shared) \
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 0, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17) RETURNING id",
+       shared, held_by) \
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 0, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18) \
+       RETURNING id",
     )
     .bind(brain_id)
     .bind(&body.key)
@@ -465,6 +470,7 @@ impl Store {
     .bind(marks.locked)
     .bind(marks.internal_only)
     .bind(marks.shared)
+    .bind(held_by)
     .fetch_one(&mut *tx)
     .await?;
     match live {
@@ -535,6 +541,7 @@ impl Store {
         status.name()
       )));
     }
+    super::held::held(&old, "version")?;
     let marks = Marks::set(
       &brain,
       Given {
@@ -679,6 +686,7 @@ impl Store {
       if !status.is_live() {
         return Err(Fault::Conflict(format!("Memory {id} is {}; a merge takes live rows.", status.name())));
       }
+      super::held::held(&row, "merge")?;
       merged.push(row);
     }
     if let Some(key) = &body.key {
@@ -934,6 +942,7 @@ impl Store {
     let closed = self.row_of(&mut tx, brain_id, id, true).await?;
     let about = about_row(&mut tx, &closed).await?;
     heads_only(&brain, judged(body.standing, &[&about]), "restoration")?;
+    super::held::held(&closed, "restoration")?;
     if closed.kind == SHEET {
       return Err(Fault::Conflict(format!(
         "Memory {id} is a sheet; a person's sheet is rendered from their facts and is not restored."
@@ -1025,6 +1034,7 @@ impl Store {
       text("reason", reason, REASON_MOST)?;
     }
     let row = self.row_of(&mut *tx, brain_id, id, true).await?;
+    super::held::held(&row, "move")?;
     let was = row.status()?;
     if was == body.status {
       let memory = self.member_of(&mut *tx, brain_id, id).await?;
@@ -1310,6 +1320,7 @@ pub(crate) struct Filter {
   lineage_id: Option<i64>,
   ids: Option<Vec<i64>>,
   superseded_by: Option<Vec<i64>>,
+  held: Option<bool>,
   label: Option<String>,
   words: Option<String>,
   situation: Option<String>,
@@ -1361,6 +1372,7 @@ impl Filter {
       lineage_id: query.lineage_id,
       ids: ids_listed("ids", query.ids.as_deref())?,
       superseded_by: ids_listed("supersededBy", query.superseded_by.as_deref())?,
+      held: query.held,
       label: query.label.clone(),
       words: query.q.clone(),
       situation: query.situation.clone(),
@@ -1403,6 +1415,10 @@ impl Filter {
     }
     if let Some(ids) = &self.superseded_by {
       sql.push(" AND superseded_by = ANY(").push_bind(ids.clone()).push(")");
+    }
+    // The rows a holder left, or the brain's own, or both where the query does not say.
+    if let Some(held) = self.held {
+      sql.push(if held { " AND held_by IS NOT NULL" } else { " AND held_by IS NULL" });
     }
     if let Some(label) = &self.label {
       match label.split_once('=') {

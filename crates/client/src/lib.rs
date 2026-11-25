@@ -19,6 +19,9 @@ pub use brains::{
   OrgTopicsQuery, SearchCount, SearchMiss, SimilarAsk, Source, Standing, UnconsolidatedEpisode,
   UnconsolidatedQuery,
 };
+pub use brains::{
+  Declaration, Declared, DeclaredMemory, Holder, HoldersQuery, WithdrawalCounts, Withdrawn,
+};
 pub use client::{Answer, BrainClient, ClientFailure};
 /// The HTTP client a `BrainClient` calls through, for a caller that sets its own timeout or proxy.
 pub use reqwest::Client as HttpClient;

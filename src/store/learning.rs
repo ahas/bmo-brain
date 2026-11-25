@@ -319,6 +319,8 @@ impl Store {
         },
         at,
         behind,
+        // A learning writes the brain's own rows; only a declaration leaves a row held.
+        None,
       )
       .await?;
     learned.written = Some(memory);

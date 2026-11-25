@@ -121,7 +121,7 @@ names at most one brain, whatever its kind.
 | Route | Does | Answers |
 |---|---|---|
 | `GET /brains` | lists brains by `kind`, `accountKey` and `agentKey` | 200, a page |
-| `POST /brains` | makes one: `accountKey`, `agentKey`, `kind` (`agent` where none is given), `name` (the agent's key where none is given) | 201, the brain; 409 `conflict` where a brain stands at the pair of keys already |
+| `POST /brains` | makes one: `accountKey`, `agentKey`, `kind` (`agent` where none is given), `name` (the agent's key where none is given); a brain of the kind `agent` is given a row of every held memory that stands (`docs/design.md`, 「What a holder leaves」), each carrying its holder's key, type, words, subjects, conditions, importance and labels, and written by the holder that left it | 201, the brain; 409 `conflict` where a brain stands at the pair of keys already |
 | `GET /org-topics` | what stands for a member of an organisation (`docs/design.md`, 「Org brains」): `brainIds`, the org brains of the member's units, comma-separated, the farthest first (one to 50, none twice); `audience`, `internal` (where none is given) or `external`, for a room where someone outside the company sits, which leaves the internal-only rows out | 200, a list; 400 for a brain named twice or one that is no org brain; 404 for a brain that does not stand |
 | `GET /brains/{brainId}` | reads one | 200; 404 |
 | `DELETE /brains/{brainId}` | lets it go whole, with everything it held | 200, the brain as it stood; 404 |
@@ -151,6 +151,32 @@ A caller deleting an account or an organisation unit for good lets go of the bra
 `brains` counts the brains and `memories` every memory row they hold, each version a row. A removal is the same
 again where nothing stands: a second call answers zeros, so a removal broken half-way is finished by calling again.
 An org brain's removal never reaches the base, whose keys are refused.
+
+### Declarations and holders
+
+A holder is a caller that leaves standing instructions in every agent's brain (`docs/design.md`, 「What a
+holder leaves」): its key is its own word for itself, 1 to 200 characters with no control character and no
+whitespace, which the brain keeps and never reads. These routes take the service's token alone; the console's
+is answered 403 `forbidden`.
+
+| Route | Does | Answers |
+|---|---|---|
+| `POST /declarations` | stands a holder's whole set: `heldBy` and `memories` (1 to 100, each `key` (required, unique among the holder's), `type`, `text`, `actorName` (the holder's key where none), `subjects` (each `type` and `key`, made where none stands), `importance` (5 where none), `validFrom` (now where none), `recallCondition`, `releaseCondition`, `labels`) in every brain of the kind `agent`. What stands for the key is made to stand as declared: an equal row is left, a missing one is written, and one the call no longer carries or that stands with other words is closed `invalidated`, its reason `holder-replaced` for a row the call rewrites and `holder-withdrawn` for one it leaves out | 201, the standing set; 200 the same where every declared row already stood as declared; 400 for a body that is not the shape the route takes; 409 `conflict` where no brain of the kind `agent` stands to hold it |
+| `GET /declarations` | the holders that stand: each `heldBy`, `brains` (how many brains hold a live row of it) and `memories` (its live rows), by `q` (words the key holds), the key's own order | 200, a page |
+| `GET /holders/{holderKey}/removal` | counts what the withdrawal below would close now, changing nothing | 200, `{"counts": {"brains", "memories"}}` |
+| `DELETE /holders/{holderKey}` | withdraws the holder: every live row of that key in every brain is moved to `invalidated` with `validTo` and `supersededAt` the moment and the reason `holder-withdrawn`, and no other row is touched | 200, `{"closed": {"brains", "memories"}}`; 400 for a key that is no key; the same again where nothing stands |
+
+A declared row is equal to a standing one where its `key`, `type`, `text`, subjects, `importance`,
+`recallCondition`, `releaseCondition` and `labels` all match; `validFrom` and the writer's name are not asked,
+so a declaration repeated where nothing changed stands where it stands. The standing set the declaration
+answers is what `GET /declarations` answers for that key, and `GET /memories` with `held=true` reads a brain's
+held rows.
+
+A row of a standing set answers `heldBy` with its holder's key. Every write that would change or close one is
+refused 409 `conflict`, the sentence naming the holder: a version of it, a merge naming it, a move of its
+status, a restoration of its lineage, a learning that strengthens or replaces it, and an injection that would
+stand a row over its key. Its use is recorded as any other row's is, and its release condition is never the
+one that ends it.
 
 Every route below stands under `/brains/{brainId}` and answers 404 `not-found` for a brain that does not
 stand.
@@ -200,7 +226,8 @@ injected), `type`, `text`, `layerId` (or null), `position`, `subjects` (each `id
 `validFrom`, `validTo` (or null), `recallCondition` (or null), `releaseCondition` (or null), `importance` (1 to
 10), `useCount` (how often it was used: handed out, reported used, confirmed or read explicitly), `lastUsedAt`
 (its latest use, or null), `lastConfirmedAt`, `consolidatedAt`, `actorName`, `reason` (why its status was moved,
-as the mover said, or null), `labels`, `locked`, `internalOnly`, `shared` and `createdAt`.
+as the mover said, or null), `labels`, `locked`, `internalOnly`, `shared`, `heldBy` (the key of the holder that
+left it, or null; 「Declarations and holders」) and `createdAt`.
 
 `locked`, `internalOnly` and `shared` are an org memory's marks (`docs/design.md`, 「Org brains」): no lower unit
 overrides its topic; it is kept from a room where someone outside the company sits; and it is a memory about a
@@ -210,6 +237,12 @@ shared, a version takes the marks of the version it supersedes, and a merge sets
 carries it. In an agent's brain all three are false, and a write that sets one true is answered 400
 `bad-request`. In an org brain a write whose memory links a subject of type `person` and is not `shared`, or is
 `shared` and links none, is answered 400 `bad-request`.
+
+`heldBy` stands only on a row a holder left, and `POST /declarations` alone gives it (`docs/design.md`, 「What a
+holder leaves」): no first version, version, merge, move, restoration or learning names the field, and none
+clears or changes it. While such a row stands, every write that would change or close it is answered 409
+`conflict` naming its holder, and only its holder's next declaration or a withdrawal of its key ends it. Its
+use is recorded as any other row's is, and a recall hands it out as 「Recall」 states.
 
 `standing` is who writes into an org brain, as the caller checked it: `head`, a head of the unit or a holder
 of its grant to write org memory; `person`, the person the memory is about; or `member`, which a write that
@@ -243,7 +276,7 @@ moves a caller's word may make:
 
 | Route | Does | Answers |
 |---|---|---|
-| `GET /memories` | lists by `type` and `status` (each one value or several, comma-separated), `excludeTypes` (comma-separated), `layerId`, `unfiled` (true for the rows in no layer), `subjectId`, `key`, `lineageId`, `ids` (comma-separated), `supersededBy` (comma-separated: the rows superseded by these), `label` (`key` or `key=value`), `q` (words the text holds), `situation` (words the `recallCondition` holds; a first page by `q` with no `asOf` also takes the `vector_candidates` live rows that pass the other filters nearest the words in meaning, the two lists fused by Reciprocal Rank Fusion and the page cut at `limit`) and `asOf` (a moment: the rows that held then, `validFrom` at or before it and `validTo` after it or, with none, `supersededAt` after it or null, whatever their status now, never a `retracted` row), in the order `order` names; a list by `key`, `subjectId`, `type`, `q` or `situation` is an explicit read, which records a use of each live row of the page it answers unless `record` is false (true where none is given) | 200, a page |
+| `GET /memories` | lists by `type` and `status` (each one value or several, comma-separated), `excludeTypes` (comma-separated), `layerId`, `unfiled` (true for the rows in no layer), `subjectId`, `key`, `lineageId`, `ids` (comma-separated), `supersededBy` (comma-separated: the rows superseded by these), `held` (true for the rows a holder left, false for the brain's own), `label` (`key` or `key=value`), `q` (words the text holds), `situation` (words the `recallCondition` holds; a first page by `q` with no `asOf` also takes the `vector_candidates` live rows that pass the other filters nearest the words in meaning, the two lists fused by Reciprocal Rank Fusion and the page cut at `limit`) and `asOf` (a moment: the rows that held then, `validFrom` at or before it and `validTo` after it or, with none, `supersededAt` after it or null, whatever their status now, never a `retracted` row), in the order `order` names; a list by `key`, `subjectId`, `type`, `q` or `situation` is an explicit read, which records a use of each live row of the page it answers unless `record` is false (true where none is given) | 200, a page |
 | `POST /memories` | writes a first version: `type`, `text`, `actorName` required; `key`, `layerId`, `position`, `subjectIds`, `subjects` (each `type` and `key`, made where none stands), `importance` (5 where none), `validFrom` (now where none), `status` (`active` where none, or `pending`), `recallCondition`, `releaseCondition`, `labels`, `locked`, `internalOnly`, `standing`; where a live row holds the key and the new `validFrom` is earlier than its own, the row is written already superseded by it in its lineage, `validTo` its `validFrom`, with the reason `earlier-than-live` | 201, the memory; 409 `conflict` where a live row holds the key and the new `validFrom` is not earlier than its own |
 | `GET /memories/{memoryId}` | reads one | 200; 404 |
 | `PATCH /memories/{memoryId}` | moves its status: `status`, `actorName`, `standing`, `at` (when it stopped holding, now where none), `reason` (kept on the row moved), `text` (for a move to `done`: the words it ended on, written as a new version that is then moved; for a move to `retracted`: what the speaker meant instead, written as a new active version, the row named retracted and pointing at it; each in one transaction); the row moved records the moment of the move as its `supersededAt` | 200, the row moved (for a retraction with `text`, the retracted row); 400 for `text` on another move; 404; 409 for a move the table does not allow |
@@ -274,9 +307,10 @@ null where it was not among the nearest), `fusedScore` (its Reciprocal Rank Fusi
 `marked` and `tokenCount`; `tokenCount` and `budgetTokens`; and
 `released`, the ids of the rows this recall ended.
 
-- **The core** is the room's active `situation` memories and the head of the sheet of everyone who spoke:
-  the first facts `GET /subjects/{subjectId}/sheet` renders for each speaker with the turn's room as
-  `roomId`, in its order, at most the rules' `core_fact_cap` of them per speaker, each a line of the block.
+- **The core** is the room's active `situation` memories, the head of the sheet of everyone who spoke and the
+  brain's live held rows (`heldBy` set): the first facts `GET /subjects/{subjectId}/sheet` renders for each
+  speaker with the turn's room as `roomId`, in its order, at most the rules' `core_fact_cap` of them per
+  speaker, each a line of the block, and every held row by its holder's key and then its own, ahead of them.
   The room's `rule` memories and a speaker's other facts and names are rows like any other: they reach the
   block only through the searched part.
 - **Every line of either part keeps the budget,** a marked one as well: a line that would carry the block
@@ -300,7 +334,8 @@ null where it was not among the nearest), `fusedScore` (its Reciprocal Rank Fusi
   `active` row's `releaseCondition` is among the turn's words, that situation has come true: the row is never
   handed out, and the recall moves it to `invalidated` with `validTo` the moment and the condition as its
   `reason`, publishing `memory.moved`, in the recall's own transaction. `released` names every row it ended,
-  and the release stands whether or not `record` is set.
+  and the release stands whether or not `record` is set. A held row is never released and never left out: a
+  turn that says its `releaseCondition` is handed it all the same (`docs/design.md`, 「What a holder leaves」).
 - **A row handed to the session before** in the same version is marked: its line carries its id and no
   words. With `record` true, a use of each row handed out is recorded and it is marked for `sessionKey`.
 - **A line** is `- [#<id> <type> since <date>] <text>`, `until <date>` following the first date where the row
@@ -360,8 +395,8 @@ takes the base layer alone; a named layer that does not stand is 404.
 
 | Route | Does | Answers |
 |---|---|---|
-| `GET /export` | the brain, or the layers `layers` names (comma-separated) with the subjects and live rows they hold, as a brain file | 200, `application/vnd.sqlite3`; 404 for a layer that does not stand |
-| `POST /injections` | reads the brain file in the body (`application/vnd.sqlite3`) into the brain: a layer is reused by its name, a subject by its type and key, a live row whose key a live row of the brain holds supersedes it unless it is the same, every other live row is added; nothing is overwritten | 201, `subjectsAdded`, `layersAdded`, `memoriesAdded`, `memoriesSuperseded`; 400 for a body that is no brain file, of another shape, holding a live row whose key is no key or whose type is `sheet`, or, read into an org brain, holding a live row that links a subject of type `person` and is not shared, or is shared and links none; nothing of such a file is read in |
+| `GET /export` | the brain, or the layers `layers` names (comma-separated) with the subjects and live rows they hold, as a brain file; the held rows a holder left are not written into it | 200, `application/vnd.sqlite3`; 404 for a layer that does not stand |
+| `POST /injections` | reads the brain file in the body (`application/vnd.sqlite3`) into the brain: a layer is reused by its name, a subject by its type and key, a live row whose key a live row of the brain holds supersedes it unless it is the same, every other live row is added; nothing is overwritten | 201, `subjectsAdded`, `layersAdded`, `memoriesAdded`, `memoriesSuperseded`; 400 for a body that is no brain file, of another shape, holding a live row whose key is no key or whose type is `sheet`, or, read into an org brain, holding a live row that links a subject of type `person` and is not shared, or is shared and links none; nothing of such a file is read in; 409 `conflict` where a live row of the brain holds a key a row of the file holds and is held by a holder, naming that holder; nothing of such a file is read in |
 
 The file is a SQLite database of the tables `brain_file` (`shape`, `exported_at`, `name`), `subjects`,
 `layers`, `memories` and `memory_subjects`, its ids local to the file; this brain writes shape 5 and reads
@@ -616,6 +651,6 @@ Every failure is the common error shape, `code` and `error`.
 | 403 | `forbidden` | the console's token on a route the screen does not use, or without the role the screen needs; a write of a member's standing that an org brain takes from a head alone |
 | 404 | `no-route` | no route answers this method and path |
 | 404 | `not-found` | nothing stands at the key the path names |
-| 409 | `conflict` | the member's state does not allow the change |
+| 409 | `conflict` | the member's state does not allow the change, which includes every write that would change or close a memory a holder left standing; the sentence names the holder |
 | 410 | `gone` | an event stream resumed from before the oldest event kept |
 | 500 | `failed` | the service failed; the sentence is the failure |

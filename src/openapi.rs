@@ -17,6 +17,7 @@ use bmo_brain_client::{
   DuplicatesQuery, Learned, Learning, MissesQuery, Restoration, SearchMiss, SimilarAsk, TalliesQuery,
   Tally, UnconsolidatedEpisode, UnconsolidatedQuery,
 };
+use bmo_brain_client::{Declaration, Declared, Holder, HoldersQuery, WithdrawalCounts, Withdrawn};
 use bmo_brain_client::{OrgUnitQuery, RemovalCounts, Removed};
 use schemars::generate::{SchemaGenerator, SchemaSettings};
 use schemars::{JsonSchema, Schema};
@@ -316,6 +317,56 @@ fn brain_routes(g: &mut SchemaGenerator) -> Vec<Route> {
       raw_body: None,
       answers: vec![(200, json_answer::<Removed>(g))],
       codes: vec![BadRequest, Conflict],
+    },
+    Route {
+      method: "post",
+      path: "/declarations",
+      id: "declareMemories",
+      tag: "brains",
+      summary: "Stand a holder's whole set in every agent's brain: what is declared is written, what no longer \
+                stands for the key is closed, and what already stands as declared is left.",
+      parameters: vec![],
+      body: body::<Declaration>(g),
+      raw_body: None,
+      answers: vec![(201, json_answer::<Declared>(g)), (200, json_answer::<Declared>(g))],
+      codes: vec![BadRequest, Conflict],
+    },
+    Route {
+      method: "get",
+      path: "/declarations",
+      id: "listHolders",
+      tag: "brains",
+      summary: "The holders that stand: each key and how many brains hold its rows and how many rows stand.",
+      parameters: query::<HoldersQuery>(g),
+      body: None,
+      raw_body: None,
+      answers: vec![(200, json_answer::<Page<Holder>>(g))],
+      codes: vec![BadRequest],
+    },
+    Route {
+      method: "get",
+      path: "/holders/{holderKey}/removal",
+      id: "countHolderWithdrawal",
+      tag: "brains",
+      summary: "What withdrawing one holder's rows would close now, nothing changed.",
+      parameters: vec![named(g, "holderKey")],
+      body: None,
+      raw_body: None,
+      answers: vec![(200, json_answer::<WithdrawalCounts>(g))],
+      codes: vec![BadRequest],
+    },
+    Route {
+      method: "delete",
+      path: "/holders/{holderKey}",
+      id: "withdrawHolder",
+      tag: "brains",
+      summary: "Withdraw what one holder left: every live row of its key closed in every brain and no other row \
+                touched; zeros where nothing stands.",
+      parameters: vec![named(g, "holderKey")],
+      body: None,
+      raw_body: None,
+      answers: vec![(200, json_answer::<Withdrawn>(g))],
+      codes: vec![BadRequest],
     },
     Route {
       method: "get",

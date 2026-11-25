@@ -51,6 +51,20 @@ async fn subject_id(conn: &mut PgConnection, brain_id: i64, named: &SubjectKey) 
   )
 }
 
+/// The brain's live held rows, the ones a holder left and every turn is given (docs/design.md,
+/// 「What a holder leaves」): by the holder's key, then the key the holder gave the row.
+async fn held_rows(conn: &mut PgConnection, brain_id: i64) -> Held<Vec<MemoryRow>> {
+  Ok(
+    sqlx::query_as(&format!(
+      "SELECT {MEMORY_COLUMNS} FROM memories WHERE brain_id = $1 AND held_by IS NOT NULL \
+       AND status IN ('active', 'pending') ORDER BY held_by, key, id"
+    ))
+    .bind(brain_id)
+    .fetch_all(&mut *conn)
+    .await?,
+  )
+}
+
 /// A turn's cues and how many live memories of the brain each is linked to (docs/design.md, 「Recall」): the
 /// subjects it names that stand and the stems its words hold, read once for a recall or a similar ask, with
 /// the number of the brain's live memories and their mean number of stems.
@@ -269,6 +283,9 @@ impl Store {
         .await?,
       );
     }
+    // What a holder left stands on every turn of every room, by its holder's key and then its own (「What a
+    // holder leaves」), ahead of the sheet heads and never among the searched part's candidates.
+    core.extend(held_rows(&mut tx, brain_id).await?);
     let mut core_ids: BTreeSet<i64> = core.iter().map(|row| row.id).collect();
     let cap = Some(self.rules.core_fact_cap.max(0));
     for speaker in &speakers {
@@ -493,9 +510,11 @@ impl Store {
       return Ok(Vec::new());
     }
     let patterns: Vec<String> = asked.iter().map(|word| super::holding(word)).collect();
+    // A row a holder left is never among these: only its holder's withdrawal ends it (docs/design.md,
+    // 「What a holder leaves」), and a turn that says its release condition is handed it all the same.
     let rows: Vec<MemoryRow> = sqlx::query_as(&format!(
       "SELECT {MEMORY_COLUMNS} FROM memories WHERE brain_id = $1 AND status = 'active' \
-       AND release_condition IS NOT NULL AND release_condition ILIKE ANY($2) ORDER BY id"
+       AND held_by IS NULL AND release_condition IS NOT NULL AND release_condition ILIKE ANY($2) ORDER BY id"
     ))
     .bind(brain_id)
     .bind(&patterns)

@@ -100,16 +100,20 @@ impl Store {
       }
       rows
     };
+    // What a holder left never travels in a file: it comes back from its declaration, in every agent's brain at
+    // once (docs/design.md, 「What a holder leaves」).
     let memories: Vec<MemoryRow> = if layers.is_empty() {
-      sqlx::query_as(&format!("SELECT {MEMORY_COLUMNS} FROM memories WHERE brain_id = $1 ORDER BY id"))
-        .bind(brain_id)
-        .fetch_all(&mut *conn)
-        .await?
+      sqlx::query_as(&format!(
+        "SELECT {MEMORY_COLUMNS} FROM memories WHERE brain_id = $1 AND held_by IS NULL ORDER BY id"
+      ))
+      .bind(brain_id)
+      .fetch_all(&mut *conn)
+      .await?
     } else {
       let ids: Vec<i64> = layer_rows.iter().map(|(id, ..)| *id).collect();
       sqlx::query_as(&format!(
         "SELECT {MEMORY_COLUMNS} FROM memories WHERE brain_id = $1 AND layer_id = ANY($2) \
-         AND status IN ('active', 'pending') ORDER BY id"
+         AND held_by IS NULL AND status IN ('active', 'pending') ORDER BY id"
       ))
       .bind(brain_id)
       .bind(&ids)
@@ -403,6 +407,9 @@ impl Store {
         }
         None => None,
       };
+      if let Some(old) = &holder {
+        super::held::held(old, "a brain file's injection")?;
+      }
       match holder {
         Some(old) => {
           if old.text == memory.text

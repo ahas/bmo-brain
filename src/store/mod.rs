@@ -9,6 +9,7 @@ pub mod consolidation;
 pub mod duplicates;
 pub mod events;
 pub mod files;
+pub mod held;
 pub mod learning;
 pub mod misses;
 pub mod orgs;

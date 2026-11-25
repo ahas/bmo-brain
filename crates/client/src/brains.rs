@@ -134,6 +134,97 @@ pub struct OrgUnitQuery {
   pub company: String,
 }
 
+/// One memory a holder declares, standing in every agent's brain until its holder withdraws it
+/// (`docs/design.md`, 「What a holder leaves」).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct DeclaredMemory {
+  /// The holder's own identifier for the row, unique among its set.
+  pub key: String,
+  #[serde(rename = "type")]
+  pub kind: String,
+  pub text: String,
+  /// Who wrote it; the holder's key where none is given.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub actor_name: Option<String>,
+  /// The subjects it is about, by type and key, each made where it does not stand yet.
+  #[serde(default)]
+  pub subjects: Vec<SubjectKey>,
+  /// 1 to 10; 5 where none is given.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub importance: Option<i64>,
+  /// When it began to hold; now where none is given.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub valid_from: Option<i64>,
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub recall_condition: Option<String>,
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub release_condition: Option<String>,
+  #[serde(default)]
+  pub labels: Labels,
+}
+
+/// A holder's whole standing set, declared in one call.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct Declaration {
+  /// The holder's key, its own word for itself.
+  pub held_by: String,
+  /// The rows that stand, 1 to 100.
+  pub memories: Vec<DeclaredMemory>,
+}
+
+/// What a declaration came to, and what stands for the holder after it.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct Declared {
+  pub held_by: String,
+  /// The brains the set was applied to.
+  pub brains: i64,
+  /// Its live rows, every brain counted.
+  pub memories: i64,
+  /// Rows written.
+  pub written: i64,
+  /// Rows closed, each `holder-replaced` or `holder-withdrawn`.
+  pub closed: i64,
+}
+
+/// A holder that stands: its key and how many of its rows stand where.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct Holder {
+  pub held_by: String,
+  pub brains: i64,
+  pub memories: i64,
+}
+
+/// What the holders that stand are asked by.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct HoldersQuery {
+  /// Words the key holds, in any case.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub q: Option<String>,
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub after: Option<String>,
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub limit: Option<i64>,
+}
+
+/// What a withdrawal would close now, nothing changed.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct WithdrawalCounts {
+  pub counts: BrainsHeld,
+}
+
+/// What a withdrawal closed.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct Withdrawn {
+  pub closed: BrainsHeld,
+}
+
 /// Something a memory can be about, found by its type and key alone.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -380,6 +471,10 @@ pub struct Memory {
   /// in an agent's brain.
   #[serde(default)]
   pub shared: bool,
+  /// The key of the holder that left the row and may withdraw it alone; null for a row the brain's own
+  /// writers wrote.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub held_by: Option<String>,
   pub created_at: i64,
 }
 
@@ -626,6 +721,9 @@ pub struct MemoriesQuery {
   /// Words the recall condition holds, in any case: the rows a situation calls for.
   #[serde(skip_serializing_if = "Option::is_none")]
   pub situation: Option<String>,
+  /// True for the rows a holder left standing, false for the brain's own; both where none is given.
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub held: Option<bool>,
   /// A moment: the rows that held then, whatever their status now, in place of the filters' own; never a
   /// retracted row.
   #[serde(skip_serializing_if = "Option::is_none")]

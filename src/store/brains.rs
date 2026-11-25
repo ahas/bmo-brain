@@ -257,19 +257,26 @@ impl Store {
         "Brain {id} stands at this account's key and agent's key already."
       )));
     }
+    let kind = body.kind.unwrap_or_default();
+    let at = now();
     let row: BrainRow = sqlx::query_as(&format!(
       "INSERT INTO brains (kind, account_key, agent_key, name, created_at) VALUES ($1, $2, $3, $4, $5) \
        RETURNING {BRAIN_COLUMNS}"
     ))
-    .bind(body.kind.unwrap_or_default().name())
+    .bind(kind.name())
     .bind(&body.account_key)
     .bind(&body.agent_key)
     .bind(&name)
-    .bind(now())
+    .bind(at)
     .fetch_one(&mut *tx)
     .await?;
     let brain = Brain::from(row);
     publish(&mut tx, "brain.created", Some(&event_scope(brain.id)), &brain).await?;
+    // An agent arriving after a holder declared is given what the holder left (docs/design.md,
+    // 「What a holder leaves」), each row written as its holder wrote it.
+    if kind == BrainKind::Agent {
+      self.standing_rows_in(&mut tx, brain.id, at).await?;
+    }
     self.commit(tx).await?;
     Ok(brain)
   }

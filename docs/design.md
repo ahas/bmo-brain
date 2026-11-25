@@ -121,6 +121,7 @@ One row is one thing the agent remembers, in one version.
 | `locked` | in an org brain, whether a lower unit may not override its topic (「Org brains」); off in an agent's brain |
 | `internalOnly` | in an org brain, whether it is kept from a room where someone outside the company sits; off in an agent's brain |
 | `shared` | in an org brain, whether it is a memory about a person that may be known inside the organisation (「Org brains」); off in an agent's brain |
+| `heldBy` | the key of the holder that left the row and may withdraw it alone (「What a holder leaves」); null for a row the brain's own writers wrote |
 | `createdAt` | when this version was written |
 
 The two conditions are optional. A memory that carries neither is a permanent one: no situation has to be
@@ -352,9 +353,9 @@ spoke, the words of the turn, the session's key and the moment it opened, and th
 a block and a list of what it chose.
 
 - **Two parts within one budget** of about one and a half to two thousand tokens: the fixed core, the few
-  memories that stand on every turn of that room (its situation rules and the head of the sheet of everyone
-  who spoke), and the searched part, chosen by relevance. No line of either part runs past the budget, a
-  marked one no more than another.
+  memories that stand on every turn of that room (its situation rules, the head of the sheet of everyone who
+  spoke, and what a holder left), and the searched part, chosen by relevance. No line of either part runs
+  past the budget, a marked one no more than another.
 - **No rule of the room stands in the core.** A room's rules reach a turn through selection, never by
   standing: each is a candidate of the searched part like any other row, chosen when the turn's words or
   subjects call for it, and a caller that selects a turn's reference picks among them as it picks any
@@ -364,6 +365,10 @@ a block and a list of what it chose.
   none. A person's sheet can hold hundreds of facts and a turn has room for a few; the rest of a speaker's
   facts, and their names, reach a turn only through the searched part, scored and capped as any other row
   is.
+- **The core carries what a holder left:** every live held row of the brain (「What a holder leaves」), by
+  holder and then by the key the holder gave it, ahead of the searched part and never among its candidates,
+  so a turn is told what a live holder stands for whatever it says. The budget is no exception for these
+  either: a line that would carry the block past it is left out like any other.
 - **Cues.** A turn's cues are the subjects it names that stand in the brain, its room and its speakers, and
   its words: lowercased, English stop words left out, each reduced to its Snowball stem. A memory's words are
   indexed the same way, so a turn's word reaches every memory holding a word of the same stem, and a stop word
@@ -419,7 +424,8 @@ a block and a list of what it chose.
   `releaseCondition`, at least the share of its words the rules name, that situation has come true: the row is
   not handed out, and recall moves it to `invalidated` with the moment and the condition as its reason, in the
   same transaction as the rest of the recall, whether or not the row would have been carried. The answer names
-  each row it released.
+  each row it released. A held row is never among them: only its holder's withdrawal ends it, and a turn that
+  says its release condition is handed the row all the same (「What a holder leaves」).
 - **Only live rows, with their span.** A row goes out with the dates it holds for, since its `validFrom` and,
   where it has one, until its `validTo`; a row whose predecessor was superseded lately goes out with one line
   saying what the previous value was and until when, or that the previous value was retracted.
@@ -514,6 +520,10 @@ judged on the brain's own record.
 - **Injection** reads a brain file into a brain it names. It overwrites nothing: a row whose `key` matches a
   live row supersedes it as a new version, a subject found by its type and key is reused, a layer found by
   its name is reused, and the rest are added. The brain does not ask where the file came from.
+- **A brain file never carries what a holder left.** Export writes a brain's own rows and leaves the held
+  ones out, and a file is read as holding none: a row written over a live held row's key would supersede it,
+  and the injection is refused whole instead (「What a holder leaves」). What a holder stands for comes back
+  from its declaration, in every agent's brain at once, and not from a file that stands in one.
 - **Keeping a content repository's backup current** is the owner's act, or an agent's at the owner's word:
   export the layers, put the file in the repository. The brain never reads a repository.
 
@@ -630,6 +640,54 @@ layers, above every company, and it is an org brain like any other, with no stor
   source's brain and memory named in its labels, and the source stays as it was in its own brain. A caller
   reading the base for the brain a memory was raised from leaves that memory out, since the agent already
   holds its source.
+
+## What a holder leaves
+
+A holder is a caller that leaves standing instructions in the brains of a deployment: a service live on the
+machine declares what an agent working there must know about it and how it is used, and asks that neither the
+agent nor a person at a screen take it away. The brain knows nothing of what a holder is: it keeps a key the
+caller gives, reads nothing in it, and lets that key alone, and nothing else, end what was left.
+
+- **One key, one standing set.** A memory may carry `heldBy`, the holder's key; such a row is a *held* row.
+  A row with no key there was written by an agent or a person and is the brain's own, changed as 「Versions」
+  states. The mark is not a fourth org mark: it stands in an agent's brain, and a held row carries none of
+  `locked`, `internalOnly` and `shared`.
+- **A declaration is the only way one is written,** and a holder writes its whole set in one call. The call
+  makes what stands for that key stand as declared: a declared row that already stands as declared is left
+  where it is, one that does not stand is written, and a live row of that key the call no longer carries, or
+  that stands with other words, is closed. The answer counts what came to be, and the same call over a set
+  that already stands writes and closes nothing. A declaration is refused where no agent's brain stands to
+  hold it.
+- **It stands in every agent's brain.** A declaration writes its rows into each brain of the kind `agent`,
+  and a brain made later is given every held row that stands, so an agent arriving after a holder declared
+  knows what the holder left. Each brain holds its own row of a declared set, found by the key the holder
+  gave it; the copies are read, used and closed together by the holder's acts, and never apart.
+- **Nobody changes a held row while it stands.** A version, a merge naming one, a status move, a
+  restoration of its lineage, a learning that strengthens or replaces it, an injection that would stand a
+  row over its key, and the release of a condition a turn says all reach a held row and are refused, the
+  sentence naming the holder. Its words, its type, its subjects, its conditions and its importance are the
+  holder's, not the agent's whose brain holds them, not a person's at the screen, not another holder's. What
+  a held row is used for is recorded like any other row's: a hand-out and a confirmation change nothing.
+- **A withdrawal is the other act that ends one,** the act that takes a holder's words out of the
+  deployment: it names the holder's key and closes every live row of that key in every brain, `invalidated`
+  with the reason `holder-withdrawn`, and touches no other row. It answers what it closed and is the same
+  again where nothing stands. Nothing is deleted: a closed held row stays readable in its lineage, and the
+  holder's next declaration begins a new one.
+- **A skill is a held row like any other.** How a thing is used is the words its holder declares, beside the
+  row that says when to reach for them. The type, the key, the conditions and the length are the holder's;
+  the brain hands them out, keeps them from change and withdraws them exactly as it does a one-line rule.
+  Where a holder's instructions are long, the row carried into a turn says when to read the whole of them,
+  and the whole stands in the same brain under the same key.
+- **They stand on every turn.** A recall carries every live held row in its core, ahead of the searched
+  part and kept within the block's budget as every line is (「Recall」). A caller that reads a brain directly
+  lists what is held with the same reads that list any memory, by `held` where it wants the held rows or the
+  brain's own alone: a held row is a memory, read, counted and used as one (「Memories」). The
+  situation a held row says when it is needed is words for the agent that reads them; the brain never reads
+  them itself.
+- **What a holder leaves is not the base's.** The base is what agents learned and an administrator raised
+  (「The base」); what a holder leaves is declared whole, stands wherever an agent's brain stands, and goes
+  when its holder withdraws it. The mark tells the two apart, and no reading or route treats one as the
+  other.
 
 ## The layers a reading takes
 

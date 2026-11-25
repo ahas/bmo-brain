@@ -12,6 +12,7 @@ use crate::brains::{
   RecallAsk, Recorded, Restoration, SearchMiss, SheetQuery, SimilarAsk, Subject, SubjectChange,
   SubjectsQuery, TalliesQuery, Tally, TypeCount, TypesQuery, UnconsolidatedEpisode, UnconsolidatedQuery,
 };
+use crate::brains::{Declaration, Declared, Holder, HoldersQuery, WithdrawalCounts, Withdrawn};
 use crate::brains::{OrgUnitQuery, RemovalCounts, Removed};
 use crate::wire::{Event, EventsQuery, Health, Page, WireError};
 
@@ -193,6 +194,26 @@ impl BrainClient {
       company: company_key.to_owned(),
     };
     Self::answered(self.request(Method::DELETE, &["org-units", unit_key]).query(&query)).await
+  }
+
+  /// `POST /declarations`
+  pub async fn declare(&self, body: &Declaration) -> Answer<Declared> {
+    Self::answered(self.send(Method::POST, &["declarations"], body)).await
+  }
+
+  /// `GET /declarations`
+  pub async fn holders(&self, query: &HoldersQuery) -> Answer<Page<Holder>> {
+    Self::answered(self.get(&["declarations"], query)).await
+  }
+
+  /// `GET /holders/{holderKey}/removal`
+  pub async fn holder_removal(&self, holder_key: &str) -> Answer<WithdrawalCounts> {
+    Self::answered(self.request(Method::GET, &["holders", holder_key, "removal"])).await
+  }
+
+  /// `DELETE /holders/{holderKey}`
+  pub async fn holder_withdraw(&self, holder_key: &str) -> Answer<Withdrawn> {
+    Self::answered(self.request(Method::DELETE, &["holders", holder_key])).await
   }
 
   /// `GET /brains/{brainId}/subjects`

@@ -590,6 +590,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/declarations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The holders that stand: each key and how many brains hold its rows and how many rows stand. */
+        get: operations["listHolders"];
+        put?: never;
+        /** Stand a holder's whole set in every agent's brain: what is declared is written, what no longer stands for the key is closed, and what already stands as declared is left. */
+        post: operations["declareMemories"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/discipline": {
         parameters: {
             query?: never;
@@ -633,6 +651,40 @@ export interface paths {
         };
         /** Readiness and version. */
         get: operations["readHealth"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/holders/{holderKey}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Withdraw what one holder left: every live row of its key closed in every brain and no other row touched; zeros where nothing stands. */
+        delete: operations["withdrawHolder"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/holders/{holderKey}/removal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** What withdrawing one holder's rows would close now, nothing changed. */
+        get: operations["countHolderWithdrawal"];
         put?: never;
         post?: never;
         delete?: never;
@@ -812,6 +864,70 @@ export interface components {
              */
             writtenSince?: number | null;
         };
+        /** @description A holder's whole standing set, declared in one call. */
+        Declaration: {
+            /** @description The holder's key, its own word for itself. */
+            heldBy: string;
+            /** @description The rows that stand, 1 to 100. */
+            memories: components["schemas"]["DeclaredMemory"][];
+        };
+        /** @description What a declaration came to, and what stands for the holder after it. */
+        Declared: {
+            /**
+             * Format: int64
+             * @description The brains the set was applied to.
+             */
+            brains: number;
+            /**
+             * Format: int64
+             * @description Rows closed, each `holder-replaced` or `holder-withdrawn`.
+             */
+            closed: number;
+            heldBy: string;
+            /**
+             * Format: int64
+             * @description Its live rows, every brain counted.
+             */
+            memories: number;
+            /**
+             * Format: int64
+             * @description Rows written.
+             */
+            written: number;
+        };
+        /**
+         * @description One memory a holder declares, standing in every agent's brain until its holder withdraws it
+         *     (`docs/design.md`, 「What a holder leaves」).
+         */
+        DeclaredMemory: {
+            /** @description Who wrote it; the holder's key where none is given. */
+            actorName?: string | null;
+            /**
+             * Format: int64
+             * @description 1 to 10; 5 where none is given.
+             */
+            importance?: number | null;
+            /** @description The holder's own identifier for the row, unique among its set. */
+            key: string;
+            /** @default {} */
+            labels: {
+                [key: string]: string;
+            };
+            recallCondition?: string | null;
+            releaseCondition?: string | null;
+            /**
+             * @description The subjects it is about, by type and key, each made where it does not stand yet.
+             * @default []
+             */
+            subjects: components["schemas"]["SubjectKey"][];
+            text: string;
+            type: string;
+            /**
+             * Format: int64
+             * @description When it began to hold; now where none is given.
+             */
+            validFrom?: number | null;
+        };
         /** @description A pair of live rows about one subject that may say one thing, with why it stands as a candidate. */
         DuplicateCandidate: {
             /** @description The older row. */
@@ -937,6 +1053,20 @@ export interface components {
             /** @description The session the memories were handed to, which marks them for that session. */
             sessionKey?: string | null;
         };
+        /** @description A holder that stands: its key and how many of its rows stand where. */
+        Holder: {
+            /** Format: int64 */
+            brains: number;
+            heldBy: string;
+            /** Format: int64 */
+            memories: number;
+        };
+        /** @description One page of a list, oldest first. */
+        HolderPage: {
+            items: components["schemas"]["Holder"][];
+            /** @description Whether anything stands past the last item. */
+            more: boolean;
+        };
         /** @description What an injection came to. */
         Injected: {
             /** Format: int64 */
@@ -1057,6 +1187,11 @@ export interface components {
             consolidatedAt: number | null;
             /** Format: int64 */
             createdAt: number;
+            /**
+             * @description The key of the holder that left the row and may withdraw it alone; null for a row the brain's own
+             *     writers wrote.
+             */
+            heldBy?: string | null;
             /** Format: int64 */
             id: number;
             /**
@@ -1768,6 +1903,11 @@ export interface components {
              * @description Its importance × (1 + its novelty against the live rows about its subjects).
              */
             gain: number;
+            /**
+             * @description The key of the holder that left the row and may withdraw it alone; null for a row the brain's own
+             *     writers wrote.
+             */
+            heldBy?: string | null;
             /** Format: int64 */
             id: number;
             /**
@@ -1880,6 +2020,14 @@ export interface components {
             code: string;
             /** @description What went wrong. */
             error: string;
+        };
+        /** @description What a withdrawal would close now, nothing changed. */
+        WithdrawalCounts: {
+            counts: components["schemas"]["BrainsHeld"];
+        };
+        /** @description What a withdrawal closed. */
+        Withdrawn: {
+            closed: components["schemas"]["BrainsHeld"];
         };
     };
     responses: {
@@ -2556,6 +2704,8 @@ export interface operations {
                 asOf?: number | null;
                 /** @description Types left out, comma-separated. */
                 excludeTypes?: string | null;
+                /** @description True for the rows a holder left standing, false for the brain's own; both where none is given. */
+                held?: boolean | null;
                 /** @description The rows these ids name, comma-separated. */
                 ids?: string | null;
                 key?: string | null;
@@ -3279,6 +3429,71 @@ export interface operations {
             404: components["responses"]["NotFound"];
         };
     };
+    listHolders: {
+        parameters: {
+            query?: {
+                after?: string | null;
+                limit?: number | null;
+                /** @description Words the key holds, in any case. */
+                q?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HolderPage"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    declareMemories: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Declaration"];
+            };
+        };
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Declared"];
+                };
+            };
+            /** @description Created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Declared"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+        };
+    };
     readDiscipline: {
         parameters: {
             query?: never;
@@ -3355,6 +3570,56 @@ export interface operations {
                     "application/json": components["schemas"]["Health"];
                 };
             };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    withdrawHolder: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                holderKey: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Withdrawn"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    countHolderWithdrawal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                holderKey: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WithdrawalCounts"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
         };
