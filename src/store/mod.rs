@@ -43,6 +43,8 @@ pub enum Fault {
   NotFound(String),
   /// The member's state does not allow the change.
   Conflict(String),
+  /// A holder keeps the member from change: only its own next declaration or a withdrawal of its key ends it.
+  Locked(String),
   /// The member stood once and is let go of.
   Gone(String),
   /// The store failed.
@@ -56,6 +58,7 @@ impl std::fmt::Display for Fault {
       | Self::Forbidden(why)
       | Self::NotFound(why)
       | Self::Conflict(why)
+      | Self::Locked(why)
       | Self::Gone(why)
       | Self::Failed(why) => out.write_str(why),
     }

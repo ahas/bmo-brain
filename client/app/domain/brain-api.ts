@@ -234,3 +234,11 @@ export function isConflict(error: unknown): boolean {
 
   return data?.code === "conflict";
 }
+
+// Whether a refusal is the brain's lock: a service of the deployment left this row and keeps it from every
+// other writer, and only that service's own act ends it (docs/design.md, 「What a holder leaves」).
+export function isLocked(error: unknown): boolean {
+  const data = (error as { data?: { code?: string } } | null)?.data;
+
+  return data?.code === "locked";
+}

@@ -173,7 +173,7 @@ answers is what `GET /declarations` answers for that key, and `GET /memories` wi
 held rows.
 
 A row of a standing set answers `heldBy` with its holder's key. Every write that would change or close one is
-refused 409 `conflict`, the sentence naming the holder: a version of it, a merge naming it, a move of its
+refused 409 `locked`, the sentence naming the holder: a version of it, a merge naming it, a move of its
 status, a restoration of its lineage, a learning that strengthens or replaces it, and an injection that would
 stand a row over its key. Its use is recorded as any other row's is, and its release condition is never the
 one that ends it.
@@ -396,7 +396,7 @@ takes the base layer alone; a named layer that does not stand is 404.
 | Route | Does | Answers |
 |---|---|---|
 | `GET /export` | the brain, or the layers `layers` names (comma-separated) with the subjects and live rows they hold, as a brain file; the held rows a holder left are not written into it | 200, `application/vnd.sqlite3`; 404 for a layer that does not stand |
-| `POST /injections` | reads the brain file in the body (`application/vnd.sqlite3`) into the brain: a layer is reused by its name, a subject by its type and key, a live row whose key a live row of the brain holds supersedes it unless it is the same, every other live row is added; nothing is overwritten | 201, `subjectsAdded`, `layersAdded`, `memoriesAdded`, `memoriesSuperseded`; 400 for a body that is no brain file, of another shape, holding a live row whose key is no key or whose type is `sheet`, or, read into an org brain, holding a live row that links a subject of type `person` and is not shared, or is shared and links none; nothing of such a file is read in; 409 `conflict` where a live row of the brain holds a key a row of the file holds and is held by a holder, naming that holder; nothing of such a file is read in |
+| `POST /injections` | reads the brain file in the body (`application/vnd.sqlite3`) into the brain: a layer is reused by its name, a subject by its type and key, a live row whose key a live row of the brain holds supersedes it unless it is the same, every other live row is added; nothing is overwritten | 201, `subjectsAdded`, `layersAdded`, `memoriesAdded`, `memoriesSuperseded`; 400 for a body that is no brain file, of another shape, holding a live row whose key is no key or whose type is `sheet`, or, read into an org brain, holding a live row that links a subject of type `person` and is not shared, or is shared and links none; nothing of such a file is read in; 409 `locked` where a live row of the brain holds a key a row of the file holds and is held by a holder, naming that holder; nothing of such a file is read in |
 
 The file is a SQLite database of the tables `brain_file` (`shape`, `exported_at`, `name`), `subjects`,
 `layers`, `memories` and `memory_subjects`, its ids local to the file; this brain writes shape 5 and reads
@@ -651,6 +651,7 @@ Every failure is the common error shape, `code` and `error`.
 | 403 | `forbidden` | the console's token on a route the screen does not use, or without the role the screen needs; a write of a member's standing that an org brain takes from a head alone |
 | 404 | `no-route` | no route answers this method and path |
 | 404 | `not-found` | nothing stands at the key the path names |
-| 409 | `conflict` | the member's state does not allow the change, which includes every write that would change or close a memory a holder left standing; the sentence names the holder |
+| 409 | `conflict` | the member's state does not allow the change |
+| 409 | `locked` | a holder keeps the member from change: every write that would change or close a memory a holder left standing answers it, and the sentence names the holder. Only that holder's next declaration or a withdrawal of its key ends the member |
 | 410 | `gone` | an event stream resumed from before the oldest event kept |
 | 500 | `failed` | the service failed; the sentence is the failure |

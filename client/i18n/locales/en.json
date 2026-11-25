@@ -39,6 +39,7 @@
     "error": {
       "conflict": "Another writer changed this memory after you read it. The new version is shown, and your words are kept.",
       "english_only": "Memories are saved in English only. Words that are not English remain, so nothing was saved.",
+      "held": "A service of this deployment left this memory and keeps it, so it cannot be changed here. Your words are kept.",
       "no_translator": "No translator reaches this screen, so only words written in English can be saved.",
       "read": "Couldn't read the brain.",
       "save": "Couldn't save.",

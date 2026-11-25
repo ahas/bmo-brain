@@ -28,19 +28,21 @@ pub enum ErrorCode {
   NoRoute,
   NotFound,
   Conflict,
+  Locked,
   Gone,
   Failed,
 }
 
 impl ErrorCode {
   /// Every code, in the order of their statuses.
-  pub const ALL: [ErrorCode; 8] = [
+  pub const ALL: [ErrorCode; 9] = [
     Self::BadRequest,
     Self::Unauthorized,
     Self::Forbidden,
     Self::NoRoute,
     Self::NotFound,
     Self::Conflict,
+    Self::Locked,
     Self::Gone,
     Self::Failed,
   ];
@@ -54,6 +56,7 @@ impl ErrorCode {
       Self::NoRoute => "no-route",
       Self::NotFound => "not-found",
       Self::Conflict => "conflict",
+      Self::Locked => "locked",
       Self::Gone => "gone",
       Self::Failed => "failed",
     }
@@ -66,7 +69,7 @@ impl ErrorCode {
       Self::Unauthorized => 401,
       Self::Forbidden => 403,
       Self::NoRoute | Self::NotFound => 404,
-      Self::Conflict => 409,
+      Self::Conflict | Self::Locked => 409,
       Self::Gone => 410,
       Self::Failed => 500,
     }
@@ -83,6 +86,7 @@ impl ErrorCode {
       Self::NoRoute => "no route answers this method and path",
       Self::NotFound => "nothing stands at the key the path names",
       Self::Conflict => "the member's state does not allow the change",
+      Self::Locked => "a holder keeps the member from change, and only its own act ends it",
       Self::Gone => "the stream was resumed from before the oldest event kept",
       Self::Failed => "the service failed",
     }

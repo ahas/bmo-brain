@@ -397,9 +397,12 @@ async function saveEdit(): Promise<void> {
     emit("changed");
     emit("open", written.id);
   } catch (error) {
-    if (api.isConflict(error)) {
-      // Another writer moved the row first: the words being written stay, and the row is read again.
-      island.say({ tone: "warning", title: t("brain.error.conflict") });
+    // Two refusals both keep the words being written and read the row again: another writer moved the row
+    // first, or a service of the deployment left this row and keeps it from every other writer.
+    const refusal = api.isLocked(error) ? "brain.error.held" : api.isConflict(error) ? "brain.error.conflict" : null;
+
+    if (refusal !== null) {
+      island.say({ tone: "warning", title: t(refusal) });
       const kept = { ...draft };
       const english = draftWords.english.value;
 

@@ -1248,10 +1248,13 @@ pub const EARLIER_THAN_LIVE: &str = "earlier-than-live";
 /// The most characters a move's reason holds.
 const REASON_MOST: usize = 2_000;
 
+/// The weight a row takes where its writer gives none: the middle of the scale.
+pub(crate) const DEFAULT_IMPORTANCE: i16 = 5;
+
 /// An importance as a row takes it: 1 to 10, 5 where none is given.
-fn importance(asked: Option<i64>) -> Held<i16> {
+pub(crate) fn importance(asked: Option<i64>) -> Held<i16> {
   match asked {
-    None => Ok(5),
+    None => Ok(DEFAULT_IMPORTANCE),
     Some(importance) if (1..=10).contains(&importance) => Ok(importance as i16),
     Some(importance) => Err(Fault::BadRequest(format!("importance is {importance}; it is 1 to 10."))),
   }

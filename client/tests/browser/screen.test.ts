@@ -42,6 +42,7 @@ const WORDS = JSON.parse(readFileSync(new URL("../../i18n/locales/ko.json", impo
     action: Record<string, string>;
     hint: Record<string, string>;
     index: Record<string, string>;
+    error: Record<string, string>;
   };
 };
 // The layer's words the host answers beside the screen's own (`host/i18n/`).
@@ -232,6 +233,21 @@ function json(route: Route, body: unknown): Promise<void> {
   return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) });
 }
 
+// The row the stand-in keeps from a writer, as a row a service left is kept: the version is refused with the
+// brain's own lock, naming the holder (docs/design.md, 「What a holder leaves」).
+let keptFrom: number | null = null;
+
+function refusal(route: Route, id: number): Promise<void> {
+  return route.fulfill({
+    status: 409,
+    contentType: "application/json",
+    body: JSON.stringify({
+      code: "locked",
+      error: `Memory ${id} is held by "application-a", which version may neither change nor close.`
+    })
+  });
+}
+
 async function answer(route: Route): Promise<void> {
   const request = route.request();
   const url = new URL(request.url());
@@ -248,7 +264,13 @@ async function answer(route: Route): Promise<void> {
     const version = /^\/brains\/1\/memories\/(\d+)\/versions$/.exec(path);
     const layer = /^\/brains\/1\/layers\/(\d+)$/.exec(path);
 
-    if (method === "POST" && version !== null) return json(route, memoryOf(versioned(Number(version[1]), body)));
+    if (method === "POST" && version !== null) {
+      const id = Number(version[1]);
+
+      if (id === keptFrom) return refusal(route, id);
+
+      return json(route, memoryOf(versioned(id, body)));
+    }
 
     if (method === "PATCH" && layer !== null) {
       const changed = layers.find((one) => one.id === Number(layer[1]))!;
@@ -1108,6 +1130,32 @@ describe.skipIf(!ready)("the brain's screen in a browser", () => {
       await piece.first().waitFor();
       expect(await piece.locator("[data-held]").count()).toBe(1);
       expect(await piece.locator("button").count()).toBe(1);
+    }, 90_000);
+
+    test("a tab the service left behind reads, in the screen's own words, who keeps the row it tried to change", async () => {
+      const KEEPING = "A saying the screen still shows as its own.";
+
+      rows.push({ id: 91, type: "lore", text: KEEPING, layerId: null, position: 1, status: "active" });
+      keptFrom = 91;
+
+      await page.setViewportSize(WIDE);
+      await page.goto(`${origin}/brain/1/list`, { waitUntil: "load" });
+      await page.getByText(KEEPING).first().waitFor();
+
+      await page.getByText(KEEPING).first().click();
+      await page.getByRole("button", { name: WORDS.brain.action.edit!, exact: true }).click();
+
+      const words = page.locator("textarea").first();
+      await words.waitFor();
+      await words.fill("Words a stale tab tries to leave on the row.");
+      await page.getByRole("button", { name: WORDS.brain.action.save!, exact: true }).click();
+
+      // The screen keeps no control that would try this on a held row; a tab written before the service declared
+      // still meets the refusal, and reads whose row it is rather than a bare failure to save.
+      await page.getByText(WORDS.brain.error.held!).first().waitFor();
+      expect(await page.getByText(WORDS.brain.error.save!).count()).toBe(0);
+
+      keptFrom = null;
     }, 90_000);
   });
 });

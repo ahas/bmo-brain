@@ -275,7 +275,7 @@ async fn nothing_a_caller_may_write_changes_or_closes_a_held_row() {
       )
       .await,
   );
-  assert_eq!(version, (409, "conflict".to_owned()));
+  assert_eq!(version, (409, "locked".to_owned()));
 
   let merge = refused(
     client
@@ -291,10 +291,10 @@ async fn nothing_a_caller_may_write_changes_or_closes_a_held_row() {
       )
       .await,
   );
-  assert_eq!(merge, (409, "conflict".to_owned()));
+  assert_eq!(merge, (409, "locked".to_owned()));
 
   let move_it = refused(client.memory_move(brain, ids[0], &moved_to(MemoryStatus::Invalidated)).await);
-  assert_eq!(move_it, (409, "conflict".to_owned()));
+  assert_eq!(move_it, (409, "locked".to_owned()));
 
   // A learning that would version a held row, and one that would close it, are both refused.
   let strengthens = refused(
@@ -308,7 +308,7 @@ async fn nothing_a_caller_may_write_changes_or_closes_a_held_row() {
       )
       .await,
   );
-  assert_eq!(strengthens, (409, "conflict".to_owned()));
+  assert_eq!(strengthens, (409, "locked".to_owned()));
 
   let replaces = refused(
     client
@@ -321,7 +321,7 @@ async fn nothing_a_caller_may_write_changes_or_closes_a_held_row() {
       )
       .await,
   );
-  assert_eq!(replaces, (409, "conflict".to_owned()));
+  assert_eq!(replaces, (409, "locked".to_owned()));
 
   // The refusals name whose row it is, so the caller is told who may end it.
   let answer = client
@@ -506,7 +506,7 @@ async fn a_withdrawal_closes_every_row_of_its_key_and_touches_nothing_else() {
       )
       .await,
   );
-  assert_eq!(restored, (409, "conflict".to_owned()));
+  assert_eq!(restored, (409, "locked".to_owned()));
 
   let again = client.holder_withdraw("holder-a").await.unwrap();
   assert_eq!((again.closed.brains, again.closed.memories), (0, 0));

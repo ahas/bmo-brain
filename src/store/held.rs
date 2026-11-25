@@ -12,7 +12,7 @@ use sqlx::PgConnection;
 
 use super::brains::event_scope;
 use super::sheets::written_type;
-use super::versions::{MemoryRow, subjects_by_row};
+use super::versions::{DEFAULT_IMPORTANCE, MemoryRow, importance, subjects_by_row};
 use super::{Fault, Held, Store, TEXT_MOST};
 use super::{key as key_rule, now, publish, text as text_rule};
 
@@ -43,7 +43,7 @@ pub(crate) fn held(row: &MemoryRow, what: &str) -> Held<()> {
   let Some(holder) = &row.held_by else {
     return Ok(());
   };
-  Err(Fault::Conflict(format!(
+  Err(Fault::Locked(format!(
     "Memory {id} is held by {holder:?}, which {what} may neither change nor close; only that holder's next \
      declaration or a withdrawal of its key ends it.",
     id = row.id
@@ -51,35 +51,71 @@ pub(crate) fn held(row: &MemoryRow, what: &str) -> Held<()> {
 }
 
 /// Whether the row already stands as the holder declares it: its words, its type, its weight, its conditions,
-/// its labels and the subjects it is about. When it does, a declaration leaves it where it stands.
+/// its labels and the subjects it is about. When it does, a declaration leaves it where it stands. A weight the
+/// holder left out is asked for by the same default a row is written with, so a set declared twice answers that
+/// nothing changed.
 fn stands_as(declared: &DeclaredMemory, row: &Standing) -> bool {
-  let subjects: Vec<(String, String)> =
-    row.subjects.iter().map(|subject| (subject.0.clone(), subject.1.clone())).collect();
-  let mut asked: Vec<(String, String)> = declared
-    .subjects
-    .iter()
-    .map(|subject| (subject.kind.clone(), subject.key.clone()))
-    .collect();
-  asked.sort();
-  asked.dedup();
-  let mut holds = subjects;
-  holds.sort();
-  holds.dedup();
+  let about = |pairs: Vec<(String, String)>| {
+    let mut sorted = pairs;
+    sorted.sort();
+    sorted.dedup();
+    sorted
+  };
+  let holds = about(row.subjects.clone());
+  let asked = about(
+    declared
+      .subjects
+      .iter()
+      .map(|subject| (subject.kind.clone(), subject.key.clone()))
+      .collect(),
+  );
+
   declared.kind == row.kind
     && declared.text == row.text
-    && declared.importance.unwrap_or(5) == i64::from(row.importance)
+    && declared.importance.unwrap_or(i64::from(DEFAULT_IMPORTANCE)) == i64::from(row.importance)
     && declared.recall_condition == row.recall_condition
     && declared.release_condition == row.release_condition
     && declared.labels == row.labels
     && asked == holds
 }
 
-fn declared_importance(asked: Option<i64>) -> Held<i16> {
-  match asked {
-    None => Ok(5),
-    Some(asked) if (1..=10).contains(&asked) => Ok(asked as i16),
-    Some(asked) => Err(Fault::BadRequest(format!("importance is {asked}; it is 1 to 10."))),
+/// The shape a declaration's body must answer before anything is stood: one holder key, its rows keyed once
+/// each, and every field of every row within what a row takes.
+fn declared_rule(body: &Declaration) -> Held<()> {
+  key_rule("heldBy", &body.held_by)?;
+  if body.memories.is_empty() || body.memories.len() > DECLARED_MOST {
+    return Err(Fault::BadRequest(format!(
+      "memories holds {}; a declaration holds 1 to {DECLARED_MOST}.",
+      body.memories.len()
+    )));
   }
+
+  let mut named: BTreeSet<&str> = BTreeSet::new();
+  for memory in &body.memories {
+    key_rule("key", &memory.key)?;
+    if !named.insert(memory.key.as_str()) {
+      return Err(Fault::BadRequest(format!("memories names the key {:?} twice.", memory.key)));
+    }
+    written_type(&memory.kind)?;
+    text_rule("text", &memory.text, TEXT_MOST)?;
+    for (field, words) in [
+      ("recallCondition", memory.recall_condition.as_deref()),
+      ("releaseCondition", memory.release_condition.as_deref()),
+    ] {
+      if let Some(words) = words {
+        text_rule(field, words, super::CONDITION_MOST)?;
+      }
+    }
+    importance(memory.importance)?;
+    if let Some(key) = &memory.actor_name {
+      text_rule("actorName", key, TEXT_MOST)?;
+    }
+    for subject in &memory.subjects {
+      key_rule("subjects.type", &subject.kind)?;
+      key_rule("subjects.key", &subject.key)?;
+    }
+  }
+  Ok(())
 }
 
 impl Store {
@@ -87,41 +123,15 @@ impl Store {
   /// written, and what the set no longer carries or stands otherwise is closed. The act is the same again where
   /// nothing differs.
   pub async fn declare(&self, body: &Declaration) -> Held<Declared> {
-    key_rule("heldBy", &body.held_by)?;
-    if body.memories.is_empty() || body.memories.len() > DECLARED_MOST {
-      return Err(Fault::BadRequest(format!(
-        "memories holds {}; a declaration holds 1 to {DECLARED_MOST}.",
-        body.memories.len()
-      )));
-    }
-    let mut named: BTreeSet<&str> = BTreeSet::new();
-    for memory in &body.memories {
-      key_rule("key", &memory.key)?;
-      if !named.insert(memory.key.as_str()) {
-        return Err(Fault::BadRequest(format!("memories names the key {:?} twice.", memory.key)));
-      }
-      written_type(&memory.kind)?;
-      text_rule("text", &memory.text, TEXT_MOST)?;
-      for (field, words) in [
-        ("recallCondition", memory.recall_condition.as_deref()),
-        ("releaseCondition", memory.release_condition.as_deref()),
-      ] {
-        if let Some(words) = words {
-          text_rule(field, words, super::CONDITION_MOST)?;
-        }
-      }
-      declared_importance(memory.importance)?;
-      if let Some(key) = &memory.actor_name {
-        text_rule("actorName", key, TEXT_MOST)?;
-      }
-      for subject in &memory.subjects {
-        key_rule("subjects.type", &subject.kind)?;
-        key_rule("subjects.key", &subject.key)?;
-      }
-    }
+    declared_rule(body)?;
 
     let holder = body.held_by.as_str();
     let at = now();
+    let mut asked: BTreeMap<&str, &DeclaredMemory> = BTreeMap::new();
+    for memory in &body.memories {
+      asked.insert(memory.key.as_str(), memory);
+    }
+
     let mut tx = self.begin().await?;
     let brains: Vec<i64> = sqlx::query_scalar("SELECT id FROM brains WHERE kind = 'agent' ORDER BY id")
       .fetch_all(&mut *tx)
@@ -164,7 +174,7 @@ impl Store {
           text: memory.text.clone(),
           actor_name: memory.actor_name.clone().unwrap_or_else(|| holder.to_owned()),
           subjects: memory.subjects.clone(),
-          importance: Some(i64::from(declared_importance(memory.importance)?)),
+          importance: Some(i64::from(importance(memory.importance)?)),
           valid_from: memory.valid_from,
           recall_condition: memory.recall_condition.clone(),
           release_condition: memory.release_condition.clone(),
