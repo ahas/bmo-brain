@@ -14,7 +14,8 @@ import type { Browser, Locator, Page, Route } from "playwright-core";
 // seven or fewer without. And an org brain, at a wide window and a phone's: read and never written, one line saying
 // where it is written, the create button disabled and saying the same, and no carry, move, description, edit or status
 // move standing, while an agent's brain keeps its create button. And the last night's sleep, at a wide window and a
-// phone's: its card folded at the head of the memories, opened by a press, and its row opened from it. The screen
+// phone's: its card folded at the head of the memories, opened by a press, and its row opened from it, read in the
+// newest-first order the brain's grammar has, the stand-in refusing any other. The screen
 // stands alone on the host under `host/`,
 // and the brain's routes are answered by a stand-in holding an agent's brain, which keeps every write, so what the
 // screen wrote is read back and the screen read again shows it, and the base beside it. Skipped where the browser
@@ -64,10 +65,16 @@ interface Write {
   body: Record<string, unknown>;
 }
 
+interface Read {
+  path: string;
+  query: URLSearchParams;
+}
+
 const AT = 1_790_000_000_000;
 let layers: LayerRow[] = [];
 let rows: Row[] = [];
 let writes: Write[] = [];
+let reads: Read[] = [];
 
 // The base, brain 2, an org brain the screen reads and never writes (docs/design.md, 「The screen」): one layer and one
 // memory in it.
@@ -94,6 +101,7 @@ function seed(): void {
     { id: 8, type: "fact", text: "unfiled one", layerId: null, position: 0, status: "active" }
   ];
   writes = [];
+  reads = [];
 }
 
 function memoryOf(row: Row): Record<string, unknown> {
@@ -127,6 +135,15 @@ function layerOf(layer: LayerRow): Record<string, unknown> {
 }
 
 const byPosition = <T extends { id: number; position: number }>(a: T, b: T) => a.position - b.position || a.id - b.id;
+
+// The order grammar of the brain's memory list (docs/boundary-api.md, 「Memories」): a field, ascending, or
+// descending with a leading `-`. A stand-in that took any word for it would pass a screen asking in a key the
+// brain refuses.
+const ORDER_FIELDS = ["id", "position", "validFrom", "importance", "useCount"];
+
+function orderAccepted(order: string): boolean {
+  return ORDER_FIELDS.includes(order.replace(/^-/, ""));
+}
 
 function listed(query: URLSearchParams): Row[] {
   const statuses = query.get("status")?.split(",");
@@ -167,6 +184,8 @@ async function answer(route: Route): Promise<void> {
   const path = url.pathname.slice(RELAY.length);
   const method = request.method();
 
+  if (method === "GET") reads.push({ path, query: url.searchParams });
+
   if (method !== "GET") {
     const body = (request.postDataJSON() ?? {}) as Record<string, unknown>;
 
@@ -187,6 +206,18 @@ async function answer(route: Route): Promise<void> {
 
     return route.fulfill({ status: 404 });
   }
+
+  const order = url.searchParams.get("order");
+
+  if (order !== null && path.endsWith("/memories") && !orderAccepted(order))
+    return route.fulfill({
+      status: 400,
+      contentType: "application/json",
+      body: JSON.stringify({
+        code: "bad-request",
+        error: `order is "${order}"; it is id, position, validFrom, importance or useCount, descending with a leading -.`
+      })
+    });
 
   switch (path) {
     case "/events":
@@ -572,6 +603,10 @@ describe.skipIf(!ready)("the brain's screen in a browser", () => {
         const card = page.locator("[data-sleep-card]");
 
         await card.waitFor();
+        // The card reads the newest sleep first, in an order the brain accepts: the stand-in refuses any other, and
+        // the card never stands over a refused read.
+        const sleepRead = reads.find((read) => read.path === "/brains/1/memories" && read.query.get("label") === "sleep");
+        expect(sleepRead?.query.get("order")).toBe("-validFrom");
         expect(await card.innerText()).toContain("2026-11-24");
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
         await card.getByRole("button").first().click();

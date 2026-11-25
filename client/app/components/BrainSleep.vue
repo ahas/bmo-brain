@@ -54,7 +54,7 @@ function ago(at: number): string {
 
 async function read(): Promise<void> {
   try {
-    const page = await api.memoryPage(props.brainId, sleepFilter(), "desc_validFrom", null, 1);
+    const page = await api.memoryPage(props.brainId, sleepFilter(), "-validFrom", null, 1);
     slept.value = page.items[0] ?? null;
   } catch (error) {
     slept.value = null;
