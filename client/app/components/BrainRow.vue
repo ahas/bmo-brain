@@ -30,6 +30,16 @@
         <UButton size="xs" color="neutral" variant="outline" :label="t('brain.action.open_live')" @click="emit('open', live.id)" />
       </div>
 
+      <!-- What a service of the deployment left stands read-only here: the brain keeps it from every other
+           writer, and the line says whose it is (docs/design.md, 「What a holder leaves」). -->
+      <div v-if="heldBy !== null" class="flex items-center gap-2 border-b border-default px-4 py-2" data-held-note>
+        <UIcon name="i-material-symbols-lock-outline" class="size-4 shrink-0 text-muted" aria-hidden="true" />
+        <div class="min-w-0 flex-1">
+          <UBadge color="neutral" variant="soft" size="sm">{{ t("brain.label.held") }} · <span class="font-mono">{{ heldBy }}</span></UBadge>
+          <p class="mt-1 text-sm text-muted">{{ t("brain.hint.held") }}</p>
+        </div>
+      </div>
+
       <div class="flex flex-col gap-4 p-4">
         <div v-if="!editing">
           <BrainText :text="memory.text" text-class="text-base whitespace-pre-wrap select-text" />
@@ -67,12 +77,15 @@
         </div>
 
         <div v-if="!editing && !readOnly" class="flex flex-wrap gap-2">
-          <UButton v-if="memory.status === 'pending'" size="sm" icon="i-material-symbols-check" :label="t('brain.action.approve')" :loading="busy" @click="move('active')" />
+          <UButton v-if="memory.status === 'pending' && heldBy === null" size="sm" icon="i-material-symbols-check" :label="t('brain.action.approve')" :loading="busy" @click="move('active')" />
+          <!-- Recording a use is not a change of the row, so it stands for a held row as for any other. -->
           <UButton v-if="live && memory.id === live.id" size="sm" color="neutral" variant="outline" icon="i-material-symbols-thumb-up-outline" :label="t('brain.action.confirm')" :loading="busy" @click="confirm" />
-          <UButton v-if="isLive" size="sm" color="neutral" variant="outline" icon="i-material-symbols-task-alt" :label="t('brain.action.done')" @click="askMove('done')" />
-          <UButton v-if="isLive" size="sm" color="error" variant="outline" icon="i-material-symbols-block" :label="t('brain.action.invalidate')" @click="askMove('invalidated')" />
-          <UButton v-if="isLive" size="sm" color="error" variant="outline" icon="i-material-symbols-undo" :label="t('brain.action.retract')" @click="askMove('retracted')" />
-          <UButton v-if="restorable" size="sm" color="neutral" variant="outline" icon="i-material-symbols-undo" :label="t('brain.action.restore')" :loading="busy" @click="restore" />
+          <template v-if="heldBy === null">
+            <UButton v-if="isLive" size="sm" color="neutral" variant="outline" icon="i-material-symbols-task-alt" :label="t('brain.action.done')" @click="askMove('done')" />
+            <UButton v-if="isLive" size="sm" color="error" variant="outline" icon="i-material-symbols-block" :label="t('brain.action.invalidate')" @click="askMove('invalidated')" />
+            <UButton v-if="isLive" size="sm" color="error" variant="outline" icon="i-material-symbols-undo" :label="t('brain.action.retract')" @click="askMove('retracted')" />
+            <UButton v-if="restorable" size="sm" color="neutral" variant="outline" icon="i-material-symbols-undo" :label="t('brain.action.restore')" :loading="busy" @click="restore" />
+          </template>
         </div>
 
         <dl class="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-2 text-sm [&>dt]:text-muted">
@@ -256,7 +269,10 @@ const next = computed(() => versions.value[versionIndex.value + 1]);
 const newest = computed(() => versions.value[versions.value.length - 1]);
 const live = computed(() => versions.value.find((version) => version.status === "active" || version.status === "pending"));
 const isLive = computed(() => memory.value?.status === "active" || memory.value?.status === "pending");
-const editable = computed(() => isLive.value && !props.readOnly);
+// What a service of the deployment left standing in this brain: the screen reads it and ends none of it
+// (docs/design.md, 「What a holder leaves」). Recording its use is the one act here a held row takes.
+const heldBy = computed(() => memory.value?.heldBy ?? null);
+const editable = computed(() => isLive.value && !props.readOnly && heldBy.value === null);
 const restorable = computed(
   () =>
     memory.value !== null &&

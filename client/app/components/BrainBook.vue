@@ -27,23 +27,29 @@
           <li
             v-for="(piece, index) in pieces"
             :key="piece.id"
-            :draggable="!busy && !readOnly"
+            :draggable="!busy && movable(piece)"
             data-piece
             class="group flex items-start gap-2 border-b border-default p-4"
-            :class="[readOnly ? '' : 'cursor-grab active:cursor-grabbing', landing === index ? LINE_BEFORE : '', landing === pieces.length && index === pieces.length - 1 ? LINE_AFTER : '', carrying === index ? 'opacity-50' : '']"
+            :class="[movable(piece) ? 'cursor-grab active:cursor-grabbing' : '', landing === index ? LINE_BEFORE : '', landing === pieces.length && index === pieces.length - 1 ? LINE_AFTER : '', carrying === index ? 'opacity-50' : '']"
             @dragstart="carry($event, index)"
             @dragend="setDown"
           >
-            <UIcon v-if="!readOnly" name="i-material-symbols-drag-indicator" class="size-5 shrink-0 text-muted" aria-hidden="true" />
+            <UIcon v-if="movable(piece)" name="i-material-symbols-drag-indicator" class="size-5 shrink-0 text-muted" aria-hidden="true" />
+            <span v-else class="size-5 shrink-0" aria-hidden="true" />
             <span class="w-8 shrink-0 text-sm text-muted tabular-nums">{{ piece.position }}</span>
-            <button type="button" class="min-w-0 flex-1 text-start text-sm whitespace-pre-wrap hover:text-primary" @click="emit('open', piece.id)">{{ reader.shown(piece.text) }}</button>
+            <button type="button" class="min-w-0 flex-1 text-start text-sm whitespace-pre-wrap hover:text-primary" @click="emit('open', piece.id)">
+              <span v-if="held(piece)" role="img" :aria-label="t('brain.label.held')" :title="t('brain.label.held')" class="me-1 inline-flex items-center align-text-bottom" data-held>
+                <UIcon name="i-material-symbols-lock-outline" class="size-4 text-muted" aria-hidden="true" />
+              </span>{{ reader.shown(piece.text) }}</button>
             <span class="shrink-0 text-sm text-muted">{{ typeName(t, te, piece.type) }}</span>
-            <div v-if="!readOnly" class="flex shrink-0 items-center opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 pointer-coarse:opacity-100">
+            <!-- A place is made only where no held row would have to move for it, so the control never stands
+                 for an act the brain would refuse. -->
+            <div v-if="movable(piece)" class="flex shrink-0 items-center opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 pointer-coarse:opacity-100">
               <UTooltip :text="t('brain.action.up')">
-                <UButton size="xs" color="neutral" variant="ghost" icon="i-material-symbols-keyboard-arrow-up" :aria-label="t('brain.action.up')" :disabled="index === 0 || busy" @click="swap(index, index - 1)" />
+                <UButton size="xs" color="neutral" variant="ghost" icon="i-material-symbols-keyboard-arrow-up" :aria-label="t('brain.action.up')" :disabled="index === 0 || busy || !movable(pieces[index - 1]!)" @click="swap(index, index - 1)" />
               </UTooltip>
               <UTooltip :text="t('brain.action.down')">
-                <UButton size="xs" color="neutral" variant="ghost" icon="i-material-symbols-keyboard-arrow-down" :aria-label="t('brain.action.down')" :disabled="index === pieces.length - 1 || busy" @click="swap(index, index + 1)" />
+                <UButton size="xs" color="neutral" variant="ghost" icon="i-material-symbols-keyboard-arrow-down" :aria-label="t('brain.action.down')" :disabled="index === pieces.length - 1 || busy || !movable(pieces[index + 1]!)" @click="swap(index, index + 1)" />
               </UTooltip>
             </div>
           </li>
@@ -90,6 +96,16 @@ const pieces = ref<Memory[]>([]);
 const rendering = ref("");
 const reading = ref<"pieces" | "rendering">("pieces");
 const busy = ref(false);
+
+// A piece a service of the deployment left is read here and moved nowhere: only the service that left it ends
+// it, and no place is made that would move it (docs/design.md, 「What a holder leaves」).
+function held(piece: Memory): boolean {
+  return piece.heldBy !== undefined && piece.heldBy !== null;
+}
+
+function movable(piece: Memory): boolean {
+  return !props.readOnly && !held(piece);
+}
 
 // The layer shown: the one chosen in the index, the first where none is, and none for the unfiled.
 const current = computed(() =>

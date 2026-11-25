@@ -58,6 +58,9 @@ interface Row {
   layerId: number | null;
   position: number;
   status: "active" | "superseded";
+  // The key of the service that left the row, where a holder left it (the brain's `docs/design.md`,
+  // 「What a holder leaves」).
+  heldBy?: string;
   labels?: Record<string, string>;
 }
 
@@ -346,6 +349,18 @@ async function answer(route: Route): Promise<void> {
     }
     case "/brains/1/tallies":
       return json(route, []);
+    // One row and its lineage as the row view reads them: the held row the screen test below seeds stands
+    // under its own id.
+    case "/brains/1/memories/90": {
+      const row = rows.find((one) => one.id === 90);
+
+      return row === undefined ? route.fulfill({ status: 404 }) : json(route, memoryOf(row));
+    }
+    case "/brains/1/lineages/90": {
+      const row = rows.find((one) => one.id === 90);
+
+      return row === undefined ? route.fulfill({ status: 404 }) : json(route, [memoryOf(row)]);
+    }
     case "/brains/1/memories": {
       // A page starts past the memory the cursor names, in the listed order, and says whether more stand past it.
       const items = listed(url.searchParams);
@@ -1047,5 +1062,52 @@ describe.skipIf(!ready)("the brain's screen in a browser", () => {
       expect(await button(WORDS.brain.action.create!).isDisabled()).toBe(false);
       expect(await page.locator("p", { hasText: said }).count()).toBe(0);
     }, 60_000);
+  });
+
+  describe("what a service of the deployment left stands read alone", () => {
+    const HELD_TEXT = "A schedule goes to the schedule service, never the calendar.";
+
+    test("the row carries its mark in the list and the layer view, and its row view offers no change and no move", async () => {
+      rows.push({
+        id: 90,
+        type: "lore",
+        text: HELD_TEXT,
+        layerId: 3,
+        position: 1,
+        status: "active",
+        heldBy: "application-a"
+      });
+
+      await page.setViewportSize(WIDE);
+      await page.goto(`${origin}/brain/1/list`, { waitUntil: "load" });
+
+      const line = page.locator("tr", { hasText: HELD_TEXT });
+      await line.first().waitFor();
+      expect(await line.locator("[data-held]").count()).toBe(1);
+
+      await page.getByText(HELD_TEXT).first().click();
+      const note = page.locator("[data-held-note]");
+      await note.waitFor();
+      expect(await note.innerText()).toContain("application-a");
+
+      // What the brain keeps from every other writer, the screen never offers: an edit, a status move, an end.
+      for (const name of [
+        WORDS.brain.action.edit!,
+        WORDS.brain.action.done!,
+        WORDS.brain.action.invalidate!,
+        WORDS.brain.action.retract!,
+        WORDS.brain.action.restore!
+      ]) {
+        // Exact, so an index row's own describe control is not taken for the row's edit.
+        expect(await page.getByRole("button", { name, exact: true }).count(), name).toBe(0);
+      }
+
+      // In the layer view it is read: it is carried nowhere, and no place is made that would move it.
+      await page.goto(`${origin}/brain/1/book?layer=3`, { waitUntil: "load" });
+      const piece = page.locator("[data-piece]", { hasText: HELD_TEXT });
+      await piece.first().waitFor();
+      expect(await piece.locator("[data-held]").count()).toBe(1);
+      expect(await piece.locator("button").count()).toBe(1);
+    }, 90_000);
   });
 });

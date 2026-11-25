@@ -30,6 +30,11 @@
       >
         <template #type-cell="{ row }">{{ typeName(t, te, row.original.type) }}</template>
         <template #text-cell="{ row }">
+          <!-- A row a service left stands with its own mark: the screen keeps no other sign that it is not the
+               agent's or a person's to change (docs/design.md, 「What a holder leaves」). -->
+          <span v-if="row.original.heldBy" role="img" :aria-label="t('brain.label.held')" :title="t('brain.label.held')" class="me-1 inline-flex items-center" data-held>
+            <UIcon name="i-material-symbols-lock-outline" class="size-4 text-muted" aria-hidden="true" />
+          </span>
           <span :title="reader.of(row.original.text) === undefined ? undefined : row.original.text">{{ reader.shown(row.original.text) }}</span>
         </template>
         <template #layer-cell="{ row }">{{ layerName(row.original.layerId) }}</template>
@@ -56,6 +61,9 @@
               <div class="flex items-center gap-2 text-sm text-muted">
                 <span>{{ typeName(t, te, memory.type) }}</span>
                 <BrainStatus :status="memory.status" />
+                <span v-if="memory.heldBy" role="img" :aria-label="t('brain.label.held')" :title="t('brain.label.held')" class="inline-flex items-center" data-held>
+                  <UIcon name="i-material-symbols-lock-outline" class="size-4 text-muted" aria-hidden="true" />
+                </span>
                 <span class="ms-auto tabular-nums">{{ day(memory.validFrom) }}</span>
               </div>
               <p class="line-clamp-3 text-sm">{{ reader.shown(memory.text) }}</p>
