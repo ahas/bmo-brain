@@ -295,6 +295,17 @@ async function answer(route: Route): Promise<void> {
       })
     });
 
+  // One row of this brain and its lineage, as the row view reads them, under whatever id a test seeds.
+  const one = /^\/brains\/1\/(memories|lineages)\/(\d+)$/.exec(path);
+
+  if (one !== null) {
+    const found = rows.find((row) => row.id === Number(one[2]));
+
+    if (found === undefined) return route.fulfill({ status: 404 });
+
+    return json(route, one[1] === "lineages" ? [memoryOf(found)] : memoryOf(found));
+  }
+
   switch (path) {
     case "/events":
       // A stream that names an hour to wait before it is opened again, so the page holds no stream and reads afresh
@@ -371,18 +382,6 @@ async function answer(route: Route): Promise<void> {
     }
     case "/brains/1/tallies":
       return json(route, []);
-    // One row and its lineage as the row view reads them: the held row the screen test below seeds stands
-    // under its own id.
-    case "/brains/1/memories/90": {
-      const row = rows.find((one) => one.id === 90);
-
-      return row === undefined ? route.fulfill({ status: 404 }) : json(route, memoryOf(row));
-    }
-    case "/brains/1/lineages/90": {
-      const row = rows.find((one) => one.id === 90);
-
-      return row === undefined ? route.fulfill({ status: 404 }) : json(route, [memoryOf(row)]);
-    }
     case "/brains/1/memories": {
       // A page starts past the memory the cursor names, in the listed order, and says whether more stand past it.
       const items = listed(url.searchParams);
