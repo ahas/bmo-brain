@@ -576,6 +576,9 @@ pub struct Restoration {
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub text: Option<String>,
   pub actor_name: String,
+  /// The labels the restored version carries, replacing the closed row's whole; the closed row's where none.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub labels: Option<Labels>,
   /// Who writes into an org brain; `member` where none is given.
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub standing: Option<Standing>,

@@ -2023,6 +2023,16 @@
           "actorName": {
             "type": "string"
           },
+          "labels": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "The labels the restored version carries, replacing the closed row's whole; the closed row's where none.",
+            "type": [
+              "object",
+              "null"
+            ]
+          },
           "standing": {
             "anyOf": [
               {

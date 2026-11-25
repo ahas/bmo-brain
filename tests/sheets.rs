@@ -533,6 +533,7 @@ async fn no_write_takes_the_type_sheet() {
   let restored = Restoration {
     text: None,
     actor_name: "writer-a".to_owned(),
+    labels: None,
     standing: None,
   };
   assert_eq!(

@@ -1466,6 +1466,10 @@ export interface components {
         /** @description A closed lineage restored: a new active version written after its newest, closed one. */
         Restoration: {
             actorName: string;
+            /** @description The labels the restored version carries, replacing the closed row's whole; the closed row's where none. */
+            labels?: {
+                [key: string]: string;
+            } | null;
             /** @description Who writes into an org brain; `member` where none is given. */
             standing?: components["schemas"]["Standing"] | null;
             /** @description The closed row's text where none is given. */

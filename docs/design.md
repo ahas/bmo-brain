@@ -190,6 +190,11 @@ No type is called `sheet`. A person's standing sheet is a rendering of their nam
   `done` or `invalidated` lineage (never a `retracted` one) is followed by a new `active` version in the same
   lineage, its text the closed one's or the restorer's, and the closed row stays as it was, a record of the span
   it held for. A lineage that holds a live version already has nothing to restore.
+- **A restored version carries nothing of the close.** What the close wrote, the reason the row was moved for,
+  its `validTo` and its `supersededAt`, stays on the closed row, and the new version holds from the moment of the
+  restoration with no reason. Its labels are the closed row's, or the restorer's where it names them, replacing
+  them whole: the labels are the caller's (「Memories」), so a caller that records a close in labels of its own
+  names the ones the restored version keeps, and the brain neither reads nor drops any of them itself.
 - **`pending` is one thing only:** a memory waiting for a person's approval. The agent never parks a
   memory as `pending` because it has one source (「Writing」), and it does not offer common knowledge for
   approval either: what members bring to the shared knowledge the agent collects and keeps on its own, as a

@@ -436,6 +436,7 @@ async fn a_members_word_is_a_proposal_a_head_accepts_and_every_other_write_is_a_
   let restoration = Restoration {
     text: None,
     actor_name: "writer-b".to_owned(),
+    labels: None,
     standing: Some(Standing::Member),
   };
   assert_eq!(refused(client.memory_restore(unit, closed.id, &restoration).await), forbidden);

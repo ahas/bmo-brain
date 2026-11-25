@@ -470,6 +470,7 @@ async fn a_closed_lineage_is_restored_by_a_new_version_and_only_from_its_newest_
     let body = Restoration {
       text: text.map(str::to_owned),
       actor_name: "screen".to_owned(),
+      labels: None,
       standing: None,
     };
     async move { client.memory_restore(brain, id, &body).await }
@@ -502,6 +503,51 @@ async fn a_closed_lineage_is_restored_by_a_new_version_and_only_from_its_newest_
   assert_eq!((again.text.as_str(), again.lineage_id), ("Back again", keyed.id));
   assert_eq!(client.lineage(brain, keyed.id).await.unwrap().len(), 3);
   assert_eq!(refused(restore(999_999, None).await), (404, "not-found".to_owned()));
+}
+
+#[tokio::test]
+async fn a_restored_version_carries_nothing_of_the_close_and_the_labels_its_restorer_names() {
+  let served = Served::new().await;
+  let client = &served.client;
+  let brain = brain_of(client).await;
+  let written = client
+    .memory_add(
+      brain,
+      &NewMemory {
+        labels: labels(&[("closed-why", "spent"), ("closed-words", "It ended."), ("source", "writer-a")]),
+        ..memory("check", "A check")
+      },
+    )
+    .await
+    .unwrap();
+  let close = || MemoryMove {
+    reason: Some("spent".to_owned()),
+    ..moved(MemoryStatus::Invalidated)
+  };
+  let restore = |id: i64, kept: Option<&[(&str, &str)]>| {
+    let body = Restoration {
+      text: None,
+      actor_name: "screen".to_owned(),
+      labels: kept.map(labels),
+      standing: None,
+    };
+    async move { client.memory_restore(brain, id, &body).await }
+  };
+
+  let closed = client.memory_move(brain, written.id, &close()).await.unwrap();
+  let restored = restore(written.id, Some(&[("source", "writer-a")][..])).await.unwrap();
+  assert_eq!(
+    (restored.status, restored.reason.as_deref(), restored.valid_to, restored.superseded_at),
+    (MemoryStatus::Active, None, None, None)
+  );
+  assert!(restored.valid_from >= closed.superseded_at.unwrap());
+  assert_eq!(restored.labels, labels(&[("source", "writer-a")]));
+  let kept = client.memory(brain, written.id).await.unwrap();
+  assert_eq!((kept.reason.as_deref(), kept.labels.len()), (Some("spent"), 3));
+
+  client.memory_move(brain, restored.id, &close()).await.unwrap();
+  let unnamed = restore(restored.id, None).await.unwrap();
+  assert_eq!((unnamed.reason.as_deref(), unnamed.labels.clone()), (None, restored.labels));
 }
 
 #[tokio::test]

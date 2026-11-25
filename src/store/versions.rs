@@ -921,7 +921,8 @@ impl Store {
   }
 
   /// A closed lineage restored: a new active version written after its newest version, which is `done` or
-  /// `invalidated` and stays as it was.
+  /// `invalidated` and stays as it was with what its close wrote; the new version takes the restorer's labels
+  /// where it names them, else the closed row's.
   pub async fn memory_restore(&self, brain_id: i64, id: i64, body: &Restoration) -> Held<Memory> {
     given("actorName", &body.actor_name)?;
     if let Some(words) = &body.text {
@@ -998,7 +999,7 @@ impl Store {
     .bind(closed.last_confirmed_at)
     .bind(closed.consolidated_at)
     .bind(&body.actor_name)
-    .bind(&closed.labels)
+    .bind(Json(body.labels.as_ref().unwrap_or(&closed.labels.0)))
     .bind(closed.locked)
     .bind(closed.internal_only)
     .bind(closed.shared)

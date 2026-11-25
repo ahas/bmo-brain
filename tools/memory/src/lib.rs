@@ -672,6 +672,7 @@ async fn entry(client: &BrainClient, brain: i64, session: &Session, call: Call) 
           &Restoration {
             text: None,
             actor_name: ACTOR.to_owned(),
+            labels: None,
             standing: None,
           },
         )
