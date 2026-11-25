@@ -1150,11 +1150,14 @@ describe.skipIf(!ready)("the brain's screen in a browser", () => {
       // The row's own control for the act, with nothing typed: what is asked is the write the service refuses.
       await page.getByRole("button", { name: WORDS.brain.action.approve!, exact: true }).click();
 
-      // The screen keeps no control that would try this on a held row; a tab written before the service declared
-      // still meets the refusal, and reads whose row it is rather than a bare failure to save.
-      await page.getByRole("status").filter({ hasText: WORDS.brain.error.held! }).first().waitFor();
+      // The screen keeps no control that would try this on a held row; a tab written before the service
+      // declared still meets the refusal, and reads whose row it is rather than a bare failure to save.
+      await until(
+        () => writes.some((write) => write.method === "PATCH" && write.path.endsWith("/memories/91")),
+        "the move the row offered"
+      );
+      await page.getByText(WORDS.brain.error.held!).first().waitFor();
       expect(await page.getByText(WORDS.brain.error.save!).count()).toBe(0);
-      expect(writes.some((write) => write.method === "PATCH" && write.path.endsWith("/memories/91"))).toBe(true);
 
       keptFrom = null;
     }, 90_000);
