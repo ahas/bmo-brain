@@ -1,6 +1,6 @@
 //! The schema's starting point (docs/design.md, 「The schema」): a blank database gets the baseline whole, an
 //! install holding the last record before 1.0.0 is taken as it stands, one holding part of it is refused, and the
-//! migration after the baseline removes the imported closing labels and nothing else.
+//! migrations after the baseline change no row beyond the imported closing labels, and end with `held by`.
 
 use crate::support::Bare;
 
@@ -10,7 +10,8 @@ use sqlx::PgConnection;
 const BASELINE: &str = include_str!("../migrations/0001_baseline.sql");
 
 // The record every migrated database holds.
-const MIGRATED: [(i64, &str); 2] = [(1, "baseline"), (2, "imported closing labels")];
+const MIGRATED: [(i64, &str); 3] =
+  [(1, "baseline"), (2, "imported closing labels"), (3, "held by")];
 
 // The record an install from before 1.0.0 holds once every migration of its last release ran.
 const BEFORE: &[(i64, &str)] = &[
@@ -158,7 +159,7 @@ async fn memories(db: &mut PgConnection) -> (Vec<String>, Vec<serde_json::Value>
 }
 
 #[tokio::test]
-async fn the_migration_after_the_baseline_removes_the_imported_closing_labels_and_nothing_else() {
+async fn the_migrations_after_the_baseline_change_no_row_beyond_the_imported_closing_labels() {
   let bare = Bare::blank().await;
   let mut db = bare.connect().await;
   let baseline = MIGRATOR.iter().next().unwrap();

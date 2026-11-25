@@ -97,22 +97,28 @@ async fn agent_brain(client: &BrainClient, account: &str, agent: &str) -> i64 {
     .id
 }
 
+/// What stands for a holder in one brain: its live rows, by the holder's key and then the key the holder
+/// gave each. The list itself stands in no such order — `GET /memories` keeps its own order and names no
+/// status unless the caller does — so the read names the live statuses and puts them in the holder's order.
 async fn held_of(client: &BrainClient, brain_id: i64) -> Vec<(Option<String>, String, String)> {
   let page = client
     .memories(
       brain_id,
       &MemoriesQuery {
         held: Some(true),
+        status: Some("active,pending".to_owned()),
         ..Default::default()
       },
     )
     .await
     .unwrap();
-  page
+  let mut rows: Vec<(Option<String>, String, String)> = page
     .items
     .into_iter()
     .map(|row| (row.held_by, row.key.unwrap_or_default(), row.text))
-    .collect()
+    .collect();
+  rows.sort_by(|first, second| first.0.cmp(&second.0).then_with(|| first.1.cmp(&second.1)));
+  rows
 }
 
 async fn own_of(client: &BrainClient, brain_id: i64) -> Vec<String> {
@@ -121,6 +127,7 @@ async fn own_of(client: &BrainClient, brain_id: i64) -> Vec<String> {
       brain_id,
       &MemoriesQuery {
         held: Some(false),
+        status: Some("active,pending".to_owned()),
         ..Default::default()
       },
     )
@@ -498,11 +505,31 @@ async fn a_held_row_never_travels_in_a_brain_file() {
   let client = &served.client;
   let first = agent_brain(client, "account-a", "agent-a").await;
   declare(client, "holder-a", vec![declared("manual", "how the holder is used.")]).await;
-  client
+
+  // No writing path reaches a holder's key. A first version naming a key a held row stands on is refused
+  // outright, the sentence naming the row that holds it, and a version of the held row itself is refused
+  // with the holder named, so the key stays the holder's alone.
+  let taken = refused(
+    client
+      .memory_add(
+        first,
+        &NewMemory {
+          key: Some("manual".to_owned()),
+          kind: "fact".to_owned(),
+          text: "the brain's own saying".to_owned(),
+          actor_name: "writer-a".to_owned(),
+          ..Default::default()
+        },
+      )
+      .await,
+  );
+  assert_eq!(taken, (409, "conflict".to_owned()));
+
+  let own = client
     .memory_add(
       first,
       &NewMemory {
-        key: Some("manual".to_owned()),
+        key: Some("own-saying".to_owned()),
         kind: "fact".to_owned(),
         text: "the brain's own saying".to_owned(),
         actor_name: "writer-a".to_owned(),
@@ -511,28 +538,20 @@ async fn a_held_row_never_travels_in_a_brain_file() {
     )
     .await
     .unwrap();
+  assert_eq!(own.held_by, None);
 
-  // Export writes the brain's own row alone.
+  // Export writes the brain's own row alone, and a file therefore carries no holder's row to stand over a
+  // held key: what a holder stands for comes back from its declaration, in every agent's brain at once.
   let file = client.export(first, &bmo_brain_client::ExportQuery::default()).await.unwrap();
   let late = agent_brain(client, "account-b", "agent-b").await;
   let injected = client.inject(late, file).await.unwrap();
-  assert_eq!(injected.memories_added, 1);
-  assert!(held_of(client, late).await.is_empty(), "a file brings no holder's row");
-
-  // A file whose row would stand over a held key is refused whole.
-  let other = agent_brain(client, "account-c", "agent-c").await;
-  let file = client.export(late, &bmo_brain_client::ExportQuery::default()).await.unwrap();
-  let refused_injection = client.inject(first, file).await;
-  let Err(bmo_brain_client::ClientFailure::Answered {
-    status,
-    answer: Some(answer),
-  }) = refused_injection
-  else {
-    panic!("an injection over a held key was due to be refused");
-  };
-  assert_eq!((status, answer.code.as_str()), (409, "conflict"));
-  assert!(answer.error.contains("holder-a"), "the sentence names the holder: {}", answer.error);
-  assert!(held_of(client, other).await.is_empty());
+  assert_eq!((injected.memories_added, injected.memories_superseded), (1, 0));
+  assert_eq!(own_of(client, late).await, vec!["the brain's own saying".to_owned()]);
+  assert_eq!(
+    held_of(client, late).await,
+    held_of(client, first).await,
+    "a brain made after a declaration is given what stands, and no file carries it"
+  );
 }
 
 #[tokio::test]
