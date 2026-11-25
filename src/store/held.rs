@@ -55,14 +55,15 @@ pub(crate) fn held(row: &MemoryRow, what: &str) -> Held<()> {
 /// holder left out is asked for by the same default a row is written with, so a set declared twice answers that
 /// nothing changed.
 fn stands_as(declared: &DeclaredMemory, row: &Standing) -> bool {
-  let about = |pairs: Vec<(String, String)>| {
+  // The pairs as a set: the holder gives them in any order, and a row stands with each one once.
+  let as_set = |pairs: Vec<(String, String)>| {
     let mut sorted = pairs;
     sorted.sort();
     sorted.dedup();
     sorted
   };
-  let holds = about(row.subjects.clone());
-  let asked = about(
+  let holds = as_set(row.subjects.clone());
+  let asked = as_set(
     declared
       .subjects
       .iter()
