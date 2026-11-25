@@ -58,7 +58,7 @@ interface Row {
   text: string;
   layerId: number | null;
   position: number;
-  status: "active" | "superseded";
+  status: "active" | "pending" | "superseded";
   // The key of the service that left the row, where a holder left it (the brain's `docs/design.md`,
   // 「What a holder leaves」).
   heldBy?: string;
@@ -271,6 +271,10 @@ async function answer(route: Route): Promise<void> {
 
       return json(route, memoryOf(versioned(id, body)));
     }
+
+    const moved = /^\/brains\/1\/memories\/(\d+)$/.exec(path);
+
+    if (method === "PATCH" && moved !== null && Number(moved[1]) === keptFrom) return refusal(route, Number(moved[1]));
 
     if (method === "PATCH" && layer !== null) {
       const changed = layers.find((one) => one.id === Number(layer[1]))!;
@@ -1134,7 +1138,7 @@ describe.skipIf(!ready)("the brain's screen in a browser", () => {
     test("a tab the service left behind reads, in the screen's own words, who keeps the row it tried to change", async () => {
       const KEEPING = "A saying the screen still shows as its own.";
 
-      rows.push({ id: 91, type: "lore", text: KEEPING, layerId: null, position: 1, status: "active" });
+      rows.push({ id: 91, type: "lore", text: KEEPING, layerId: null, position: 1, status: "pending" });
       keptFrom = 91;
 
       await page.setViewportSize(WIDE);
@@ -1142,17 +1146,15 @@ describe.skipIf(!ready)("the brain's screen in a browser", () => {
       await page.getByText(KEEPING).first().waitFor();
 
       await page.getByText(KEEPING).first().click();
-      await page.getByRole("button", { name: WORDS.brain.action.edit!, exact: true }).click();
 
-      // The row is saved as the stale tab holds it, without typing: what is asked is the write the service
-      // refuses, not a translation of new words.
-      await page.locator("textarea").first().waitFor();
-      await page.locator("[data-edit-save]").click();
+      // The row's own control for the act, with nothing typed: what is asked is the write the service refuses.
+      await page.getByRole("button", { name: WORDS.brain.action.approve!, exact: true }).click();
 
       // The screen keeps no control that would try this on a held row; a tab written before the service declared
       // still meets the refusal, and reads whose row it is rather than a bare failure to save.
-      await page.getByText(WORDS.brain.error.held!).first().waitFor();
+      await page.getByRole("status").filter({ hasText: WORDS.brain.error.held! }).first().waitFor();
       expect(await page.getByText(WORDS.brain.error.save!).count()).toBe(0);
+      expect(writes.some((write) => write.method === "PATCH" && write.path.endsWith("/memories/91"))).toBe(true);
 
       keptFrom = null;
     }, 90_000);

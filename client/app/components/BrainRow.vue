@@ -397,12 +397,9 @@ async function saveEdit(): Promise<void> {
     emit("changed");
     emit("open", written.id);
   } catch (error) {
-    // Two refusals both keep the words being written and read the row again: another writer moved the row
-    // first, or a service of the deployment left this row and keeps it from every other writer.
-    const refusal = api.isLocked(error) ? "brain.error.held" : api.isConflict(error) ? "brain.error.conflict" : null;
-
-    if (refusal !== null) {
-      island.say({ tone: "warning", title: t(refusal) });
+    // A refusal the screen names keeps the words being written and reads the row again: another writer moved
+    // the row first, or a service of the deployment left it and keeps it from every other writer.
+    if (refuse(error)) {
       const kept = { ...draft };
       const english = draftWords.english.value;
 
@@ -438,6 +435,18 @@ function askMove(status: MemoryStatus): void {
   moving.value = true;
 }
 
+// A refusal the screen has words of its own for: a service of the deployment keeps this row, or another
+// writer moved it first. Where the refusal is neither, the island tells the failure as it does anywhere.
+function refuse(error: unknown): boolean {
+  const key = api.isLocked(error) ? "brain.error.held" : api.isConflict(error) ? "brain.error.conflict" : null;
+
+  if (key === null) return false;
+
+  island.say({ tone: "warning", title: t(key) });
+
+  return true;
+}
+
 async function move(status: MemoryStatus): Promise<void> {
   const found = memory.value;
 
@@ -461,7 +470,7 @@ async function move(status: MemoryStatus): Promise<void> {
     if (moved.id !== found.id) emit("open", moved.id);
     else await read();
   } catch (error) {
-    island.fail(error, t("brain.error.save"));
+    if (!refuse(error)) island.fail(error, t("brain.error.save"));
   } finally {
     busy.value = false;
   }
@@ -480,7 +489,7 @@ async function restore(): Promise<void> {
     emit("changed");
     emit("open", restored.id);
   } catch (error) {
-    island.fail(error, t("brain.error.save"));
+    if (!refuse(error)) island.fail(error, t("brain.error.save"));
   } finally {
     busy.value = false;
   }
@@ -498,7 +507,7 @@ async function confirm(): Promise<void> {
     island.say({ tone: "success", title: t("brain.status.confirmed") });
     await read();
   } catch (error) {
-    island.fail(error, t("brain.error.save"));
+    if (!refuse(error)) island.fail(error, t("brain.error.save"));
   } finally {
     busy.value = false;
   }
