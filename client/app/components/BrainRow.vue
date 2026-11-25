@@ -72,7 +72,7 @@
           <p v-if="memory.type === 'persona'" class="text-sm text-warning">{{ t("brain.hint.persona_cache") }}</p>
           <div class="flex justify-end gap-2">
             <UButton color="neutral" variant="ghost" :label="t('common.action.cancel')" @click="editing = false" />
-            <UButton :label="t('common.action.save')" :loading="busy || draftWords.busy.value" @click="saveEdit" />
+            <UButton data-edit-save :label="t('common.action.save')" :loading="busy || draftWords.busy.value" @click="saveEdit" />
           </div>
         </div>
 

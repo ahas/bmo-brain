@@ -1147,7 +1147,7 @@ describe.skipIf(!ready)("the brain's screen in a browser", () => {
       const words = page.locator("textarea").first();
       await words.waitFor();
       await words.fill("Words a stale tab tries to leave on the row.");
-      await page.getByRole("button", { name: WORDS.brain.action.save!, exact: true }).click();
+      await page.locator("[data-edit-save]").click();
 
       // The screen keeps no control that would try this on a held row; a tab written before the service declared
       // still meets the refusal, and reads whose row it is rather than a bare failure to save.
