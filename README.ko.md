@@ -67,8 +67,8 @@ bun run --cwd client check
 Rust 크레이트 `bmo-brain-client`와 `package/` 아래의 TypeScript 패키지 `bmo-brain-client`입니다.
 
 - 다운스트림 체크아웃은 TypeScript 패키지를 팩으로 설치합니다. `package/`에서 `bun pm pack`을 실행하면
-  `bmo-brain-client-<version>.tgz`가 만들어지고, 체크아웃은 이를 경로로 추가합니다. 패키지 버전은 서비스 버전과
-  같습니다.
+  `bmo-brain-client-<version>.tgz`가 만들어지고, 체크아웃은 이를 경로로 추가합니다. 패키지 버전은 서비스
+  매니페스트가 적는 자리표시 값과 같습니다.
 - `brainClient(<address>, <token>)`는 문서의 라우트를 호출로 삼고 그 문서로 타입이 매겨진 클라이언트를
   돌려줍니다. 예: `brain.GET("/brains/{brainId}/memories/{memoryId}", { params: { path: { brainId, memoryId } } })`.
   모든 호출에는 토큰이 실리고, `GET /events`는 한 페이지를 돌려줍니다. 실시간 스트림을 읽으려는 호출자는

@@ -72,7 +72,7 @@ The service publishes its client in two languages, both from `docs/openapi.json`
 `bmo-brain-client` under `crates/client`, and the TypeScript package `bmo-brain-client` under `package/`.
 
 - A downstream checkout installs the TypeScript package from its pack: `bun pm pack` in `package/` makes
-  `bmo-brain-client-<version>.tgz`, which the checkout adds by path. The package's version is the service's.
+  `bmo-brain-client-<version>.tgz`, which the checkout adds by path. The package's version is the placeholder the service's manifest names.
 - `brainClient(<address>, <token>)` answers a client whose calls are the document's routes, typed by it:
   `brain.GET("/brains/{brainId}/memories/{memoryId}", { params: { path: { brainId, memoryId } } })`. Every call carries the token,
   and `GET /events` answers a page; a caller reading the live stream reads server-sent events itself.

@@ -132,7 +132,7 @@ async fn every_route_takes_the_token_and_a_route_no_one_serves_is_no_route() {
   assert_eq!(refused(served.with_token("wrong").health().await), (401, "unauthorized".into()));
   let health = served.client.health().await.unwrap();
   assert!(health.ready);
-  assert_eq!(health.version, env!("CARGO_PKG_VERSION"));
+  assert_eq!(health.version, bmo_brain::VERSION);
   let http = reqwest::Client::new();
   for (method, path) in [
     (reqwest::Method::GET, "/nowhere"),

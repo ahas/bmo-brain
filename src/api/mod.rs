@@ -243,7 +243,7 @@ async fn health(State(brain): State<Brain>) -> Json<Health> {
   Json(Health {
     ready: reason.is_none(),
     reason,
-    version: env!("CARGO_PKG_VERSION").to_owned(),
+    version: crate::VERSION.to_owned(),
     rules: brain.store.rules.clone(),
     searches,
     embedding,

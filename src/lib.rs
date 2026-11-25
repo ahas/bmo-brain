@@ -13,3 +13,11 @@ pub mod mcp;
 pub mod openapi;
 pub mod store;
 pub mod tool_env;
+
+/// The version the service's health and its MCP server answer: the set's version the build was made at,
+/// which the testbed hands the build as `BMO_VERSION`, else the manifest's placeholder (bmo-chat's
+/// `docs/conventions.md`, 「Versions」).
+pub const VERSION: &str = match option_env!("BMO_VERSION") {
+  Some(version) => version,
+  None => env!("CARGO_PKG_VERSION"),
+};

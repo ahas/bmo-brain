@@ -72,7 +72,7 @@ bun run --cwd client check
 
 - 下流のチェックアウトは TypeScript パッケージをパックからインストールします。`package/` で `bun pm pack` を
   実行すると `bmo-brain-client-<version>.tgz` ができ、チェックアウトはそれをパスで追加します。パッケージの
-  バージョンはサービスのバージョンと同じです。
+  バージョンはサービスのマニフェストが記すプレースホルダーと同じです。
 - `brainClient(<address>, <token>)` は、ドキュメントのルートを呼び出しとし、そのドキュメントで型付けされた
   クライアントを返します。例: `brain.GET("/brains/{brainId}/memories/{memoryId}", { params: { path: { brainId, memoryId } } })`。
   すべての呼び出しはトークンを伴い、`GET /events` は一ページ分を返します。ライブストリームを読む呼び出し側は

@@ -64,7 +64,7 @@ bun run --cwd client check
 `bmo-brain-client`，以及 `package/` 下的 TypeScript 包 `bmo-brain-client`。
 
 - 下游检出从打包文件安装 TypeScript 包：在 `package/` 中运行 `bun pm pack` 会生成
-  `bmo-brain-client-<version>.tgz`，检出再按路径添加它。包的版本与服务的版本一致。
+  `bmo-brain-client-<version>.tgz`，检出再按路径添加它。包的版本与服务清单所写的占位值一致。
 - `brainClient(<address>, <token>)` 返回一个客户端，它的调用就是文档中的路由，并由文档提供类型：
   `brain.GET("/brains/{brainId}/memories/{memoryId}", { params: { path: { brainId, memoryId } } })`。每次调用都会携带令牌，
   `GET /events` 返回一页结果；需要读取实时流的调用方自行读取 server-sent events。

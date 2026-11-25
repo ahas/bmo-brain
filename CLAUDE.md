@@ -45,5 +45,7 @@ A change moves through three stages in order:
 3. Verification: the test targets the change touched, then `cargo test --workspace` once, the Cargo suite
    `testbed.toml` declares.
 
-The version is the workspace's: until the first release it is `0.1.0-rev.N`, and each change raises only the
-revision. The testbed's declaration, `testbed.toml`, carries none.
+The version is the set's, read off the git tag when a build is made: the testbed hands it to the build as
+`BMO_VERSION`, and the health, the MCP server and `--version` answer it (bmo-chat's `docs/conventions.md`,
+「Versions」). The manifests' versions and the OpenAPI document's are a placeholder that never moves; no change
+moves a version. The testbed's declaration, `testbed.toml`, carries none.

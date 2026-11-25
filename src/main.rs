@@ -23,7 +23,7 @@ use rmcp::ServiceExt;
 use rmcp::transport::stdio;
 
 #[derive(Parser)]
-#[command(name = "bmo-brain", version, about = "The brain service and its command.")]
+#[command(name = "bmo-brain", version = bmo_brain::VERSION, about = "The brain service and its command.")]
 struct Command {
   /// The configuration file; `BMO_BRAIN_CONFIG` where none is given.
   #[arg(long, global = true, env = "BMO_BRAIN_CONFIG")]

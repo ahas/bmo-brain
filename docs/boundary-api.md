@@ -600,8 +600,8 @@ The service publishes its client in two languages, both from `docs/openapi.json`
 
 A downstream checkout installs the TypeScript package from its pack: `bun pm pack` in `package/` makes
 `bmo-brain-client-<version>.tgz`, which the checkout adds by path. The package and the document both carry
-the service's version, and the package's tests fail where its types or its version differ from the
-document.
+the placeholder version the service's manifest names, and the package's tests fail where its types or its
+version differ from the document. The running service's version is its health's and its MCP server's.
 
 ## Codes
 
