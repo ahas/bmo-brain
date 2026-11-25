@@ -7,7 +7,7 @@ use crate::support;
 
 use bmo_brain_client::{
   BrainClient, MemoriesQuery, MemoryMove, MemoryStatus, MemoryVersion, NewBrain, NewLayer, NewMemory,
-  Restoration, SubjectKey, SubjectsQuery, TalliesQuery, TallyBy,
+  Restoration, SubjectKey, SubjectsQuery, TalliesQuery, TallyBy, TypesQuery,
 };
 use support::{CONSOLE_TOKEN, Served, TOKEN, labels, refused};
 
@@ -156,6 +156,81 @@ async fn the_list_takes_several_statuses_and_types_leaves_types_out_and_names_ro
     )
     .await;
   assert_eq!(refused(bad), (400, "bad-request".to_owned()));
+}
+
+#[tokio::test]
+async fn a_type_is_found_by_the_name_the_caller_sends_with_the_words() {
+  let served = Served::new().await;
+  let client = &served.client;
+  let brain = brain_of(client).await;
+  client.memory_add(brain, &memory("fact", "The kiln fires at dawn.")).await.unwrap();
+  client.memory_add(brain, &memory("tip", "Warm the pot first.")).await.unwrap();
+  let kinds = |page: &bmo_brain_client::Page<bmo_brain_client::TypeCount>| {
+    page.items.iter().map(|type_count| type_count.kind.clone()).collect::<Vec<_>>()
+  };
+  // The words alone find a type by its own word.
+  let by_word = client
+    .types(
+      brain,
+      &TypesQuery {
+        q: Some("fact".to_owned()),
+        ..TypesQuery::default()
+      },
+    )
+    .await
+    .unwrap();
+  assert_eq!(kinds(&by_word), ["fact"]);
+  // The words no type word holds find nothing where no names are sent.
+  let alone = client
+    .types(
+      brain,
+      &TypesQuery {
+        q: Some("Truth".to_owned()),
+        ..TypesQuery::default()
+      },
+    )
+    .await
+    .unwrap();
+  assert!(alone.items.is_empty());
+  // The name the caller sends with the words finds the type, in any case, and the words match the name alone.
+  let named = client
+    .types(
+      brain,
+      &TypesQuery {
+        q: Some("truth".to_owned()),
+        names: Some("fact=Truth,tip=Hint".to_owned()),
+        ..TypesQuery::default()
+      },
+    )
+    .await
+    .unwrap();
+  assert_eq!(kinds(&named), ["fact"]);
+  // A reserved type with no live row stands under its name, as it does under its own word.
+  let empty = client
+    .types(
+      brain,
+      &TypesQuery {
+        q: Some("Wisdom".to_owned()),
+        names: Some("knowledge=Wisdom".to_owned()),
+        ..TypesQuery::default()
+      },
+    )
+    .await
+    .unwrap();
+  assert_eq!(kinds(&empty), ["knowledge"]);
+  assert_eq!(empty.items[0].count, 0);
+  // The names are read only with words: no words, the whole page stands whatever names are sent.
+  let whole = client
+    .types(
+      brain,
+      &TypesQuery {
+        names: Some("fact=Truth".to_owned()),
+        ..TypesQuery::default()
+      },
+    )
+    .await
+    .unwrap();
+  assert!(whole.items.iter().any(|type_count| type_count.kind == "tip"));
 }
 
 #[tokio::test]

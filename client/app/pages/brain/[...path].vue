@@ -190,7 +190,7 @@ import BrainTeach from "../../components/BrainTeach.vue";
 import BrainTimeline from "../../components/BrainTimeline.vue";
 import * as api from "../../domain/brain-api";
 import { EVERY_TYPE, EVERY_TYPE_BUT_EPISODES, ORDERS, STATUS_CHOICES, cleared, filterOf, honours, orderOf, pathOf, placeOf, queryOf, standing } from "../../domain/brain-place";
-import { subjectTypeName, typeName } from "../../domain/brain-names";
+import { subjectTypeName, typeName, typeSearchNames } from "../../domain/brain-names";
 import { ENGLISH, useReading } from "../../domain/brain-reading";
 import { useBrainStream } from "../../domain/brain-stream";
 
@@ -222,7 +222,7 @@ const INDEX_PAGE = 50;
 
 const route = useRoute();
 const router = useRouter();
-const { t, te } = useI18n();
+const { t, te, tm } = useI18n();
 // Whether the console this screen stands in offers its title bar, under the key the layer names for it. Only its
 // presence is read: the screen lays nothing into it.
 const bar = inject<object | null>("bmo-console-title-bar", null);
@@ -250,6 +250,9 @@ const typeCounts = ref<Tally[]>([]);
 type IndexTab = "layers" | "subjects" | "types";
 const indexTab = ref<IndexTab>("layers");
 const indexWords = ref("");
+// The names the reader's language gives the types, sent with the words so a type is found by the name it shows
+// (docs/design.md, 「The screen」, "Names in the reader's language").
+const typeNames = computed(() => typeSearchNames(t, tm, te));
 const layerMore = ref(false);
 const subjectMore = ref(false);
 // The type filter's own first page, read at the brain for the choices it opens with, and the chosen type among them.
@@ -460,7 +463,7 @@ async function findTypes(words: string): Promise<{ value: string; label: string;
     .map((type) => choice(type, countOf(type.type)));
 
   try {
-    const page = await api.typePage(brainId, { q: asked, limit: INDEX_PAGE });
+    const page = await api.typePage(brainId, { q: asked, names: typeNames.value, limit: INDEX_PAGE });
     const kinds = page.items.map((type) => type.type);
     const counted =
       kinds.length === 0 ? [] : await api.tallies(brainId, "type", filterOf(place.value, "type"), kinds.join(","));
@@ -811,7 +814,7 @@ async function readFirst(brainId: number, tab: IndexTab, wanted = INDEX_PAGE): P
       await ensureSubject(brainId, place.value.subject);
       reveal.value++;
     } else {
-      const page = await api.typePage(brainId, { q: indexWords.value, limit: Math.min(wanted, 500) });
+      const page = await api.typePage(brainId, { q: indexWords.value, names: indexWords.value.trim() === "" ? undefined : typeNames.value, limit: Math.min(wanted, 500) });
 
       if (!current(tab, token)) return;
 
@@ -872,7 +875,7 @@ async function readNext(tab: IndexTab): Promise<void> {
       subjectCursor.value = page.items.at(-1)?.id ?? subjectCursor.value;
       await readSubjectCounts(brainId, page.items);
     } else {
-      const page = await api.typePage(brainId, { q: indexWords.value, after: typeCursor.value, limit: INDEX_PAGE });
+      const page = await api.typePage(brainId, { q: indexWords.value, names: indexWords.value.trim() === "" ? undefined : typeNames.value, after: typeCursor.value, limit: INDEX_PAGE });
 
       if (!current(tab, token)) return;
 

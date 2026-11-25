@@ -829,7 +829,10 @@ console bundle contract and served by the brain itself (`docs/boundary-api.md`, 
   brain, not the agent's reading, so they record no use (「Use」).
 - **Names in the reader's language.** A type, a subject's type and a status are shown by their names in the
   language pack, a type the pack does not name by its own word; no code, enum word or JSON stands in the
-  screen.
+  screen. The search takes the shown name as well as the brain's word: the screen sends the names its pack
+  gives the types with the words typed, and the brain matches a type by the name given for it, so a reader
+  finds a reserved type by the name the screen shows and the match is marked on that name. The brain stores
+  none of the names; the caller's words stand in the query alone.
 - **The row view** stands on the right, or over the list on a phone, under a heading naming the memory (its
   type's name and its number) with a close control at its start and its own actions, editing and its version
   timeline, as labelled icon buttons at its end. It has no tabs: its sections stand one under another, the

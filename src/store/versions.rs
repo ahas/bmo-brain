@@ -1150,21 +1150,31 @@ impl Store {
 
   /// The types in use in a brain, with the count of live memories each, the reserved ones first and every other
   /// by its name: a type whose rows are all closed is not in use. A page of that list, `after` the type the
-  /// page read last ended on.
+  /// page read last ended on. Words narrow it by the type's own word and by the names the caller sends, each
+  /// `type=name`: a screen shows a type under its own language's name, and sends that name with the words.
   pub async fn types(&self, brain_id: i64, query: &TypesQuery) -> Held<Page<TypeCount>> {
     let limit = limit(query.limit)?;
     let mut conn = self.connection().await?;
     brain_of(&mut conn, brain_id).await?;
+    let words = query.q.as_deref().map(str::trim).filter(|words| !words.is_empty());
+    let words = words.map(str::to_lowercase);
+    let by_name = named_types(query.names.as_deref(), words.as_deref());
     let mut sql = QueryBuilder::<Postgres>::new("SELECT type, COUNT(*) FROM memories WHERE brain_id = ");
     sql.push_bind(brain_id);
     sql.push(" AND status IN ('active', 'pending')");
-    if let Some(words) = query.q.as_deref().map(str::trim).filter(|words| !words.is_empty()) {
-      sql.push(" AND type ILIKE ").push_bind(holding(words));
+    if let Some(words) = &words {
+      sql.push(" AND (type ILIKE ").push_bind(holding(words));
+      if !by_name.is_empty() {
+        sql.push(" OR type = ANY(").push_bind(by_name.clone()).push(")");
+      }
+      sql.push(")");
     }
     sql.push(" GROUP BY type ORDER BY type");
     let counted: Vec<(String, i64)> = sql.build_query_as().fetch_all(&mut *conn).await?;
-    let asked = query.q.as_deref().map(str::trim).filter(|words| !words.is_empty());
-    let named = |kind: &str| asked.is_none_or(|words| kind.to_lowercase().contains(&words.to_lowercase()));
+    let named = |kind: &str| match &words {
+      None => true,
+      Some(words) => kind.to_lowercase().contains(words) || by_name.iter().any(|named| named == kind),
+    };
     // Where a type stands in the list: the reserved ones first, in the order code depends on them, then every
     // other by its name. The same key cuts the page, so a page walks the order the list stands in.
     fn rank(kind: &str) -> (usize, &str) {
@@ -1199,6 +1209,22 @@ impl Store {
       .map_or(0, |seen| types.partition_point(|held| rank(&held.kind) <= rank(seen.trim())));
     Ok(page(types.into_iter().skip(from).collect(), limit))
   }
+}
+
+/// The types a caller's names find under the words given: each pair `type=name`, comma-separated, and a type
+/// stands where the name it is given holds the words, in any case. The names are read only where words are, and
+/// the words are already folded to lowercase.
+fn named_types(names: Option<&str>, words: Option<&str>) -> Vec<String> {
+  let Some(words) = words else { return Vec::new() };
+
+  names
+    .unwrap_or("")
+    .split(',')
+    .filter_map(|pair| pair.split_once('='))
+    .filter(|(_, name)| name.trim().to_lowercase().contains(words))
+    .map(|(kind, _)| kind.to_owned())
+    .filter(|kind| !kind.is_empty())
+    .collect()
 }
 
 /// The rows that held at the moment `$AT` stands for, whatever their status now: their span covers it, or,

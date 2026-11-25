@@ -756,6 +756,11 @@ pub struct TypesQuery {
   /// Words the type holds, in any case.
   #[serde(skip_serializing_if = "Option::is_none")]
   pub q: Option<String>,
+  /// The caller's names for the types, each `type=name`, comma-separated: with words given, a type matches them
+  /// where its own word or the name the caller gives it holds them, so a reader finds a type by the name a
+  /// screen shows it under. The brain reads the names only for this search and stores none of them.
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub names: Option<String>,
   /// The type the page read last ended on; the next page begins past it, in the order the list stands in.
   #[serde(skip_serializing_if = "Option::is_none")]
   pub after: Option<String>,

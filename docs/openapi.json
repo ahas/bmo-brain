@@ -5772,6 +5772,19 @@
             }
           },
           {
+            "description": "The caller's names for the types, each `type=name`, comma-separated: with words given, a type matches them\nwhere its own word or the name the caller gives it holds them, so a reader finds a type by the name a\nscreen shows it under. The brain reads the names only for this search and stores none of them.",
+            "in": "query",
+            "name": "names",
+            "required": false,
+            "schema": {
+              "description": "The caller's names for the types, each `type=name`, comma-separated: with words given, a type matches them\nwhere its own word or the name the caller gives it holds them, so a reader finds a type by the name a\nscreen shows it under. The brain reads the names only for this search and stores none of them.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
             "description": "Words the type holds, in any case.",
             "in": "query",
             "name": "q",
@@ -7511,6 +7524,13 @@
             "format": "int64",
             "type": [
               "integer",
+              "null"
+            ]
+          },
+          "names": {
+            "description": "The caller's names for the types, each `type=name`, comma-separated: with words given, a type matches them\nwhere its own word or the name the caller gives it holds them, so a reader finds a type by the name a\nscreen shows it under. The brain reads the names only for this search and stores none of them.",
+            "type": [
+              "string",
               "null"
             ]
           },

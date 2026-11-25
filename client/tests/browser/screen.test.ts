@@ -324,8 +324,23 @@ async function answer(route: Route): Promise<void> {
       return json(route, pageOf(found, url.searchParams, (subject) => subject.id));
     }
     case "/brains/1/types": {
-      const q = (url.searchParams.get("q") ?? "").toLowerCase();
-      const found = typesOf().filter((type) => q === "" || type.type.toLowerCase().includes(q));
+      // The words match a type by its own word or by the name the caller sends for it, each `type=name`.
+      const q = (url.searchParams.get("q") ?? "").trim().toLowerCase();
+      const names = new Map(
+        (url.searchParams.get("names") ?? "")
+          .split(",")
+          .flatMap((pair) => {
+            const at = pair.indexOf("=");
+
+            return at === -1 ? [] : ([[pair.slice(0, at), pair.slice(at + 1)]] as [string, string][]);
+          })
+      );
+      const found = typesOf().filter(
+        (type) =>
+          q === "" ||
+          type.type.toLowerCase().includes(q) ||
+          (names.get(type.type) ?? "").toLowerCase().includes(q)
+      );
 
       return json(route, pageOf(found, url.searchParams, (type) => type.type));
     }
@@ -930,6 +945,41 @@ describe.skipIf(!ready)("the brain's screen in a browser", () => {
         "the type filter's search"
       );
       await page.getByRole("option", { name: /alpha-type/ }).first().waitFor();
+    }, 60_000);
+
+    test("a reserved type is found by the name the reader's language gives it, in the index and the type filter", async () => {
+      seed();
+      await page.setViewportSize(WIDE);
+      await page.goto(`${origin}/brain/1/list`, { waitUntil: "load" });
+      await layerRows().first().waitFor();
+      await page.getByRole("tab", { name: WORDS.brain.index.types! }).click();
+      await typeRows().first().waitFor();
+      // The first page stands with the types in use: fact and persona.
+      expect(await typeRows().count()).toBe(2);
+
+      // The words are the name the screen shows the type under, and the names go with them, so the brain finds
+      // the type by that name and the row marks the match on the name it shows.
+      await page.getByPlaceholder(WORDS.brain.label.index_search!).fill("사실");
+      await until(async () => (await typeRows().count()) === 1, "the type searched by its name");
+      const ask = indexReads("/brains/1/types").at(-1)!;
+
+      expect(ask.query.get("q")).toBe("사실");
+      expect(ask.query.get("names")).toContain("fact=사실");
+      expect(await typeRows().first().locator("mark").innerText()).toBe("사실");
+
+      // The filter's search asks the same way; a reserved type with no live row, which the first page does not
+      // hold, is found by its name where before the brain would have found it only by its English word.
+      await openFilters();
+      await chosen(WORDS.brain.label.type!).click();
+      await page.getByPlaceholder(COMMON.common.placeholder.search, { exact: true }).fill("지식");
+      await until(
+        () => reads.some((read) => read.path === "/brains/1/types" && read.query.get("q") === "지식"),
+        "the type filter's search by name"
+      );
+      const filtered = reads.filter((read) => read.path === "/brains/1/types" && read.query.get("q") === "지식").at(-1)!;
+
+      expect(filtered.query.get("names")).toContain("knowledge=지식");
+      await page.getByRole("option", { name: /지식/ }).first().waitFor();
     }, 60_000);
 
     test("a page of a list that fails keeps what was read and is read again from its retry", async () => {
