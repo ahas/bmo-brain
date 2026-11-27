@@ -1,17 +1,16 @@
-import { mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import tailwindcss from "@tailwindcss/vite";
 import vue from "@vitejs/plugin-vue";
 import { consoleBundle } from "bmo-ui/bundle/console-bundle.js";
+import { consoleTheme } from "bmo-ui/bundle/console-theme.js";
 import AutoImport from "unplugin-auto-import/vite";
 import Components from "unplugin-vue-components/vite";
 import { defineConfig } from "vite";
 
 import type { Plugin } from "vite";
-
-import { quoted, themeStylesheet } from "./theme.ts";
 
 // The brain screen as the browser module a console loads (docs/boundary-api.md, 「The console bundle」), built
 // with bmo-ui's bundle build: the libraries a console shares stay imports of the package's own path, which the
@@ -129,31 +128,6 @@ function sharedOnly(): Plugin {
   };
 }
 
-// The layer's stylesheet with none of the sources it scans, so the module's stylesheet carries the
-// utilities of the screen's own sources alone; the console's stylesheet carries the rest.
-const THEME = join(generated, "console-theme");
-
-function writeTheme(): void {
-  const ui = join(packages, "@nuxt", "ui", "dist", "runtime");
-  const layer = join(packages, "bmo-ui", "app", "assets", "css", "main.css");
-
-  mkdirSync(THEME, { recursive: true });
-  writeFileSync(join(THEME, "ui.css"), themeStylesheet(join(generated, "ui.css")));
-  writeFileSync(
-    join(THEME, "nuxt-ui.css"),
-    themeStylesheet(join(ui, "index.css"), { "#build/ui.css": quoted(join(THEME, "ui.css")) })
-  );
-  writeFileSync(
-    join(THEME, "layer.css"),
-    themeStylesheet(layer, {
-      tailwindcss: `${quoted("tailwindcss")} source(none)`,
-      "@nuxt/ui": quoted(join(THEME, "nuxt-ui.css"))
-    })
-  );
-}
-
-writeTheme();
-
 // The bundle's words: one JSON object keyed by locale, each locale's tree from its file.
 function readWords(): Record<string, Record<string, unknown>> {
   const folder = join(root, "i18n", "locales");
@@ -183,6 +157,7 @@ export default defineConfig({
   logLevel: "warn",
   plugins: [
     consoleBundle({ name: "brain", words: WORDS }),
+    consoleTheme(),
     sharedOnly(),
     vue({ isProduction: true }),
     AutoImport({
@@ -199,9 +174,6 @@ export default defineConfig({
     tailwindcss(),
     words()
   ],
-  resolve: {
-    alias: [{ find: /^#console-theme$/, replacement: join(THEME, "layer.css") }]
-  },
   define: {
     "import.meta.server": "false",
     "import.meta.client": "true",
