@@ -387,6 +387,17 @@
               "$ref": "#/components/schemas/DeclaredMemory"
             },
             "type": "array"
+          },
+          "within": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HolderReach"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The brains the set stands in; every agent's brain where none is named."
           }
         },
         "required": [
@@ -828,6 +839,37 @@
         "required": [
           "items",
           "more"
+        ],
+        "type": "object"
+      },
+      "HolderReach": {
+        "description": "The brains a holder's set stands in, named by the keys the caller gives (docs/design.md, 「What a holder\nleaves」): every agent's brain an account owns, or one org brain by its company and unit keys.",
+        "properties": {
+          "accountKey": {
+            "description": "The account's key, or the company's for an org brain.",
+            "type": "string"
+          },
+          "agentKey": {
+            "description": "The unit's key, for an org brain alone.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BrainKind"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "`agent` for the agents' brains of the account, `org` for the one org brain; `agent` where none is given."
+          }
+        },
+        "required": [
+          "accountKey"
         ],
         "type": "object"
       },

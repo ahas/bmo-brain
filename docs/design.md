@@ -650,17 +650,23 @@ caller gives, reads nothing in it, and lets that key alone, and nothing else, en
 
 - **One key, one standing set.** A memory may carry `heldBy`, the holder's key; such a row is a *held* row.
   A row with no key there was written by an agent or a person and is the brain's own, changed as 「Versions」
-  states. The mark is not a fourth org mark: it stands in an agent's brain, and a held row carries none of
-  `locked`, `internalOnly` and `shared`.
+  states. The mark is not a fourth org mark: a held row carries none of `locked`, `internalOnly` and
+  `shared`, in an org brain as in an agent's.
 - **A declaration is the only way one is written,** and a holder writes its whole set in one call. The call
   makes what stands for that key stand as declared: a declared row that already stands as declared is left
   where it is, one that does not stand is written, and a live row of that key the call no longer carries, or
   that stands with other words, is closed. The answer counts what came to be, and the same call over a set
   that already stands writes and closes nothing. A declaration is refused where no agent's brain stands to
   hold it.
-- **It stands in every agent's brain.** A declaration writes its rows into each brain of the kind `agent`,
-  and a brain made later is given every held row that stands, so an agent arriving after a holder declared
-  knows what the holder left. Each brain holds its own row of a declared set, found by the key the holder
+- **It stands in the brains its reach names, every agent's brain where it names none.** A declaration may
+  name its reach, `within`, by the keys the caller gives, which the brain reads as keys and nothing more: an
+  account's key, and the set stands in each brain of the kind `agent` that account owns; or an org brain's
+  company and unit keys, and the set stands in that one org brain, which every member's reading takes in
+  (「The layers a reading takes」). A declaration naming none writes its rows into each brain of the kind
+  `agent`. The brain keeps each holder's reach with its key, and a declaration naming another reach moves the
+  set: what stands in a brain the new reach leaves out is closed. A brain made later is given the held rows of
+  every holder whose reach takes it in, so an agent arriving after a holder declared knows what the holder left,
+  and a person's agent made later knows what was left for that person. Each brain holds its own row of a declared set, found by the key the holder
   gave it; the copies are read, used and closed together by the holder's acts, and never apart.
 - **Nobody changes a held row while it stands.** A version, a merge naming one, a status move, a
   restoration of its lineage, a learning that strengthens or replaces it and an injection that would stand a

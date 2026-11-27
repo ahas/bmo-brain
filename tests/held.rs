@@ -6,8 +6,8 @@
 use crate::support;
 
 use bmo_brain_client::{
-  BrainClient, BrainKind, Declaration, DeclaredMemory, Holder, HoldersQuery, MemoriesQuery, MemoryVersion,
-  NewBrain, NewMemory, RecallAsk, Restoration, SubjectKey,
+  BrainClient, BrainKind, Declaration, DeclaredMemory, Holder, HolderReach, HoldersQuery, MemoriesQuery,
+  MemoryVersion, NewBrain, NewMemory, RecallAsk, Restoration, SubjectKey,
 };
 use bmo_brain_client::{MemoryMerge, MemoryMove, MemoryStatus};
 use support::{CONSOLE_TOKEN, Served, labels, refused};
@@ -38,6 +38,7 @@ async fn declare(
 ) -> bmo_brain_client::Declared {
   client
     .declare(&Declaration {
+      within: None,
       held_by: holder.to_owned(),
       memories,
     })
@@ -189,6 +190,7 @@ async fn a_declaration_stands_its_set_in_every_agents_brain_and_repeating_it_is_
   // The same declaration over a set that stands as declared writes nothing and closes nothing.
   let again = client
     .declare(&Declaration {
+      within: None,
       held_by: "holder-a".to_owned(),
       memories: set,
     })
@@ -592,6 +594,7 @@ async fn the_consoles_token_reaches_no_declaration_route() {
     refused(
       console
         .declare(&Declaration {
+          within: None,
           held_by: "holder-a".to_owned(),
           memories: vec![declared("first", "words.")],
         })
@@ -614,6 +617,7 @@ async fn a_declaration_names_its_key_and_its_rows_to_the_shape() {
     refused(
       client
         .declare(&Declaration {
+          within: None,
           held_by: "no key here".to_owned(),
           memories: vec![declared("first", "words.")],
         })
@@ -625,6 +629,7 @@ async fn a_declaration_names_its_key_and_its_rows_to_the_shape() {
     refused(
       client
         .declare(&Declaration {
+          within: None,
           held_by: "holder-a".to_owned(),
           memories: vec![],
         })
@@ -636,6 +641,7 @@ async fn a_declaration_names_its_key_and_its_rows_to_the_shape() {
     refused(
       client
         .declare(&Declaration {
+          within: None,
           held_by: "holder-a".to_owned(),
           memories: vec![declared("same", "one."), declared("same", "two.")],
         })
@@ -650,6 +656,7 @@ async fn a_declaration_names_its_key_and_its_rows_to_the_shape() {
       blank
         .client
         .declare(&Declaration {
+          within: None,
           held_by: "holder-a".to_owned(),
           memories: vec![declared("first", "words.")],
         })
@@ -657,4 +664,122 @@ async fn a_declaration_names_its_key_and_its_rows_to_the_shape() {
     ),
     (409, "conflict".to_owned())
   );
+}
+
+async fn declare_within(
+  client: &BrainClient,
+  holder: &str,
+  within: HolderReach,
+  memories: Vec<DeclaredMemory>,
+) -> Result<bmo_brain_client::Declared, String> {
+  client
+    .declare(&Declaration {
+      within: Some(within),
+      held_by: holder.to_owned(),
+      memories,
+    })
+    .await
+    .map_err(|why| why.to_string())
+}
+
+fn account_reach(account: &str) -> HolderReach {
+  HolderReach {
+    kind: None,
+    account_key: account.to_owned(),
+    agent_key: None,
+  }
+}
+
+#[tokio::test]
+async fn a_declaration_within_an_account_stands_in_that_accounts_agents_alone_and_in_one_made_later() {
+  let served = Served::new().await;
+  let client = &served.client;
+  let mine = agent_brain(client, "account-a", "agent-a").await;
+  let theirs = agent_brain(client, "account-b", "agent-b").await;
+  let stood =
+    declare_within(client, "app-a", account_reach("account-a"), vec![declared("app-a.when", "use app a.")])
+      .await
+      .unwrap();
+
+  assert_eq!(stood.brains, 1);
+  assert_eq!(held_of(client, mine).await.len(), 1);
+  assert!(held_of(client, theirs).await.is_empty(), "another account's brain holds none of it");
+
+  // A second agent of the same account is given it as it is made; another account's new agent is not.
+  let later = agent_brain(client, "account-a", "agent-c").await;
+  let other_later = agent_brain(client, "account-b", "agent-d").await;
+  assert_eq!(held_of(client, later).await.len(), 1);
+  assert!(held_of(client, other_later).await.is_empty());
+
+  // A holder with no reach still reaches every agent's brain made later.
+  declare(client, "service-a", vec![declared("service-a.when", "use service a.")]).await;
+  let newest = agent_brain(client, "account-b", "agent-e").await;
+  assert_eq!(
+    held_of(client, newest).await,
+    vec![(Some("service-a".to_owned()), "service-a.when".to_owned(), "use service a.".to_owned())]
+  );
+}
+
+#[tokio::test]
+async fn a_declaration_naming_another_reach_moves_the_set_and_a_withdrawal_forgets_the_reach() {
+  let served = Served::new().await;
+  let client = &served.client;
+  let first = agent_brain(client, "account-a", "agent-a").await;
+  let second = agent_brain(client, "account-b", "agent-b").await;
+  declare_within(client, "app-a", account_reach("account-a"), vec![declared("app-a.when", "use app a.")])
+    .await
+    .unwrap();
+
+  let moved =
+    declare_within(client, "app-a", account_reach("account-b"), vec![declared("app-a.when", "use app a.")])
+      .await
+      .unwrap();
+  assert_eq!((moved.written, moved.closed), (1, 1));
+  assert!(
+    held_of(client, first).await.is_empty(),
+    "the brain the new reach leaves out holds none of it"
+  );
+  assert_eq!(held_of(client, second).await.len(), 1);
+
+  client.holder_withdraw("app-a").await.unwrap();
+  assert!(held_of(client, second).await.is_empty());
+  let later = agent_brain(client, "account-b", "agent-c").await;
+  assert!(
+    held_of(client, later).await.is_empty(),
+    "a withdrawn holder leaves nothing to a brain made later"
+  );
+}
+
+#[tokio::test]
+async fn a_declaration_within_an_org_brain_stands_there_alone_and_a_reach_naming_none_is_refused() {
+  let served = Served::new().await;
+  let client = &served.client;
+  let agent = agent_brain(client, "account-a", "agent-a").await;
+  let org = client
+    .brain_add(&NewBrain {
+      account_key: "company-a".to_owned(),
+      agent_key: "unit-a".to_owned(),
+      name: None,
+      kind: Some(BrainKind::Org),
+    })
+    .await
+    .unwrap()
+    .id;
+  let unit = HolderReach {
+    kind: Some(BrainKind::Org),
+    account_key: "company-a".to_owned(),
+    agent_key: Some("unit-a".to_owned()),
+  };
+  let stood = declare_within(client, "app-b", unit, vec![declared("app-b.when", "use app b.")])
+    .await
+    .unwrap();
+
+  assert_eq!(stood.brains, 1);
+  assert_eq!(held_of(client, org).await.len(), 1);
+  assert!(held_of(client, agent).await.is_empty());
+
+  let nowhere =
+    declare_within(client, "app-c", account_reach("account-z"), vec![declared("app-c.when", "use app c.")])
+      .await;
+  assert!(nowhere.unwrap_err().contains("409"), "a reach naming no brain is refused");
 }

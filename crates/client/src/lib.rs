@@ -20,7 +20,7 @@ pub use brains::{
   UnconsolidatedQuery,
 };
 pub use brains::{
-  Declaration, Declared, DeclaredMemory, Holder, HoldersQuery, WithdrawalCounts, Withdrawn,
+  Declaration, Declared, DeclaredMemory, Holder, HolderReach, HoldersQuery, WithdrawalCounts, Withdrawn,
 };
 pub use client::{Answer, BrainClient, ClientFailure};
 /// The HTTP client a `BrainClient` calls through, for a caller that sets its own timeout or proxy.

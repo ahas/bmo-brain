@@ -1,6 +1,6 @@
 //! The schema's starting point (docs/design.md, 「The schema」): a blank database gets the baseline whole, an
 //! install holding the last record before 1.0.0 is taken as it stands, one holding part of it is refused, and the
-//! migrations after the baseline change no row beyond the imported closing labels, and end with `held by`.
+//! migrations after the baseline change no row beyond the imported closing labels, and end with `holder reach`.
 
 use crate::support::Bare;
 
@@ -10,7 +10,8 @@ use sqlx::PgConnection;
 const BASELINE: &str = include_str!("../migrations/0001_baseline.sql");
 
 // The record every migrated database holds.
-const MIGRATED: [(i64, &str); 3] = [(1, "baseline"), (2, "imported closing labels"), (3, "held by")];
+const MIGRATED: [(i64, &str); 4] =
+  [(1, "baseline"), (2, "imported closing labels"), (3, "held by"), (4, "holder reach")];
 
 // The record an install from before 1.0.0 holds once every migration of its last release ran.
 const BEFORE: &[(i64, &str)] = &[
@@ -31,16 +32,27 @@ const BEFORE: &[(i64, &str)] = &[
   (15, "shared mark"),
 ];
 
-// What the migration after the closing labels adds to the laid schema: the holder's key on a memory row and
-// the index that reads one holder's rows together (`migrations/0003_held_by.sql` states both). A database laid
-// from the baseline alone, or installed before it and left as it stands, is compared with those two additions
-// standing, because the migration after them is what every path ends with.
+// What the migrations after the closing labels add to the laid schema: the holder's key on a memory row and
+// the index that reads one holder's rows together, and the table keeping each holder's reach (the migrations
+// state them). A database laid from the baseline alone, or installed before it and left as it stands, is
+// compared with those additions standing, because the migrations after them are what every path ends with.
 fn with_holder(laid: &str) -> String {
   laid
     .to_owned()
     .replace(
       "memories.shared boolean NO false, memory_subjects",
       "memories.shared boolean NO false, memories.held_by text YES , memory_subjects",
+    )
+    .replace(
+      "handouts.at bigint NO , ",
+      "handouts.at bigint NO , holder_reaches.held_by text NO , holder_reaches.kind text NO , \
+       holder_reaches.account_key text NO , holder_reaches.agent_key text YES , \
+       holder_reaches.declared_at bigint NO , ",
+    )
+    .replace(
+      "CREATE UNIQUE INDEX layers_brain_id_name_key",
+      "CREATE UNIQUE INDEX holder_reaches_pkey ON public.holder_reaches USING btree (held_by), \
+       CREATE UNIQUE INDEX layers_brain_id_name_key",
     )
     .replace(
       "CREATE INDEX memories_by_layer",

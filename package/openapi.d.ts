@@ -870,6 +870,8 @@ export interface components {
             heldBy: string;
             /** @description The rows that stand, 1 to 100. */
             memories: components["schemas"]["DeclaredMemory"][];
+            /** @description The brains the set stands in; every agent's brain where none is named. */
+            within?: components["schemas"]["HolderReach"] | null;
         };
         /** @description What a declaration came to, and what stands for the holder after it. */
         Declared: {
@@ -1066,6 +1068,18 @@ export interface components {
             items: components["schemas"]["Holder"][];
             /** @description Whether anything stands past the last item. */
             more: boolean;
+        };
+        /**
+         * @description The brains a holder's set stands in, named by the keys the caller gives (docs/design.md, 「What a holder
+         *     leaves」): every agent's brain an account owns, or one org brain by its company and unit keys.
+         */
+        HolderReach: {
+            /** @description The account's key, or the company's for an org brain. */
+            accountKey: string;
+            /** @description The unit's key, for an org brain alone. */
+            agentKey?: string | null;
+            /** @description `agent` for the agents' brains of the account, `org` for the one org brain; `agent` where none is given. */
+            kind?: components["schemas"]["BrainKind"] | null;
         };
         /** @description What an injection came to. */
         Injected: {

@@ -1,12 +1,13 @@
 //! What a holder leaves in the brains of a deployment (docs/design.md, 「What a holder leaves」): one key's
-//! standing set declared whole, written into every agent's brain and into each brain as it is made, refused to
-//! every write that would change or close a row of it, and withdrawn by that key alone.
+//! standing set declared whole, written into the brains its reach names (every agent's brain where it names
+//! none) and into each brain made later that the reach takes in, refused to every write that would change or
+//! close a row of it, and withdrawn by that key alone.
 
 use std::collections::{BTreeMap, BTreeSet};
 
 use bmo_brain_client::{
-  BrainsHeld, Declaration, Declared, DeclaredMemory, Holder, HoldersQuery, Labels, NewMemory, Page,
-  SubjectKey, SubjectRef,
+  BrainKind, BrainsHeld, Declaration, Declared, DeclaredMemory, Holder, HolderReach, HoldersQuery, Labels,
+  NewMemory, Page, SubjectKey, SubjectRef,
 };
 use sqlx::PgConnection;
 
@@ -134,19 +135,40 @@ impl Store {
     }
 
     let mut tx = self.begin().await?;
-    let brains: Vec<i64> = sqlx::query_scalar("SELECT id FROM brains WHERE kind = 'agent' ORDER BY id")
-      .fetch_all(&mut *tx)
-      .await?;
+    let brains = reached_brains(&mut tx, body.within.as_ref()).await?;
     if brains.is_empty() {
-      return Err(Fault::Conflict(
-        "No brain of the kind agent stands, so nothing holds a declaration; it is declared again once one does."
+      return Err(Fault::Conflict(match &body.within {
+        None => "No brain of the kind agent stands, so nothing holds a declaration; it is declared again once one \
+                 does."
           .to_owned(),
-      ));
+        Some(_) => "No brain the declaration's reach names stands, so nothing holds it; it is declared again once \
+                    one does."
+          .to_owned(),
+      }));
     }
+
+    // The set leaves every brain its reach no longer takes in, and the reach is kept for a brain made later.
+    let outside: Vec<i64> = sqlx::query_scalar(
+      "SELECT DISTINCT brain_id FROM memories WHERE held_by = $1 AND status IN ('active', 'pending') \
+       AND NOT (brain_id = ANY($2)) ORDER BY brain_id",
+    )
+    .bind(holder)
+    .bind(&brains)
+    .fetch_all(&mut *tx)
+    .await?;
+    let mut closed_outside = 0;
+    for brain_id in outside {
+      for row in self.standing_of(&mut tx, brain_id, holder).await?.values() {
+        self.close_held(&mut tx, brain_id, row.id, HOLDER_WITHDRAWN, at).await?;
+        closed_outside += 1;
+      }
+    }
+    keep_reach(&mut tx, holder, body.within.as_ref(), at).await?;
 
     let mut declared = Declared {
       held_by: body.held_by.clone(),
       brains: brains.len() as i64,
+      closed: closed_outside,
       ..Default::default()
     };
     for brain_id in brains {
@@ -257,6 +279,7 @@ impl Store {
       closed.memories += 1;
     }
     closed.brains = brains.len() as i64;
+    keep_reach(&mut tx, holder, None, at).await?;
     self.commit(tx).await?;
     Ok(closed)
   }
@@ -264,11 +287,19 @@ impl Store {
   /// The rows every standing declaration leaves, written into a brain as it is made, so an agent arriving after
   /// a holder declared knows what the holder left.
   pub(crate) async fn standing_rows_in(&self, tx: &mut PgConnection, brain_id: i64, at: i64) -> Held<()> {
+    // Only the holders whose reach takes the new brain in: one with no reach kept reaches every agent's brain,
+    // and an account's reach the agents' brains that account owns.
     let rows: Vec<MemoryRow> = sqlx::query_as(&format!(
       "SELECT DISTINCT ON (held_by, key) {} FROM memories \
-       WHERE held_by IS NOT NULL AND status IN ('active', 'pending') ORDER BY held_by, key, id",
+       WHERE held_by IS NOT NULL AND status IN ('active', 'pending') \
+       AND (NOT EXISTS (SELECT 1 FROM holder_reaches r WHERE r.held_by = memories.held_by) \
+            OR EXISTS (SELECT 1 FROM holder_reaches r JOIN brains b ON b.id = $1 \
+                       WHERE r.held_by = memories.held_by AND r.kind = 'agent' AND b.kind = 'agent' \
+                       AND r.account_key = b.account_key)) \
+       ORDER BY held_by, key, id",
       super::versions::MEMORY_COLUMNS
     ))
+    .bind(brain_id)
     .fetch_all(&mut *tx)
     .await?;
     let ids: Vec<i64> = rows.iter().map(|row| row.id).collect();
@@ -391,4 +422,71 @@ impl Store {
     publish(tx, "memory.moved", Some(&event_scope(brain_id)), &member).await?;
     Ok(())
   }
+}
+
+// The brains a reach names: every agent's brain where it names none, the agents' brains an account owns, or one
+// org brain by its company and unit keys.
+async fn reached_brains(tx: &mut PgConnection, within: Option<&HolderReach>) -> Held<Vec<i64>> {
+  let Some(reach) = within else {
+    return Ok(
+      sqlx::query_scalar("SELECT id FROM brains WHERE kind = 'agent' ORDER BY id")
+        .fetch_all(&mut *tx)
+        .await?,
+    );
+  };
+  match reach.kind.unwrap_or_default() {
+    BrainKind::Agent => Ok(
+      sqlx::query_scalar("SELECT id FROM brains WHERE kind = 'agent' AND account_key = $1 ORDER BY id")
+        .bind(&reach.account_key)
+        .fetch_all(&mut *tx)
+        .await?,
+    ),
+    BrainKind::Org => {
+      let Some(unit) = &reach.agent_key else {
+        return Err(Fault::BadRequest("An org brain's reach names its unit as agentKey.".to_owned()));
+      };
+      Ok(
+        sqlx::query_scalar(
+          "SELECT id FROM brains WHERE kind = 'org' AND account_key = $1 AND agent_key = $2 ORDER BY id",
+        )
+        .bind(&reach.account_key)
+        .bind(unit)
+        .fetch_all(&mut *tx)
+        .await?,
+      )
+    }
+  }
+}
+
+// The holder's reach kept with its key, or forgotten where the declaration names none, so a brain made later is
+// given the rows of the holders whose reach takes it in.
+async fn keep_reach(
+  tx: &mut PgConnection,
+  holder: &str,
+  within: Option<&HolderReach>,
+  at: i64,
+) -> Held<()> {
+  match within {
+    None => {
+      sqlx::query("DELETE FROM holder_reaches WHERE held_by = $1")
+        .bind(holder)
+        .execute(&mut *tx)
+        .await?;
+    }
+    Some(reach) => {
+      sqlx::query(
+        "INSERT INTO holder_reaches (held_by, kind, account_key, agent_key, declared_at) VALUES ($1, $2, $3, $4, $5) \
+         ON CONFLICT (held_by) DO UPDATE SET kind = EXCLUDED.kind, account_key = EXCLUDED.account_key, \
+         agent_key = EXCLUDED.agent_key, declared_at = EXCLUDED.declared_at",
+      )
+      .bind(holder)
+      .bind(reach.kind.unwrap_or_default().name())
+      .bind(&reach.account_key)
+      .bind(&reach.agent_key)
+      .bind(at)
+      .execute(&mut *tx)
+      .await?;
+    }
+  }
+  Ok(())
 }

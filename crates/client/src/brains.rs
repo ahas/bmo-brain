@@ -172,6 +172,24 @@ pub struct Declaration {
   pub held_by: String,
   /// The rows that stand, 1 to 100.
   pub memories: Vec<DeclaredMemory>,
+  /// The brains the set stands in; every agent's brain where none is named.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub within: Option<HolderReach>,
+}
+
+/// The brains a holder's set stands in, named by the keys the caller gives (docs/design.md, 「What a holder
+/// leaves」): every agent's brain an account owns, or one org brain by its company and unit keys.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct HolderReach {
+  /// `agent` for the agents' brains of the account, `org` for the one org brain; `agent` where none is given.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub kind: Option<BrainKind>,
+  /// The account's key, or the company's for an org brain.
+  pub account_key: String,
+  /// The unit's key, for an org brain alone.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub agent_key: Option<String>,
 }
 
 /// What a declaration came to, and what stands for the holder after it.
