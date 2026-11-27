@@ -180,7 +180,8 @@ one that ends it.
 
 **A service declares its set from its own repository through the brain's command.** `bmo-brain holder declare
 <file>` reads a holder's set from a TOML file — `held_by`, the holder's key, and one `[[memory]]` table a row,
-each `key`, `type`, `text` and `recall_condition`, and `importance` where it is given — and stands it with `POST
+each `key`, `type`, `text` and `recall_condition`, and `importance` where it is given; a key stands once in a
+brain across every holder, so a service keys its rows by its own name, `<service>.<word>` — and stands it with `POST
 /declarations`; `bmo-brain holder withdraw <key>` withdraws the holder with `DELETE /holders/{holderKey}`. Both
 reach the brain at the address and with the token the data root's `env/brain.env` holds, the file the tool reads
 (「Its tool」), the data root `BMO_DATA_DIR` names or `~/.local/share/bmo/data`; where that file does not stand,
