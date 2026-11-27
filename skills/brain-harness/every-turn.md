@@ -13,16 +13,19 @@ it as you read, in the turn itself. Nothing writes it for you.
   handed to this session already is one you have seen in this session. Beside it stands the brain's index:
   each group with how many of its entries you have not read.
 - **When the answer needs something the recall does not hold,** look it up before you answer:
-  - a person's fact, a room's own memory, what someone is called: `brain_list` with the subject and the type
+  - a person's fact, a room's own memory, what someone is called: `bmo/brain_list` with the subject and the type
     wanted, the subject `{"type": "person", "key": "<their id>"}` or `{"type": "room", "key": "<the room's
     id>"}` and `type` such as `fact`, `name`, `promise` or `situation`; `situation` with the words of the
-    situation in front of you, for the memories written for one; or `brain_similar` with the question's words
+    situation in front of you, for the memories written for one; or `bmo/brain_similar` with the question's words
     as `text` and the subject under `subjects`;
   - a document, a room's rule, a piece of knowledge, a person's whole sheet: `reference_search` with the words
     the entry would hold as `query`, then `reference_piece` with the `slug` and `group` it answers.
-- **`brain_list` and `brain_similar` also answer `base`:** the platform's shared memories the same ask finds,
+- **`bmo/brain_list` and `bmo/brain_similar` also answer `base`:** the platform's shared memories the same ask finds,
   general tips and checks every agent may read. Follow them as you follow your own, and never name one under
   `confirms`, `strengthens` or `replaces`: you write your own brain alone.
+- **These are the hosted brain tool's entries,** each called as `bmo use bmo/<entry> --json '{...}'`;
+  `bmo use bmo/<entry> --describe` gives its arguments. An answer marked `isError` is a refusal: read its words
+  for what to do next.
 - **The brain is reached through these tools alone.** Never through its database, its files or its port: no
   query, no file read, no call of its address. What the tools do not answer, you do not know.
 - The recall also says whether a consolidation is due. When it is, do the consolidation (below) in this turn
@@ -34,20 +37,20 @@ it as you read, in the turn itself. Nothing writes it for you.
   messages that arrived while you were away, handed to you after a handover or when you return to a room.
   Read those as you read a live message and write what matters from them the same way. Nothing else writes
   it for you: no digest and no person-book writer runs behind you.
-- **Keep what may matter later as an episode** (`brain_episode`): what was said as `text`, who said it as
+- **Keep what may matter later as an episode** (`bmo/brain_episode`): what was said as `text`, who said it as
   `speaker` (their id) and the room as `room` (this turn's room where you name none), with an `importance`
   from 1 to 10: small talk 1 or 2; a decision, a promise, a correction, news 6 or more. Not every line is an
   episode; a line that changes nothing is not.
-- **For every fact you learn,** ask `brain_similar` with the candidate's words as `text` and its `subjects`,
+- **For every fact you learn,** ask `bmo/brain_similar` with the candidate's words as `text` and its `subjects`,
   read the likes,
   and judge the candidate: a duplicate (list it under `confirms`), a fuller statement of one (`strengthens`),
-  a contradiction of some (`replaces`), or new. Then call `brain_learn` once with that judgement. The brain
+  a contradiction of some (`replaces`), or new. Then call `bmo/brain_learn` once with that judgement. The brain
   applies it whole. The source is always who said it: `own` for what someone says about themselves, `owner`
   only for what the owner states or instructs, `told` for what someone says about someone else, `inferred` for
   what you conclude. The brain writes `told` and `inferred` as rumors and never lets them close a fact.
 - **One thing, one row.** Whatever one sentence tells you is written once, under the one type it is: never a
   row of one type and another row of another type for the same thing. What you learn about a person is one
-  `brain_learn` per thing: type `fact`, one
+  `bmo/brain_learn` per thing: type `fact`, one
   short English sentence, the person as a subject (`type` `person`, their id). Link the room only where the
   fact holds in this room alone; a fact that holds wherever they are links no room (`room` empty). Date it:
   `validFrom` is when the fact began to hold, and never a date the fact itself states. A state that began
@@ -57,16 +60,20 @@ it as you read, in the turn itself. Nothing writes it for you.
   from their facts, so keeping it right is keeping each fact right.
 - **A promise you make, a check you owe, a follow-up you are handed, a state of something under way** are
   memories too (types `promise`, `check`, `followup`, `state`), about the room and the person. Before writing
-  one, list the open ones of its type about that person (`brain_list` with the subject, the `type` and no
+  one, list the open ones of its type about that person (`bmo/brain_list` with the subject, the `type` and no
   words: a word search misses a row written in another language), and read them: the one you were about to
   write may already stand, and the thing you just learned may be what one of them was waiting for. When one is
-  kept, finished or over, move it to `done` with `brain_move` (its `memory_id` and the `status`); when it stopped
+  kept, finished or over, move it to `done` with `bmo/brain_move` (its `memory_id` and the `status`); when it stopped
   holding, `invalidated`. Learning a fact that an open follow-up was waiting for closes that follow-up in the
-  same turn. Write these with `brain_learn` under their type. Any memory may carry the situation that brings it
+  same turn. Write these with `bmo/brain_learn` under their type. Any memory may carry the situation that brings it
   to mind and the situation that ends it, in a few English words: `recallCondition` is said by the turn that
   needs it, and the brain hands the memory out then; `releaseCondition` is said by the turn that ends it, and
   the brain closes the memory as `invalidated` itself. Set them only where you know them, leave both out
   otherwise, and change one with a new version, never by an edit.
+- **A lesson for your own work** — when this happens, do that — is type `tip`, or `check` for a thing to verify
+  each time: one short English instruction, with `recallCondition` naming the situation in the words a later turn
+  would hold, since a lesson whose situation never comes back is never handed out. Read the likes with
+  `bmo/brain_similar` first and confirm, strengthen or replace rather than writing a second one.
 - **A rule the owner sets for a situation** ("whenever X, do Y") is a `situation` memory about the room, or
   about no room where it holds everywhere, with the situation and the act in its text.
 - **What someone wants to be called** is one `name` memory about that person alone: in English, the title
@@ -79,11 +86,11 @@ it as you read, in the turn itself. Nothing writes it for you.
 ## Consolidation
 
 - When the recall says a consolidation is due, or when your session is about to be folded or handed off,
-  read `brain_unconsolidated`, highest priority first, with the facts you hold about their subjects, and write
-  what the episodes come to through `brain_learn`: the facts several episodes agree on, with the episodes
+  read `bmo/brain_unconsolidated`, highest priority first, with the facts you hold about their subjects, and write
+  what the episodes come to through `bmo/brain_learn`: the facts several episodes agree on, with the episodes
   under `grounds`; the corrections they force; the reflections worth keeping (type `reflection`: a pattern
-  across episodes). Then mark the episodes with `brain_consolidated`.
-- A fold also clears the brain's marks for your session (`brain_fold`), so what you knew may attach to the
+  across episodes). Then mark the episodes with `bmo/brain_consolidated`.
+- A fold also clears the brain's marks for your session (`bmo/brain_fold`), so what you knew may attach to the
   next session.
 
 ## The language of a memory
