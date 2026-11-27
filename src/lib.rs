@@ -9,6 +9,7 @@ pub mod base;
 pub mod chain;
 pub mod clock;
 pub mod config;
+pub mod holder;
 pub mod mcp;
 pub mod openapi;
 pub mod store;

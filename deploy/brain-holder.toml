@@ -1,0 +1,9 @@
+# The brain's standing line in every agent's brain: when to write a lesson (docs/boundary-api.md, 「Declarations
+# and holders」). How the tools are called is their manuals', handed with a tool's first call.
+held_by = "brain"
+
+[[memory]]
+key = "when"
+type = "tip"
+recall_condition = "a piece of work is finished and something was learned that a later task would do differently"
+text = "Write a lesson only where a later task would act differently: read brain_similar first, then brain_learn with a short recallCondition naming the situation."

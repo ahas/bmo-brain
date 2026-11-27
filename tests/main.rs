@@ -10,6 +10,7 @@ mod consolidation;
 mod events;
 mod held;
 mod history;
+mod holder_command;
 mod learning;
 mod mcp;
 mod misses;

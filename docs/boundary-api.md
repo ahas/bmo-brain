@@ -178,6 +178,16 @@ status, a restoration of its lineage, a learning that strengthens or replaces it
 stand a row over its key. Its use is recorded as any other row's is, and its release condition is never the
 one that ends it.
 
+**A service declares its set from its own repository through the brain's command.** `bmo-brain holder declare
+<file>` reads a holder's set from a TOML file — `held_by`, the holder's key, and one `[[memory]]` table a row,
+each `key`, `type`, `text` and `recall_condition`, and `importance` where it is given — and stands it with `POST
+/declarations`; `bmo-brain holder withdraw <key>` withdraws the holder with `DELETE /holders/{holderKey}`. Both
+reach the brain at the address and with the token the data root's `env/brain.env` holds, the file the tool reads
+(「Its tool」), the data root `BMO_DATA_DIR` names or `~/.local/share/bmo/data`; where that file does not stand,
+they say so and exit 0, so a deployment on a machine with no brain goes on. A refusal of the brain is said and
+exits 1. A service's deployment calls it from the brain's deploy tree, `~/.local/share/bmo-brain/deploy/bin/`,
+once the service is up; the brain's own deployment declares the brain's own set the same way, from its `deploy/brain-holder.toml`.
+
 Every route below stands under `/brains/{brainId}` and answers 404 `not-found` for a brain that does not
 stand.
 

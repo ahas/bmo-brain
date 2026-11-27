@@ -73,6 +73,19 @@ enum Verb {
     #[command(subcommand)]
     word: BaseWord,
   },
+  /// A holder's standing set, declared from a file or withdrawn.
+  Holder {
+    #[command(subcommand)]
+    word: HolderWord,
+  },
+}
+
+#[derive(Subcommand)]
+enum HolderWord {
+  /// Stands the holder's set the TOML file declares.
+  Declare { file: PathBuf },
+  /// Withdraws the holder from every brain.
+  Withdraw { key: String },
 }
 
 #[derive(Subcommand)]
@@ -323,6 +336,16 @@ async fn main() -> ExitCode {
       Err(why) => Err(why),
     },
     Verb::Mcp { brain, token } => mcp(&brain, token).await,
+    Verb::Holder { word } => {
+      let outcome = match word {
+        HolderWord::Declare { file } => bmo_brain::holder::declare(&file).await,
+        HolderWord::Withdraw { key } => bmo_brain::holder::withdraw(&key).await,
+      };
+
+      println!("{}", outcome.line);
+
+      return std::process::ExitCode::from(outcome.code);
+    }
     Verb::Openapi => {
       print!("{}", openapi_json());
       Ok(())

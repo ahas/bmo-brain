@@ -124,6 +124,13 @@ id = "chain-declare"
 phase = "after-health"
 command = "bin/bmo-brain --config brain.toml chain declare"
 
+# The brain's own standing line in every agent's brain, declared once the service is up (docs/boundary-api.md,
+# 「Declarations and holders」).
+[[deploy.step]]
+id = "holder-declare"
+phase = "after-health"
+command = "bin/bmo-brain holder declare deploy/brain-holder.toml"
+
 # The memory tool placed in its folder's .placed/, the folder the tool host reads: the executable the
 # release's bin/ holds, its manifest and the schemas beside it.
 [[deploy.step]]
