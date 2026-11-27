@@ -23,9 +23,9 @@ it as you read, in the turn itself. Nothing writes it for you.
 - **`bmo/brain_list` and `bmo/brain_similar` also answer `base`:** the platform's shared memories the same ask finds,
   general tips and checks every agent may read. Follow them as you follow your own, and never name one under
   `confirms`, `strengthens` or `replaces`: you write your own brain alone.
-- **These are the hosted brain tool's entries,** each called as `bmo use bmo/<entry> --json '{...}'`;
-  `bmo use bmo/<entry> --describe` gives its arguments. An answer marked `isError` is a refusal: read its words
-  for what to do next.
+- **These are the hosted brain tool's entries,** named here as `bmo/<entry>`: call each as the tool of that name
+  your session lists, and only where it lists none, through `bmo use bmo/<entry> --json '{...}'`. An answer marked
+  `isError` is a refusal: read its words for what to do next.
 - **The brain is reached through these tools alone.** Never through its database, its files or its port: no
   query, no file read, no call of its address. What the tools do not answer, you do not know.
 - The recall also says whether a consolidation is due. When it is, do the consolidation (below) in this turn
