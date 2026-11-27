@@ -389,6 +389,11 @@ async function answer(route: Route): Promise<void> {
       return json(route, pageOf(found, url.searchParams, (type) => type.type));
     }
     case "/brains/1/tallies":
+      // The unfiled's count alone is answered, so the index's first page shows when its read has ended.
+      if (url.searchParams.get("by") === "layer" && url.searchParams.get("unfiled") === "true") {
+        return json(route, [{ group: null, count: listed(url.searchParams).length, importance: 0, lastUsedAt: null }]);
+      }
+
       return json(route, []);
     case "/brains/1/memories": {
       // A page starts past the memory the cursor names, in the listed order, and says whether more stand past it.
@@ -886,9 +891,35 @@ describe.skipIf(!ready)("the brain's screen in a browser", () => {
       seed();
       for (let n = 1; n <= 70; n++) layers.push({ id: 100 + n, name: `layer-${String(n).padStart(2, "0")}`, position: 100 + n });
       await page.setViewportSize(WIDE);
-      await page.goto(`${origin}/brain/1/list`, { waitUntil: "load" });
-      await layerRows().first().waitFor();
-      expect(await layerRows().count()).toBe(50);
+
+      // The page's motion is held still while the index opens, so its rows stand wherever their motion leaves
+      // them however busy the machine is, and the foot is judged against that.
+      const motion = await page.context().newCDPSession(page);
+
+      await motion.send("Animation.enable");
+      await motion.send("Animation.setPlaybackRate", { playbackRate: 0 });
+
+      try {
+        await page.goto(`${origin}/brain/1/list`, { waitUntil: "load" });
+        // The first page's read ends once its counts stand, the unfiled's among them; three of the browser's frames
+        // after it, the foot has been measured against the rows and any page it asked is on its way.
+        await page.locator("[data-unfiled]", { hasText: "1" }).waitFor();
+
+        const opened = await page.evaluate(async () => {
+          for (let n = 0; n < 3; n++) await new Promise((done) => requestAnimationFrame(done));
+
+          return {
+            rows: document.querySelectorAll("[data-layer]").length,
+            // Anything in the foot but its own marker is a page's placeholder or its failure.
+            footHolds: document.querySelectorAll('[data-index-scroller] [data-next-page-foot] > * > :not([aria-hidden="true"])').length
+          };
+        });
+
+        expect(opened).toEqual({ rows: 50, footHolds: 0 });
+      } finally {
+        await motion.send("Animation.setPlaybackRate", { playbackRate: 1 });
+        await motion.detach();
+      }
 
       const first = indexReads("/brains/1/layers");
 

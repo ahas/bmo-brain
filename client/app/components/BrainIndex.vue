@@ -34,7 +34,7 @@
            while every layer is read and no words narrow the list, so a landing is always between two layers known. -->
       <template v-if="tab === 'layers'">
         <div ref="layerList" @dragover="layerOver" @dragleave="layerLeft" @drop="layerDropped">
-          <MovingList tag="ul" class="flex flex-col py-1">
+          <MovingList tag="ul" class="flex flex-col pt-1">
           <li
             v-for="(layer, index) in layers"
             :key="layer.id"
@@ -75,7 +75,12 @@
               </UTooltip>
             </div>
           </li>
-          <li key="unfiled" data-unfiled @dragenter="pieceEnter($event, 'unfiled')" @dragleave="pieceLeave($event, 'unfiled')">
+          </MovingList>
+          <!-- The unfiled stands in a list of its own under the layers' moving list: a row standing after them there
+               would make every page that lands an arrival before it, unfolding from nothing, and the foot under rows
+               still folded would read as reached and fetch a page nobody scrolled to. -->
+          <ul class="pb-1">
+          <li data-unfiled @dragenter="pieceEnter($event, 'unfiled')" @dragleave="pieceLeave($event, 'unfiled')">
             <button
               type="button"
               class="flex w-full items-center gap-2 px-3 py-3 text-start hover:bg-elevated active:bg-elevated"
@@ -91,7 +96,7 @@
               <UBadge v-bind="COUNT_BADGE" color="neutral"><RollingNumber :value="layerCount(null)" /></UBadge>
             </button>
           </li>
-          </MovingList>
+          </ul>
         </div>
         <NextPageFoot
           :more="more.layers"
