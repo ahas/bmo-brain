@@ -247,6 +247,19 @@
             "description": "The version of bmo-ui the bundle was built on, as the bundle build wrote it beside the module.",
             "type": "string"
           },
+          "layerUses": {
+            "additionalProperties": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "description": "What of bmo-ui the bundle uses, each module it imports with the names it imports of it, as the bundle build wrote\nit beside the module; a console attaches a bundle built on another release by it.",
+            "type": [
+              "object",
+              "null"
+            ]
+          },
           "name": {
             "description": "The bundle's name, in kebab-case: its words' namespace.",
             "type": "string"

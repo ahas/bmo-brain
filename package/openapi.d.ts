@@ -809,6 +809,13 @@ export interface components {
             icon: string;
             /** @description The version of bmo-ui the bundle was built on, as the bundle build wrote it beside the module. */
             layer: string;
+            /**
+             * @description What of bmo-ui the bundle uses, each module it imports with the names it imports of it, as the bundle build wrote
+             *     it beside the module; a console attaches a bundle built on another release by it.
+             */
+            layerUses?: {
+                [key: string]: string[];
+            } | null;
             /** @description The bundle's name, in kebab-case: its words' namespace. */
             name: string;
             /** @description Whether every call the screen makes needs the reader's owner key. */

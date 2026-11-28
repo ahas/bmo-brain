@@ -252,6 +252,10 @@ pub struct ConsoleManifest {
   pub service_name: String,
   /// The version of bmo-ui the bundle was built on, as the bundle build wrote it beside the module.
   pub layer: String,
+  /// What of bmo-ui the bundle uses, each module it imports with the names it imports of it, as the bundle build wrote
+  /// it beside the module; a console attaches a bundle built on another release by it.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub layer_uses: Option<std::collections::BTreeMap<String, Vec<String>>>,
   /// The path the module is answered at.
   pub bundle: String,
   /// The path the stylesheet is answered at, where the bundle has one.

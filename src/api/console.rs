@@ -135,12 +135,16 @@ pub struct Bundle {
   pub words: Vec<u8>,
   /// The version of bmo-ui the bundle was built on.
   pub layer: String,
+  /// What of bmo-ui the bundle uses, each module with the names it imports of it, where the build wrote that.
+  pub layer_uses: Option<std::collections::BTreeMap<String, Vec<String>>>,
 }
 
 /// The layer file as the bundle build writes it.
 #[derive(serde::Deserialize)]
 struct LayerFile {
   layer: String,
+  #[serde(default)]
+  uses: Option<std::collections::BTreeMap<String, Vec<String>>>,
 }
 
 /// A file of the folder, or none where it does not stand.
@@ -165,7 +169,7 @@ impl Bundle {
     serde_json::from_slice::<serde_json::Map<String, serde_json::Value>>(&words).map_err(|why| {
       io::Error::new(io::ErrorKind::InvalidData, format!("the words are no JSON object: {why}"))
     })?;
-    let LayerFile { layer } = serde_json::from_slice(&layer).map_err(|why| {
+    let LayerFile { layer, uses } = serde_json::from_slice(&layer).map_err(|why| {
       io::Error::new(io::ErrorKind::InvalidData, format!("the layer file does not name a layer: {why}"))
     })?;
     Ok(Some(Self {
@@ -174,6 +178,7 @@ impl Bundle {
         .map(|bytes| Served::named("style", "css", bytes)),
       words,
       layer,
+      layer_uses: uses,
     }))
   }
 
@@ -187,6 +192,7 @@ impl Bundle {
       screen_path: format!("/{NAME}"),
       service_name: NAME.to_owned(),
       layer: self.layer.clone(),
+      layer_uses: self.layer_uses.clone(),
       bundle: self.module.path(),
       stylesheet: self.stylesheet.as_ref().map(Served::path),
       words: format!("{FILES}/words"),

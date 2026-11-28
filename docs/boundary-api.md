@@ -431,6 +431,10 @@ layer's own bundle build.
 | `GET /console-bundle/words` | 200, the bundle's words |
 | `GET /console-bundle/{file}` | 200, the module or the stylesheet the manifest names |
 
+- **The manifest's `layer` and `layerUses`** are read from the `layer.json` the bundle build writes beside the
+  module: the release the bundle was built on, and what of bmo-ui it uses, which a console attaches a bundle built
+  on another release by (bmo-ui's `docs/console-bundles.md`, "A console attaches a bundle it can run"); a file that
+  names no uses leaves `layerUses` out.
 - **What the brain's manifest names:** the bundle and service `brain`, its menu title `brain.title.screen`,
   its entry in the sidebar section `administration`, among the services an administrator runs the system
   with, its screens under `/brain`, the role `administrator` with no owner key, the event stream read, the
