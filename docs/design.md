@@ -122,6 +122,8 @@ One row is one thing the agent remembers, in one version.
 | `internalOnly` | in an org brain, whether it is kept from a room where someone outside the company sits; off in an agent's brain |
 | `shared` | in an org brain, whether it is a memory about a person that may be known inside the organisation (「Org brains」); off in an agent's brain |
 | `heldBy` | the key of the holder that left the row and may withdraw it alone (「What a holder leaves」); null for a row the brain's own writers wrote |
+| `triggers` | on a held row, the keys the system fetches it by where it meets one: a tool's name, a notice's kind, a room (「What a holder leaves」); none on every other row |
+| `everyTurn` | on a held row, whether it stands on every turn; true on every row a holder did not mark otherwise |
 | `createdAt` | when this version was written |
 
 The two conditions are optional. A memory that carries neither is a permanent one: no situation has to be
@@ -353,8 +355,9 @@ spoke, the words of the turn, the session's key and the moment it opened, and th
 a block and a list of what it chose.
 
 - **Two parts within one budget** of about one and a half to two thousand tokens: the fixed core, the few
-  memories that stand on every turn of that room (its situation rules, the head of the sheet of everyone who
-  spoke, and what a holder left), and the searched part, chosen by relevance. No line of either part runs
+  memories that stand on that turn (the room's situation rules, the head of the sheet of everyone who
+  spoke, what a holder left to stand on every turn, and the held rows keyed to a trigger the turn meets), and the
+  searched part, chosen by relevance. No line of either part runs
   past the budget, a marked one no more than another.
 - **No rule of the room stands in the core.** A room's rules reach a turn through selection, never by
   standing: each is a candidate of the searched part like any other row, chosen when the turn's words or
@@ -365,14 +368,20 @@ a block and a list of what it chose.
   none. A person's sheet can hold hundreds of facts and a turn has room for a few; the rest of a speaker's
   facts, and their names, reach a turn only through the searched part, scored and capped as any other row
   is.
-- **The core carries what a holder left:** every live held row of the brain (「What a holder leaves」), by
-  holder and then by the key the holder gave it, ahead of the searched part and never among its candidates,
-  so a turn is told what a live holder stands for whatever it says. The budget is no exception for these
-  either: a line that would carry the block past it is left out like any other.
+- **The core carries what a holder left to stand:** every live held row marked to stand on every turn, and every
+  live held row carrying one of the triggers the caller names for the turn — the tool it is about to call, the
+  kind of the notice it carries, its room (「What a holder leaves」) — by holder and then by the key the holder
+  gave it, ahead of the searched part and never among its candidates. A held row marked otherwise that no trigger
+  of the turn names is a candidate of the searched part like any other row, reached by its words, its subjects,
+  its recall condition or its meaning. The budget is no exception for the core either: a line that would carry
+  the block past it is left out like any other.
 - **Cues.** A turn's cues are the subjects it names that stand in the brain, its room and its speakers, and
-  its words: lowercased, English stop words left out, each reduced to its Snowball stem. A memory's words are
-  indexed the same way, so a turn's word reaches every memory holding a word of the same stem, and a stop word
-  reaches none.
+  its words: lowercased, English stop words left out, each reduced to its Snowball stem, and a run of Hangul
+  taken as its pairs of neighbouring syllables in place of a stem. A memory's words are indexed the same way, so
+  a turn's word reaches every memory holding a word of the same stem, and a stop word reaches none. A Korean word
+  carries its particles and endings on its stem, so one form of it (`봉보스퀜은`) and another (`봉보스퀜을`, or
+  the bare `봉보스퀜`) share the pairs of the stem they are built on and reach each other, where no English
+  stemmer would join them; a one-syllable word gives no pair and is reached by meaning alone.
 - **The searched part's candidates** are the live rows a cue reaches, about a subject the turn names or
   holding one of its stems, and the rows whose recall condition the turn says. Nothing drops a candidate for
   its age or its disuse.
@@ -398,7 +407,9 @@ a block and a list of what it chose.
   turn's common words. A matched subject cue gives (1 / J) · ln(N / fan_j) with no length term, a subject link
   being no word of the text.
 - **A situation is words.** A memory's `recallCondition` says when it is needed, and a turn says it where the
-  turn's words hold at least the share of the condition's words the rules name: that row is a candidate though
+  turn's words hold at least the share of the condition's words the rules name, a Korean word of either counted
+  by its syllable pairs as well as whole, so a condition written in Korean is said by a Korean turn in any form
+  of its words: that row is a candidate though
   neither its own words nor its subjects name it, and its relevance is the most a cue set gives, ln N, as
   though every cue were linked to that row alone.
 - **Rows near in meaning join the candidates** (「Vectors」): the turn's words are embedded once, and the
@@ -681,17 +692,29 @@ caller gives, reads nothing in it, and lets that key alone, and nothing else, en
   with the reason `holder-withdrawn`, and touches no other row. It answers what it closed and is the same
   again where nothing stands. Nothing is deleted: a closed held row stays readable in its lineage, and the
   holder's next declaration begins a new one.
-- **A skill is a held row like any other.** How a thing is used is the words its holder declares, beside the
-  row that says when to reach for them. The type, the key, the conditions and the length are the holder's;
-  the brain hands them out, keeps them from change and withdraws them exactly as it does a one-line rule.
-  Where a holder's instructions are long, the row carried into a turn says when to read the whole of them,
-  and the whole stands in the same brain under the same key.
-- **They stand on every turn.** A recall carries every live held row in its core, ahead of the searched
-  part and kept within the block's budget as every line is (「Recall」). A caller that reads a brain directly
-  lists what is held with the same reads that list any memory, by `held` where it wants the held rows or the
-  brain's own alone: a held row is a memory, read, counted and used as one (「Memories」). The
-  situation a held row says when it is needed is words for the agent that reads them; the brain never reads
-  them itself.
+- **A skill is a held row like any other.** How a thing is used is the words its holder declares. The type, the
+  key, the conditions, the triggers and the length are the holder's; the brain hands them out, keeps them from
+  change and withdraws them exactly as it does a one-line rule.
+- **Two kinds of held row, by how a turn comes to it.** A held row stands on every turn unless its holder marks
+  it otherwise (`everyTurn` false): the one line a service says of when to reach for it is such a row. A row
+  marked otherwise is system-owned all the same, kept from every change as above, yet comes to a turn only where
+  it is called for: by a trigger the turn meets, or, with none, by its situation as any row is searched. A
+  procedure, a tool's manual and a room's own guidance are rows of that second kind, so no turn carries them
+  until the moment they are for. A row of that kind names a trigger or a recall condition, since nothing else
+  could bring it out.
+- **A trigger is a key the system meets, read as a key.** A held row may carry `triggers`, each a word the
+  brain keeps and never reads: the caller that composes a turn knows exactly when the turn is about to call a
+  tool, carries a notice of a kind, or answers in a room, and names that key; the rows carrying it are fetched
+  exactly, with no search. The brain matches the words as they stand and attaches no meaning to them; the
+  callers agree among themselves how a key is spelt (a tool's full name `<namespace>/<tool>`, a notice's kind,
+  `room:<id>`). A recall naming triggers stands their rows in its core (「Recall」); a list by `trigger` reads
+  them directly (「Memories」).
+- **Where they stand.** A recall carries the held rows in its core as 「Recall」 states, ahead of the searched
+  part and kept within the block's budget as every line is. A caller that reads a brain directly lists what is
+  held with the same reads that list any memory, by `held` where it wants the held rows or the brain's own
+  alone, and by `trigger` for the rows a key fetches: a held row is a memory, read, counted and used as one
+  (「Memories」). The situation a held row says when it is needed is words for the agent and for recall's
+  search; the brain never judges it otherwise.
 - **What a holder leaves is not the base's.** The base is what agents learned and an administrator raised
   (「The base」); what a holder leaves is declared whole, stands wherever an agent's brain stands, and goes
   when its holder withdraws it. The mark tells the two apart, and no reading or route treats one as the

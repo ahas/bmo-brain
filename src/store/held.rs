@@ -13,7 +13,7 @@ use sqlx::PgConnection;
 
 use super::brains::event_scope;
 use super::sheets::written_type;
-use super::versions::{DEFAULT_IMPORTANCE, MemoryRow, importance, subjects_by_row};
+use super::versions::{DEFAULT_IMPORTANCE, HeldMark, MemoryRow, importance, subjects_by_row};
 use super::{Fault, Held, Store, TEXT_MOST};
 use super::{key as key_rule, now, publish, text as text_rule};
 
@@ -25,6 +25,9 @@ pub const HOLDER_REPLACED: &str = "holder-replaced";
 /// The most rows one holder may declare at once.
 const DECLARED_MOST: usize = 100;
 
+/// The most triggers one held row carries.
+const TRIGGERS_MOST: usize = 32;
+
 /// The row a declared set stands for in one brain, with its subjects as the holder's words for them.
 struct Standing {
   id: i64,
@@ -35,6 +38,8 @@ struct Standing {
   release_condition: Option<String>,
   labels: Labels,
   subjects: Vec<(String, String)>,
+  triggers: Vec<String>,
+  every_turn: bool,
 }
 
 /// Why a write that would change or close a row a holder left is refused; nothing where the row is the brain's
@@ -79,6 +84,9 @@ fn stands_as(declared: &DeclaredMemory, row: &Standing) -> bool {
     && declared.release_condition == row.release_condition
     && declared.labels == row.labels
     && asked == holds
+    && as_set(declared.triggers.iter().map(|one| (one.clone(), String::new())).collect())
+      == as_set(row.triggers.iter().map(|one| (one.clone(), String::new())).collect())
+    && declared.every_turn.unwrap_or(true) == row.every_turn
 }
 
 /// The shape a declaration's body must answer before anything is stood: one holder key, its rows keyed once
@@ -115,6 +123,22 @@ fn declared_rule(body: &Declaration) -> Held<()> {
     for subject in &memory.subjects {
       key_rule("subjects.type", &subject.kind)?;
       key_rule("subjects.key", &subject.key)?;
+    }
+    if memory.triggers.len() > TRIGGERS_MOST {
+      return Err(Fault::BadRequest(format!(
+        "triggers holds {} for the key {:?}; a row holds at most {TRIGGERS_MOST}.",
+        memory.triggers.len(),
+        memory.key
+      )));
+    }
+    for trigger in &memory.triggers {
+      key_rule("triggers", trigger)?;
+    }
+    if memory.every_turn == Some(false) && memory.triggers.is_empty() && memory.recall_condition.is_none() {
+      return Err(Fault::BadRequest(format!(
+        "The key {:?} stands on no turn: a row that is not on every turn names a trigger or a recallCondition.",
+        memory.key
+      )));
     }
   }
   Ok(())
@@ -204,7 +228,12 @@ impl Store {
           labels: memory.labels.clone(),
           ..Default::default()
         };
-        self.add_held_in(&mut tx, brain_id, &written, at, holder).await?;
+        let mark = HeldMark {
+          holder,
+          triggers: &memory.triggers,
+          every_turn: memory.every_turn.unwrap_or(true),
+        };
+        self.add_held_in(&mut tx, brain_id, &written, at, &mark).await?;
         declared.written += 1;
       }
     }
@@ -330,7 +359,12 @@ impl Store {
         actor_name: row.actor_name.clone(),
         ..Default::default()
       };
-      self.add_held_in(tx, brain_id, &body, at, holder).await?;
+      let mark = HeldMark {
+        holder,
+        triggers: &row.triggers,
+        every_turn: row.every_turn,
+      };
+      self.add_held_in(tx, brain_id, &body, at, &mark).await?;
     }
     Ok(())
   }
@@ -375,6 +409,8 @@ impl Store {
           release_condition: row.release_condition,
           labels: row.labels.0,
           subjects: mine,
+          triggers: row.triggers,
+          every_turn: row.every_turn,
         },
       );
     }
@@ -388,9 +424,9 @@ impl Store {
     brain_id: i64,
     body: &NewMemory,
     at: i64,
-    holder: &str,
+    mark: &HeldMark<'_>,
   ) -> Held<()> {
-    self.write_in(tx, brain_id, body, at, None, Some(holder)).await?;
+    self.write_in(tx, brain_id, body, at, None, Some(mark)).await?;
     Ok(())
   }
 

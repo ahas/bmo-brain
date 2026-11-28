@@ -254,6 +254,7 @@ fn ask(words: &str) -> RecallAsk {
     session_opened_at: None,
     budget_tokens: None,
     record: Some(false),
+    triggers: vec![],
   }
 }
 

@@ -162,13 +162,13 @@ is answered 403 `forbidden`.
 
 | Route | Does | Answers |
 |---|---|---|
-| `POST /declarations` | stands a holder's whole set: `heldBy` and `memories` (1 to 100, each `key` (required, unique among the holder's), `type`, `text`, `actorName` (the holder's key where none), `subjects` (each `type` and `key`, made where none stands), `importance` (5 where none), `validFrom` (now where none), `recallCondition`, `releaseCondition`, `labels`), and `within` where it names a reach: `{"accountKey"}`, every brain of the kind `agent` that account owns, or `{"accountKey", "agentKey"}` with `kind` `org`, that one org brain; with no `within`, every brain of the kind `agent`. A reach naming no brain that stands is refused 409 `conflict`. A declaration naming another reach than the holder's last closes, as `holder-withdrawn`, the rows standing in a brain the new reach leaves out. What stands for the key is made to stand as declared: an equal row is left, a missing one is written, and one the call no longer carries or that stands with other words is closed `invalidated`, its reason `holder-replaced` for a row the call rewrites and `holder-withdrawn` for one it leaves out | 201, the standing set; 200 the same where every declared row already stood as declared; 400 for a body that is not the shape the route takes; 409 `conflict` where no brain of the kind `agent` stands to hold it |
+| `POST /declarations` | stands a holder's whole set: `heldBy` and `memories` (1 to 100, each `key` (required, unique among the holder's), `type`, `text`, `actorName` (the holder's key where none), `subjects` (each `type` and `key`, made where none stands), `importance` (5 where none), `validFrom` (now where none), `recallCondition`, `releaseCondition`, `labels`, `triggers` (at most 32 keys, each as a holder key is written, the keys the system fetches the row by; none where none is given) and `everyTurn` (true where none is given; false for a row that comes to a turn only by a trigger or its situation, which then names a trigger or a `recallCondition`, else the body is answered 400)), and `within` where it names a reach: `{"accountKey"}`, every brain of the kind `agent` that account owns, or `{"accountKey", "agentKey"}` with `kind` `org`, that one org brain; with no `within`, every brain of the kind `agent`. A reach naming no brain that stands is refused 409 `conflict`. A declaration naming another reach than the holder's last closes, as `holder-withdrawn`, the rows standing in a brain the new reach leaves out. What stands for the key is made to stand as declared: an equal row is left, a missing one is written, and one the call no longer carries or that stands with other words is closed `invalidated`, its reason `holder-replaced` for a row the call rewrites and `holder-withdrawn` for one it leaves out | 201, the standing set; 200 the same where every declared row already stood as declared; 400 for a body that is not the shape the route takes; 409 `conflict` where no brain of the kind `agent` stands to hold it |
 | `GET /declarations` | the holders that stand: each `heldBy`, `brains` (how many brains hold a live row of it) and `memories` (its live rows), by `q` (words the key holds), the key's own order | 200, a page |
 | `GET /holders/{holderKey}/removal` | counts what the withdrawal below would close now, changing nothing | 200, `{"counts": {"brains", "memories"}}` |
 | `DELETE /holders/{holderKey}` | withdraws the holder: every live row of that key in every brain is moved to `invalidated` with `validTo` and `supersededAt` the moment and the reason `holder-withdrawn`, and no other row is touched | 200, `{"closed": {"brains", "memories"}}`; 400 for a key that is no key; the same again where nothing stands |
 
 A declared row is equal to a standing one where its `key`, `type`, `text`, subjects, `importance`,
-`recallCondition`, `releaseCondition` and `labels` all match; `validFrom` and the writer's name are not asked,
+`recallCondition`, `releaseCondition`, `labels`, `triggers` (as a set) and `everyTurn` all match; `validFrom` and the writer's name are not asked,
 so a declaration repeated where nothing changed stands where it stands. The standing set the declaration
 answers is what `GET /declarations` answers for that key, and `GET /memories` with `held=true` reads a brain's
 held rows.
@@ -181,7 +181,9 @@ one that ends it.
 
 **A service declares its set from its own repository through the brain's command.** `bmo-brain holder declare
 <file>` reads a holder's set from a TOML file — `held_by`, the holder's key, and one `[[memory]]` table a row,
-each `key`, `type`, `text` and `recall_condition`, and `importance` where it is given; a key stands once in a
+each `key`, `type`, `text` and `recall_condition`, and `importance`, `triggers` and `every_turn` where they are given;
+in place of `text` a row may name `text_file`, a file by its path from the set's own folder, whose whole content,
+trimmed, is the row's words, so a service that also ships those words as a file keeps one source; a key stands once in a
 brain across every holder, so a service keys its rows by its own name, `<service>.<word>` — and stands it with `POST
 /declarations`; `bmo-brain holder withdraw <key>` withdraws the holder with `DELETE /holders/{holderKey}`. Both
 reach the brain at the address and with the token the data root's `env/brain.env` holds, the file the tool reads
@@ -239,7 +241,8 @@ injected), `type`, `text`, `layerId` (or null), `position`, `subjects` (each `id
 10), `useCount` (how often it was used: handed out, reported used, confirmed or read explicitly), `lastUsedAt`
 (its latest use, or null), `lastConfirmedAt`, `consolidatedAt`, `actorName`, `reason` (why its status was moved,
 as the mover said, or null), `labels`, `locked`, `internalOnly`, `shared`, `heldBy` (the key of the holder that
-left it, or null; 「Declarations and holders」) and `createdAt`.
+left it, or null; 「Declarations and holders」), `triggers` (the keys a held row is fetched by; left out where it
+carries none), `everyTurn` (whether a held row stands on every turn; true on every other row) and `createdAt`.
 
 `locked`, `internalOnly` and `shared` are an org memory's marks (`docs/design.md`, 「Org brains」): no lower unit
 overrides its topic; it is kept from a room where someone outside the company sits; and it is a memory about a
@@ -288,7 +291,7 @@ moves a caller's word may make:
 
 | Route | Does | Answers |
 |---|---|---|
-| `GET /memories` | lists by `type` and `status` (each one value or several, comma-separated), `excludeTypes` (comma-separated), `layerId`, `unfiled` (true for the rows in no layer), `subjectId`, `key`, `lineageId`, `ids` (comma-separated), `supersededBy` (comma-separated: the rows superseded by these), `held` (true for the rows a holder left, false for the brain's own), `label` (`key` or `key=value`), `q` (words the text holds), `situation` (words the `recallCondition` holds; a first page by `q` with no `asOf` also takes the `vector_candidates` live rows that pass the other filters nearest the words in meaning, the two lists fused by Reciprocal Rank Fusion and the page cut at `limit`) and `asOf` (a moment: the rows that held then, `validFrom` at or before it and `validTo` after it or, with none, `supersededAt` after it or null, whatever their status now, never a `retracted` row), in the order `order` names; a list by `key`, `subjectId`, `type`, `q` or `situation` is an explicit read, which records a use of each live row of the page it answers unless `record` is false (true where none is given) | 200, a page |
+| `GET /memories` | lists by `type` and `status` (each one value or several, comma-separated), `excludeTypes` (comma-separated), `layerId`, `unfiled` (true for the rows in no layer), `subjectId`, `key`, `lineageId`, `ids` (comma-separated), `supersededBy` (comma-separated: the rows superseded by these), `held` (true for the rows a holder left, false for the brain's own), `trigger` (comma-separated keys: the rows carrying one of them), `label` (`key` or `key=value`), `q` (words the text holds), `situation` (words the `recallCondition` holds; a first page by `q` with no `asOf` also takes the `vector_candidates` live rows that pass the other filters nearest the words in meaning, the two lists fused by Reciprocal Rank Fusion and the page cut at `limit`) and `asOf` (a moment: the rows that held then, `validFrom` at or before it and `validTo` after it or, with none, `supersededAt` after it or null, whatever their status now, never a `retracted` row), in the order `order` names; a list by `key`, `subjectId`, `type`, `q`, `situation` or `trigger` is an explicit read, which records a use of each live row of the page it answers unless `record` is false (true where none is given) | 200, a page |
 | `POST /memories` | writes a first version: `type`, `text`, `actorName` required; `key`, `layerId`, `position`, `subjectIds`, `subjects` (each `type` and `key`, made where none stands), `importance` (5 where none), `validFrom` (now where none), `status` (`active` where none, or `pending`), `recallCondition`, `releaseCondition`, `labels`, `locked`, `internalOnly`, `standing`; where a live row holds the key and the new `validFrom` is earlier than its own, the row is written already superseded by it in its lineage, `validTo` its `validFrom`, with the reason `earlier-than-live` | 201, the memory; 409 `conflict` where a live row holds the key and the new `validFrom` is not earlier than its own |
 | `GET /memories/{memoryId}` | reads one | 200; 404 |
 | `PATCH /memories/{memoryId}` | moves its status: `status`, `actorName`, `standing`, `at` (when it stopped holding, now where none), `reason` (kept on the row moved), `text` (for a move to `done`: the words it ended on, written as a new version that is then moved; for a move to `retracted`: what the speaker meant instead, written as a new active version, the row named retracted and pointing at it; each in one transaction); the row moved records the moment of the move as its `supersededAt` | 200, the row moved (for a retraction with `text`, the retracted row); 400 for `text` on another move; 404; 409 for a move the table does not allow |
@@ -312,17 +315,18 @@ answer carries a strength, and a memory ends only by an event (`docs/design.md`,
 ### Recall
 
 `POST /recall` takes the turn: `room` (a subject by `type` and `key`), `speakers` (subjects), `words`,
-`sessionKey`, `sessionOpenedAt`, `budgetTokens` (the brain's own where none is given) and `record` (true
-where none is given). It answers `block`, the text the turn is handed; `chosen`, each `memoryId`, `type`,
+`sessionKey`, `sessionOpenedAt`, `budgetTokens` (the brain's own where none is given), `record` (true
+where none is given) and `triggers` (the keys the turn meets, none where none is given). It answers `block`, the text the turn is handed; `chosen`, each `memoryId`, `type`,
 `part` (`core` or `searched`), `score` (its relevance), `vectorSimilarity` (its cosine with the turn's words, or
 null where it was not among the nearest), `fusedScore` (its Reciprocal Rank Fusion score, null for a core row),
 `marked` and `tokenCount`; `tokenCount` and `budgetTokens`; and
 `released`, the ids of the rows this recall ended.
 
 - **The core** is the room's active `situation` memories, the head of the sheet of everyone who spoke and the
-  brain's live held rows (`heldBy` set): the first facts `GET /subjects/{subjectId}/sheet` renders for each
+  brain's live held rows (`heldBy` set) that stand on every turn (`everyTurn`) or carry one of the turn's
+  `triggers`, the others being candidates of the searched part: the first facts `GET /subjects/{subjectId}/sheet` renders for each
   speaker with the turn's room as `roomId`, in its order, at most the rules' `core_fact_cap` of them per
-  speaker, each a line of the block, and every held row by its holder's key and then its own, ahead of them.
+  speaker, each a line of the block, and each such held row by its holder's key and then its own, ahead of them.
   The room's `rule` memories and a speaker's other facts and names are rows like any other: they reach the
   block only through the searched part.
 - **Every line of either part keeps the budget,** a marked one as well: a line that would carry the block

@@ -15,6 +15,37 @@ fn folder(name: &str) -> std::path::PathBuf {
 }
 
 #[test]
+fn a_holder_s_row_reads_its_words_from_the_file_it_names_and_carries_its_triggers() {
+  let at = folder("text-file");
+  std::fs::create_dir_all(at.join("skills")).unwrap();
+  std::fs::write(at.join("skills/manual.md"), "How service a is used.\n").unwrap();
+  let mut held: HolderFile = toml::from_str(
+    r#"
+held_by = "service-a"
+
+[[memory]]
+key = "service-a.manual"
+type = "skill"
+recall_condition = "using service a"
+text_file = "skills/manual.md"
+triggers = ["service-a/put"]
+every_turn = false
+"#,
+  )
+  .unwrap();
+
+  held.read_texts(&at).unwrap();
+  assert_eq!(
+    held.declaration(),
+    json!({ "heldBy": "service-a", "memories": [
+      { "key": "service-a.manual", "type": "skill", "text": "How service a is used.",
+        "recallCondition": "using service a", "triggers": ["service-a/put"], "everyTurn": false }
+    ] })
+  );
+  let _ = std::fs::remove_dir_all(&at);
+}
+
+#[test]
 fn a_holder_s_file_is_the_declaration_body() {
   let held: HolderFile = toml::from_str(
     r#"

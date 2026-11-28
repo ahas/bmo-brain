@@ -71,7 +71,7 @@ capabilities = ["room.chat"]
 unbounded = true
 
 [entry.bundle."brain.lessons"]
-shown = ["type", "status", "subject", "key", "words", "situation", "limit"]
+shown = ["type", "status", "subject", "key", "words", "situation", "trigger", "limit"]
 
 [[entry]]
 namespace = "bmo"

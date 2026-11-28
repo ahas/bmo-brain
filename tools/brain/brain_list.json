@@ -67,6 +67,13 @@
       ],
       "description": "Words the recall condition holds: the memories a situation calls for, as your turn's words would bring them out."
     },
+    "trigger": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "A key the system fetches standing instructions by: a tool's full name, a notice's kind, room:<id>."
+    },
     "limit": {
       "type": [
         "integer",

@@ -162,6 +162,14 @@ pub struct DeclaredMemory {
   pub release_condition: Option<String>,
   #[serde(default)]
   pub labels: Labels,
+  /// The keys the system fetches it by where it meets one: a tool's name, a notice's kind, a room (`docs/design.md`,
+  /// 「What a holder leaves」); none where it is fetched by none.
+  #[serde(default, skip_serializing_if = "Vec::is_empty")]
+  pub triggers: Vec<String>,
+  /// Whether it stands on every turn; true where none is given. A row that does not is handed where one of its
+  /// triggers is met or its situation calls for it.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub every_turn: Option<bool>,
 }
 
 /// A holder's whole standing set, declared in one call.
@@ -493,7 +501,17 @@ pub struct Memory {
   /// writers wrote.
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub held_by: Option<String>,
+  /// The keys the system fetches a held row by; none on every other row.
+  #[serde(default, skip_serializing_if = "Vec::is_empty")]
+  pub triggers: Vec<String>,
+  /// Whether a held row stands on every turn; true on every row a holder did not mark otherwise.
+  #[serde(default = "every_turn_default")]
+  pub every_turn: bool,
   pub created_at: i64,
+}
+
+fn every_turn_default() -> bool {
+  true
 }
 
 /// A memory to write as a first version.
@@ -742,6 +760,9 @@ pub struct MemoriesQuery {
   /// True for the rows a holder left standing, false for the brain's own; both where none is given.
   #[serde(skip_serializing_if = "Option::is_none")]
   pub held: Option<bool>,
+  /// The rows carrying one of these triggers, comma-separated.
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub trigger: Option<String>,
   /// A moment: the rows that held then, whatever their status now, in place of the filters' own; never a
   /// retracted row.
   #[serde(skip_serializing_if = "Option::is_none")]
@@ -920,6 +941,9 @@ pub struct RecallAsk {
   /// Whether the hand-out is recorded as uses and marks; true where none is given.
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub record: Option<bool>,
+  /// The keys the turn meets — a tool's name, a notice's kind, its room — whose held rows stand in its core.
+  #[serde(default, skip_serializing_if = "Vec::is_empty")]
+  pub triggers: Vec<String>,
 }
 
 /// Which part of the block a memory was chosen for.

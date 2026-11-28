@@ -28,6 +28,8 @@ fn declared(key: &str, text: &str) -> DeclaredMemory {
     recall_condition: Some("a turn asks about plans".to_owned()),
     release_condition: None,
     labels: labels(&[]),
+    triggers: vec![],
+    every_turn: None,
   }
 }
 
@@ -146,6 +148,7 @@ fn ask(words: &str) -> RecallAsk {
     session_opened_at: None,
     budget_tokens: None,
     record: Some(false),
+    triggers: vec![],
   }
 }
 
@@ -380,6 +383,77 @@ async fn every_turn_is_handed_a_held_row_and_no_turn_ends_it() {
   assert_eq!((closed.closed.brains, closed.closed.memories), (1, 1));
   let after = client.recall(brain, &ask("unrelated weather report")).await.unwrap();
   assert!(after.chosen.is_empty());
+}
+
+#[tokio::test]
+async fn a_held_row_off_every_turn_comes_by_its_trigger_or_its_situation_and_is_fetched_by_its_key() {
+  let served = Served::new().await;
+  let client = &served.client;
+  let brain = agent_brain(client, "account-a", "agent-a").await;
+  let mut when = declared("holder-a.when", "reach for the holder's tools when plans are due.");
+  when.recall_condition = None;
+  let mut manual =
+    declared("holder-a.manual", "call holder/plan_put with the plan's words, one plan a call.");
+  manual.every_turn = Some(false);
+  manual.triggers = vec!["holder/plan_put".to_owned()];
+  manual.recall_condition = Some("filing a garden plan".to_owned());
+  declare(client, "holder-a", vec![when, manual]).await;
+  let core = |recall: &bmo_brain_client::Recall| -> Vec<i64> {
+    recall
+      .chosen
+      .iter()
+      .filter(|choice| choice.part == bmo_brain_client::RecallPart::Core)
+      .map(|choice| choice.memory_id)
+      .collect()
+  };
+
+  // A turn meeting no trigger and saying nothing of the row is handed the every-turn row alone.
+  let plain = client.recall(brain, &ask("unrelated weather report")).await.unwrap();
+  assert_eq!(plain.chosen.len(), 1, "{:?}", plain.chosen);
+
+  // A turn naming the row's trigger stands it in the core whatever its words say.
+  let mut keyed = ask("unrelated weather report");
+  keyed.triggers = vec!["holder/plan_put".to_owned()];
+  let keyed = client.recall(brain, &keyed).await.unwrap();
+  assert_eq!(core(&keyed).len(), 2, "{:?}", keyed.chosen);
+
+  // A turn saying the row's situation reaches it through the searched part.
+  let said = client.recall(brain, &ask("we are filing a garden plan today")).await.unwrap();
+  assert!(
+    said.chosen.iter().any(|choice| choice.part == bmo_brain_client::RecallPart::Searched),
+    "{:?}",
+    said.chosen
+  );
+
+  // A list by the trigger fetches the row exactly.
+  let fetched = client
+    .memories(
+      brain,
+      &MemoriesQuery {
+        trigger: Some("holder/plan_put".to_owned()),
+        record: Some(false),
+        ..Default::default()
+      },
+    )
+    .await
+    .unwrap();
+  let keys: Vec<Option<String>> = fetched.items.iter().map(|memory| memory.key.clone()).collect();
+  assert_eq!(keys, vec![Some("holder-a.manual".to_owned())]);
+  assert_eq!(fetched.items[0].triggers, vec!["holder/plan_put".to_owned()]);
+  assert!(!fetched.items[0].every_turn);
+
+  // A row off every turn naming neither a trigger nor a situation could never come out, and is refused.
+  let mut lost = declared("holder-a.lost", "nothing brings this out.");
+  lost.every_turn = Some(false);
+  lost.recall_condition = None;
+  let refusal = client
+    .declare(&Declaration {
+      within: None,
+      held_by: "holder-a".to_owned(),
+      memories: vec![lost],
+    })
+    .await;
+  assert_eq!(refused(refusal).0, 400);
 }
 
 #[tokio::test]

@@ -10,8 +10,13 @@ use sqlx::PgConnection;
 const BASELINE: &str = include_str!("../migrations/0001_baseline.sql");
 
 // The record every migrated database holds.
-const MIGRATED: [(i64, &str); 4] =
-  [(1, "baseline"), (2, "imported closing labels"), (3, "held by"), (4, "holder reach")];
+const MIGRATED: [(i64, &str); 5] = [
+  (1, "baseline"),
+  (2, "imported closing labels"),
+  (3, "held by"),
+  (4, "holder reach"),
+  (5, "held triggers"),
+];
 
 // The record an install from before 1.0.0 holds once every migration of its last release ran.
 const BEFORE: &[(i64, &str)] = &[
@@ -32,8 +37,9 @@ const BEFORE: &[(i64, &str)] = &[
   (15, "shared mark"),
 ];
 
-// What the migrations after the closing labels add to the laid schema: the holder's key on a memory row and
-// the index that reads one holder's rows together, and the table keeping each holder's reach (the migrations
+// What the migrations after the closing labels add to the laid schema: the holder's key, its triggers and its
+// every-turn mark on a memory row, the indexes that read one holder's rows together and a trigger's rows, and
+// the table keeping each holder's reach (the migrations
 // state them). A database laid from the baseline alone, or installed before it and left as it stands, is
 // compared with those additions standing, because the migrations after them are what every path ends with.
 fn with_holder(laid: &str) -> String {
@@ -41,7 +47,8 @@ fn with_holder(laid: &str) -> String {
     .to_owned()
     .replace(
       "memories.shared boolean NO false, memory_subjects",
-      "memories.shared boolean NO false, memories.held_by text YES , memory_subjects",
+      "memories.shared boolean NO false, memories.held_by text YES , \
+       memories.triggers ARRAY NO '{}'::text[], memories.every_turn boolean NO true, memory_subjects",
     )
     .replace(
       "handouts.at bigint NO , ",
@@ -58,6 +65,10 @@ fn with_holder(laid: &str) -> String {
       "CREATE INDEX memories_by_layer",
       "CREATE INDEX memories_by_holder ON public.memories USING btree (held_by, brain_id, id) \
        WHERE (held_by IS NOT NULL), CREATE INDEX memories_by_layer",
+    )
+    .replace(
+      "CREATE INDEX memories_by_type",
+      "CREATE INDEX memories_by_trigger ON public.memories USING gin (triggers), CREATE INDEX memories_by_type",
     )
 }
 
@@ -175,10 +186,12 @@ async fn an_install_short_of_the_last_release_before_the_baseline_is_refused() {
 
 // Every column of every memory, the labels apart, and the labels, ordered by id.
 async fn memories(db: &mut PgConnection) -> (Vec<String>, Vec<serde_json::Value>) {
-  // The row as it stood before the migration, its labels aside and the holder's key aside: the key is the
-  // column a later migration gives every row, and it stands null on every row written before a holder came.
-  let rest: Vec<String> =
-    sqlx::query_scalar("SELECT (to_jsonb(m) - 'labels' - 'held_by')::text FROM memories m ORDER BY id")
+  // The row as it stood before the migration, its labels aside and the holder's columns aside: the key, the
+  // triggers and the every-turn mark are columns later migrations give every row, standing at their defaults on
+  // every row written before a holder came.
+  let rest: Vec<String> = sqlx::query_scalar(
+    "SELECT (to_jsonb(m) - 'labels' - 'held_by' - 'triggers' - 'every_turn')::text FROM memories m ORDER BY id",
+  )
       .fetch_all(&mut *db)
       .await
       .unwrap();

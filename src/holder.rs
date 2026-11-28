@@ -25,12 +25,36 @@ pub struct HeldMemory {
   pub key: String,
   #[serde(rename = "type")]
   pub kind: String,
+  /// The row's words, or, with `text_file`, none: the words are that file's.
+  #[serde(default)]
   pub text: String,
+  /// A file beside the set's own, by its path from the set's folder, whose whole content is the row's words, so
+  /// a service keeps one source for words it also ships as a file.
+  pub text_file: Option<PathBuf>,
   pub recall_condition: String,
   pub importance: Option<i64>,
+  #[serde(default)]
+  pub triggers: Vec<String>,
+  pub every_turn: Option<bool>,
 }
 
 impl HolderFile {
+  /// Each row's words read from the file it names, by its path from `folder`; why one could not be read.
+  pub fn read_texts(&mut self, folder: &Path) -> Result<(), String> {
+    for memory in &mut self.memories {
+      let Some(named) = &memory.text_file else { continue };
+      if !memory.text.is_empty() {
+        return Err(format!("{} names both text and text_file", memory.key));
+      }
+      let path = folder.join(named);
+      memory.text = std::fs::read_to_string(&path)
+        .map_err(|why| format!("{}: {} could not be read: {why}", memory.key, path.display()))?
+        .trim()
+        .to_owned();
+    }
+    Ok(())
+  }
+
   /// The body `POST /declarations` takes.
   pub fn declaration(&self) -> Value {
     let memories: Vec<Value> = self
@@ -46,6 +70,12 @@ impl HolderFile {
 
         if let Some(importance) = memory.importance {
           row["importance"] = importance.into();
+        }
+        if !memory.triggers.is_empty() {
+          row["triggers"] = memory.triggers.clone().into();
+        }
+        if let Some(every_turn) = memory.every_turn {
+          row["everyTurn"] = every_turn.into();
         }
 
         row
@@ -114,10 +144,13 @@ pub async fn declare(file: &Path) -> Outcome {
     Ok(text) => text,
     Err(why) => return said(format!("holder declare: {} could not be read: {why}", file.display()), 1),
   };
-  let held: HolderFile = match toml::from_str(&text) {
+  let mut held: HolderFile = match toml::from_str(&text) {
     Ok(held) => held,
     Err(why) => return said(format!("holder declare: {} is no holder's set: {why}", file.display()), 1),
   };
+  if let Err(why) = held.read_texts(file.parent().unwrap_or(Path::new("."))) {
+    return said(format!("holder declare: {why}"), 1);
+  }
   let body: bmo_brain_client::Declaration = match serde_json::from_value(held.declaration()) {
     Ok(body) => body,
     Err(why) => return said(format!("holder declare: {} is no holder's set: {why}", file.display()), 1),

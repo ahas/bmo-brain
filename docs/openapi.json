@@ -465,6 +465,13 @@
               "null"
             ]
           },
+          "everyTurn": {
+            "description": "Whether it stands on every turn; true where none is given. A row that does not is handed where one of its\ntriggers is met or its situation calls for it.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "importance": {
             "description": "1 to 10; 5 where none is given.",
             "format": "int64",
@@ -506,6 +513,13 @@
           },
           "text": {
             "type": "string"
+          },
+          "triggers": {
+            "description": "The keys the system fetches it by where it meets one: a tool's name, a notice's kind, a room (`docs/design.md`,\n「What a holder leaves」); none where it is fetched by none.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
           },
           "type": {
             "type": "string"
@@ -1202,6 +1216,11 @@
             "format": "int64",
             "type": "integer"
           },
+          "everyTurn": {
+            "default": true,
+            "description": "Whether a held row stands on every turn; true on every row a holder did not mark otherwise.",
+            "type": "boolean"
+          },
           "heldBy": {
             "description": "The key of the holder that left the row and may withdraw it alone; null for a row the brain's own\nwriters wrote.",
             "type": [
@@ -1339,6 +1358,13 @@
           "text": {
             "type": "string"
           },
+          "triggers": {
+            "description": "The keys the system fetches a held row by; none on every other row.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
           "type": {
             "description": "What the row is; the reserved types are stated in the design.",
             "type": "string"
@@ -1389,6 +1415,7 @@
           "locked",
           "internalOnly",
           "shared",
+          "everyTurn",
           "createdAt"
         ],
         "type": "object"
@@ -2115,6 +2142,13 @@
             "description": "Everyone who spoke this turn.",
             "items": {
               "$ref": "#/components/schemas/SubjectKey"
+            },
+            "type": "array"
+          },
+          "triggers": {
+            "description": "The keys the turn meets — a tool's name, a notice's kind, its room — whose held rows stand in its core.",
+            "items": {
+              "type": "string"
             },
             "type": "array"
           },
@@ -2866,6 +2900,11 @@
             "format": "int64",
             "type": "integer"
           },
+          "everyTurn": {
+            "default": true,
+            "description": "Whether a held row stands on every turn; true on every row a holder did not mark otherwise.",
+            "type": "boolean"
+          },
           "gain": {
             "description": "Its importance × (1 + its novelty against the live rows about its subjects).",
             "format": "double",
@@ -3026,6 +3065,13 @@
           "text": {
             "type": "string"
           },
+          "triggers": {
+            "description": "The keys the system fetches a held row by; none on every other row.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
           "type": {
             "description": "What the row is; the reserved types are stated in the design.",
             "type": "string"
@@ -3076,6 +3122,7 @@
           "locked",
           "internalOnly",
           "shared",
+          "everyTurn",
           "createdAt",
           "priority",
           "gain",
@@ -4624,6 +4671,19 @@
             "required": false,
             "schema": {
               "description": "The rows superseded by these, comma-separated ids.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "The rows carrying one of these triggers, comma-separated.",
+            "in": "query",
+            "name": "trigger",
+            "required": false,
+            "schema": {
+              "description": "The rows carrying one of these triggers, comma-separated.",
               "type": [
                 "string",
                 "null"
@@ -7359,6 +7419,13 @@
               "null"
             ]
           },
+          "trigger": {
+            "description": "The rows carrying one of these triggers, comma-separated.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "type": {
             "description": "One type, or several, comma-separated.",
             "type": [
@@ -8120,6 +8187,13 @@
             "description": "Everyone who spoke this turn.",
             "items": {
               "$ref": "#/components/schemas/SubjectKey"
+            },
+            "type": "array"
+          },
+          "triggers": {
+            "description": "The keys the turn meets — a tool's name, a notice's kind, its room — whose held rows stand in its core.",
+            "items": {
+              "type": "string"
             },
             "type": "array"
           },

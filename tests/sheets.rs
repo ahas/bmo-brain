@@ -428,6 +428,7 @@ async fn recall_core_carries_the_cap_of_a_speakers_facts_newest_first_and_keeps_
     session_opened_at: None,
     budget_tokens: budget,
     record: None,
+    triggers: vec![],
   };
 
   let recall = client.recall(brain, &ask(None)).await.unwrap();

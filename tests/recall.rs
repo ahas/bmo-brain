@@ -63,6 +63,7 @@ fn ask(speakers: &[SubjectKey], words: &str, budget: Option<i64>) -> RecallAsk {
     session_opened_at: None,
     budget_tokens: budget,
     record: Some(false),
+    triggers: vec![],
   }
 }
 
@@ -82,6 +83,16 @@ fn a_texts_stems_leave_the_stop_words_out_and_meet_by_their_jaccard_overlap() {
   assert!(stems("what is it that was there").is_empty());
   assert_eq!(overlap(&stems("orchard ladder barn"), &stems("orchard ladder loft")), 2.0 / 4.0);
   assert_eq!(overlap(&stems(""), &stems("the")), 0.0);
+}
+
+#[test]
+fn a_korean_word_is_indexed_by_its_syllable_pairs_so_its_forms_meet() {
+  let bare = stems("봉보스퀜");
+  assert_eq!(bare.iter().cloned().collect::<Vec<_>>(), ["보스", "봉보", "스퀜"]);
+  // A particle on the stem adds its own pair and keeps every pair of the stem.
+  assert!(bare.is_subset(&stems("봉보스퀜은 어디 있어")));
+  // A Korean word beside English words leaves their stems as they were.
+  assert_eq!(stems("kiln 가마는").into_iter().collect::<Vec<_>>(), ["kiln", "가마", "마는"]);
 }
 
 #[tokio::test]
@@ -110,6 +121,21 @@ async fn a_word_reaches_a_row_by_its_stem_and_a_stop_word_reaches_none() {
     .unwrap();
   assert_eq!(likes.iter().map(|m| m.id).collect::<Vec<_>>(), [kiln.id]);
   let _ = well;
+}
+
+#[tokio::test]
+async fn a_korean_turn_reaches_a_korean_row_in_another_form_of_its_word() {
+  let served = Served::new().await;
+  let client = &served.client;
+  let brain = brain_of(client).await;
+  let named = client
+    .memory_add(brain, &memory("봉보스퀜을 매일 아침 산책시킨다.", 5, &[]))
+    .await
+    .unwrap();
+  let other = client.memory_add(brain, &memory("우물은 깊다.", 5, &[])).await.unwrap();
+  let turn = client.recall(brain, &ask(&[], "봉보스퀜은 오늘 어때?", None)).await.unwrap();
+  assert_eq!(searched(&turn), [named.id], "{:?}", turn.chosen);
+  let _ = other;
 }
 
 #[tokio::test]

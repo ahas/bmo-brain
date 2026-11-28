@@ -26,7 +26,7 @@ pub const RESERVED_TYPES: [&str; 9] =
 pub(crate) const MEMORY_COLUMNS: &str = "id, brain_id, key, type, text, layer_id, position, status, lineage_id, \
   superseded_by, superseded_at, valid_from, valid_to, recall_condition, release_condition, importance, hits, \
   hit_times, last_hit_at, last_confirmed_at, consolidated_at, actor_name, reason, labels, locked, internal_only, \
-  shared, held_by, created_at";
+  shared, held_by, triggers, every_turn, created_at";
 
 #[derive(FromRow, Clone)]
 pub(crate) struct MemoryRow {
@@ -59,7 +59,17 @@ pub(crate) struct MemoryRow {
   pub internal_only: bool,
   pub shared: bool,
   pub held_by: Option<String>,
+  pub triggers: Vec<String>,
+  pub every_turn: bool,
   pub created_at: i64,
+}
+
+/// What a declaration writes on a held row beside its words: the holder's key, the keys the system fetches the
+/// row by, and whether it stands on every turn (docs/design.md, 「What a holder leaves」).
+pub(crate) struct HeldMark<'a> {
+  pub holder: &'a str,
+  pub triggers: &'a [String],
+  pub every_turn: bool,
 }
 
 impl MemoryRow {
@@ -100,6 +110,8 @@ impl MemoryRow {
       internal_only: self.internal_only,
       shared: self.shared,
       held_by: self.held_by,
+      triggers: self.triggers,
+      every_turn: self.every_turn,
       created_at: self.created_at,
     })
   }
@@ -361,7 +373,7 @@ impl Store {
     body: &NewMemory,
     at: i64,
     behind: Option<i64>,
-    held_by: Option<&str>,
+    held: Option<&HeldMark<'_>>,
   ) -> Held<Memory> {
     written_type(&body.kind)?;
     text("text", &body.text, TEXT_MOST)?;
@@ -449,8 +461,8 @@ impl Store {
     let id: i64 = sqlx::query_scalar(
       "INSERT INTO memories (brain_id, key, type, text, layer_id, position, status, lineage_id, valid_from, \
        recall_condition, release_condition, importance, actor_name, labels, created_at, locked, internal_only, \
-       shared, held_by) \
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 0, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18) \
+       shared, held_by, triggers, every_turn) \
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 0, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20) \
        RETURNING id",
     )
     .bind(brain_id)
@@ -470,7 +482,9 @@ impl Store {
     .bind(marks.locked)
     .bind(marks.internal_only)
     .bind(marks.shared)
-    .bind(held_by)
+    .bind(held.map(|mark| mark.holder))
+    .bind(held.map(|mark| mark.triggers.to_vec()).unwrap_or_default())
+    .bind(held.is_none_or(|mark| mark.every_turn))
     .fetch_one(&mut *tx)
     .await?;
     match live {
@@ -1324,6 +1338,7 @@ pub(crate) struct Filter {
   ids: Option<Vec<i64>>,
   superseded_by: Option<Vec<i64>>,
   held: Option<bool>,
+  triggers: Vec<String>,
   label: Option<String>,
   words: Option<String>,
   situation: Option<String>,
@@ -1346,13 +1361,14 @@ fn ids_listed(field: &str, value: Option<&str>) -> Held<Option<Vec<i64>>> {
 }
 
 impl Filter {
-  /// Whether the list is an explicit read: by key, subject, type or words.
+  /// Whether the list is an explicit read: by key, subject, type, words, situation or trigger.
   pub(crate) fn is_explicit(&self) -> bool {
     self.key.is_some()
       || self.subject_id.is_some()
       || !self.kinds.is_empty()
       || self.words.is_some()
       || self.situation.is_some()
+      || !self.triggers.is_empty()
   }
 
   /// The filters a memory list's query names.
@@ -1376,6 +1392,7 @@ impl Filter {
       ids: ids_listed("ids", query.ids.as_deref())?,
       superseded_by: ids_listed("supersededBy", query.superseded_by.as_deref())?,
       held: query.held,
+      triggers: listed(query.trigger.as_deref()),
       label: query.label.clone(),
       words: query.q.clone(),
       situation: query.situation.clone(),
@@ -1422,6 +1439,9 @@ impl Filter {
     // The rows a holder left, or the brain's own, or both where the query does not say.
     if let Some(held) = self.held {
       sql.push(if held { " AND held_by IS NOT NULL" } else { " AND held_by IS NULL" });
+    }
+    if !self.triggers.is_empty() {
+      sql.push(" AND triggers && ").push_bind(self.triggers.clone());
     }
     if let Some(label) = &self.label {
       match label.split_once('=') {

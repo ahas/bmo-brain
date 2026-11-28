@@ -672,6 +672,7 @@ async fn recall_hands_out_the_core_and_the_searched_part_marks_repeats_and_keeps
     session_opened_at: None,
     budget_tokens: None,
     record: None,
+    triggers: vec![],
   };
   let recall = client.recall(brain, &ask).await.unwrap();
   let chosen: Vec<(i64, RecallPart, bool)> =
@@ -1222,6 +1223,7 @@ async fn recall_core_carries_no_rule_and_a_rule_is_found_by_search_when_its_word
     session_opened_at: None,
     budget_tokens: budget,
     record: Some(false),
+    triggers: vec![],
   };
   let core_of = |recall: &bmo_brain_client::Recall| -> Vec<i64> {
     recall
@@ -1416,6 +1418,7 @@ async fn recall_brings_a_memory_out_by_its_situation_and_ends_the_one_a_turn_rel
     session_opened_at: None,
     budget_tokens: None,
     record: Some(false),
+    triggers: vec![],
   };
   let chosen =
     |recall: &bmo_brain_client::Recall| -> Vec<i64> { recall.chosen.iter().map(|c| c.memory_id).collect() };

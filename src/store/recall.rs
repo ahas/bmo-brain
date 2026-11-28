@@ -13,7 +13,7 @@ use super::rules::{Rules, tokens};
 use super::sheets::sheet_rows;
 use super::vectors::fuse;
 use super::versions::{MEMORY_COLUMNS, MemoryRow};
-use super::words::{index_words, overlap, stems};
+use super::words::{hangul_pairs, index_words, overlap, stems};
 use super::{Fault, Held, Store, now, publish};
 
 /// The types the searched part never offers: the persona goes into a prompt by its own route, and an episode
@@ -23,12 +23,18 @@ const UNSEARCHED: [&str; 2] = ["persona", "episode"];
 /// The most candidates the searched part reads before scoring.
 const CANDIDATES_MOST: i64 = 500;
 
-/// The words of a text, lowercased, as a condition is matched by: runs of letters and digits.
+/// The words of a text, lowercased, as a condition is matched by: runs of letters and digits, a Korean word as
+/// its syllable pairs as well (docs/design.md, 「Recall」).
 fn words(text: &str) -> BTreeSet<String> {
   text
     .split(|c: char| !c.is_alphanumeric())
     .filter(|word| word.chars().count() >= 2)
-    .map(|word| word.to_lowercase())
+    .flat_map(|word| {
+      let lowered = word.to_lowercase();
+      let mut said = hangul_pairs(&lowered);
+      said.push(lowered);
+      said
+    })
     .collect()
 }
 
@@ -51,15 +57,17 @@ async fn subject_id(conn: &mut PgConnection, brain_id: i64, named: &SubjectKey) 
   )
 }
 
-/// The brain's live held rows, the ones a holder left and every turn is given (docs/design.md,
-/// 「What a holder leaves」): by the holder's key, then the key the holder gave the row.
-async fn held_rows(conn: &mut PgConnection, brain_id: i64) -> Held<Vec<MemoryRow>> {
+/// The brain's live held rows a turn stands on (docs/design.md, 「What a holder leaves」): those that stand on
+/// every turn, and those carrying a trigger the turn meets; by the holder's key, then the key the holder gave the
+/// row.
+async fn held_rows(conn: &mut PgConnection, brain_id: i64, triggers: &[String]) -> Held<Vec<MemoryRow>> {
   Ok(
     sqlx::query_as(&format!(
       "SELECT {MEMORY_COLUMNS} FROM memories WHERE brain_id = $1 AND held_by IS NOT NULL \
-       AND status IN ('active', 'pending') ORDER BY held_by, key, id"
+       AND status IN ('active', 'pending') AND (every_turn OR triggers && $2) ORDER BY held_by, key, id"
     ))
     .bind(brain_id)
+    .bind(triggers)
     .fetch_all(&mut *conn)
     .await?,
   )
@@ -283,9 +291,10 @@ impl Store {
         .await?,
       );
     }
-    // What a holder left stands on every turn of every room, by its holder's key and then its own (「What a
-    // holder leaves」), ahead of the sheet heads and never among the searched part's candidates.
-    core.extend(held_rows(&mut tx, brain_id).await?);
+    // What a holder left to stand on every turn, and what it keyed to a trigger the turn meets, by its holder's
+    // key and then its own (「What a holder leaves」), ahead of the sheet heads; its other rows are candidates of
+    // the searched part like any other.
+    core.extend(held_rows(&mut tx, brain_id, &ask.triggers).await?);
     let mut core_ids: BTreeSet<i64> = core.iter().map(|row| row.id).collect();
     let cap = Some(self.rules.core_fact_cap.max(0));
     for speaker in &speakers {

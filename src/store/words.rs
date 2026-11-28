@@ -1,6 +1,6 @@
 //! The words recall reads by (docs/design.md, 「Recall」): a text's words lowercased, English stop words left
-//! out, each reduced to its Snowball stem; the stems of a brain's rows kept on the rows; and the
-//! Jaccard overlap of two rows' stems.
+//! out, each reduced to its Snowball stem, and a run of Hangul taken as its syllable pairs; the stems of a brain's
+//! rows kept on the rows; and the Jaccard overlap of two rows' stems.
 
 use std::collections::BTreeSet;
 use std::sync::LazyLock;
@@ -192,18 +192,51 @@ static STOPPED: LazyLock<BTreeSet<&'static str>> = LazyLock::new(|| STOP_WORDS.i
 
 static STEMMER: LazyLock<Stemmer> = LazyLock::new(|| Stemmer::create(Algorithm::English));
 
+/// Whether a character is a Hangul syllable.
+fn is_hangul(c: char) -> bool {
+  ('\u{AC00}'..='\u{D7A3}').contains(&c)
+}
+
+/// The syllable pairs of each run of Hangul in a word, each pair of neighbouring syllables once: a Korean word
+/// carries its particles and endings on its stem (`봉보스퀜은`, `봉보스퀜을`), and the pairs its stem holds are
+/// the ones every form of it shares, which no English stemmer reaches. A run of one syllable gives none.
+pub fn hangul_pairs(word: &str) -> Vec<String> {
+  let mut pairs = Vec::new();
+  let mut previous: Option<char> = None;
+  for c in word.chars() {
+    if is_hangul(c) {
+      if let Some(before) = previous {
+        pairs.push([before, c].iter().collect());
+      }
+      previous = Some(c);
+    } else {
+      previous = None;
+    }
+  }
+  pairs
+}
+
 /// The stems of a text: its runs of letters, digits and inner apostrophes, lowercased, the stop words and the
-/// one-character words left out, each reduced to its Snowball stem, each once.
+/// one-character words left out, each reduced to its Snowball stem, each once; a run of Hangul gives its syllable
+/// pairs in place of a stem.
 pub fn stems(text: &str) -> BTreeSet<String> {
-  text
-    .to_lowercase()
-    .replace('\u{2019}', "'")
-    .split(|c: char| !(c.is_alphanumeric() || c == '\''))
-    .map(|word| word.trim_matches('\''))
-    .filter(|word| word.chars().count() >= 2 && !STOPPED.contains(word))
-    .map(|word| STEMMER.stem(word).replace('\'', ""))
-    .filter(|stem| !stem.is_empty())
-    .collect()
+  let lowered = text.to_lowercase().replace('\u{2019}', "'");
+  let mut said = BTreeSet::new();
+  for word in lowered.split(|c: char| !(c.is_alphanumeric() || c == '\'')) {
+    said.extend(hangul_pairs(word));
+    // What stands outside the Hangul: the word's other runs, each read as an English word is.
+    for rest in word.split(is_hangul) {
+      let rest = rest.trim_matches('\'');
+      if rest.chars().count() < 2 || STOPPED.contains(rest) {
+        continue;
+      }
+      let stem = STEMMER.stem(rest).replace('\'', "");
+      if !stem.is_empty() {
+        said.insert(stem);
+      }
+    }
+  }
+  said
 }
 
 /// The Jaccard overlap of two stem sets: what they share over what either holds; nothing where both are empty.

@@ -527,6 +527,7 @@ pub async fn answer(handed: Handed) -> Result<Answer, String> {
         key: string(arguments, "key"),
         q: string(arguments, "words"),
         situation: string(arguments, "situation"),
+        trigger: string(arguments, "trigger"),
         limit: integer(arguments, "limit"),
         ..Default::default()
       };
